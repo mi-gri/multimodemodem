@@ -1,3 +1,11 @@
+# MultiModeModem (m³) authors
+
+Michael Grigutsch, DO3BOX
+
+- E-Mail: do3box-github@migri.de
+
+-------------
+
 # MadModem authors
 
 ## Project lead and original MadModem material
