@@ -2,7 +2,7 @@
 
 **MultiModeModem (m³)** is a fork of **[MadModem](https://github.com/l-papadopol/MM)**
 by **Lucian-Ioan Papadopol, IZ6NNH** ([madexp.it](https://www.madexp.it)), maintained by
-DO3BOX at [mi-gri/MadModem-3box](https://github.com/mi-gri/MadModem-3box).
+DO3BOX at [mi-gri/MultiModeModem](https://github.com/mi-gri/MultiModeModem).
 It keeps everything MadModem offers (digital modes, waterfall, CAT/PTT, rotator,
 editable ADIF logbook, Auto QSO) and adds JTDX-style FT operation: decode colours,
 waterfall, decode filters (CQ/end, worked, countries, continents), late-final handling and

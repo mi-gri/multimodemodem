@@ -23742,7 +23742,7 @@ void MainWindow::showAboutMadModem()
         "<b>Website:</b> www.madexp.it<br>"
         "<b>License:</b> GPLv3</p>"
         "<p><b>MultiModeModem:</b> fork by DO3BOX, "
-        "github.com/mi-gri/MadModem-3box. Decode display and filters "
+        "github.com/mi-gri/MultiModeModem. Decode display and filters "
         "follow JTDX; FT protocols by the WSJT-X authors.</p>"
         "<p><b>Principal tester:</b> IK7IMK Nick<br>"
         "Testing, valuable advice and new ideas.</p>"
