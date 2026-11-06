@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="MadModem"
+APP_NAME="MultiModeModem"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 BUILD_DIR="${MADMODEM_LINUX_BUILD_DIR:-$ROOT_DIR/build-linux-github}"
@@ -48,12 +48,12 @@ if [[ ! -x "$INSTALL_DIR/bin/$APP_NAME" ]]; then
     exit 1
 fi
 if [[ ! -f "$INSTALL_DIR/bin/rtty_rules" ]]; then
-    echo "ERROR: rtty_rules was not installed beside MadModem: $INSTALL_DIR/bin/rtty_rules" >&2
+    echo "ERROR: rtty_rules was not installed beside MultiModeModem: $INSTALL_DIR/bin/rtty_rules" >&2
     exit 1
 fi
 
 if [[ ! -f "$INSTALL_DIR/bin/cw_rules" ]]; then
-    echo "ERROR: cw_rules was not installed beside MadModem: $INSTALL_DIR/bin/cw_rules" >&2
+    echo "ERROR: cw_rules was not installed beside MultiModeModem: $INSTALL_DIR/bin/cw_rules" >&2
     exit 1
 fi
 printf '\nLinux build complete:\n  %s\n  %s\n  %s\n' "$INSTALL_DIR/bin/$APP_NAME" "$INSTALL_DIR/bin/rtty_rules" "$INSTALL_DIR/bin/cw_rules"

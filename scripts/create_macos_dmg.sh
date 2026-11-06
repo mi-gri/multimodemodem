@@ -13,7 +13,7 @@ touch "$work/volume/.metadata_never_index"
 for attempt in 1 2 3; do
     echo "==> Creating DMG (attempt $attempt/3)"
     rm -f "$work/package.dmg"
-    if hdiutil create -volname MadModem -srcfolder "$work/volume" -fs HFS+ \
+    if hdiutil create -volname MultiModeModem -srcfolder "$work/volume" -fs HFS+ \
         -ov -format UDZO "$work/package.dmg" > "$work/hdiutil.log" 2>&1; then
         cat "$work/hdiutil.log"
         hdiutil verify "$work/package.dmg"

@@ -11,13 +11,13 @@ with tempfile.TemporaryDirectory(prefix='mm-publish-check-') as tmp:
     t=Path(tmp);assets=t/'assets';assets.mkdir();bin=t/'bin';bin.mkdir()
     files=[]
     for platform in ('Ubuntu24.04','Fedora43'):
-        for ext in ('zip','tar.gz'):files.append(f'MadModem-{version}-{platform}-x86_64.{ext}')
-    files += [f'MadModem-{version}-115-Ubuntu24.04-amd64-Setup.run',f'madmodem-{version}-115.fc43.x86_64-Setup.run']
-    files += [f'MadModem-{version}-115-Ubuntu24.04-amd64.deb',f'madmodem-{version}-115.fc43.x86_64.rpm']
-    for cpu in ('legacy','avx2'):files.append(f'MadModem-{version}-Windows-x86_64-{cpu}-standalone.zip')
-    files.append(f'MadModem-{version}-Windows-x64-Setup.exe')
+        for ext in ('zip','tar.gz'):files.append(f'MultiModeModem-{version}-{platform}-x86_64.{ext}')
+    files += [f'MultiModeModem-{version}-115-Ubuntu24.04-amd64-Setup.run',f'multimodemodem-{version}-115.fc43.x86_64-Setup.run']
+    files += [f'MultiModeModem-{version}-115-Ubuntu24.04-amd64.deb',f'multimodemodem-{version}-115.fc43.x86_64.rpm']
+    for cpu in ('legacy','avx2'):files.append(f'MultiModeModem-{version}-Windows-x86_64-{cpu}-standalone.zip')
+    files.append(f'MultiModeModem-{version}-Windows-x64-Setup.exe')
     for arch in ('x86_64','arm64'):
-        for ext in ('zip','dmg','pkg'):files.append(f'MadModem-{version}-macOS-{arch}-unsigned.{ext}')
+        for ext in ('zip','dmg','pkg'):files.append(f'MultiModeModem-{version}-macOS-{arch}-unsigned.{ext}')
     for name in files:(assets/name).write_bytes(b'LOCAL FIXTURE ONLY')
     gh=bin/'gh'
     gh.write_text('''#!/usr/bin/env python3
@@ -56,7 +56,7 @@ p.write_text(json.dumps(d));print(result);sys.exit(status)
     creates=[x for x in d['calls'] if x[:2]==['release','create']]
     assert len(creates)==1 and creates[0][2]==f'build-{version}-115'
     print('PASS publisher creates a numbered prerelease without Latest, preserves edited notes and stamps one build identity on rerun')
-    expected_native={f'MadModem-{version}-Linux-Ubuntu24.04-64bit-Package.deb',f'MadModem-{version}-Linux-Fedora43-64bit-Package.rpm'}
+    expected_native={f'MultiModeModem-{version}-Linux-Ubuntu24.04-64bit-Package.deb',f'MultiModeModem-{version}-Linux-Fedora43-64bit-Package.rpm'}
     assert expected_native <= d['uploaded'].keys()
     assert len(d['uploaded'])==18, d['uploaded'].keys()
     checksums={name:sha for sha,name in (line.split('  ',1) for line in d['checksums'].splitlines())}
@@ -67,7 +67,7 @@ p.write_text(json.dumps(d));print(result);sys.exit(status)
         result=subprocess.run(['bash',str(ROOT/'scripts/publish_github_release.sh'),str(assets)],env=env,capture_output=True,text=True)
         assert result.returncode!=0 and state.read_bytes()==before, 'partial native release was published'
         package.write_bytes(saved)
-    ambiguous=assets/f'MadModem-{version}-116-Ubuntu24.04-amd64.deb';ambiguous.write_bytes(b'ambiguous build')
+    ambiguous=assets/f'MultiModeModem-{version}-116-Ubuntu24.04-amd64.deb';ambiguous.write_bytes(b'ambiguous build')
     before=state.read_bytes()
     result=subprocess.run(['bash',str(ROOT/'scripts/publish_github_release.sh'),str(assets)],env=env,capture_output=True,text=True)
     assert result.returncode!=0 and state.read_bytes()==before, 'ambiguous native build was published'

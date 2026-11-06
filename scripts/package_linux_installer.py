@@ -45,13 +45,13 @@ def main():
     release = distribution_release(args.build_dir.resolve(), revision.group(1), os.environ.get("MADMODEM_BUILD_NUMBER", ""))
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='madmodem-package-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='multimodemodem-package-') as tmp:
         work = Path(tmp)
         payload = work / 'payload'
-        private = payload / 'usr/lib/madmodem'
-        run('cmake', '--install', args.build_dir.resolve(), '--prefix', '/usr/lib/madmodem',
+        private = payload / 'usr/lib/multimodemodem'
+        run('cmake', '--install', args.build_dir.resolve(), '--prefix', '/usr/lib/multimodemodem',
             env={**os.environ, 'DESTDIR': str(payload)})
-        binary = private / 'bin/MadModem'
+        binary = private / 'bin/MultiModeModem'
         if not binary.is_file():
             raise SystemExit('Installed executable missing')
         # Native packages use system libraries. Never silently ship an untracked
@@ -59,16 +59,16 @@ def main():
         for pattern in ('lib*/libhamlib.so*',):
             for lib in private.glob(pattern):
                 lib.unlink()
-        (private / 'bin/managed-install.flag').write_text('MadModem managed installation\n')
+        (private / 'bin/managed-install.flag').write_text('MultiModeModem managed installation\n')
         (private / 'bin/distribution-platform.txt').write_text(('Ubuntu24.04' if args.format == 'deb' else 'Fedora43') + '\n')
         shared = payload / 'usr/share'
         shutil.move(str(private / 'share'), str(shared))
         bindir = payload / 'usr/bin'
         bindir.mkdir(parents=True)
-        launcher = bindir / 'MadModem'
-        launcher.write_text('#!/bin/sh\nexec /usr/lib/madmodem/bin/MadModem "$@"\n')
+        launcher = bindir / 'MultiModeModem'
+        launcher.write_text('#!/bin/sh\nexec /usr/lib/multimodemodem/bin/MultiModeModem "$@"\n')
         launcher.chmod(0o755)
-        documentation = shared / 'doc/madmodem'
+        documentation = shared / 'doc/multimodemodem'
         documentation.mkdir(parents=True)
         for name in ('COPYING', 'LICENSE.md', 'THIRD_PARTY_NOTICES.md', 'RELEASE_NOTES.md'):
             shutil.copy2(ROOT / name, documentation / name)
@@ -77,7 +77,7 @@ def main():
                 raise SystemExit(f'Missing runtime data: {name}')
         if args.format == 'deb':
             (work / 'debian').mkdir()
-            (work / 'debian/control').write_text('Source: madmodem\nSection: hamradio\nPriority: optional\nMaintainer: Papadopol Lucian-Ioan <l.i.papadopol@gmail.com>\n\nPackage: madmodem\nArchitecture: any\nDescription: Amateur radio digital modem\n')
+            (work / 'debian/control').write_text('Source: multimodemodem\nSection: hamradio\nPriority: optional\nMaintainer: Michael Grigutsch, DO3BOX <do3box-github@migri.de>\n\nPackage: multimodemodem\nArchitecture: any\nDescription: Amateur radio digital modem\n')
             native_env = {key: value for key, value in os.environ.items() if key != 'LD_LIBRARY_PATH'}
             result = run('dpkg-shlibdeps', '-O', '-e' + str(binary), cwd=work, capture_output=True, text=True, env=native_env)
             dependencies = next(line.split('=', 1)[1] for line in result.stdout.splitlines() if line.startswith('shlibs:Depends='))
@@ -86,21 +86,21 @@ def main():
             arch = run('dpkg', '--print-architecture', capture_output=True, text=True).stdout.strip()
             control = payload / 'DEBIAN'
             control.mkdir()
-            (control / 'control').write_text(f'Package: madmodem\nVersion: {version}-{release}\nArchitecture: {arch}\nSection: hamradio\nPriority: optional\nMaintainer: Papadopol Lucian-Ioan <l.i.papadopol@gmail.com>\nHomepage: https://www.madexp.it\nDepends: {dependencies}\nDescription: Amateur radio digital modem and logbook\n CW, RTTY, FT8/FT4 and other digital modes with CAT control.\n')
-            package = output / f'MadModem-{version}-{release}-Ubuntu24.04-{arch}.deb'
+            (control / 'control').write_text(f'Package: multimodemodem\nVersion: {version}-{release}\nArchitecture: {arch}\nSection: hamradio\nPriority: optional\nMaintainer: Michael Grigutsch, DO3BOX <do3box-github@migri.de>\nHomepage: https://github.com/mi-gri/MultiModeModem\nDepends: {dependencies}\nDescription: Amateur radio digital modem and logbook (based on MadModem)\n CW, RTTY, FT8/FT4 and other digital modes with CAT control.\n')
+            package = output / f'MultiModeModem-{version}-{release}-Ubuntu24.04-{arch}.deb'
             run('dpkg-deb', '--root-owner-group', '--build', payload, package)
             run('dpkg-deb', '--info', package)
         else:
             for name in ('BUILD', 'RPMS', 'SOURCES', 'SPECS', 'SRPMS'):
                 (work / name).mkdir()
-            spec = work / 'SPECS/madmodem.spec'
+            spec = work / 'SPECS/multimodemodem.spec'
             # All paths come from a private mkdtemp directory, never user metadata.
-            spec.write_text(f'''Name: madmodem
+            spec.write_text(f'''Name: multimodemodem
 Version: {version}
 Release: {release}%{{?dist}}
 Summary: Amateur radio digital modem and logbook
 License: GPL-3.0-only
-URL: https://www.madexp.it
+URL: https://github.com/mi-gri/MultiModeModem
 Requires: qt5-qtdeclarative, qt5-qtlocation, qt5-qtmultimedia, qt5-qtbase-gui
 %global debug_package %{{nil}}
 %description
@@ -109,11 +109,11 @@ CW, RTTY, FT8/FT4 and other digital modes with CAT control.
 mkdir -p %{{buildroot}}
 cp -a {payload}/. %{{buildroot}}/
 %files
-/usr/bin/MadModem
-/usr/lib/madmodem
+/usr/bin/MultiModeModem
+/usr/lib/multimodemodem
 /usr/share/applications/MultiModeModem.desktop
 /usr/share/icons/hicolor/*/apps/*.png
-%doc /usr/share/doc/madmodem
+%doc /usr/share/doc/multimodemodem
 ''')
             run('rpmbuild', '-bb', '--define', f'_topdir {work}', spec)
             packages = list((work / 'RPMS').rglob('*.rpm'))

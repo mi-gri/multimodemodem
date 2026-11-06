@@ -32,33 +32,33 @@ require_package() {
 }
 for platform in Ubuntu24.04 Fedora43; do
     for extension in zip tar.gz; do
-        require_package "MadModem-$version-Linux-$platform-64bit-Portable.$extension" \
-            "$assets_dir/MadModem-$version-$platform-x86_64.$extension"
+        require_package "MultiModeModem-$version-Linux-$platform-64bit-Portable.$extension" \
+            "$assets_dir/MultiModeModem-$version-$platform-x86_64.$extension"
     done
 done
-require_package "MadModem-$version-Linux-Ubuntu24.04-64bit-Installer.run" \
-    "$assets_dir"/MadModem-"$version"-*-Ubuntu24.04-amd64-Setup.run
-require_package "MadModem-$version-Linux-Fedora43-64bit-Installer.run" \
-    "$assets_dir"/madmodem-"$version"-*.fc43.x86_64-Setup.run
-require_package "MadModem-$version-Linux-Ubuntu24.04-64bit-Package.deb" \
-    "$assets_dir"/MadModem-"$version"-*-Ubuntu24.04-amd64.deb
-require_package "MadModem-$version-Linux-Fedora43-64bit-Package.rpm" \
-    "$assets_dir"/madmodem-"$version"-*.fc43.x86_64.rpm
+require_package "MultiModeModem-$version-Linux-Ubuntu24.04-64bit-Installer.run" \
+    "$assets_dir"/MultiModeModem-"$version"-*-Ubuntu24.04-amd64-Setup.run
+require_package "MultiModeModem-$version-Linux-Fedora43-64bit-Installer.run" \
+    "$assets_dir"/multimodemodem-"$version"-*.fc43.x86_64-Setup.run
+require_package "MultiModeModem-$version-Linux-Ubuntu24.04-64bit-Package.deb" \
+    "$assets_dir"/MultiModeModem-"$version"-*-Ubuntu24.04-amd64.deb
+require_package "MultiModeModem-$version-Linux-Fedora43-64bit-Package.rpm" \
+    "$assets_dir"/multimodemodem-"$version"-*.fc43.x86_64.rpm
 for variant in legacy avx2; do
     cpu=Compatible
     [[ "$variant" != avx2 ]] || cpu=AVX2-FMA
-    require_package "MadModem-$version-Windows-64bit-Portable-$cpu.zip" \
-        "$assets_dir/MadModem-$version-Windows-x86_64-$variant-standalone.zip"
+    require_package "MultiModeModem-$version-Windows-64bit-Portable-$cpu.zip" \
+        "$assets_dir/MultiModeModem-$version-Windows-x86_64-$variant-standalone.zip"
 done
-require_package "MadModem-$version-Windows-64bit-Installer-AutoCPU.exe" \
-    "$assets_dir/MadModem-$version-Windows-x64-Setup.exe"
+require_package "MultiModeModem-$version-Windows-64bit-Installer-AutoCPU.exe" \
+    "$assets_dir/MultiModeModem-$version-Windows-x64-Setup.exe"
 for arch in x86_64 arm64; do
     cpu=Intel
     [[ "$arch" != arm64 ]] || cpu=AppleSilicon
     for extension in zip dmg pkg; do
         case "$extension" in zip) kind=Portable ;; dmg) kind=DiskImage ;; pkg) kind=Installer ;; esac
-        require_package "MadModem-$version-macOS-$cpu-$kind.$extension" \
-            "$assets_dir/MadModem-$version-macOS-$arch-unsigned.$extension"
+        require_package "MultiModeModem-$version-macOS-$cpu-$kind.$extension" \
+            "$assets_dir/MultiModeModem-$version-macOS-$arch-unsigned.$extension"
     done
 done
 (
@@ -72,12 +72,12 @@ create_options=()
 edit_options=()
 if [[ "${GITHUB_REF_TYPE:-}" == tag ]]; then
     tag="$GITHUB_REF_NAME"
-    title="MadModem $version"
+    title="MultiModeModem $version"
     create_options+=(--verify-tag)
 else
     # Unique build tags never move an existing version tag or replace a stable release.
     tag="build-$version-$GITHUB_RUN_NUMBER"
-    title="MadModem $version — build $GITHUB_RUN_NUMBER"
+    title="MultiModeModem $version — build $GITHUB_RUN_NUMBER"
     prerelease=true
     create_options+=(--latest=false)
     edit_options+=(--latest=false)
@@ -105,7 +105,7 @@ while IFS= read -r asset; do
     # Linux installer names previously included the source revision, which may
     # differ from the revision being uploaded now.
     case "$asset" in
-        MadModem-"$version"-*-Ubuntu24.04-amd64-Setup.run|madmodem-"$version"-*.fc43.x86_64-Setup.run)
+        MultiModeModem-"$version"-*-Ubuntu24.04-amd64-Setup.run|multimodemodem-"$version"-*.fc43.x86_64-Setup.run)
             obsolete=true ;;
     esac
     if [[ "$obsolete" == true ]]; then gh release delete-asset "$tag" "$asset" --yes; fi

@@ -7,8 +7,8 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 cat "$root/packaging/COPYRIGHT.txt" "$root/COPYING" > "$work/INSTALLER_LICENSE.txt"
 for variant in legacy avx2; do
-    source_dir="$out/MadModem-$version-Windows-x86_64-$variant-standalone"
-    test -f "$source_dir/bin/MadModem.exe"
+    source_dir="$out/MultiModeModem-$version-Windows-x86_64-$variant-standalone"
+    test -f "$source_dir/bin/MultiModeModem.exe"
     mkdir -p "$work/$variant"
     cp -a "$source_dir/." "$work/$variant/"
     printf 'Managed installation; user data is stored outside this directory.\n' > "$work/$variant/bin/managed-install.flag"
@@ -21,4 +21,4 @@ iscc="${ISCC:-/c/Program Files (x86)/Inno Setup 6/ISCC.exe}"
 test -x "$iscc"
 MSYS2_ARG_CONV_EXCL='*' "$iscc" "/DAppVersion=$version" \
     "/DPayloadRoot=$(cygpath -w "$work")" "/DOutputRoot=$(cygpath -w "$out")" \
-    "$(cygpath -w "$root/packaging/windows/MadModem.iss")"
+    "$(cygpath -w "$root/packaging/windows/MultiModeModem.iss")"

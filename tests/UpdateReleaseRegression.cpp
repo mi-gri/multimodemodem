@@ -82,17 +82,17 @@ int main(int argc,char **argv){
     const auto mintPlatform=UpdateController::linuxPlatform("","","ID=linuxmint\nVERSION_ID=22.3");
     const auto runNames=UpdateController::linuxAssetNames("0.6.4",true,mintPlatform,130);
     QJsonObject mintAssets{{"assets",QJsonArray{
-        QJsonObject{{"name","MadModem-0.6.4-Linux-Fedora43-64bit-Installer.run"}},
-        QJsonObject{{"name","MadModem-0.6.4-Linux-Ubuntu24.04-64bit-Package.deb"}},
-        QJsonObject{{"name","MadModem-0.6.4-130-Ubuntu24.04-amd64-Setup.run"}},
-        QJsonObject{{"name","MadModem-0.6.4-Linux-Ubuntu24.04-64bit-Installer.run"}}}}};
+        QJsonObject{{"name","MultiModeModem-0.6.4-Linux-Fedora43-64bit-Installer.run"}},
+        QJsonObject{{"name","MultiModeModem-0.6.4-Linux-Ubuntu24.04-64bit-Package.deb"}},
+        QJsonObject{{"name","MultiModeModem-0.6.4-130-Ubuntu24.04-amd64-Setup.run"}},
+        QJsonObject{{"name","MultiModeModem-0.6.4-Linux-Ubuntu24.04-64bit-Installer.run"}}}}};
     check(UpdateController::selectAsset(mintAssets,runNames).value("name")==runNames.first(),"Mint did not prefer canonical Ubuntu RUN");
     auto mintEntries=mintAssets.value("assets").toArray();mintEntries.removeLast();mintAssets.insert("assets",mintEntries);
     check(UpdateController::selectAsset(mintAssets,runNames).value("name")==runNames.last(),"legacy same-build Ubuntu RUN ignored");
     check(UpdateController::selectAsset(mintAssets,UpdateController::linuxAssetNames("0.6.4",true,mintPlatform,131)).isEmpty(),"another build or native package selected as RUN");
     check(UpdateController::selectAsset(mintAssets,UpdateController::linuxAssetNames("0.6.4",false,mintPlatform,130)).isEmpty(),"portable changed into managed installation");
     check(UpdateController::linuxAssetNames("0.6.4",true,"Debian13",130).isEmpty(),"unsupported package ABI guessed");
-    check(UpdateController::linuxAssetNames("0.6.4",true,"Fedora43",130).last()=="madmodem-0.6.4-130.fc43.x86_64-Setup.run","legacy Fedora RUN identity incorrect");
+    check(UpdateController::linuxAssetNames("0.6.4",true,"Fedora43",130).last()=="multimodemodem-0.6.4-130.fc43.x86_64-Setup.run","legacy Fedora RUN identity incorrect");
     std::cout<<"PASS Mint 22.x without Ubuntu codename, compatible Noble derivative, incompatible bases rejected, canonical/legacy RUN and channel separation\n";
     QJsonObject assets{{"assets",QJsonArray{QJsonObject{{"name","test.zip"}},QJsonObject{{"name","test.tar.gz"}},QJsonObject{{"name","wrong-platform.run"}}}}};
     check(UpdateController::selectAsset(assets,{"test.tar.gz","test.zip"}).value("name")=="test.tar.gz","asset preference follows API order");

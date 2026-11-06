@@ -648,9 +648,9 @@ if(WIN32)
         WIN32_EXECUTABLE ON
     )
 
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/madmodem.rc")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/multimodemodem.rc")
         target_sources(MadModem PRIVATE
-            madmodem.rc
+            multimodemodem.rc
         )
     endif()
 endif()
@@ -663,18 +663,18 @@ if(APPLE AND MADMODEM_MACOS_BUNDLE)
     if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS deployment target" FORCE)
     endif()
-    set(MADMODEM_MACOS_BUNDLE_ID "org.iz6nnh.madmodem" CACHE STRING "macOS bundle identifier")
-    set(MADMODEM_MACOS_ICON "${CMAKE_CURRENT_BINARY_DIR}/MadModem.icns")
+    set(MADMODEM_MACOS_BUNDLE_ID "de.migri.multimodemodem" CACHE STRING "macOS bundle identifier")
+    set(MADMODEM_MACOS_ICON "${CMAKE_CURRENT_BINARY_DIR}/MultiModeModem.icns")
 
     add_custom_command(
         OUTPUT "${MADMODEM_MACOS_ICON}"
         COMMAND "${CMAKE_COMMAND}"
-            "-DINPUT_ICON=${CMAKE_CURRENT_SOURCE_DIR}/icons/madmodem_1024.png"
+            "-DINPUT_ICON=${CMAKE_CURRENT_SOURCE_DIR}/icons/multimodemodem_1024.png"
             "-DOUTPUT_ICON=${MADMODEM_MACOS_ICON}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/GenerateMacOSIcon.cmake"
-        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/icons/madmodem_1024.png"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/icons/multimodemodem_1024.png"
                 "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/GenerateMacOSIcon.cmake"
-        COMMENT "Generating MadModem.icns for macOS bundle"
+        COMMENT "Generating MultiModeModem.icns for macOS bundle"
         VERBATIM
     )
 
@@ -687,7 +687,7 @@ if(APPLE AND MADMODEM_MACOS_BUNDLE)
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "MultiModeModem"
         MACOSX_BUNDLE_GUI_IDENTIFIER "${MADMODEM_MACOS_BUNDLE_ID}"
-        MACOSX_BUNDLE_ICON_FILE "MadModem.icns"
+        MACOSX_BUNDLE_ICON_FILE "MultiModeModem.icns"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/Info.plist.in"
     )
 
@@ -1319,12 +1319,12 @@ endif()
 
 if(UNIX AND NOT APPLE)
     foreach(ICON_SIZE 16 24 32 48 64 128 256 512 1024)
-        install(FILES icons/madmodem_${ICON_SIZE}.png
+        install(FILES icons/multimodemodem_${ICON_SIZE}.png
             DESTINATION share/icons/hicolor/${ICON_SIZE}x${ICON_SIZE}/apps
-            RENAME madmodem.png
+            RENAME multimodemodem.png
         )
     endforeach()
-    install(FILES icons/madmodem_256.png
+    install(FILES icons/multimodemodem_256.png
         DESTINATION share/icons/hicolor/256x256/apps
         RENAME MultiModeModem.png
     )

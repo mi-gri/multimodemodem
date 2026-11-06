@@ -74,7 +74,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           python3 scripts/package_linux_installer.py --build-dir build-installer --format deb
-          test -s dist/packages/MadModem-*-Ubuntu24.04-amd64.deb
+          test -s dist/packages/MultiModeModem-*-Ubuntu24.04-amd64.deb
           bash scripts/test_linux_installer.sh dist/packages/*-Setup.run
       - uses: actions/upload-artifact@v4
         with:
@@ -123,7 +123,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           python3 scripts/package_linux_installer.py --build-dir build-installer --format rpm
-          test -s dist/packages/madmodem-*.fc43.x86_64.rpm
+          test -s dist/packages/multimodemodem-*.fc43.x86_64.rpm
           bash scripts/test_linux_installer.sh dist/packages/*-Setup.run
       - uses: actions/upload-artifact@v4
         with:
@@ -186,7 +186,7 @@ jobs:
         timeout-minutes: 3
         env:
           QT_QPA_PLATFORM: windows
-        run: ./build-windows-msys2-legacy/MadModem.exe --window-rotator-regression
+        run: ./build-windows-msys2-legacy/MultiModeModem.exe --window-rotator-regression
       - name: Create portable ZIPs
         shell: msys2 {0}
         run: bash scripts/package_windows_msys2.sh
@@ -207,7 +207,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer-logs
-          path: ${{ runner.temp }}/madmodem-installer-logs/
+          path: ${{ runner.temp }}/multimodemodem-installer-logs/
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:

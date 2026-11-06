@@ -1372,7 +1372,7 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::handleTextAssistAnalysisReady, Qt::QueuedConnection);
     m_textAssistThread->start();
 
-    setWindowIcon(QIcon(":/icons/madmodem.png"));
+    setWindowIcon(QIcon(":/icons/multimodemodem.png"));
     if (ui->txtLog != nullptr) {
         ui->txtLog->setMaximumBlockCount(5000);
     }
@@ -23719,7 +23719,7 @@ void MainWindow::showAboutMadModem()
     header->setSpacing(14);
 
     QLabel *icon = new QLabel(&dialog);
-    icon->setPixmap(QIcon(QStringLiteral(":/icons/madmodem.png")).pixmap(48, 48));
+    icon->setPixmap(QIcon(QStringLiteral(":/icons/multimodemodem.png")).pixmap(48, 48));
     icon->setFixedSize(54, 54);
     header->addWidget(icon, 0, Qt::AlignTop);
 

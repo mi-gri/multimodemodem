@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
     MadModemInstallation::adoptUpstreamUserData();
     QCoreApplication::setApplicationVersion(QStringLiteral(MADMODEM_VERSION_STRING));
     app.setApplicationDisplayName(MadModemIdentity::windowTitle());
-    app.setWindowIcon(QIcon(":/icons/madmodem.png"));
+    app.setWindowIcon(QIcon(":/icons/multimodemodem.png"));
 
     // Windows GUI executables can make QCommandLineParser::showVersion open
     // a modal message box when no console is attached. Keep the standalone

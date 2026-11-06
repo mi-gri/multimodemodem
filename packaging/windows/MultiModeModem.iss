@@ -8,14 +8,14 @@
   #error OutputRoot is required
 #endif
 [Setup]
-AppId={{E9A289C9-3586-49BE-82A2-72594C56E2B8}
-AppName=MadModem
+AppId={{44C5C2FB-3EF8-41FA-84BF-A518655068B2}
+AppName=MultiModeModem
 AppVersion={#AppVersion}
-AppPublisher=Lucian-Ioan Papadopol
-AppCopyright=Copyright (C) 2026 Papadopol Lucian-Ioan
-AppPublisherURL=https://www.madexp.it
-DefaultDirName={localappdata}\Programs\MadModem
-DefaultGroupName=MadModem
+AppPublisher=Michael Grigutsch, DO3BOX
+AppCopyright=Copyright (C) 2026 Papadopol Lucian-Ioan, Michael Grigutsch
+AppPublisherURL=https://github.com/mi-gri/MultiModeModem
+DefaultDirName={localappdata}\Programs\MultiModeModem
+DefaultGroupName=MultiModeModem
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -23,9 +23,9 @@ MinVersion=10.0
 UsePreviousAppDir=yes
 DisableProgramGroupPage=yes
 OutputDir={#OutputRoot}
-OutputBaseFilename=MadModem-{#AppVersion}-Windows-x64-Setup
-SetupIconFile=..\..\icons\madmodem.ico
-UninstallDisplayIcon={app}\bin\MadModem.exe
+OutputBaseFilename=MultiModeModem-{#AppVersion}-Windows-x64-Setup
+SetupIconFile=..\..\icons\multimodemodem.ico
+UninstallDisplayIcon={app}\bin\MultiModeModem.exe
 LicenseFile={#PayloadRoot}\INSTALLER_LICENSE.txt
 Compression=lzma2
 SolidCompression=yes
@@ -46,11 +46,11 @@ Source: "{#PayloadRoot}\legacy\*"; DestDir: "{app}"; Flags: ignoreversion recurs
 Source: "{#PayloadRoot}\avx2\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: UseAvx2
 
 [Icons]
-Name: "{group}\MadModem"; Filename: "{app}\bin\MadModem.exe"; WorkingDir: "{app}\bin"
-Name: "{autodesktop}\MadModem"; Filename: "{app}\bin\MadModem.exe"; WorkingDir: "{app}\bin"; Tasks: desktopicon
+Name: "{group}\MultiModeModem"; Filename: "{app}\bin\MultiModeModem.exe"; WorkingDir: "{app}\bin"
+Name: "{autodesktop}\MultiModeModem"; Filename: "{app}\bin\MultiModeModem.exe"; WorkingDir: "{app}\bin"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\bin\MadModem.exe"; Description: "{cm:LaunchProgram,MadModem}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\bin\MultiModeModem.exe"; Description: "{cm:LaunchProgram,MultiModeModem}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 var

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="MadModem"
+APP_NAME="MultiModeModem"
 VERSION="$(cat "$ROOT_DIR/MADMODEM_VERSION.txt" 2>/dev/null || echo dev)"
 OUT_DIR="${MADMODEM_PACKAGE_OUT_DIR:-$ROOT_DIR/dist/packages}"
 BUILD_LEGACY="${MADMODEM_WINDOWS_BUILD_LEGACY:-on}"
@@ -83,11 +83,11 @@ package_variant() {
     copy_common_payload "$package_dir"
 
     cat > "$package_dir/RUN_WINDOWS.txt" <<TXT
-MadModem Windows MXE static package
+MultiModeModem Windows MXE static package
 ===================================
 
 Run:
-  MadModem.exe
+  MultiModeModem.exe
 
 Version: $VERSION
 Variant: $label

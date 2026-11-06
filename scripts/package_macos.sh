@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="MadModem"
+APP_NAME="MultiModeModem"
 ARCHS="${MADMODEM_OSX_ARCHITECTURES:-$(uname -m)}"
 BUILD_DIR="${MADMODEM_MACOS_BUILD_DIR:-$ROOT_DIR/build-macos-$ARCHS}"
 APP_PATH="${MADMODEM_APP_PATH:-$BUILD_DIR/$APP_NAME.app}"
@@ -49,7 +49,7 @@ mkdir -p "$APP_PATH/Contents/MacOS"
 # First let Qt's official deploy tool do its normal pass.  Do NOT pass
 # -qmldir here: on Homebrew Qt6 it scans too broadly and tries to deploy
 # optional modules not installed on the runner (QtStateMachine, Qt3D,
-# VirtualKeyboard...), which broke arm64 packaging.  MadModem only needs the
+# VirtualKeyboard...), which broke arm64 packaging.  MultiModeModem only needs the
 # small QML map files plus QtQuick/QtLocation/QtPositioning imports, copied
 # explicitly below.
 "$MACDEPLOYQT" "$APP_PATH" -verbose=2 -no-codesign || {
@@ -103,12 +103,12 @@ mkdir -p "$APP_PATH/Contents/Resources/qml"
 copy_qml_module_minimal "QtQuick" "$QT_QML_DIR"
 copy_qml_module_minimal "QtLocation" "$QT_QML_DIR"
 copy_qml_module_minimal "QtPositioning" "$QT_QML_DIR"
-# Keep MadModem's own QML files available beside Qt imports.
-mkdir -p "$APP_PATH/Contents/Resources/qml/MadModem"
-cp -f "$ROOT_DIR/qml"/*.qml "$APP_PATH/Contents/Resources/qml/MadModem/" 2>/dev/null || true
+# Keep MultiModeModem's own QML files available beside Qt imports.
+mkdir -p "$APP_PATH/Contents/Resources/qml/MultiModeModem"
+cp -f "$ROOT_DIR/qml"/*.qml "$APP_PATH/Contents/Resources/qml/MultiModeModem/" 2>/dev/null || true
 
 
-# Homebrew Qt may deploy optional imageformat plugins that MadModem does not
+# Homebrew Qt may deploy optional imageformat plugins that MultiModeModem does not
 # need.  The PDF image plugin can reference QtPdf.framework, which is not
 # installed by the lean Qt toolchain on GitHub runners.  Do not make the whole
 # app package depend on that optional plugin.
@@ -285,7 +285,7 @@ verify_qt_framework_closure() {
 }
 
 cat > "$APP_PATH/Contents/MacOS/BUILD_INFO.txt" <<TXT
-MadModem macOS package
+MultiModeModem macOS package
 ======================
 Version: $VERSION
 Architecture: $STAMP_ARCH
@@ -310,7 +310,7 @@ ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
 python3 - "$ZIP_PATH" <<'PYZIP'
 import sys, zipfile
 with zipfile.ZipFile(sys.argv[1]) as archive:
-    required = 'MadModem.app/Contents/Frameworks/QtSerialPort.framework/Versions/A/QtSerialPort'
+    required = 'MultiModeModem.app/Contents/Frameworks/QtSerialPort.framework/Versions/A/QtSerialPort'
     if required not in archive.namelist():
         raise SystemExit('ERROR: packaged ZIP is missing QtSerialPort')
     if archive.testzip() is not None:

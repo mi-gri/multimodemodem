@@ -43,8 +43,8 @@ while IFS= read -r asset; do
     esac
 
     if [[ "$base" == *Windows*x86_64*standalone.zip ]]; then
-        if ! unzip -l "$asset" | grep -q 'MadModem.exe'; then
-            echo "ERROR: Windows standalone ZIP missing MadModem.exe: $base" >&2
+        if ! unzip -l "$asset" | grep -q 'MultiModeModem.exe'; then
+            echo "ERROR: Windows standalone ZIP missing MultiModeModem.exe: $base" >&2
             bad=1
         fi
         if ! unzip -l "$asset" | grep -q 'runtime-dll-report.txt'; then
@@ -56,18 +56,18 @@ while IFS= read -r asset; do
             bad=1
         fi
         if ! unzip -l "$asset" | grep -Eq '(^|[[:space:]])[^[:space:]]*/?bin/rtty_rules$|(^|[[:space:]])rtty_rules$'; then
-            echo "ERROR: Windows standalone ZIP missing rtty_rules beside MadModem.exe: $base" >&2
+            echo "ERROR: Windows standalone ZIP missing rtty_rules beside MultiModeModem.exe: $base" >&2
             bad=1
         fi
         if ! unzip -l "$asset" | grep -Eq '(^|[[:space:]])[^[:space:]]*/?bin/cw_rules$|(^|[[:space:]])cw_rules$'; then
-            echo "ERROR: Windows standalone ZIP missing cw_rules beside MadModem.exe: $base" >&2
+            echo "ERROR: Windows standalone ZIP missing cw_rules beside MultiModeModem.exe: $base" >&2
             bad=1
         fi
     fi
 
     if [[ "$base" == *Linux*x86_64.tar.gz ]]; then
-        if ! tar -tzf "$asset" | grep -E '/bin/MadModem$' >/dev/null; then
-            echo "ERROR: Linux tarball missing bin/MadModem: $base" >&2
+        if ! tar -tzf "$asset" | grep -E '/bin/MultiModeModem$' >/dev/null; then
+            echo "ERROR: Linux tarball missing bin/MultiModeModem: $base" >&2
             bad=1
         fi
         if ! tar -tzf "$asset" | grep -E '/bin/rtty_rules$' >/dev/null; then
@@ -81,21 +81,21 @@ while IFS= read -r asset; do
     fi
 
     if [[ "$base" == *macOS*unsigned.zip ]]; then
-        if ! unzip -l "$asset" | grep -q 'MadModem.app/Contents/Frameworks/QtSerialPort.framework/Versions/A/QtSerialPort'; then
+        if ! unzip -l "$asset" | grep -q 'MultiModeModem.app/Contents/Frameworks/QtSerialPort.framework/Versions/A/QtSerialPort'; then
             echo "ERROR: macOS ZIP missing QtSerialPort.framework binary: $base" >&2
-            unzip -l "$asset" | grep 'MadModem.app/Contents/Frameworks' >&2 || true
+            unzip -l "$asset" | grep 'MultiModeModem.app/Contents/Frameworks' >&2 || true
             bad=1
         fi
-        if ! unzip -l "$asset" | grep -q 'MadModem.app/Contents/MacOS/BUILD_INFO.txt'; then
+        if ! unzip -l "$asset" | grep -q 'MultiModeModem.app/Contents/MacOS/BUILD_INFO.txt'; then
             echo "ERROR: macOS ZIP missing BUILD_INFO.txt: $base" >&2
             bad=1
         fi
-        if ! unzip -l "$asset" | grep -q 'MadModem.app/Contents/MacOS/rtty_rules'; then
-            echo "ERROR: macOS ZIP missing rtty_rules beside MadModem: $base" >&2
+        if ! unzip -l "$asset" | grep -q 'MultiModeModem.app/Contents/MacOS/rtty_rules'; then
+            echo "ERROR: macOS ZIP missing rtty_rules beside MultiModeModem: $base" >&2
             bad=1
         fi
-        if ! unzip -l "$asset" | grep -q 'MadModem.app/Contents/MacOS/cw_rules'; then
-            echo "ERROR: macOS ZIP missing cw_rules beside MadModem: $base" >&2
+        if ! unzip -l "$asset" | grep -q 'MultiModeModem.app/Contents/MacOS/cw_rules'; then
+            echo "ERROR: macOS ZIP missing cw_rules beside MultiModeModem: $base" >&2
             bad=1
         fi
     fi
@@ -111,11 +111,11 @@ if [[ "$bad" -ne 0 ]]; then
 fi
 
 {
-    echo "MadModem ${VERSION} GitHub release manifest"
+    echo "MultiModeModem ${VERSION} GitHub release manifest"
     echo "Tag: ${GITHUB_REF_NAME:-manual}"
     echo "Commit: ${GITHUB_SHA:-manual}"
     echo
     find "$ASSET_DIR" -type f -printf '%f\n' | sort
-} > "$ASSET_DIR/MadModem-${VERSION}-RELEASE-MANIFEST.txt"
+} > "$ASSET_DIR/MultiModeModem-${VERSION}-RELEASE-MANIFEST.txt"
 
 echo "Release asset validation OK."

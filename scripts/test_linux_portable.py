@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='mm portable ') as temp:
             for name, resolved in dependencies(file, env):
                 assert HOST.fullmatch(name) or resolved.resolve().is_relative_to(root), (file, name, resolved)
     # Invoke through both public entry points, outside the package working directory.
-    for executable, option in [('AppRun', '--version'), ('bin/MadModem', '--portable-runtime-regression'),
+    for executable, option in [('AppRun', '--version'), ('bin/MultiModeModem', '--portable-runtime-regression'),
                                ('AppRun', '--window-rotator-regression')]:
         result = subprocess.run([str(root / executable), option], cwd=work, env=env,
                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=90)

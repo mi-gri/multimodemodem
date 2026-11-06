@@ -30,7 +30,7 @@
 #include <memory>
 namespace {
 QString uiText(const char* key, const char* fallback) { return MadModemI18n::translate(QString::fromUtf8(key), QString::fromUtf8(fallback)); }
-const QString repository = QStringLiteral("https://github.com/l-papadopol/MM");
+const QString repository = QStringLiteral("https://github.com/mi-gri/multimodemodem");
 struct ReleaseIdentity { QString version; quint64 build = 0; };
 ReleaseIdentity releaseIdentity(const QJsonObject &release) {
     if (release.value("draft").toBool()) return {};
@@ -70,7 +70,7 @@ int compareRelease(const QJsonObject &a, const QJsonObject &b) {
 
 bool assetUrl(const QUrl& url) {
     return url.scheme() == "https" && url.host() == "github.com" && url.userInfo().isEmpty() &&
-           url.path().startsWith("/l-papadopol/MM/releases/download/");
+           url.path().startsWith("/mi-gri/multimodemodem/releases/download/", Qt::CaseInsensitive);
 }
 }
 UpdateController::UpdateController(QWidget* window, QMenu* help, std::function<bool()> idle)
@@ -157,14 +157,14 @@ QString UpdateController::linuxPlatform(const QString& marker, const QString& bu
 }
 QStringList UpdateController::linuxAssetNames(const QString& version, bool managed, const QString& platform, quint64 releaseBuild) {
     if (platform != "Ubuntu24.04" && platform != "Fedora43") return {};
-    const QString base = "MadModem-" + version;
+    const QString base = "MultiModeModem-" + version;
     if (managed) {
         QStringList names{base + "-Linux-" + platform + "-64bit-Installer.run"};
         // Earlier releases exposed the packager's original filename. Stay on
         // the installed ABI and .run channel, even when both native formats exist.
         if (releaseBuild) {
             if (platform == "Ubuntu24.04") names.append(base + "-" + QString::number(releaseBuild) + "-Ubuntu24.04-amd64-Setup.run");
-            else names.append("madmodem-" + version + "-" + QString::number(releaseBuild) + ".fc43.x86_64-Setup.run");
+            else names.append("multimodemodem-" + version + "-" + QString::number(releaseBuild) + ".fc43.x86_64-Setup.run");
         }
         return names;
     }
@@ -174,7 +174,7 @@ QStringList UpdateController::linuxAssetNames(const QString& version, bool manag
             base + "-" + platform + "-x86_64.zip"};
 }
 QStringList UpdateController::assetNames(const QString& version, bool managed, quint64 releaseBuild) {
-    const QString base = "MadModem-" + version;
+    const QString base = "MultiModeModem-" + version;
 #ifdef Q_OS_WIN
     if (QSysInfo::buildCpuArchitecture() != "x86_64") return {};
     if (managed) return {base + "-Windows-64bit-Installer-AutoCPU.exe"};
@@ -221,7 +221,7 @@ void UpdateController::check(bool manual) {
     fetchReleasePage(1);
 }
 void UpdateController::fetchReleasePage(int page) {
-    const QUrl url(QStringLiteral("https://api.github.com/repos/l-papadopol/MM/releases?per_page=100&page=%1").arg(page));
+    const QUrl url(QStringLiteral("https://api.github.com/repos/mi-gri/multimodemodem/releases?per_page=100&page=%1").arg(page));
     fetch(url, 4*1024*1024, [this, page](QByteArray bytes) {
         const auto document = QJsonDocument::fromJson(bytes);
         if (!document.isArray()) { fail(uiText("update_invalid", "Invalid release information.")); return; }
@@ -251,7 +251,7 @@ void UpdateController::fetchReleasePage(int page) {
 }
 void UpdateController::fetch(const QUrl& url, qint64 maximum, std::function<void(QByteArray)> done) {
     QNetworkRequest request(url);
-    request.setRawHeader("User-Agent", "MadModem/" MADMODEM_VERSION_STRING);
+    request.setRawHeader("User-Agent", "MultiModeModem/" MADMODEM_VERSION_STRING);
     request.setRawHeader("Accept", "application/vnd.github+json");
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     auto* reply = m_network.get(request);
@@ -325,7 +325,7 @@ void UpdateController::download(const QUrl& url, const QString& name, const QByt
     auto hash = std::make_shared<QCryptographicHash>(QCryptographicHash::Sha256);
     auto received = std::make_shared<qint64>(0);
     QNetworkRequest request(url);
-    request.setRawHeader("User-Agent", "MadModem/" MADMODEM_VERSION_STRING);
+    request.setRawHeader("User-Agent", "MultiModeModem/" MADMODEM_VERSION_STRING);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     auto* reply = m_network.get(request);
     auto* timer = new QTimer(reply); timer->setSingleShot(true); timer->start(60000);

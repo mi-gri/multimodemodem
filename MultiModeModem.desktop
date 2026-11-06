@@ -4,7 +4,7 @@ Name=MultiModeModem (m³)
 GenericName=Amateur radio modem (based on MadModem)
 Comment=Amateur radio digital modem for WEFAX, SSTV, RTTY, BPSK, CW, Feld Hell, FT4 and FT8
 Exec=MultiModeModem
-Icon=madmodem
+Icon=multimodemodem
 Terminal=false
 Categories=HamRadio;Audio;Network;Utility;
 

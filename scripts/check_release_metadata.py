@@ -59,12 +59,12 @@ def check(root: Path, env: dict[str, str]) -> list[str]:
     cmake = read("CMakeLists.txt")
     require("CMakeLists.txt / project VERSION",
             r"project\s*\(\s*MadModem\s+VERSION\s+(\S+)", version, cmake)
-    resource = read("madmodem.rc")
+    resource = read("multimodemodem.rc")
     for field in ("FILEVERSION", "PRODUCTVERSION"):
-        require(f"madmodem.rc / {field}", rf"^\s*{field}\s+([0-9,]+)\s*$",
+        require(f"multimodemodem.rc / {field}", rf"^\s*{field}\s+([0-9,]+)\s*$",
                 ",".join(numbers + ["0"]), resource)
     for field in ("FileVersion", "ProductVersion"):
-        require(f"madmodem.rc / {field}", rf'VALUE\s+"{field}",\s*"([^"\r\n]*)"',
+        require(f"multimodemodem.rc / {field}", rf'VALUE\s+"{field}",\s*"([^"\r\n]*)"',
                 version + r"\0", resource)
 
     try:

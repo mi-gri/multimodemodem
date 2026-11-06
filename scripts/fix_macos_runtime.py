@@ -57,7 +57,7 @@ def binaries(app):
 
 def repair(app, brew):
     frameworks = app / 'Contents/Frameworks'
-    executable = app / 'Contents/MacOS/MadModem'
+    executable = app / 'Contents/MacOS/MultiModeModem'
     search = [brew / 'lib'] + sorted((brew / 'opt').glob('*/lib'))
     queue = binaries(app)
     seen = set()
@@ -107,7 +107,7 @@ def repair(app, brew):
 
 
 def verify(app):
-    executable = app / 'Contents/MacOS/MadModem'
+    executable = app / 'Contents/MacOS/MultiModeModem'
     required_archs = set(run('lipo', '-archs', executable).split())
     for binary in binaries(app):
         if not required_archs.issubset(run('lipo', '-archs', binary).split()):

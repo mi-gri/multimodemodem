@@ -5,9 +5,9 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') {
 }
 $root = Split-Path $PSScriptRoot -Parent
 $version = (Get-Content "$root/MADMODEM_VERSION.txt" -Raw).Trim()
-$setup = "$root/dist/packages/MadModem-$version-Windows-x64-Setup.exe"
-$destination = Join-Path $env:RUNNER_TEMP 'MadModem Installer Test'
-$logDirectory = Join-Path $env:RUNNER_TEMP 'madmodem-installer-logs'
+$setup = "$root/dist/packages/MultiModeModem-$version-Windows-x64-Setup.exe"
+$destination = Join-Path $env:RUNNER_TEMP 'MultiModeModem Installer Test'
+$logDirectory = Join-Path $env:RUNNER_TEMP 'multimodemodem-installer-logs'
 New-Item -ItemType Directory -Force $logDirectory | Out-Null
 
 function Invoke-BoundedProcess {
@@ -63,21 +63,21 @@ function Invoke-BoundedProcess {
 }
 
 try {
-    $userData = Join-Path $env:LOCALAPPDATA 'MadModem'
+    $userData = Join-Path $env:LOCALAPPDATA 'MultiModeModem'
     New-Item -ItemType Directory -Force $userData | Out-Null
     $sentinel = Join-Path $userData 'installer-test.txt'
     Set-Content $sentinel 'preserve user data'
     $probe = Invoke-BoundedProcess -Name 'cpu-probe' -FilePath "$root/cpu-probe.exe" -TimeoutSeconds 30 -AllowedExitCodes @(0, 1)
     $variant = if ($probe -eq 0) { 'avx2' } else { 'legacy' }
     Write-Host "Expected CPU variant: $variant"
-    $expected = (Get-FileHash "$root/dist/packages/MadModem-$version-Windows-x86_64-$variant-standalone/bin/MadModem.exe").Hash
+    $expected = (Get-FileHash "$root/dist/packages/MultiModeModem-$version-Windows-x86_64-$variant-standalone/bin/MultiModeModem.exe").Hash
     for ($i = 0; $i -lt 2; $i++) {
         $setupLog = Join-Path $logDirectory "setup-$i.log"
         $null = Invoke-BoundedProcess -Name "install-$i" -FilePath $setup -TimeoutSeconds 240 -Arguments @(
             '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-',
             "/DIR=`"$destination`"", "/LOG=`"$setupLog`"")
         if (!(Test-Path "$destination/bin/managed-install.flag")) { throw 'Missing managed installation marker' }
-        if ((Get-FileHash "$destination/bin/MadModem.exe").Hash -ne $expected) { throw 'Incorrect CPU variant installed' }
+        if ((Get-FileHash "$destination/bin/MultiModeModem.exe").Hash -ne $expected) { throw 'Incorrect CPU variant installed' }
         if ((Get-Content $sentinel -Raw).Trim() -ne 'preserve user data') { throw 'User data changed during reinstall' }
     }
     # Exercise the bundled native platform plugin without MSYS2/Qt search paths.
@@ -92,8 +92,8 @@ try {
         foreach ($key in @('QT_PLUGIN_PATH', 'QT_QPA_PLATFORM_PLUGIN_PATH', 'QML_IMPORT_PATH', 'QML2_IMPORT_PATH')) {
             [Environment]::SetEnvironmentVariable($key, $null, 'Process')
         }
-        $null = Invoke-BoundedProcess -Name 'installed-version' -FilePath "$destination/bin/MadModem.exe" -Arguments @('--version') -TimeoutSeconds 30
-        if ((Get-Content (Join-Path $logDirectory 'installed-version.stdout.log') -Raw).Trim() -ne "MadModem $version") {
+        $null = Invoke-BoundedProcess -Name 'installed-version' -FilePath "$destination/bin/MultiModeModem.exe" -Arguments @('--version') -TimeoutSeconds 30
+        if ((Get-Content (Join-Path $logDirectory 'installed-version.stdout.log') -Raw).Trim() -ne "MultiModeModem $version (based on MadModem)") {
             throw 'Installed application did not print the expected version'
         }
     } finally {
@@ -102,7 +102,7 @@ try {
     $uninstallLog = Join-Path $logDirectory 'uninstall.log'
     $null = Invoke-BoundedProcess -Name 'uninstall' -FilePath "$destination/unins000.exe" -TimeoutSeconds 120 -Arguments @(
         '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$uninstallLog`"")
-    if (Test-Path "$destination/bin/MadModem.exe") { throw 'Uninstaller left the application executable behind' }
+    if (Test-Path "$destination/bin/MultiModeModem.exe") { throw 'Uninstaller left the application executable behind' }
     if ((Get-Content $sentinel -Raw).Trim() -ne 'preserve user data') { throw 'Uninstall removed user data' }
     Write-Host "PASS install, $variant CPU selection, reinstall, standalone launch and data preservation"
 } catch {

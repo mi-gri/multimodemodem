@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="MadModem"
+APP_NAME="MultiModeModem"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 BUILD_LEGACY="${MADMODEM_WINDOWS_BUILD_LEGACY:-on}"

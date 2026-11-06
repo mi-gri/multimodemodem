@@ -4,15 +4,15 @@
         <file alias="apply_portable.ps1">updates/apply_portable.ps1</file>
     </qresource>
     <qresource prefix="/icons">
-        <file alias="madmodem.png">icons/madmodem_512.png</file>
-        <file alias="madmodem_16.png">icons/madmodem_16.png</file>
-        <file alias="madmodem_24.png">icons/madmodem_24.png</file>
-        <file alias="madmodem_32.png">icons/madmodem_32.png</file>
-        <file alias="madmodem_48.png">icons/madmodem_48.png</file>
-        <file alias="madmodem_64.png">icons/madmodem_64.png</file>
-        <file alias="madmodem_128.png">icons/madmodem_128.png</file>
-        <file alias="madmodem_256.png">icons/madmodem_256.png</file>
-        <file alias="madmodem_512.png">icons/madmodem_512.png</file>
+        <file alias="multimodemodem.png">icons/multimodemodem_512.png</file>
+        <file alias="multimodemodem_16.png">icons/multimodemodem_16.png</file>
+        <file alias="multimodemodem_24.png">icons/multimodemodem_24.png</file>
+        <file alias="multimodemodem_32.png">icons/multimodemodem_32.png</file>
+        <file alias="multimodemodem_48.png">icons/multimodemodem_48.png</file>
+        <file alias="multimodemodem_64.png">icons/multimodemodem_64.png</file>
+        <file alias="multimodemodem_128.png">icons/multimodemodem_128.png</file>
+        <file alias="multimodemodem_256.png">icons/multimodemodem_256.png</file>
+        <file alias="multimodemodem_512.png">icons/multimodemodem_512.png</file>
         <file alias="logbook_add.png">icons/logbook_add.png</file>
         <file alias="flag_en.png">icons/flag_en.png</file>
         <file alias="flag_it.png">icons/flag_it.png</file>

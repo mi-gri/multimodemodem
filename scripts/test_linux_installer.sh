@@ -8,12 +8,12 @@ if env -u DISPLAY -u WAYLAND_DISPLAY bash "$installer" </dev/null; then
     echo 'ERROR: license acceptance was bypassed' >&2; exit 1
 fi
 bash "$installer" --accept-gpl3
-test -x /usr/bin/MadModem
-test -f /usr/lib/madmodem/bin/managed-install.flag
+test -x /usr/bin/MultiModeModem
+test -f /usr/lib/multimodemodem/bin/managed-install.flag
 test -f /usr/share/applications/MultiModeModem.desktop
-user_data="${XDG_DATA_HOME:-$HOME/.local/share}/MadModem"
+user_data="${XDG_DATA_HOME:-$HOME/.local/share}/MultiModeModem"
 mkdir -p "$user_data"
 printf 'preserve user data\n' > "$user_data/installer-test.txt"
 bash "$installer" --accept-gpl3
 grep -qx 'preserve user data' "$user_data/installer-test.txt"
-QT_QPA_PLATFORM=offscreen /usr/bin/MadModem --version
+QT_QPA_PLATFORM=offscreen /usr/bin/MultiModeModem --version

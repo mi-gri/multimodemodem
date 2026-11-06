@@ -117,9 +117,9 @@ def main():
                         shutil.which('qmake-qt5') or shutil.which('qmake') or 'qmake')
     args = parser.parse_args()
     root = args.package.resolve()
-    binary = root / 'bin/MadModem'
+    binary = root / 'bin/MultiModeModem'
     if not binary.is_file() or not elf(binary):
-        raise RuntimeError('Expected a freshly staged ELF executable in bin/MadModem')
+        raise RuntimeError('Expected a freshly staged ELF executable in bin/MultiModeModem')
     version = run(args.qmake, '-query', 'QT_VERSION').stdout.strip()
     if not version.startswith('5.'):
         raise RuntimeError(f'Linux packaging expects Qt5, found {version}')
@@ -169,7 +169,7 @@ def main():
     fonts.mkdir(parents=True, exist_ok=True)
     shutil.copy2(Path(__file__).resolve().parents[1] / 'packaging/linux/fonts.conf', fonts / 'fonts.conf')
     (root / 'bin/qt.conf').write_text('[Paths]\nPrefix=..\nLibraries=lib\nPlugins=plugins\nQml2Imports=qml\n')
-    binary.rename(root / 'bin/MadModem.bin')
+    binary.rename(root / 'bin/MultiModeModem.bin')
     binary.write_text('''#!/bin/sh
 set -eu
 MM_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -180,15 +180,15 @@ export QML2_IMPORT_PATH="$MM_ROOT/qml"
 export QML_IMPORT_PATH="$MM_ROOT/qml"
 export FONTCONFIG_PATH="$MM_ROOT/etc/fonts"
 export FONTCONFIG_FILE="$MM_ROOT/etc/fonts/fonts.conf"
-exec "$MM_ROOT/bin/MadModem.bin" "$@"
+exec "$MM_ROOT/bin/MultiModeModem.bin" "$@"
 ''')
     binary.chmod(0o755)
     launcher = root / 'AppRun'
-    launcher.write_text('#!/bin/sh\nset -eu\nMM_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec "$MM_ROOT/bin/MadModem" "$@"\n')
+    launcher.write_text('#!/bin/sh\nset -eu\nMM_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec "$MM_ROOT/bin/MultiModeModem" "$@"\n')
     launcher.chmod(0o755)
     # Verify closure using ONLY the bundled search path, including every plugin.
     env = dict(os.environ, LD_LIBRARY_PATH=str(libdir))
-    for file in [root / 'bin/MadModem.bin'] + [p for p in origins if elf(p)]:
+    for file in [root / 'bin/MultiModeModem.bin'] + [p for p in origins if elf(p)]:
         for name, resolved in dependencies(file, env):
             if not HOST.fullmatch(name) and not resolved.resolve().is_relative_to(root):
                 raise RuntimeError(f'Runtime escapes portable directory: {file}: {name} => {resolved}')

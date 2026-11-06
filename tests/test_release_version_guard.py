@@ -17,7 +17,7 @@ class ReleaseGuard(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         names = ["MADMODEM_VERSION.txt", "MADMODEM_SOURCE_REVISION.txt", "MadModemVersion.h",
-                 "CMakeLists.txt", "madmodem.rc", "mainwindow.ui",
+                 "CMakeLists.txt", "multimodemodem.rc", "mainwindow.ui",
                  "scripts/ci_release_version_guard.sh", "scripts/check_release_metadata.py"]
         names += [str(p.relative_to(ROOT)) for ext in ("qhp", "qhcp")
                   for p in (ROOT / "docs/help").glob("MM_*." + ext)]
@@ -51,7 +51,7 @@ class ReleaseGuard(unittest.TestCase):
         result = self.run_guard()
         self.assertNotEqual(result.returncode, 0)
         for name in ("MADMODEM_SOURCE_REVISION.txt", "MadModemVersion.h", "CMakeLists.txt",
-                     "madmodem.rc", "mainwindow.ui", "MM_en.qhp"):
+                     "multimodemodem.rc", "mainwindow.ui", "MM_en.qhp"):
             self.assertIn(name, result.stderr)
 
     def test_stale_header_is_rejected(self):
@@ -67,14 +67,14 @@ class ReleaseGuard(unittest.TestCase):
 
     def test_cmake_windows_ui_and_help_fail_together(self):
         self.change("CMakeLists.txt", "VERSION " + VERSION, "VERSION 0.0.0")
-        self.change("madmodem.rc", ",".join(VERSION.split(".") + ["0"]), "0,0,0,0")
+        self.change("multimodemodem.rc", ",".join(VERSION.split(".") + ["0"]), "0,0,0,0")
         self.change("mainwindow.ui", "MadModem " + VERSION, "MadModem 0.0.0")
         for ext in ("qhp", "qhcp"):
             self.change("docs/help/MM_en." + ext, "org.madmodem.mm." + VERSION.replace(".", ""),
                         "org.madmodem.mm.000")
         result = self.run_guard()
         self.assertNotEqual(result.returncode, 0)
-        for name in ("CMakeLists.txt", "madmodem.rc", "mainwindow.ui", "MM_en.qhp", "MM_en.qhcp"):
+        for name in ("CMakeLists.txt", "multimodemodem.rc", "mainwindow.ui", "MM_en.qhp", "MM_en.qhcp"):
             self.assertIn(name, result.stderr)
 
     def test_missing_and_malformed_metadata_are_rejected(self):

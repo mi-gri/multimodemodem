@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="MadModem"
+APP_NAME="MultiModeModem"
 VERSION="$(cat "$ROOT_DIR/MADMODEM_VERSION.txt" 2>/dev/null || echo dev)"
 OUT_DIR="${MADMODEM_PACKAGE_OUT_DIR:-$ROOT_DIR/dist/packages}"
 BUILD_LEGACY="${MADMODEM_WINDOWS_BUILD_LEGACY:-on}"
@@ -73,7 +73,7 @@ copy_common_payload() {
 
     # Human-facing release documents stay in the package root so the user is not
     # greeted by a wall of DLLs. Runtime/data files that the executable resolves
-    # relative to applicationDirPath() live beside MadModem.exe inside bin/.
+    # relative to applicationDirPath() live beside MultiModeModem.exe inside bin/.
     for f in README.md RELEASE_NOTES.md CHANGELOG.md LICENSE.md COPYING AUTHORS.md THIRD_PARTY_NOTICES.md TRANSLATION_AUDIT.md; do
         [[ -f "$ROOT_DIR/$f" ]] && cp -f "$ROOT_DIR/$f" "$package_dir/"
     done
@@ -87,7 +87,7 @@ copy_common_payload() {
     elif [[ -d "$ROOT_DIR/docs" ]]; then
         mkdir -p "$package_dir/docs/images"
         cat > "$package_dir/docs/images/README.md" <<TXT
-Place MadModem screenshots here for the GitHub README gallery.
+Place MultiModeModem screenshots here for the GitHub README gallery.
 TXT
     fi
 
@@ -106,16 +106,16 @@ TXT
     fi
 
     cat > "$package_dir/RUN_WINDOWS.txt" <<TXT
-MadModem Windows package
+MultiModeModem Windows package
 ========================
 
-Run MadModem from the portable launcher in this folder:
+Run MultiModeModem from the portable launcher in this folder:
 
-  MadModem.cmd
+  MultiModeModem.cmd
 
 The executable and all runtime DLLs are stored in bin/ to keep the package root
-readable. Do not move MadModem.exe out of bin/: Qt and MinGW runtime DLLs must
-remain beside the executable. The launcher always starts bin\MadModem.exe with
+readable. Do not move MultiModeModem.exe out of bin/: Qt and MinGW runtime DLLs must
+remain beside the executable. The launcher always starts bin\MultiModeModem.exe with
 working directory set to bin\, so it remains valid after extracting the ZIP
 anywhere on your PC.
 
@@ -127,7 +127,7 @@ TXT
 
 create_windows_shortcut() {
     local package_dir="$1"
-    local launcher="$package_dir/MadModem.cmd"
+    local launcher="$package_dir/MultiModeModem.cmd"
 
     # Do not ship a .lnk generated on the GitHub runner: Windows shortcuts store
     # absolute paths such as D:\a\... and become broken after extraction.  A tiny
@@ -138,14 +138,14 @@ create_windows_shortcut() {
 setlocal
 set "MADMODEM_ROOT=%~dp0"
 set "MADMODEM_BIN=%MADMODEM_ROOT%bin"
-if not exist "%MADMODEM_BIN%\MadModem.exe" (
-  echo MadModem.exe not found in "%MADMODEM_BIN%"
+if not exist "%MADMODEM_BIN%\MultiModeModem.exe" (
+  echo MultiModeModem.exe not found in "%MADMODEM_BIN%"
   echo The Windows package must keep the executable and DLLs inside the bin folder.
   pause
   exit /b 1
 )
 cd /d "%MADMODEM_BIN%"
-start "MadModem" "%MADMODEM_BIN%\MadModem.exe" %*
+start "MultiModeModem" "%MADMODEM_BIN%\MultiModeModem.exe" %*
 endlocal
 CMD
 
@@ -348,7 +348,7 @@ bundle_runtime_dll_closure() {
     fi
 
     {
-        echo "MadModem Windows standalone runtime DLL report"
+        echo "MultiModeModem Windows standalone runtime DLL report"
         echo "Package: $(basename "$package_dir")"
         echo
         echo "Bundled DLLs:"
