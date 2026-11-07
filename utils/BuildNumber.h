@@ -8,4 +8,7 @@
 // local count never looks like a newer or older published release.
 namespace MadModemBuild {
 const char *number();
+// Short Git commit of a local build ("+" when tracked files were modified);
+// empty for distribution builds and when Git is not available.
+const char *revision();
 }

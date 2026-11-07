@@ -1646,7 +1646,7 @@ MainWindow::MainWindow(QWidget *parent)
         last=state;
     });diagnosticHealthTimer->start(1000);
     appendLog("MM started.");
-    appendLog(QStringLiteral("MadModem %1 | build %2 | source %3 | commit %4").arg(QStringLiteral(MADMODEM_VERSION_STRING), QString::fromLatin1(MadModemBuild::number()), QStringLiteral(MADMODEM_SOURCE_REVISION), QStringLiteral(MADMODEM_BUILD_COMMIT)));
+    appendLog(QStringLiteral("%1 %2 | %3 | source %4 | commit %5").arg(ProductName::longName(), QStringLiteral(MADMODEM_VERSION_STRING), MadModemIdentity::buildLabel(), QStringLiteral(MADMODEM_SOURCE_REVISION), QStringLiteral(MADMODEM_BUILD_COMMIT)));
     appendLog("Settings file: " + AppSettings::settingsFilePath());
     appendLog("Receiver is ready. Use Status → ▶ RX to start live decoding, or analyze a WAV test file from the mode panel.");
     updateMainStateButton();

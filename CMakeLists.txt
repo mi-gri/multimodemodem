@@ -256,12 +256,14 @@ find_package(ZLIB REQUIRED)
 # Build number for the title bar and logs: the distribution number when set,
 # otherwise a local counter that goes up with every build after a source change.
 set(MADMODEM_BUILD_NUMBER_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/MadModemBuildNumber.cpp")
+find_package(Git QUIET)
 add_custom_target(madmodem_build_counter ALL
     COMMAND ${CMAKE_COMMAND}
         "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}"
         "-DOUTPUT=${MADMODEM_BUILD_NUMBER_SOURCE}"
         "-DFIXED_NUMBER=${MADMODEM_BUILD_NUMBER}"
+        "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/MadModemBuildCounter.cmake"
     BYPRODUCTS "${MADMODEM_BUILD_NUMBER_SOURCE}"
     COMMENT "MadModem build number"
