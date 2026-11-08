@@ -42,7 +42,7 @@ if a.sanitize:
         obj = out / (Path(name).stem + '.o')
         compile_file(s / name, obj)
         objects.append(str(obj))
-    i = next(i for i, v in enumerate(link) if v.endswith('libmadmodem_ft_reference.a'))
+    i = next(i for i, v in enumerate(link) if v.endswith('libm3_ft_reference.a'))
     link[i:i+1] = objects
     link += ['-fsanitize=address,undefined']
 exe = out / 'probe'

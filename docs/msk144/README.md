@@ -34,5 +34,5 @@ If the selected boundary has already been missed, transmission is deferred to
 the next matching period. The waveform is prepared when the scheduler is armed,
 leaving only RX stop, PTT and audio-device start on the timed boundary path.
 
-`madmodem_msk144_native_regression` round-trips generated audio through both a
+`m3_msk144_native_regression` round-trips generated audio through both a
 normal message and an MSK40 short message as part of normal CTest.

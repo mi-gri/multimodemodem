@@ -82,7 +82,7 @@ checks = {
     "Q65 RX has one always-built native path": (
         "Q65NativeEngine.cpp" in cmake
         and "MADMODEM_ENABLE_Q65" not in cmake
-        and "MADMODEM_FFTW3_LIBRARY" not in re.search(r"target_link_libraries\(madmodem_q65\b(.*?)\)", cmake, re.S).group(1)
+        and "MADMODEM_FFTW3_LIBRARY" not in re.search(r"target_link_libraries\(m3_q65\b(.*?)\)", cmake, re.S).group(1)
         and "Q65 RX start blocked" not in main
         and "findSyncCandidates" in q65_engine
         and "q65_intrinsics_ff" in q65_engine

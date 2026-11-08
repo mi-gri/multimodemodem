@@ -34,7 +34,7 @@ for obsolete in ['rttyMatchedFilterEnabled', 'rttyMarkSpaceEnhancerEnabled', 'm_
     if obsolete in conditioner or obsolete in conditioner_h:
         errors.append(f'DspConditioner still owns obsolete parallel RTTY filter state: {obsolete}')
 must(Path('tests/RttySyntheticBench.cpp'), ['mark_fade_-18_db', 'cw_plus20_db_offset300', 'noise_only'])
-if 'madmodem_rtty_synthetic_bench' not in cmake:
+if 'm3_rtty_synthetic_bench' not in cmake:
     errors.append('CMakeLists.txt: RTTY synthetic bench is not registered with CTest')
 must(Path('scripts/build_linux_github.sh'), ['$INSTALL_DIR/bin/rtty_rules', '$INSTALL_DIR/bin/cw_rules'])
 must(Path('scripts/package_linux_github.sh'), ['$PACKAGE_DIR/bin/rtty_rules', '$PACKAGE_DIR/bin/cw_rules'])

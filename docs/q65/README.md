@@ -44,7 +44,7 @@ decode.
 
 ## Regression
 
-`madmodem_q65_native_regression` generates real TX audio at 12 kHz and requires
+`m3_q65_native_regression` generates real TX audio at 12 kHz and requires
 the native receiver to recover the exact packed message in Q65A, Q65B, Q65C
 and Q65D. It also verifies the symbol geometry for all four supported periods.
 The test is part of normal CTest and package CI.

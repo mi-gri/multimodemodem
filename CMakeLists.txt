@@ -257,7 +257,7 @@ find_package(ZLIB REQUIRED)
 # otherwise a local counter that goes up with every build after a source change.
 set(MADMODEM_BUILD_NUMBER_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/MadModemBuildNumber.cpp")
 find_package(Git QUIET)
-add_custom_target(madmodem_build_counter ALL
+add_custom_target(m3_build_counter ALL
     COMMAND ${CMAKE_COMMAND}
         "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}"
@@ -268,15 +268,15 @@ add_custom_target(madmodem_build_counter ALL
     BYPRODUCTS "${MADMODEM_BUILD_NUMBER_SOURCE}"
     COMMENT "MadModem build number"
     VERBATIM)
-add_library(madmodem_build_number STATIC "${MADMODEM_BUILD_NUMBER_SOURCE}" utils/BuildNumber.h)
-target_include_directories(madmodem_build_number PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-add_dependencies(madmodem_build_number madmodem_build_counter)
+add_library(m3_build_number STATIC "${MADMODEM_BUILD_NUMBER_SOURCE}" utils/BuildNumber.h)
+target_include_directories(m3_build_number PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+add_dependencies(m3_build_number m3_build_counter)
 
-add_library(madmodem_diagnostics STATIC runtime/SessionDiagnostics.cpp runtime/GzipLogWriter.h)
-target_link_libraries(madmodem_diagnostics PUBLIC ${QT}::Core Threads::Threads ZLIB::ZLIB madmodem_build_number)
-target_include_directories(madmodem_diagnostics PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+add_library(m3_diagnostics STATIC runtime/SessionDiagnostics.cpp runtime/GzipLogWriter.h)
+target_link_libraries(m3_diagnostics PUBLIC ${QT}::Core Threads::Threads ZLIB::ZLIB m3_build_number)
+target_include_directories(m3_diagnostics PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
-add_library(madmodem_cwskimmer STATIC
+add_library(m3_cwskimmer STATIC
     modems/cw/skimmer/CwSkimmerTypes.h
     modems/cw/skimmer/CwSkimmerEngine.h
     modems/cw/skimmer/CwSkimmerEngine.cpp
@@ -291,21 +291,21 @@ add_library(madmodem_cwskimmer STATIC
     modems/cw/skimmer/SelectedToneCwTracker.h
     modems/cw/skimmer/SelectedToneCwTracker.cpp
 )
-target_include_directories(madmodem_cwskimmer PUBLIC
+target_include_directories(m3_cwskimmer PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/modems/cw"
     "${CMAKE_CURRENT_SOURCE_DIR}/modems/cw/skimmer"
 )
-target_link_libraries(madmodem_cwskimmer PUBLIC Threads::Threads)
+target_link_libraries(m3_cwskimmer PUBLIC Threads::Threads)
 # This target is pure C++ and has no Q_OBJECT classes. Disable Qt autogen on
 # AppleClang/Qt6 as an extra isolation layer: otherwise global AUTOMOC creates
 # an unnecessary autogen TU and noisy Qt diagnostics can obscure real errors.
-set_target_properties(madmodem_cwskimmer PROPERTIES
+set_target_properties(m3_cwskimmer PROPERTIES
     AUTOMOC OFF
     AUTOUIC OFF
     AUTORCC OFF
 )
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(madmodem_cwskimmer PRIVATE -Wall -Wextra -Wno-unused-function -Wno-unused-variable)
+    target_compile_options(m3_cwskimmer PRIVATE -Wall -Wextra -Wno-unused-function -Wno-unused-variable)
 endif()
 
 
@@ -315,21 +315,21 @@ endif()
 # one lock instead of duplicating symbols or pretending per-mode locks isolate
 # the common workspace.
 # -------------------------------------------------------------------------
-add_library(madmodem_weak_signal_codec STATIC
+add_library(m3_weak_signal_codec STATIC
     modems/weak_signal/WeakSignalCodecLock.h
     modems/weak_signal/WeakSignalCodecLock.cpp
     third_party/mshv_gpl/nhash.cpp
     third_party/mshv_gpl/port/HvPackUnpackMsg/pack_unpack_msg77.h
     third_party/mshv_gpl/port/HvPackUnpackMsg/pack_unpack_msg77.cpp
 )
-target_include_directories(madmodem_weak_signal_codec PUBLIC
+target_include_directories(m3_weak_signal_codec PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/modems/weak_signal"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mshv_gpl"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mshv_gpl/port"
 )
-target_link_libraries(madmodem_weak_signal_codec PUBLIC ${QT}::Core Threads::Threads)
+target_link_libraries(m3_weak_signal_codec PUBLIC ${QT}::Core Threads::Threads)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(madmodem_weak_signal_codec PRIVATE -Wall -Wextra)
+    target_compile_options(m3_weak_signal_codec PRIVATE -Wall -Wextra)
 endif()
 
 # -------------------------------------------------------------------------
@@ -337,16 +337,16 @@ endif()
 # the application text-mode decoders. Keep the implementation in one target
 # so standalone regression executables link the exact same DSP code as MM.
 # -------------------------------------------------------------------------
-add_library(madmodem_linear_resampler STATIC
+add_library(m3_linear_resampler STATIC
     dsp/text/LinearResampler.h
     dsp/text/LinearResampler.cpp
 )
-target_include_directories(madmodem_linear_resampler PUBLIC
+target_include_directories(m3_linear_resampler PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/dsp/text"
 )
-target_link_libraries(madmodem_linear_resampler PUBLIC ${QT}::Core)
+target_link_libraries(m3_linear_resampler PUBLIC ${QT}::Core)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(madmodem_linear_resampler PRIVATE -Wall -Wextra)
+    target_compile_options(m3_linear_resampler PRIVATE -Wall -Wextra)
 endif()
 
 # Native FT8/FT4 recovery from pinned MSHV source, isolated from TX/CAT.
@@ -354,7 +354,7 @@ find_library(MADMODEM_FFTW3_LIBRARY NAMES fftw3 fftw3-3 libfftw3.so.3)
 if(NOT MADMODEM_FFTW3_LIBRARY)
     message(FATAL_ERROR "FT reference recovery requires FFTW3 double precision (libfftw3-dev / fftw / brew fftw)")
 endif()
-add_library(madmodem_ft_reference STATIC
+add_library(m3_ft_reference STATIC
     modems/ft8/FtReferenceRecovery.h modems/ft8/FtReferenceRecovery.cpp
     third_party/mshv_gpl/ft_reference/budget.cpp
     third_party/mshv_gpl/ft_reference/decoderft8.cpp
@@ -362,12 +362,12 @@ add_library(madmodem_ft_reference STATIC
     third_party/mshv_gpl/ft_reference/decoderft4.cpp
     third_party/mshv_gpl/ft_reference/decoderpom.cpp
     third_party/mshv_gpl/ft_reference/fft.cpp)
-target_include_directories(madmodem_ft_reference PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(madmodem_ft_reference PUBLIC ${QT}::Core madmodem_weak_signal_codec madmodem_diagnostics Threads::Threads "${MADMODEM_FFTW3_LIBRARY}")
+target_include_directories(m3_ft_reference PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(m3_ft_reference PUBLIC ${QT}::Core m3_weak_signal_codec m3_diagnostics Threads::Threads "${MADMODEM_FFTW3_LIBRARY}")
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-ftrivial-auto-var-init=zero" MADMODEM_FT_AUTO_INIT)
 if(MADMODEM_FT_AUTO_INIT)
-    target_compile_options(madmodem_ft_reference PRIVATE -ftrivial-auto-var-init=zero)
+    target_compile_options(m3_ft_reference PRIVATE -ftrivial-auto-var-init=zero)
 else()
     message(FATAL_ERROR "FT recovery requires a compiler supporting -ftrivial-auto-var-init=zero; select a current GCC or Clang toolchain")
 endif()
@@ -375,9 +375,9 @@ endif()
 # -------------------------------------------------------------------------
 # MSK144 native RX/TX engine, including full 144-bit frames and MSK40 hashed
 # short messages. Mode-specific coding is bundled here; shared 77-bit
-# message/hash code belongs to madmodem_weak_signal_codec.
+# message/hash code belongs to m3_weak_signal_codec.
 # -------------------------------------------------------------------------
-add_library(madmodem_msk144 STATIC
+add_library(m3_msk144 STATIC
     modems/msk144/Msk144Decoder.h
     modems/msk144/Msk144Decoder.cpp
     modems/msk144/tx/Msk144Transmitter.h
@@ -387,25 +387,25 @@ add_library(madmodem_msk144 STATIC
     third_party/mshv_gpl/port/HvPackUnpackMsg/pack_msg.cpp
     third_party/mshv_gpl/port/HvPackUnpackMsg/unpack_msg.cpp
 )
-target_include_directories(madmodem_msk144 PUBLIC
+target_include_directories(m3_msk144 PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/modems/msk144"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mshv_gpl"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mshv_gpl/port"
 )
-target_link_libraries(madmodem_msk144 PUBLIC madmodem_weak_signal_codec ${QT}::Core ${QT}::Widgets Threads::Threads)
-target_link_libraries(madmodem_msk144 PUBLIC madmodem_linear_resampler)
+target_link_libraries(m3_msk144 PUBLIC m3_weak_signal_codec ${QT}::Core ${QT}::Widgets Threads::Threads)
+target_link_libraries(m3_msk144 PUBLIC m3_linear_resampler)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(madmodem_msk144 PRIVATE -Wall -Wextra -Wno-unused-function -Wno-unused-variable -Wno-sign-compare -Wno-unused-parameter)
+    target_compile_options(m3_msk144 PRIVATE -Wall -Wextra -Wno-unused-function -Wno-unused-variable -Wno-sign-compare -Wno-unused-parameter)
 endif()
 
 
 
 # -------------------------------------------------------------------------
 # Q65A/B/C/D native RX/TX engine. QRA primitives are bundled here and shared
-# message/hash code is linked from madmodem_weak_signal_codec; the demodulator
+# message/hash code is linked from m3_weak_signal_codec; the demodulator
 # has no optional FFT or runtime backend.
 # -------------------------------------------------------------------------
-add_library(madmodem_q65 STATIC
+add_library(m3_q65 STATIC
     modems/q65/Q65Decoder.h
     modems/q65/Q65Decoder.cpp
     modems/q65/Q65NativeEngine.h
@@ -416,15 +416,15 @@ add_library(madmodem_q65 STATIC
     third_party/mshv_gpl/port/HvGenQ65/gen_q65.cpp
     third_party/mshv_gpl/port/HvGenQ65/q65_subs.cpp
 )
-target_include_directories(madmodem_q65 PUBLIC
+target_include_directories(m3_q65 PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/modems/q65"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mshv_gpl"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mshv_gpl/port"
 )
-target_link_libraries(madmodem_q65 PUBLIC madmodem_weak_signal_codec ${QT}::Core ${QT}::Widgets Threads::Threads)
-target_link_libraries(madmodem_q65 PUBLIC madmodem_linear_resampler)
+target_link_libraries(m3_q65 PUBLIC m3_weak_signal_codec ${QT}::Core ${QT}::Widgets Threads::Threads)
+target_link_libraries(m3_q65 PUBLIC m3_linear_resampler)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(madmodem_q65 PRIVATE -Wall -Wextra -Wno-unused-function -Wno-unused-variable -Wno-sign-compare -Wno-unused-parameter)
+    target_compile_options(m3_q65 PRIVATE -Wall -Wextra -Wno-unused-function -Wno-unused-variable -Wno-sign-compare -Wno-unused-parameter)
 endif()
 
 # -------------------------------------------------------------------------
@@ -768,13 +768,13 @@ if(WIN32)
 endif()
 
 target_link_libraries(MadModem PRIVATE
-    madmodem_ft_reference
-    madmodem_diagnostics
-    madmodem_cwskimmer
-    madmodem_msk144
-    madmodem_q65
-    madmodem_weak_signal_codec
-    madmodem_linear_resampler
+    m3_ft_reference
+    m3_diagnostics
+    m3_cwskimmer
+    m3_msk144
+    m3_q65
+    m3_weak_signal_codec
+    m3_linear_resampler
     ${QT}::Widgets
     ${QT}::SerialPort
     ${QT}::Multimedia
@@ -1094,149 +1094,149 @@ install(TARGETS MadModem
 # timing-sensitive production components instead of only producing packages.
 include(CTest)
 if(BUILD_TESTING)
-    add_executable(madmodem_ft_timing_policy tests/FtTimingPolicyRegression.cpp)
-    set_target_properties(madmodem_ft_timing_policy PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
-    add_test(NAME madmodem_ft_timing_policy COMMAND madmodem_ft_timing_policy)
-    set_tests_properties(madmodem_ft_timing_policy PROPERTIES TIMEOUT 10)
-    add_executable(madmodem_ft_reference_budget
+    add_executable(m3_ft_timing_policy tests/FtTimingPolicyRegression.cpp)
+    set_target_properties(m3_ft_timing_policy PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME m3_ft_timing_policy COMMAND m3_ft_timing_policy)
+    set_tests_properties(m3_ft_timing_policy PROPERTIES TIMEOUT 10)
+    add_executable(m3_ft_reference_budget
         tests/FtReferenceBudgetRegression.cpp
         tests/FtReferenceBudgetPeer.cpp
         third_party/mshv_gpl/ft_reference/budget.cpp)
-    target_include_directories(madmodem_ft_reference_budget PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(madmodem_ft_reference_budget PRIVATE Threads::Threads)
-    set_target_properties(madmodem_ft_reference_budget PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
-    add_test(NAME madmodem_ft_reference_budget COMMAND madmodem_ft_reference_budget)
-    set_tests_properties(madmodem_ft_reference_budget PROPERTIES TIMEOUT 10)
-    add_executable(madmodem_ft_ldpc_check tests/FtLdpcCheckRegression.cpp)
-    target_include_directories(madmodem_ft_ldpc_check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    add_test(NAME madmodem_ft_ldpc_check COMMAND madmodem_ft_ldpc_check)
-    set_tests_properties(madmodem_ft_ldpc_check PROPERTIES TIMEOUT 30)
-    add_executable(madmodem_ft_native_spectrum tests/FtNativeSpectrumRegression.cpp)
-    target_include_directories(madmodem_ft_native_spectrum PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_ft_native_spectrum PRIVATE Threads::Threads "${MADMODEM_FFTW3_LIBRARY}")
-    add_test(NAME madmodem_ft_native_spectrum COMMAND madmodem_ft_native_spectrum)
-    set_tests_properties(madmodem_ft_native_spectrum PROPERTIES TIMEOUT 30)
-    add_executable(madmodem_ft_coherent_alignment tests/FtCoherentAlignmentRegression.cpp)
-    target_include_directories(madmodem_ft_coherent_alignment PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    add_test(NAME madmodem_ft_coherent_alignment COMMAND madmodem_ft_coherent_alignment)
-    set_tests_properties(madmodem_ft_coherent_alignment PROPERTIES TIMEOUT 30)
-    add_executable(madmodem_ft_signal_envelope tests/FtSignalEnvelopeRegression.cpp)
-    target_include_directories(madmodem_ft_signal_envelope PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    add_test(NAME madmodem_ft_signal_envelope COMMAND madmodem_ft_signal_envelope)
-    set_tests_properties(madmodem_ft_signal_envelope PROPERTIES TIMEOUT 30)
-    add_executable(madmodem_session_diagnostics tests/SessionDiagnosticsRegression.cpp)
-    target_link_libraries(madmodem_session_diagnostics PRIVATE madmodem_diagnostics)
-    add_test(NAME madmodem_session_diagnostics COMMAND madmodem_session_diagnostics)
-    set_tests_properties(madmodem_session_diagnostics PROPERTIES TIMEOUT 30)
+    target_include_directories(m3_ft_reference_budget PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_ft_reference_budget PRIVATE Threads::Threads)
+    set_target_properties(m3_ft_reference_budget PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME m3_ft_reference_budget COMMAND m3_ft_reference_budget)
+    set_tests_properties(m3_ft_reference_budget PROPERTIES TIMEOUT 10)
+    add_executable(m3_ft_ldpc_check tests/FtLdpcCheckRegression.cpp)
+    target_include_directories(m3_ft_ldpc_check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME m3_ft_ldpc_check COMMAND m3_ft_ldpc_check)
+    set_tests_properties(m3_ft_ldpc_check PROPERTIES TIMEOUT 30)
+    add_executable(m3_ft_native_spectrum tests/FtNativeSpectrumRegression.cpp)
+    target_include_directories(m3_ft_native_spectrum PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_ft_native_spectrum PRIVATE Threads::Threads "${MADMODEM_FFTW3_LIBRARY}")
+    add_test(NAME m3_ft_native_spectrum COMMAND m3_ft_native_spectrum)
+    set_tests_properties(m3_ft_native_spectrum PROPERTIES TIMEOUT 30)
+    add_executable(m3_ft_coherent_alignment tests/FtCoherentAlignmentRegression.cpp)
+    target_include_directories(m3_ft_coherent_alignment PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME m3_ft_coherent_alignment COMMAND m3_ft_coherent_alignment)
+    set_tests_properties(m3_ft_coherent_alignment PROPERTIES TIMEOUT 30)
+    add_executable(m3_ft_signal_envelope tests/FtSignalEnvelopeRegression.cpp)
+    target_include_directories(m3_ft_signal_envelope PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME m3_ft_signal_envelope COMMAND m3_ft_signal_envelope)
+    set_tests_properties(m3_ft_signal_envelope PROPERTIES TIMEOUT 30)
+    add_executable(m3_session_diagnostics tests/SessionDiagnosticsRegression.cpp)
+    target_link_libraries(m3_session_diagnostics PRIVATE m3_diagnostics)
+    add_test(NAME m3_session_diagnostics COMMAND m3_session_diagnostics)
+    set_tests_properties(m3_session_diagnostics PROPERTIES TIMEOUT 30)
     find_package(${QT} REQUIRED COMPONENTS Test)
-    add_executable(madmodem_decode_clipboard tests/DecodeTableClipboardRegression.cpp)
-    target_include_directories(madmodem_decode_clipboard PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(madmodem_decode_clipboard PRIVATE ${QT}::Widgets ${QT}::Test)
-    add_test(NAME madmodem_decode_clipboard COMMAND madmodem_decode_clipboard)
-    set_tests_properties(madmodem_decode_clipboard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 10)
-    add_executable(madmodem_ft_cq_directive tests/FtCqDirectiveRegression.cpp)
-    target_include_directories(madmodem_ft_cq_directive PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(madmodem_ft_cq_directive PRIVATE ${QT}::Core)
-    set_target_properties(madmodem_ft_cq_directive PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
-    add_test(NAME madmodem_ft_cq_directive COMMAND madmodem_ft_cq_directive)
-    add_executable(madmodem_ft_cq_worklist tests/FtCqWorkListRegression.cpp)
-    target_include_directories(madmodem_ft_cq_worklist PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(madmodem_ft_cq_worklist PRIVATE ${QT}::Core)
-    set_target_properties(madmodem_ft_cq_worklist PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
-    add_test(NAME madmodem_ft_cq_worklist COMMAND madmodem_ft_cq_worklist)
-    add_executable(madmodem_ft_incremental_producer tests/FtIncrementalProducerRegression.cpp)
-    target_include_directories(madmodem_ft_incremental_producer PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(madmodem_ft_incremental_producer PRIVATE ${QT}::Core Threads::Threads)
-    add_test(NAME madmodem_ft_incremental_producer COMMAND madmodem_ft_incremental_producer)
-    set_tests_properties(madmodem_ft_incremental_producer PROPERTIES TIMEOUT 10)
-    add_executable(madmodem_update_regression tests/UpdateReleaseRegression.cpp
+    add_executable(m3_decode_clipboard tests/DecodeTableClipboardRegression.cpp)
+    target_include_directories(m3_decode_clipboard PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_decode_clipboard PRIVATE ${QT}::Widgets ${QT}::Test)
+    add_test(NAME m3_decode_clipboard COMMAND m3_decode_clipboard)
+    set_tests_properties(m3_decode_clipboard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 10)
+    add_executable(m3_ft_cq_directive tests/FtCqDirectiveRegression.cpp)
+    target_include_directories(m3_ft_cq_directive PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_ft_cq_directive PRIVATE ${QT}::Core)
+    set_target_properties(m3_ft_cq_directive PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME m3_ft_cq_directive COMMAND m3_ft_cq_directive)
+    add_executable(m3_ft_cq_worklist tests/FtCqWorkListRegression.cpp)
+    target_include_directories(m3_ft_cq_worklist PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_ft_cq_worklist PRIVATE ${QT}::Core)
+    set_target_properties(m3_ft_cq_worklist PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME m3_ft_cq_worklist COMMAND m3_ft_cq_worklist)
+    add_executable(m3_ft_incremental_producer tests/FtIncrementalProducerRegression.cpp)
+    target_include_directories(m3_ft_incremental_producer PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_ft_incremental_producer PRIVATE ${QT}::Core Threads::Threads)
+    add_test(NAME m3_ft_incremental_producer COMMAND m3_ft_incremental_producer)
+    set_tests_properties(m3_ft_incremental_producer PROPERTIES TIMEOUT 10)
+    add_executable(m3_update_regression tests/UpdateReleaseRegression.cpp
         updates/UpdateController.cpp utils/RuntimeI18n.cpp
         settings/AppSettings.cpp rotator/RotatorPeakSearch.cpp)
-    target_include_directories(madmodem_update_regression PRIVATE
+    target_include_directories(m3_update_regression PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/generated")
-    target_link_libraries(madmodem_update_regression PRIVATE ${QT}::Core ${QT}::Gui ${QT}::Widgets ${QT}::Network)
-    add_test(NAME madmodem_update_regression COMMAND madmodem_update_regression)
-    set_tests_properties(madmodem_update_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 20)
-    add_test(NAME madmodem_async_architecture_regression COMMAND MadModem --architecture-regression)
-    set_tests_properties(madmodem_async_architecture_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
-    add_test(NAME madmodem_window_rotator_regression COMMAND MadModem --window-rotator-regression)
-    set_tests_properties(madmodem_window_rotator_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
-    add_test(NAME madmodem_runtime_workers_regression COMMAND MadModem --runtime-regression)
-    set_tests_properties(madmodem_runtime_workers_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
-    add_test(NAME madmodem_settings_ui_regression COMMAND MadModem --ui-regression)
-    set_tests_properties(madmodem_settings_ui_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
-    add_executable(madmodem_tx_pull_regression tests/TxPullRegression.cpp audio/TxOutputDevice.h)
-    target_include_directories(madmodem_tx_pull_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_tx_pull_regression PRIVATE ${QT}::Core ${QT}::Gui)
-    add_test(NAME madmodem_tx_pull_regression COMMAND madmodem_tx_pull_regression)
-    add_executable(madmodem_tx_level_regression tests/TxLevelRegression.cpp audio/TxLevel.h)
-    target_include_directories(madmodem_tx_level_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    add_test(NAME madmodem_tx_level_regression COMMAND madmodem_tx_level_regression)
-    add_executable(madmodem_i18n_regression tests/RuntimeI18nRegression.cpp utils/RuntimeI18n.cpp tests/i18n.qrc)
-    target_include_directories(madmodem_i18n_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_i18n_regression PRIVATE ${QT}::Core)
-    add_test(NAME madmodem_i18n_regression COMMAND madmodem_i18n_regression)
-    add_executable(madmodem_rotator_coordinates tests/RotatorCoordinatesRegression.cpp)
-    target_include_directories(madmodem_rotator_coordinates PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    set_target_properties(madmodem_rotator_coordinates PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
-    add_test(NAME madmodem_rotator_coordinates COMMAND madmodem_rotator_coordinates)
-    add_executable(madmodem_antialias_regression tests/AntiAliasRegression.cpp)
-    target_include_directories(madmodem_antialias_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    set_target_properties(madmodem_antialias_regression PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
-    add_test(NAME madmodem_antialias_regression COMMAND madmodem_antialias_regression)
-    add_executable(madmodem_capture_clock tests/CaptureClockRegression.cpp)
-    target_include_directories(madmodem_capture_clock PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_capture_clock PRIVATE ${QT}::Core)
-    add_test(NAME madmodem_capture_clock COMMAND madmodem_capture_clock)
+    target_link_libraries(m3_update_regression PRIVATE ${QT}::Core ${QT}::Gui ${QT}::Widgets ${QT}::Network)
+    add_test(NAME m3_update_regression COMMAND m3_update_regression)
+    set_tests_properties(m3_update_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 20)
+    add_test(NAME m3_async_architecture_regression COMMAND MadModem --architecture-regression)
+    set_tests_properties(m3_async_architecture_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+    add_test(NAME m3_window_rotator_regression COMMAND MadModem --window-rotator-regression)
+    set_tests_properties(m3_window_rotator_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+    add_test(NAME m3_runtime_workers_regression COMMAND MadModem --runtime-regression)
+    set_tests_properties(m3_runtime_workers_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+    add_test(NAME m3_settings_ui_regression COMMAND MadModem --ui-regression)
+    set_tests_properties(m3_settings_ui_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+    add_executable(m3_tx_pull_regression tests/TxPullRegression.cpp audio/TxOutputDevice.h)
+    target_include_directories(m3_tx_pull_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_tx_pull_regression PRIVATE ${QT}::Core ${QT}::Gui)
+    add_test(NAME m3_tx_pull_regression COMMAND m3_tx_pull_regression)
+    add_executable(m3_tx_level_regression tests/TxLevelRegression.cpp audio/TxLevel.h)
+    target_include_directories(m3_tx_level_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME m3_tx_level_regression COMMAND m3_tx_level_regression)
+    add_executable(m3_i18n_regression tests/RuntimeI18nRegression.cpp utils/RuntimeI18n.cpp tests/i18n.qrc)
+    target_include_directories(m3_i18n_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_i18n_regression PRIVATE ${QT}::Core)
+    add_test(NAME m3_i18n_regression COMMAND m3_i18n_regression)
+    add_executable(m3_rotator_coordinates tests/RotatorCoordinatesRegression.cpp)
+    target_include_directories(m3_rotator_coordinates PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    set_target_properties(m3_rotator_coordinates PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME m3_rotator_coordinates COMMAND m3_rotator_coordinates)
+    add_executable(m3_antialias_regression tests/AntiAliasRegression.cpp)
+    target_include_directories(m3_antialias_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    set_target_properties(m3_antialias_regression PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME m3_antialias_regression COMMAND m3_antialias_regression)
+    add_executable(m3_capture_clock tests/CaptureClockRegression.cpp)
+    target_include_directories(m3_capture_clock PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_capture_clock PRIVATE ${QT}::Core)
+    add_test(NAME m3_capture_clock COMMAND m3_capture_clock)
 
-    add_executable(madmodem_resampler_streaming tests/ResamplerStreamingRegression.cpp dsp/text/LinearResampler.cpp)
-    target_include_directories(madmodem_resampler_streaming PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_resampler_streaming PRIVATE ${QT}::Core)
-    add_test(NAME madmodem_resampler_streaming COMMAND madmodem_resampler_streaming)
-    add_executable(madmodem_logbook_regression tests/LogbookRegression.cpp logbook/AdifLogbook.cpp)
-    target_include_directories(madmodem_logbook_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_logbook_regression PRIVATE ${QT}::Core)
-    add_test(NAME madmodem_logbook_regression COMMAND madmodem_logbook_regression)
-    add_executable(madmodem_wav_reader_test
+    add_executable(m3_resampler_streaming tests/ResamplerStreamingRegression.cpp dsp/text/LinearResampler.cpp)
+    target_include_directories(m3_resampler_streaming PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_resampler_streaming PRIVATE ${QT}::Core)
+    add_test(NAME m3_resampler_streaming COMMAND m3_resampler_streaming)
+    add_executable(m3_logbook_regression tests/LogbookRegression.cpp logbook/AdifLogbook.cpp)
+    target_include_directories(m3_logbook_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_logbook_regression PRIVATE ${QT}::Core)
+    add_test(NAME m3_logbook_regression COMMAND m3_logbook_regression)
+    add_executable(m3_wav_reader_test
         tests/WavFileReaderTest.cpp
         audio/WavFileReader.cpp
         audio/WavFileReader.h
     )
-    target_include_directories(madmodem_wav_reader_test PRIVATE
+    target_include_directories(m3_wav_reader_test PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"
     )
-    target_link_libraries(madmodem_wav_reader_test PRIVATE ${QT}::Core)
-    add_test(NAME madmodem_wav_reader_test COMMAND madmodem_wav_reader_test)
+    target_link_libraries(m3_wav_reader_test PRIVATE ${QT}::Core)
+    add_test(NAME m3_wav_reader_test COMMAND m3_wav_reader_test)
 
-    add_executable(madmodem_audio_flow_accounting tests/AudioFlowAccountingRegression.cpp audio/BoundedAudioDispatcher.cpp audio/BoundedAudioDispatcher.h)
-    target_include_directories(madmodem_audio_flow_accounting PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_audio_flow_accounting PRIVATE ${QT}::Core)
-    add_test(NAME madmodem_audio_flow_accounting COMMAND madmodem_audio_flow_accounting)
+    add_executable(m3_audio_flow_accounting tests/AudioFlowAccountingRegression.cpp audio/BoundedAudioDispatcher.cpp audio/BoundedAudioDispatcher.h)
+    target_include_directories(m3_audio_flow_accounting PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_audio_flow_accounting PRIVATE ${QT}::Core)
+    add_test(NAME m3_audio_flow_accounting COMMAND m3_audio_flow_accounting)
 
-    add_executable(madmodem_q65_native_regression
+    add_executable(m3_q65_native_regression
         tests/Q65NativeRegression.cpp
     )
-    target_include_directories(madmodem_q65_native_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_q65_native_regression PRIVATE madmodem_q65 ${QT}::Core)
-    add_test(NAME madmodem_q65_native_regression COMMAND madmodem_q65_native_regression)
-    set_tests_properties(madmodem_q65_native_regression PROPERTIES TIMEOUT 240)
+    target_include_directories(m3_q65_native_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_q65_native_regression PRIVATE m3_q65 ${QT}::Core)
+    add_test(NAME m3_q65_native_regression COMMAND m3_q65_native_regression)
+    set_tests_properties(m3_q65_native_regression PROPERTIES TIMEOUT 240)
 
-    add_executable(madmodem_msk144_native_regression
+    add_executable(m3_msk144_native_regression
         tests/Msk144NativeRegression.cpp
     )
-    target_include_directories(madmodem_msk144_native_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_msk144_native_regression PRIVATE madmodem_msk144 ${QT}::Core)
-    add_test(NAME madmodem_msk144_native_regression COMMAND madmodem_msk144_native_regression)
-    set_tests_properties(madmodem_msk144_native_regression PROPERTIES TIMEOUT 180)
+    target_include_directories(m3_msk144_native_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_msk144_native_regression PRIVATE m3_msk144 ${QT}::Core)
+    add_test(NAME m3_msk144_native_regression COMMAND m3_msk144_native_regression)
+    set_tests_properties(m3_msk144_native_regression PROPERTIES TIMEOUT 180)
 
     find_package(Python3 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND AND UNIX AND CMAKE_GENERATOR STREQUAL "Unix Makefiles")
-        add_test(NAME madmodem_ft_reference_native COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_ft_reference_regression.py" --build "${CMAKE_BINARY_DIR}")
-        set_tests_properties(madmodem_ft_reference_native PROPERTIES TIMEOUT 180)
-        add_test(NAME madmodem_ft_native_frontend COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_ft_coherent_regression.py" --build "${CMAKE_BINARY_DIR}" --probe FtNativeFrontendRegression.cpp)
-        set_tests_properties(madmodem_ft_native_frontend PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
-        add_test(NAME madmodem_ft_coherent_native COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_ft_coherent_regression.py" --build "${CMAKE_BINARY_DIR}")
-        set_tests_properties(madmodem_ft_coherent_native PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
+        add_test(NAME m3_ft_reference_native COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_ft_reference_regression.py" --build "${CMAKE_BINARY_DIR}")
+        set_tests_properties(m3_ft_reference_native PROPERTIES TIMEOUT 180)
+        add_test(NAME m3_ft_native_frontend COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_ft_coherent_regression.py" --build "${CMAKE_BINARY_DIR}" --probe FtNativeFrontendRegression.cpp)
+        set_tests_properties(m3_ft_native_frontend PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
+        add_test(NAME m3_ft_coherent_native COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_ft_coherent_regression.py" --build "${CMAKE_BINARY_DIR}")
+        set_tests_properties(m3_ft_coherent_native PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
     endif()
 
     if(Python3_Interpreter_FOUND)
@@ -1246,52 +1246,52 @@ if(BUILD_TESTING)
         endif()
 
         if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-            add_test(NAME madmodem_linux_update_helpers COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_update_helpers.py")
-            add_test(NAME madmodem_linux_installer_preflight COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_linux_installer_preflight.py")
-            add_test(NAME madmodem_update_publication COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_update_publication.py")
-            set_tests_properties(madmodem_linux_update_helpers madmodem_linux_installer_preflight madmodem_update_publication PROPERTIES TIMEOUT 30)
+            add_test(NAME m3_linux_update_helpers COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_update_helpers.py")
+            add_test(NAME m3_linux_installer_preflight COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_linux_installer_preflight.py")
+            add_test(NAME m3_update_publication COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_update_publication.py")
+            set_tests_properties(m3_linux_update_helpers m3_linux_installer_preflight m3_update_publication PROPERTIES TIMEOUT 30)
         endif()
 
-        add_test(NAME madmodem_architecture_guard
+        add_test(NAME m3_architecture_guard
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_guard_suite.py"
                     architecture ${MADMODEM_GUARD_UNIX_ARGS})
-        add_test(NAME madmodem_ui_contest_guard
+        add_test(NAME m3_ui_contest_guard
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_guard_suite.py"
                     ui ${MADMODEM_GUARD_UNIX_ARGS})
-        add_test(NAME madmodem_ft_runtime_guard
+        add_test(NAME m3_ft_runtime_guard
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_guard_suite.py"
                     ft ${MADMODEM_GUARD_UNIX_ARGS})
-        add_test(NAME madmodem_release_audit
+        add_test(NAME m3_release_audit
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_guard_suite.py"
                     release ${MADMODEM_GUARD_UNIX_ARGS})
     endif()
 
-    add_executable(madmodem_receiver_filter_regression
+    add_executable(m3_receiver_filter_regression
         tests/ReceiverFilterRegression.cpp dsp/WaterfallLeveler.cpp dsp/DspEngine.cpp)
-    target_include_directories(madmodem_receiver_filter_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(madmodem_receiver_filter_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core)
-    add_test(NAME madmodem_receiver_filter_regression COMMAND madmodem_receiver_filter_regression)
-    add_executable(madmodem_waterfall_cq_regression
+    target_include_directories(m3_receiver_filter_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_receiver_filter_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core)
+    add_test(NAME m3_receiver_filter_regression COMMAND m3_receiver_filter_regression)
+    add_executable(m3_waterfall_cq_regression
         tests/WaterfallCqRegression.cpp dsp/WaterfallLeveler.cpp dsp/DspEngine.cpp widgets/CqSpots.h
         modems/ft8/FtDecodeFilter.h modems/ft8/FtDecodeColours.h)
-    target_include_directories(madmodem_waterfall_cq_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(madmodem_waterfall_cq_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Gui)
-    add_test(NAME madmodem_waterfall_cq_regression COMMAND madmodem_waterfall_cq_regression)
+    target_include_directories(m3_waterfall_cq_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_waterfall_cq_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Gui)
+    add_test(NAME m3_waterfall_cq_regression COMMAND m3_waterfall_cq_regression)
 
     if(UNIX)
-        add_test(NAME madmodem_cw_native_regression
+        add_test(NAME m3_cw_native_regression
             COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cw_native_regression.sh"
                          "${CMAKE_CURRENT_BINARY_DIR}/tests-cw")
-        add_test(NAME madmodem_waterfall_native_regression
+        add_test(NAME m3_waterfall_native_regression
             COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_waterfall_leveler_regression.sh"
                          "${CMAKE_CURRENT_BINARY_DIR}/tests-waterfall")
         if(Python3_Interpreter_FOUND)
-            add_test(NAME madmodem_waterfall_integrity_guard
+            add_test(NAME m3_waterfall_integrity_guard
                 COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_guard_suite.py"
                         waterfall --with-unix-checks)
         endif()
-        set_tests_properties(madmodem_cw_native_regression
-                             madmodem_waterfall_native_regression
+        set_tests_properties(m3_cw_native_regression
+                             m3_waterfall_native_regression
                              PROPERTIES TIMEOUT 180)
     endif()
 
@@ -1349,7 +1349,7 @@ option(MADMODEM_BUILD_FT_TESTS
     ${BUILD_TESTING})
 
 if(MADMODEM_BUILD_FT_TESTS)
-    add_executable(MadModemFtSequencerSelfTest
+    add_executable(m3_ft_sequencer_selftest
         tests/FtSequencerSelfTest.cpp
         modems/ft8/FtDecodedText.h
         modems/ft8/FtDecodedText.cpp
@@ -1359,10 +1359,10 @@ if(MADMODEM_BUILD_FT_TESTS)
         modems/ft8/FtQsoSession.cpp
         modems/ft8/FtTxPlan.h
     )
-    target_include_directories(MadModemFtSequencerSelfTest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(MadModemFtSequencerSelfTest PRIVATE ${QT}::Core)
+    target_include_directories(m3_ft_sequencer_selftest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_ft_sequencer_selftest PRIVATE ${QT}::Core)
     if(BUILD_TESTING)
-        add_test(NAME madmodem_ft_sequencer COMMAND MadModemFtSequencerSelfTest)
+        add_test(NAME m3_ft_sequencer COMMAND m3_ft_sequencer_selftest)
     endif()
 endif()
 
@@ -1378,21 +1378,21 @@ if(MADMODEM_BUILD_CW_TESTS)
         tests/CwNativeRegression.cpp
     )
     target_include_directories(MadModemCwNativeRegression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(MadModemCwNativeRegression PRIVATE madmodem_cwskimmer)
+    target_link_libraries(MadModemCwNativeRegression PRIVATE m3_cwskimmer)
 endif()
 
 if(BUILD_TESTING)
-    add_executable(madmodem_all_contest_exports_regression
+    add_executable(m3_all_contest_exports_regression
         tests/AllContestExportsRegression.cpp logbook/ContestExchange.cpp dxcc/CtyCountryFile.cpp)
-    target_include_directories(madmodem_all_contest_exports_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_all_contest_exports_regression PRIVATE ${QT}::Core ${QT}::Gui)
-    add_custom_command(TARGET madmodem_all_contest_exports_regression POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cty.csv $<TARGET_FILE_DIR:madmodem_all_contest_exports_regression>/cty.csv
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/rtty_rules $<TARGET_FILE_DIR:madmodem_all_contest_exports_regression>/rtty_rules
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cw_rules $<TARGET_FILE_DIR:madmodem_all_contest_exports_regression>/cw_rules)
-    add_test(NAME madmodem_all_contest_exports_regression COMMAND madmodem_all_contest_exports_regression)
+    target_include_directories(m3_all_contest_exports_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_all_contest_exports_regression PRIVATE ${QT}::Core ${QT}::Gui)
+    add_custom_command(TARGET m3_all_contest_exports_regression POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cty.csv $<TARGET_FILE_DIR:m3_all_contest_exports_regression>/cty.csv
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/rtty_rules $<TARGET_FILE_DIR:m3_all_contest_exports_regression>/rtty_rules
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cw_rules $<TARGET_FILE_DIR:m3_all_contest_exports_regression>/cw_rules)
+    add_test(NAME m3_all_contest_exports_regression COMMAND m3_all_contest_exports_regression)
 
-    add_executable(madmodem_logbook_workflow_regression
+    add_executable(m3_logbook_workflow_regression
         tests/LogbookWorkflowRegression.cpp tests/i18n.qrc
         dialogs/LogbookDialog.cpp dialogs/LogbookDialog.h
         dialogs/ContestExportWizard.cpp dialogs/ContestExportWizard.h
@@ -1400,100 +1400,100 @@ if(BUILD_TESTING)
         widgets/QsoMapWidget.cpp widgets/QsoMapWidget.h
         settings/AppSettings.cpp rotator/RotatorPeakSearch.cpp
         dxcc/CtyCountryFile.cpp utils/RuntimeI18n.cpp utils/CockpitTheme.cpp utils/WindowResize.cpp)
-    target_include_directories(madmodem_logbook_workflow_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_logbook_workflow_regression PRIVATE ${QT}::Core ${QT}::Gui ${QT}::Widgets ${QT}::Network ${QT}::PrintSupport)
-    add_test(NAME madmodem_logbook_workflow_regression COMMAND madmodem_logbook_workflow_regression)
-    set_tests_properties(madmodem_logbook_workflow_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
+    target_include_directories(m3_logbook_workflow_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_logbook_workflow_regression PRIVATE ${QT}::Core ${QT}::Gui ${QT}::Widgets ${QT}::Network ${QT}::PrintSupport)
+    add_test(NAME m3_logbook_workflow_regression COMMAND m3_logbook_workflow_regression)
+    set_tests_properties(m3_logbook_workflow_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
 
-    add_executable(madmodem_contest_export_regression
+    add_executable(m3_contest_export_regression
         tests/ContestExportRegression.cpp tests/i18n.qrc
         dialogs/ContestExportWizard.cpp dialogs/ContestExportWizard.h
         logbook/ContestExchange.cpp logbook/ContestExchange.h
         dxcc/CtyCountryFile.cpp utils/RuntimeI18n.cpp utils/CockpitTheme.cpp utils/WindowResize.cpp)
-    target_include_directories(madmodem_contest_export_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_contest_export_regression PRIVATE ${QT}::Core ${QT}::Gui ${QT}::Widgets)
-    add_custom_command(TARGET madmodem_contest_export_regression POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cty.csv $<TARGET_FILE_DIR:madmodem_contest_export_regression>/cty.csv)
-    add_custom_command(TARGET madmodem_contest_export_regression POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/rtty_rules $<TARGET_FILE_DIR:madmodem_contest_export_regression>/rtty_rules
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cw_rules $<TARGET_FILE_DIR:madmodem_contest_export_regression>/cw_rules)
-    add_test(NAME madmodem_contest_export_regression COMMAND madmodem_contest_export_regression)
-    set_tests_properties(madmodem_contest_export_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
+    target_include_directories(m3_contest_export_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_contest_export_regression PRIVATE ${QT}::Core ${QT}::Gui ${QT}::Widgets)
+    add_custom_command(TARGET m3_contest_export_regression POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cty.csv $<TARGET_FILE_DIR:m3_contest_export_regression>/cty.csv)
+    add_custom_command(TARGET m3_contest_export_regression POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/rtty_rules $<TARGET_FILE_DIR:m3_contest_export_regression>/rtty_rules
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cw_rules $<TARGET_FILE_DIR:m3_contest_export_regression>/cw_rules)
+    add_test(NAME m3_contest_export_regression COMMAND m3_contest_export_regression)
+    set_tests_properties(m3_contest_export_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
 
-    add_executable(madmodem_cw_integration_regression
+    add_executable(m3_cw_integration_regression
         tests/CwIntegrationRegression.cpp tests/CwTestSignal.h
         modems/cw/CwDecoder.cpp modems/cw/CwDecoder.h
         modems/cw/neural/CwNeuralDecoder.cpp modems/cw/neural/CwNeuralDecoder.h
         modems/cw/CwBandSkimmer.cpp modems/cw/CwBandSkimmer.h modems/cw/CwBandSkimmerWorker.h
         dsp/text/LinearResampler.cpp)
-    target_include_directories(madmodem_cw_integration_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_cw_integration_regression PRIVATE
-        madmodem_cwskimmer ${QT}::Core ${QT}::Gui)
-    add_test(NAME madmodem_cw_integration_regression COMMAND madmodem_cw_integration_regression)
+    target_include_directories(m3_cw_integration_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_cw_integration_regression PRIVATE
+        m3_cwskimmer ${QT}::Core ${QT}::Gui)
+    add_test(NAME m3_cw_integration_regression COMMAND m3_cw_integration_regression)
 
-    add_executable(madmodem_cw_ctc_prefix_regression tests/CwCtcPrefixRegression.cpp)
-    target_include_directories(madmodem_cw_ctc_prefix_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    add_test(NAME madmodem_cw_ctc_prefix_regression COMMAND madmodem_cw_ctc_prefix_regression)
+    add_executable(m3_cw_ctc_prefix_regression tests/CwCtcPrefixRegression.cpp)
+    target_include_directories(m3_cw_ctc_prefix_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME m3_cw_ctc_prefix_regression COMMAND m3_cw_ctc_prefix_regression)
 
-    add_executable(madmodem_cw_route_probe
+    add_executable(m3_cw_route_probe
         tests/CwRouteProbe.cpp
         modems/cw/CwDecoder.cpp modems/cw/CwDecoder.h
         modems/cw/neural/CwNeuralDecoder.cpp modems/cw/neural/CwNeuralDecoder.h
         modems/cw/CwBandSkimmer.cpp modems/cw/CwBandSkimmer.h
         dsp/text/LinearResampler.cpp)
-    target_include_directories(madmodem_cw_route_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_cw_route_probe PRIVATE madmodem_cwskimmer ${QT}::Core ${QT}::Gui)
+    target_include_directories(m3_cw_route_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_cw_route_probe PRIVATE m3_cwskimmer ${QT}::Core ${QT}::Gui)
 
-    add_executable(madmodem_cw_engine_regression
+    add_executable(m3_cw_engine_regression
         tests/CwEngineIntegrationRegression.cpp
         modems/cw/CwDecoder.cpp modems/cw/CwDecoder.h
         modems/cw/neural/CwNeuralDecoder.cpp modems/cw/neural/CwNeuralDecoder.h
         modems/cw/CwBandSkimmer.cpp modems/cw/CwBandSkimmer.h
         dsp/text/LinearResampler.cpp)
-    target_include_directories(madmodem_cw_engine_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_cw_engine_regression PRIVATE
-        madmodem_cwskimmer ${QT}::Core ${QT}::Gui)
-    add_test(NAME madmodem_cw_engine_regression COMMAND madmodem_cw_engine_regression)
+    target_include_directories(m3_cw_engine_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_cw_engine_regression PRIVATE
+        m3_cwskimmer ${QT}::Core ${QT}::Gui)
+    add_test(NAME m3_cw_engine_regression COMMAND m3_cw_engine_regression)
 
-    add_executable(madmodem_cw_native_probe
+    add_executable(m3_cw_native_probe
         tests/CwNativeProbe.cpp
         modems/cw/CwDecoder.cpp modems/cw/CwDecoder.h
         modems/cw/neural/CwNeuralDecoder.cpp modems/cw/neural/CwNeuralDecoder.h
         modems/cw/CwBandSkimmer.cpp modems/cw/CwBandSkimmer.h
         dsp/text/LinearResampler.cpp)
-    target_include_directories(madmodem_cw_native_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_cw_native_probe PRIVATE
-        madmodem_cwskimmer ${QT}::Core ${QT}::Gui)
+    target_include_directories(m3_cw_native_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_cw_native_probe PRIVATE
+        m3_cwskimmer ${QT}::Core ${QT}::Gui)
 
-    add_executable(madmodem_cw_neural_probe
+    add_executable(m3_cw_neural_probe
         tests/CwNeuralProbe.cpp modems/cw/neural/CwNeuralDecoder.cpp)
-    target_include_directories(madmodem_cw_neural_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    set_target_properties(madmodem_cw_neural_probe PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    target_include_directories(m3_cw_neural_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    set_target_properties(m3_cw_neural_probe PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
 
-    add_executable(madmodem_psk_reporter tests/PskReporterRegression.cpp network/PskReporter.cpp)
-    target_include_directories(madmodem_psk_reporter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_psk_reporter PRIVATE ${QT}::Core ${QT}::Network)
-    add_test(NAME madmodem_psk_reporter COMMAND madmodem_psk_reporter)
-    set_tests_properties(madmodem_psk_reporter PROPERTIES TIMEOUT 20)
+    add_executable(m3_psk_reporter tests/PskReporterRegression.cpp network/PskReporter.cpp)
+    target_include_directories(m3_psk_reporter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_psk_reporter PRIVATE ${QT}::Core ${QT}::Network)
+    add_test(NAME m3_psk_reporter COMMAND m3_psk_reporter)
+    set_tests_properties(m3_psk_reporter PROPERTIES TIMEOUT 20)
 
-    add_executable(madmodem_rtty_contest_regression tests/RttyContestRegression.cpp
+    add_executable(m3_rtty_contest_regression tests/RttyContestRegression.cpp
         modems/rtty/RttyDecoder.cpp modems/rtty/RttyMultiDecoder.cpp
         modems/rtty/tx/RttyTransmitter.cpp dsp/common/DspConditioner.cpp
         logbook/AdifLogbook.cpp dxcc/CtyCountryFile.cpp network/QsoUdpBroadcaster.cpp)
-    target_include_directories(madmodem_rtty_contest_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_rtty_contest_regression PRIVATE madmodem_linear_resampler ${QT}::Core ${QT}::Gui ${QT}::Network)
-    add_custom_command(TARGET madmodem_rtty_contest_regression POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cty.csv $<TARGET_FILE_DIR:madmodem_rtty_contest_regression>/cty.csv)
-    add_test(NAME madmodem_rtty_contest_regression COMMAND madmodem_rtty_contest_regression)
+    target_include_directories(m3_rtty_contest_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_rtty_contest_regression PRIVATE m3_linear_resampler ${QT}::Core ${QT}::Gui ${QT}::Network)
+    add_custom_command(TARGET m3_rtty_contest_regression POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cty.csv $<TARGET_FILE_DIR:m3_rtty_contest_regression>/cty.csv)
+    add_test(NAME m3_rtty_contest_regression COMMAND m3_rtty_contest_regression)
 
-    add_executable(madmodem_rtty_synthetic_bench
+    add_executable(m3_rtty_synthetic_bench
         tests/RttySyntheticBench.cpp
         modems/rtty/RttyDecoder.cpp)
-    target_include_directories(madmodem_rtty_synthetic_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_rtty_synthetic_bench PRIVATE ${QT}::Core ${QT}::Gui)
-    add_test(NAME madmodem_rtty_synthetic_bench COMMAND madmodem_rtty_synthetic_bench)
+    target_include_directories(m3_rtty_synthetic_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_rtty_synthetic_bench PRIVATE ${QT}::Core ${QT}::Gui)
+    add_test(NAME m3_rtty_synthetic_bench COMMAND m3_rtty_synthetic_bench)
 
-    add_executable(madmodem_text_assist_workers_regression
+    add_executable(m3_text_assist_workers_regression
         tests/TextAssistWorkersRegression.cpp
         runtime/LogbookIndexWorker.h
         runtime/LogbookIndexWorker.cpp
@@ -1501,84 +1501,84 @@ if(BUILD_TESTING)
         runtime/TextAssistWorker.cpp
         logbook/AdifLogbook.cpp
         dxcc/CtyCountryFile.cpp)
-    target_include_directories(madmodem_text_assist_workers_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_text_assist_workers_regression PRIVATE ${QT}::Core)
-    add_custom_command(TARGET madmodem_text_assist_workers_regression POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cty.csv $<TARGET_FILE_DIR:madmodem_text_assist_workers_regression>/cty.csv)
-    add_test(NAME madmodem_text_assist_workers_regression COMMAND madmodem_text_assist_workers_regression)
+    target_include_directories(m3_text_assist_workers_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_text_assist_workers_regression PRIVATE ${QT}::Core)
+    add_custom_command(TARGET m3_text_assist_workers_regression POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cty.csv $<TARGET_FILE_DIR:m3_text_assist_workers_regression>/cty.csv)
+    add_test(NAME m3_text_assist_workers_regression COMMAND m3_text_assist_workers_regression)
 
-    add_executable(madmodem_installation_paths_regression tests/InstallationPathsRegression.cpp)
-    target_link_libraries(madmodem_installation_paths_regression PRIVATE ${QT}::Core)
-    add_test(NAME madmodem_installation_paths_regression COMMAND madmodem_installation_paths_regression)
-    add_executable(madmodem_installer_cpu_regression tests/InstallerCpuRegression.cpp)
-    set_target_properties(madmodem_installer_cpu_regression PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
-    add_test(NAME madmodem_installer_cpu_regression COMMAND madmodem_installer_cpu_regression)
+    add_executable(m3_installation_paths_regression tests/InstallationPathsRegression.cpp)
+    target_link_libraries(m3_installation_paths_regression PRIVATE ${QT}::Core)
+    add_test(NAME m3_installation_paths_regression COMMAND m3_installation_paths_regression)
+    add_executable(m3_installer_cpu_regression tests/InstallerCpuRegression.cpp)
+    set_target_properties(m3_installer_cpu_regression PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME m3_installer_cpu_regression COMMAND m3_installer_cpu_regression)
 endif()
 
 if(BUILD_TESTING)
-    add_executable(madmodem_gpu_sync_regression tests/FtGpuSyncRegression.cpp dsp/gpu/FtSyncCompute.cpp)
-    target_include_directories(madmodem_gpu_sync_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/third_party/opencl_headers)
-    target_link_libraries(madmodem_gpu_sync_regression PRIVATE ${QT}::Core)
-    add_test(NAME madmodem_gpu_sync_fallback COMMAND madmodem_gpu_sync_regression)
-    set_tests_properties(madmodem_gpu_sync_fallback PROPERTIES TIMEOUT 30)
+    add_executable(m3_gpu_sync_regression tests/FtGpuSyncRegression.cpp dsp/gpu/FtSyncCompute.cpp)
+    target_include_directories(m3_gpu_sync_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/third_party/opencl_headers)
+    target_link_libraries(m3_gpu_sync_regression PRIVATE ${QT}::Core)
+    add_test(NAME m3_gpu_sync_fallback COMMAND m3_gpu_sync_regression)
+    set_tests_properties(m3_gpu_sync_fallback PROPERTIES TIMEOUT 30)
 
-    add_executable(madmodem_hell_image_regression
+    add_executable(m3_hell_image_regression
         tests/HellschreiberImageRegression.cpp
         modems/hell/HellschreiberDecoder.cpp)
-    target_include_directories(madmodem_hell_image_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_hell_image_regression PRIVATE ${QT}::Core ${QT}::Gui)
-    add_test(NAME madmodem_hell_image_regression COMMAND madmodem_hell_image_regression)
-    add_test(NAME madmodem_hell_image_extended COMMAND madmodem_hell_image_regression --extended)
-    set_tests_properties(madmodem_hell_image_regression madmodem_hell_image_extended PROPERTIES TIMEOUT 90)
+    target_include_directories(m3_hell_image_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_hell_image_regression PRIVATE ${QT}::Core ${QT}::Gui)
+    add_test(NAME m3_hell_image_regression COMMAND m3_hell_image_regression)
+    add_test(NAME m3_hell_image_extended COMMAND m3_hell_image_regression --extended)
+    set_tests_properties(m3_hell_image_regression m3_hell_image_extended PROPERTIES TIMEOUT 90)
 
-    add_executable(madmodem_weatherfax_image_regression
+    add_executable(m3_weatherfax_image_regression
         tests/WeatherFaxImageRegression.cpp
         modems/weatherfax/WeatherFaxDecoder.cpp modems/weatherfax/WeatherFaxDecoder.h
         modems/weatherfax/WeatherFaxIqFilter.h dsp/FrequencyTracker.cpp)
-    target_include_directories(madmodem_weatherfax_image_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_weatherfax_image_regression PRIVATE ${QT}::Core ${QT}::Gui)
-    add_test(NAME madmodem_weatherfax_image_regression COMMAND madmodem_weatherfax_image_regression)
-    add_test(NAME madmodem_weatherfax_image_extended COMMAND madmodem_weatherfax_image_regression --extended)
-    set_tests_properties(madmodem_weatherfax_image_regression madmodem_weatherfax_image_extended PROPERTIES TIMEOUT 30)
+    target_include_directories(m3_weatherfax_image_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_weatherfax_image_regression PRIVATE ${QT}::Core ${QT}::Gui)
+    add_test(NAME m3_weatherfax_image_regression COMMAND m3_weatherfax_image_regression)
+    add_test(NAME m3_weatherfax_image_extended COMMAND m3_weatherfax_image_regression --extended)
+    set_tests_properties(m3_weatherfax_image_regression m3_weatherfax_image_extended PROPERTIES TIMEOUT 30)
 endif()
 
 if(BUILD_TESTING)
-    add_executable(madmodem_sstv_vis_regression tests/SstvVisRegression.cpp
+    add_executable(m3_sstv_vis_regression tests/SstvVisRegression.cpp
         modems/sstv/SstvDecoder.cpp modems/sstv/tx/SstvTransmitter.cpp
         third_party/mmsstv_lgpl/MmsstvRxCore.cpp)
-    target_include_directories(madmodem_sstv_vis_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_sstv_vis_regression PRIVATE ${QT}::Core ${QT}::Gui)
-    add_test(NAME madmodem_sstv_vis_regression COMMAND madmodem_sstv_vis_regression)
-    set_tests_properties(madmodem_sstv_vis_regression PROPERTIES TIMEOUT 60)
+    target_include_directories(m3_sstv_vis_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_sstv_vis_regression PRIVATE ${QT}::Core ${QT}::Gui)
+    add_test(NAME m3_sstv_vis_regression COMMAND m3_sstv_vis_regression)
+    set_tests_properties(m3_sstv_vis_regression PROPERTIES TIMEOUT 60)
 endif()
 
 if(BUILD_TESTING)
-    add_executable(madmodem_sstv_editor_regression tests/SstvEditorRegression.cpp
+    add_executable(m3_sstv_editor_regression tests/SstvEditorRegression.cpp
         dialogs/SstvImageEditorDialog.cpp utils/RuntimeI18n.cpp modems/sstv/tx/SstvTransmitter.cpp)
-    target_include_directories(madmodem_sstv_editor_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_sstv_editor_regression PRIVATE ${QT}::Core ${QT}::Gui ${QT}::Widgets)
-    add_test(NAME madmodem_sstv_editor_regression COMMAND madmodem_sstv_editor_regression)
-    set_tests_properties(madmodem_sstv_editor_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
+    target_include_directories(m3_sstv_editor_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_sstv_editor_regression PRIVATE ${QT}::Core ${QT}::Gui ${QT}::Widgets)
+    add_test(NAME m3_sstv_editor_regression COMMAND m3_sstv_editor_regression)
+    set_tests_properties(m3_sstv_editor_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
 endif()
 
 if(BUILD_TESTING)
-    add_executable(madmodem_sstv_image_adjustment_regression
+    add_executable(m3_sstv_image_adjustment_regression
         tests/SstvImageAdjustmentRegression.cpp modems/sstv/SstvDecoder.cpp
         modems/sstv/tx/SstvTransmitter.cpp third_party/mmsstv_lgpl/MmsstvRxCore.cpp)
-    target_include_directories(madmodem_sstv_image_adjustment_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_sstv_image_adjustment_regression PRIVATE ${QT}::Core ${QT}::Gui)
-    add_test(NAME madmodem_sstv_image_adjustment_regression COMMAND madmodem_sstv_image_adjustment_regression)
-    set_tests_properties(madmodem_sstv_image_adjustment_regression PROPERTIES TIMEOUT 90)
+    target_include_directories(m3_sstv_image_adjustment_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_sstv_image_adjustment_regression PRIVATE ${QT}::Core ${QT}::Gui)
+    add_test(NAME m3_sstv_image_adjustment_regression COMMAND m3_sstv_image_adjustment_regression)
+    set_tests_properties(m3_sstv_image_adjustment_regression PROPERTIES TIMEOUT 90)
 endif()
 
 if(BUILD_TESTING)
-    add_executable(madmodem_sstv_archive_regression tests/SstvArchiveRegression.cpp runtime/SstvImageArchive.cpp)
-    target_include_directories(madmodem_sstv_archive_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(madmodem_sstv_archive_regression PRIVATE ${QT}::Core ${QT}::Gui)
-    add_test(NAME madmodem_sstv_archive_regression COMMAND madmodem_sstv_archive_regression)
-    set_tests_properties(madmodem_sstv_archive_regression PROPERTIES TIMEOUT 30)
+    add_executable(m3_sstv_archive_regression tests/SstvArchiveRegression.cpp runtime/SstvImageArchive.cpp)
+    target_include_directories(m3_sstv_archive_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_sstv_archive_regression PRIVATE ${QT}::Core ${QT}::Gui)
+    add_test(NAME m3_sstv_archive_regression COMMAND m3_sstv_archive_regression)
+    set_tests_properties(m3_sstv_archive_regression PROPERTIES TIMEOUT 30)
 endif()
 
-if(TARGET madmodem_audio_flow_accounting)
-    target_link_libraries(madmodem_audio_flow_accounting PRIVATE madmodem_diagnostics)
+if(TARGET m3_audio_flow_accounting)
+    target_link_libraries(m3_audio_flow_accounting PRIVATE m3_diagnostics)
 endif()

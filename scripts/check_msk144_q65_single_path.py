@@ -36,7 +36,7 @@ checks = {
         and "modems/weak_signal/WeakSignalCodecLock.cpp" in cmake
         and "MADMODEM_ENABLE_Q65" not in cmake
         and "decoderq65.cpp" not in cmake
-        and "MADMODEM_FFTW3_LIBRARY" not in re.search(r"target_link_libraries\(madmodem_q65\b(.*?)\)", cmake, re.S).group(1)
+        and "MADMODEM_FFTW3_LIBRARY" not in re.search(r"target_link_libraries\(m3_q65\b(.*?)\)", cmake, re.S).group(1)
     ),
     "Q65 wrapper owns only the native engine": (
         "engine.decode(job.samples,job.periodId,job.config)" in q65_decoder
@@ -117,13 +117,13 @@ checks = {
     ),
     "MSK144 target contains every 77-bit protocol primitive": (
         "third_party/mshv_gpl/port/HvPackUnpackMsg/pack_unpack_msg77.cpp" in cmake
-        and "madmodem_weak_signal_codec" in cmake
+        and "m3_weak_signal_codec" in cmake
     ),
     "shared message primitives are compiled exactly once": (
         cmake.count("third_party/mshv_gpl/port/HvPackUnpackMsg/pack_unpack_msg77.cpp") == 1
         and cmake.count("third_party/mshv_gpl/nhash.cpp") == 1
-        and "target_link_libraries(madmodem_weak_signal_codec PUBLIC ${QT}::Core Threads::Threads)" in cmake
-        and "madmodem_q65\n    madmodem_weak_signal_codec" in cmake
+        and "target_link_libraries(m3_weak_signal_codec PUBLIC ${QT}::Core Threads::Threads)" in cmake
+        and "m3_q65\n    m3_weak_signal_codec" in cmake
     ),
     "FT4 FT8 MSK144 and Q65 serialize the shared message codec": (
         "WeakSignalCodecLock::mutex()" in ft_rx
@@ -150,13 +150,13 @@ checks = {
         and "complete frame deferred" in main
     ),
     "native modem regressions are registered": (
-        "madmodem_q65_native_regression" in cmake
-        and "madmodem_msk144_native_regression" in cmake
+        "m3_q65_native_regression" in cmake
+        and "m3_msk144_native_regression" in cmake
     ),
     "native modem targets carry their thread runtime": (
-        "target_link_libraries(madmodem_weak_signal_codec PUBLIC ${QT}::Core Threads::Threads)" in cmake
-        and "target_link_libraries(madmodem_msk144 PUBLIC madmodem_weak_signal_codec ${QT}::Core ${QT}::Widgets Threads::Threads)" in cmake
-        and "target_link_libraries(madmodem_q65 PUBLIC madmodem_weak_signal_codec ${QT}::Core ${QT}::Widgets Threads::Threads)" in cmake
+        "target_link_libraries(m3_weak_signal_codec PUBLIC ${QT}::Core Threads::Threads)" in cmake
+        and "target_link_libraries(m3_msk144 PUBLIC m3_weak_signal_codec ${QT}::Core ${QT}::Widgets Threads::Threads)" in cmake
+        and "target_link_libraries(m3_q65 PUBLIC m3_weak_signal_codec ${QT}::Core ${QT}::Widgets Threads::Threads)" in cmake
     ),
 }
 
