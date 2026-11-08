@@ -3,6 +3,12 @@
 #include <QJsonArray>
 #include <QRegularExpression>
 
+// Compiled once instead of on every call (several run per decode).
+namespace {
+const QRegularExpression kRegexZone(QStringLiteral("^[0-9]{1,2}$"));
+const QRegularExpression kRegexRst(QStringLiteral("^[1-5][1-9][1-9]$"));
+}
+
 namespace ContestExport {
 namespace {
 // Export evaluates geography from the logged station, never today's settings.
@@ -80,7 +86,7 @@ bool valid(const QString& value, const QJsonObject& field) {
     // ADIF/imported CQ zones may be zero-padded even when the profile's
     // interactive-input regex expects an unpadded number. Keep the recorded
     // representation in Cabrillo while checking its numeric value.
-    const QString checked=type=="zone" && QRegularExpression("^[0-9]{1,2}$").match(value).hasMatch()
+    const QString checked=type=="zone" && kRegexZone.match(value).hasMatch()
         ? QString::number(value.toInt()) : value;
     return regex.isValid() && regex.match(checked).hasMatch();
 }
@@ -126,7 +132,7 @@ QString automaticExchange(const LogbookEntry& e, const Identity& profile, bool s
         }
         if(cursor>=tokens.size()) continue;
         if(id=="RST" && (tokens.size()<exchangeFields ||
-            !QRegularExpression("^[1-5][1-9][1-9]$").match(tokens[cursor]).hasMatch())) continue;
+            !kRegexRst.match(tokens[cursor]).hasMatch())) continue;
         QString value=tokens[cursor++];
         if(i==fields.size()-1 && (field.value("type").toString()=="text" || field.value("type").toString()=="name")) {
             while(cursor<tokens.size()) value+=' '+tokens[cursor++];

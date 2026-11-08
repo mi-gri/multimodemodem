@@ -182,6 +182,27 @@
 #include <QAudioDeviceInfo>
 #endif
 
+// Compiled once instead of on every call (several run per decode).
+namespace {
+const QRegularExpression kRegexNotCallsignChars(QStringLiteral("[^A-Z0-9/]+"));
+const QRegularExpression kRegexDigit(QStringLiteral("\\d"));
+const QRegularExpression kRegexRReportWord(QStringLiteral("\\bR[+-]?[0-9]{2}\\b"));
+const QRegularExpression kRegexReportWord(QStringLiteral("\\b[+-]?[0-9]{2}\\b"));
+const QRegularExpression kRegexWhitespaceRun(QStringLiteral("\\s+"));
+const QRegularExpression kRegexGridCi(QStringLiteral("^[A-R]{2}[0-9]{2}([A-X]{2})?$"), QRegularExpression::CaseInsensitiveOption);
+const QRegularExpression kRegexReport(QStringLiteral("^[+-]\\d{2}$"));
+const QRegularExpression kRegexRReport(QStringLiteral("^R[+-]\\d{2}$"));
+const QRegularExpression kRegexTrailingRReport(QStringLiteral("\\sR[+-]\\d{2}$"));
+const QRegularExpression kRegexContestLocator(QStringLiteral("^[A-R]{2}\\d{2}(?:[A-X]{2})?$"));
+const QRegularExpression kRegexContestRst(QStringLiteral("^[1-5][1-9][1-9]$"));
+const QRegularExpression kRegexContestSerial(QStringLiteral("^\\d{1,6}$"));
+const QRegularExpression kRegexContestZone(QStringLiteral("^\\d{1,2}$"));
+const QRegularExpression kRegexContestYear(QStringLiteral("^(?:19|20)?\\d{2}$"));
+const QRegularExpression kRegexContestTime(QStringLiteral("^\\d{4}$"));
+const QRegularExpression kRegexContestAge(QStringLiteral("^\\d{1,3}$"));
+const QRegularExpression kRegexContestName(QStringLiteral("^[A-Z]{2,12}$"));
+}
+
 
 class LedVuMeterWidget final : public QWidget
 {
@@ -511,7 +532,7 @@ private:
 QString normalizeFtFilterCall(QString call)
 {
     call = call.trimmed().toUpper();
-    call.remove(QRegularExpression(QStringLiteral("[^A-Z0-9/]+")));
+    call.remove(kRegexNotCallsignChars);
     return call;
 }
 
@@ -3381,6 +3402,7 @@ void MainWindow::uploadLoggedQsoToWavelog(const LogbookEntry &entry)
     config.url = m_settings.wavelogUrl;
     config.apiKey = m_settings.wavelogApiKey;
     config.stationId = m_settings.wavelogStationId;
+    config.allowInsecureHttp = m_settings.wavelogAllowInsecureHttp;
     if (!config.isComplete()) {
         appendLog(uiText("wavelog_incomplete", "Wavelog/Cloudlog: %1 not sent - URL, API key or station location missing in Settings.").arg(entry.callsign));
         return;
@@ -3408,6 +3430,7 @@ void MainWindow::publishWavelogRadio()
     WavelogClient::Config config;
     config.url = m_settings.wavelogUrl;
     config.apiKey = m_settings.wavelogApiKey;
+    config.allowInsecureHttp = m_settings.wavelogAllowInsecureHttp;
     m_wavelog->sendRadio(config, m_settings.wavelogRadioName, hz, mode, watts);
 }
 
@@ -4899,7 +4922,7 @@ QString rttyContestCallArea(const QString &call)
         for (int i = 1; i < pieces.size(); ++i) {
             const QString suffix = pieces.at(i).trimmed().toUpper();
             if (suffix.size() == 1 && suffix.at(0).isDigit() && !prefix.isEmpty()) {
-                const int lastDigit = prefix.lastIndexOf(QRegularExpression(QStringLiteral("\\d")));
+                const int lastDigit = prefix.lastIndexOf(kRegexDigit);
                 if (lastDigit >= 0) {
                     prefix[lastDigit] = suffix.at(0);
                 }
@@ -4941,7 +4964,7 @@ QString rttyContestWpxPrefix(const QString &call)
     const QStringList pieces = normalized.split(QLatin1Char('/'), Qt::SkipEmptyParts);
     if (pieces.size() > 1) {
         for (const QString &piece : pieces) {
-            if (piece.contains(QRegularExpression(QStringLiteral("\\d"))) && piece.size() <= 4) {
+            if (piece.contains(kRegexDigit) && piece.size() <= 4) {
                 normalized = piece;
                 break;
             }
@@ -5784,14 +5807,14 @@ bool MainWindow::fillRttyContestFieldFromClick(QPlainTextEdit *terminal, int cli
 
     auto matchesField = [&](const RttyContestFieldRule &field) {
         if (!field.regex.isEmpty()) return rttyContestRegexMatches(field.regex, token);
-        if (field.type == QStringLiteral("locator")) return QRegularExpression(QStringLiteral("^[A-R]{2}\\d{2}(?:[A-X]{2})?$")).match(token).hasMatch();
-        if (field.type == QStringLiteral("rst")) return QRegularExpression(QStringLiteral("^[1-5][1-9][1-9]$")).match(token).hasMatch();
-        if (field.type == QStringLiteral("serial")) return QRegularExpression(QStringLiteral("^\\d{1,6}$")).match(token).hasMatch();
-        if (field.type == QStringLiteral("zone")) return QRegularExpression(QStringLiteral("^\\d{1,2}$")).match(token).hasMatch();
-        if (field.type == QStringLiteral("year")) return QRegularExpression(QStringLiteral("^(?:19|20)?\\d{2}$")).match(token).hasMatch();
-        if (field.type == QStringLiteral("time")) return QRegularExpression(QStringLiteral("^\\d{4}$")).match(token).hasMatch();
-        if (field.type == QStringLiteral("age")) return QRegularExpression(QStringLiteral("^\\d{1,3}$")).match(token).hasMatch();
-        if (field.type == QStringLiteral("name")) return QRegularExpression(QStringLiteral("^[A-Z]{2,12}$")).match(token).hasMatch();
+        if (field.type == QStringLiteral("locator")) return kRegexContestLocator.match(token).hasMatch();
+        if (field.type == QStringLiteral("rst")) return kRegexContestRst.match(token).hasMatch();
+        if (field.type == QStringLiteral("serial")) return kRegexContestSerial.match(token).hasMatch();
+        if (field.type == QStringLiteral("zone")) return kRegexContestZone.match(token).hasMatch();
+        if (field.type == QStringLiteral("year")) return kRegexContestYear.match(token).hasMatch();
+        if (field.type == QStringLiteral("time")) return kRegexContestTime.match(token).hasMatch();
+        if (field.type == QStringLiteral("age")) return kRegexContestAge.match(token).hasMatch();
+        if (field.type == QStringLiteral("name")) return kRegexContestName.match(token).hasMatch();
         return false;
     };
 
@@ -10936,6 +10959,11 @@ void MainWindow::setupUiConnections()
 
     // v2.42: rotating startup mottos removed; menu bar corner remains empty.
 
+    // F2 opens Settings from anywhere in the main window. The action lives
+    // on the menu bar; adding it to the window keeps the shortcut active.
+    m_actionAppSettings->setShortcut(QKeySequence(Qt::Key_F2));
+    m_actionAppSettings->setShortcutContext(Qt::WindowShortcut);
+    addAction(m_actionAppSettings);
     connect(m_actionAppSettings, &QAction::triggered,
             this, &MainWindow::showAppSettingsDialog);
     connect(ui->actionExit, &QAction::triggered,
@@ -14510,10 +14538,10 @@ void MainWindow::updateMsk144SequencerFromDecode(const QString &message, int snr
     if (msg.contains(QStringLiteral(" RR73")) || msg.contains(QStringLiteral(" RRR")) || msg.endsWith(QStringLiteral(" 73"))) {
         row = 5; // courtesy/final 73
         reason = uiText("seq_completed", "QSO completed / send 73 if needed");
-    } else if (msg.contains(QRegularExpression(QStringLiteral("\\bR[+-]?[0-9]{2}\\b")))) {
+    } else if (msg.contains(kRegexRReportWord)) {
         row = 4; // acknowledge with RR73
         reason = uiText("seq_send_rr73", "received R-report; selected RR73");
-    } else if (msg.contains(QRegularExpression(QStringLiteral("\\b[+-]?[0-9]{2}\\b")))) {
+    } else if (msg.contains(kRegexReportWord)) {
         row = 3; // reply with R-report
         reason = uiText("seq_send_r_report", "received report; selected R-report");
     } else if (!dx.isEmpty()) {
@@ -14904,10 +14932,10 @@ void MainWindow::updateQ65SequencerFromDecode(const QString &message, int snrDb)
     if (msg.contains(QStringLiteral(" RR73")) || msg.contains(QStringLiteral(" RRR")) || msg.endsWith(QStringLiteral(" 73"))) {
         row = 5;
         reason = uiText("seq_completed", "QSO completed / send 73 if needed");
-    } else if (msg.contains(QRegularExpression(QStringLiteral("\\bR[+-]?[0-9]{2}\\b")))) {
+    } else if (msg.contains(kRegexRReportWord)) {
         row = 4;
         reason = uiText("seq_send_rr73", "received R-report; selected RR73");
-    } else if (msg.contains(QRegularExpression(QStringLiteral("\\b[+-]?[0-9]{2}\\b")))) {
+    } else if (msg.contains(kRegexReportWord)) {
         row = 3;
         reason = uiText("seq_send_r_report", "received report; selected R-report");
     } else if (!dx.isEmpty()) {
@@ -19053,7 +19081,7 @@ void MainWindow::handleFt8QsoHistoryDoubleClicked(QTableWidgetItem *item)
 
     QString call;
     QString grid;
-    const QStringList parts = message.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+    const QStringList parts = message.split(kRegexWhitespaceRun, Qt::SkipEmptyParts);
     if (parts.size() >= 2) {
         if (FtDecodedText::callMatches(parts.value(0), myCall)) {
             call = parts.value(1).trimmed().toUpper();
@@ -19061,7 +19089,7 @@ void MainWindow::handleFt8QsoHistoryDoubleClicked(QTableWidgetItem *item)
             call = parts.value(0).trimmed().toUpper();
         }
     }
-    if (parts.size() >= 3 && QRegularExpression(QStringLiteral("^[A-R]{2}[0-9]{2}([A-X]{2})?$"), QRegularExpression::CaseInsensitiveOption).match(parts.value(2)).hasMatch()) {
+    if (parts.size() >= 3 && kRegexGridCi.match(parts.value(2)).hasMatch()) {
         grid = parts.value(2).left(4).toUpper();
     }
     if (!call.isEmpty() && m_editFt8DxCall != nullptr) {
@@ -19077,12 +19105,11 @@ void MainWindow::handleFt8QsoHistoryDoubleClicked(QTableWidgetItem *item)
         const QString payload = parts.value(2).trimmed().toUpper();
         if (parts.value(0).compare(QStringLiteral("CQ"), Qt::CaseInsensitive) == 0) {
             matchedRow = 0;
-        } else if (QRegularExpression(QStringLiteral("^[A-R]{2}[0-9]{2}([A-X]{2})?$"),
-                                      QRegularExpression::CaseInsensitiveOption).match(payload).hasMatch()) {
+        } else if (kRegexGridCi.match(payload).hasMatch()) {
             matchedRow = 1;
-        } else if (QRegularExpression(QStringLiteral("^[+-]\\d{2}$")).match(payload).hasMatch()) {
+        } else if (kRegexReport.match(payload).hasMatch()) {
             matchedRow = 2;
-        } else if (QRegularExpression(QStringLiteral("^R[+-]\\d{2}$")).match(payload).hasMatch()) {
+        } else if (kRegexRReport.match(payload).hasMatch()) {
             matchedRow = 3;
         } else if (payload == QStringLiteral("RR73") || payload == QStringLiteral("RRR")) {
             matchedRow = 4;
@@ -19207,11 +19234,11 @@ void MainWindow::handleFt8DecodeDoubleClicked(QTableWidgetItem *item)
         preferredTxRow = 2;
     }
 
-    const QStringList rawParts = message.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+    const QStringList rawParts = message.split(kRegexWhitespaceRun, Qt::SkipEmptyParts);
     const bool rawIsMyRReportToDx = rawParts.size() >= 3 &&
                                     FtDecodedText::callMatches(rawParts.at(0), myCall) &&
                                     !FtDecodedText::callMatches(rawParts.at(1), myCall) &&
-                                    QRegularExpression(QStringLiteral("^R[+-]\\d{2}$")).match(rawParts.at(2)).hasMatch();
+                                    kRegexRReport.match(rawParts.at(2)).hasMatch();
     if (rawIsMyRReportToDx) {
         // The DX has acknowledged our report with R-xx.  Reply with RR73/73
         // (Tx5/Tx6 family), never with another R-report.  This protects manual
@@ -19316,10 +19343,10 @@ void MainWindow::handleFt8DecodeDoubleClicked(QTableWidgetItem *item)
                                                (parsed.rrr || parsed.contestAck ||
                                                 (!parsed.report.isEmpty() && parsed.report.trimmed().toUpper().startsWith('R'))));
         if (selectedShouldBeFinalAck &&
-            QRegularExpression(QStringLiteral("\\sR[+-]\\d{2}$")).match(autoTxMessage.trimmed().toUpper()).hasMatch()) {
+            kRegexTrailingRReport.match(autoTxMessage.trimmed().toUpper()).hasMatch()) {
             const int rr73Row = qMin(4, m_tableFt8TxMessages->rowCount() - 1);
             const QString rr73Message = selectFt8TxRow(rr73Row);
-            if (!rr73Message.trimmed().isEmpty() && !QRegularExpression(QStringLiteral("\\sR[+-]\\d{2}$")).match(rr73Message.trimmed().toUpper()).hasMatch()) {
+            if (!rr73Message.trimmed().isEmpty() && !kRegexTrailingRReport.match(rr73Message.trimmed().toUpper()).hasMatch()) {
                 preferredTxRow = rr73Row;
                 autoTxMessage = rr73Message;
                 appendLog("FT sequencer safety: R-report reply corrected to RR73/73 row.");

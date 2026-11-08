@@ -335,3 +335,27 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
  'Display / FT colours':('Display / FT colours','Aspetto / colori FT','Affichage / couleurs FT','Darstellung / FT-Farben','Visning / FT-farger','Zobrazení / barvy FT'),
 }.items()})
+# Wavelog / Cloudlog: explicit override for plain http
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Allow unencrypted http (API key readable on the way)':(
+  'Allow unencrypted http (API key readable on the way)',
+  'Consenti http non cifrato (chiave API leggibile in transito)',
+  'Autoriser http non chiffré (clé API lisible en route)',
+  'Unverschlüsseltes http erlauben (API-Schlüssel unterwegs lesbar)',
+  'Tillat ukryptert http (API-nøkkelen kan leses underveis)',
+  'Povolit nešifrované http (klíč API lze cestou přečíst)'),
+ 'Only needed for a server on the internet that offers no https. Prefer https.':(
+  'Only needed for a server on the internet that offers no https. Prefer https.',
+  'Serve solo per un server su internet senza https. Preferisci https.',
+  'Nécessaire uniquement pour un serveur sur internet sans https. Préférez https.',
+  'Nur nötig für einen Server im Internet ohne https. Besser https verwenden.',
+  'Bare nødvendig for en server på internett uten https. Bruk helst https.',
+  'Potřeba jen pro server na internetu bez https. Raději použijte https.'),
+ 'With plain http your API key and all QSO data are sent unencrypted. Anyone on the network path can read the key and write to or read your log with it. Use this only if the server cannot offer https.\n\nAllow unencrypted http anyway?':(
+  'With plain http your API key and all QSO data are sent unencrypted. Anyone on the network path can read the key and write to or read your log with it. Use this only if the server cannot offer https.\n\nAllow unencrypted http anyway?',
+  'Con http semplice la chiave API e tutti i dati QSO vengono inviati senza cifratura. Chiunque lungo il percorso di rete può leggere la chiave e con essa leggere o scrivere nel tuo log. Usalo solo se il server non può offrire https.\n\nConsentire comunque http non cifrato?',
+  'Avec http simple, votre clé API et toutes les données QSO sont envoyées sans chiffrement. Toute personne sur le chemin réseau peut lire la clé et lire ou écrire dans votre carnet. N’utilisez ceci que si le serveur ne peut pas proposer https.\n\nAutoriser quand même http non chiffré ?',
+  'Mit einfachem http werden dein API-Schlüssel und alle QSO-Daten unverschlüsselt gesendet. Jeder auf dem Netzweg kann den Schlüssel mitlesen und damit dein Log lesen oder hineinschreiben. Nur verwenden, wenn der Server kein https anbieten kann.\n\nUnverschlüsseltes http trotzdem erlauben?',
+  'Med vanlig http sendes API-nøkkelen og alle QSO-data ukryptert. Alle på nettverksveien kan lese nøkkelen og lese eller skrive i loggen din med den. Bruk dette bare hvis serveren ikke kan tilby https.\n\nTillate ukryptert http likevel?',
+  'Při prostém http se klíč API i všechna data spojení posílají nešifrovaně. Kdokoli na síťové cestě může klíč přečíst a s ním číst nebo zapisovat do vašeho deníku. Použijte to jen tehdy, když server nemůže nabídnout https.\n\nPřesto povolit nešifrované http?'),
+}.items()})

@@ -4,6 +4,7 @@
 #include "utils/ProductName.h"
 #include "MadModemVersion.h"
 
+#include <QHostAddress>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -71,6 +72,34 @@ QUrl WavelogClient::endpoint(const QString &baseUrl, const QString &path)
     while (base.endsWith(QLatin1Char('/'))) base.chop(1);
     if (!base.contains(QStringLiteral("://"))) base.prepend(QStringLiteral("https://"));
     return QUrl(base + QStringLiteral("/api/") + path);
+}
+
+bool WavelogClient::isInsecureUrl(const QString &baseUrl)
+{
+    const QUrl url = endpoint(baseUrl, QString());
+    if (url.scheme().compare(QStringLiteral("http"), Qt::CaseInsensitive) != 0) return false;
+    const QString host = url.host().toLower();
+    if (host == QStringLiteral("localhost") || host.endsWith(QStringLiteral(".local")) ||
+        host.endsWith(QStringLiteral(".lan")) || host.endsWith(QStringLiteral(".home.arpa")) || !host.contains(QLatin1Char('.')))
+        return false;
+    QHostAddress address;
+    if (!address.setAddress(host)) return true;   // public DNS name over plain http
+    if (address.isLoopback() || address.isLinkLocal()) return false;
+    const QPair<QHostAddress, int> privateNets[] = {
+        QHostAddress::parseSubnet(QStringLiteral("10.0.0.0/8")),
+        QHostAddress::parseSubnet(QStringLiteral("172.16.0.0/12")),
+        QHostAddress::parseSubnet(QStringLiteral("192.168.0.0/16")),
+        QHostAddress::parseSubnet(QStringLiteral("100.64.0.0/10")),
+        QHostAddress::parseSubnet(QStringLiteral("fc00::/7")),
+    };
+    for (const auto &net : privateNets)
+        if (address.isInSubnet(net)) return false;
+    return true;
+}
+
+QString WavelogClient::insecureUrlMessage()
+{
+    return QStringLiteral("refused: plain http would send the API key unencrypted over the internet - use https");
 }
 
 QByteArray WavelogClient::qsoPayload(const Config &config, const QString &adifRecord)
@@ -186,6 +215,10 @@ void WavelogClient::uploadQso(const Config &config, const QString &callsign, con
 
 void WavelogClient::postQso(const Config &config, const QString &callsign, const QString &adifRecord, int attempt)
 {
+    if (!config.allowInsecureHttp && isInsecureUrl(config.url)) {
+        emit qsoUploaded(callsign, false, insecureUrlMessage(), false);
+        return;
+    }
     QNetworkReply *reply = postJson(endpoint(config.url, QStringLiteral("qso")), qsoPayload(config, adifRecord));
     connect(reply, &QNetworkReply::finished, this, [this, reply, config, callsign, adifRecord, attempt]() {
         reply->deleteLater();
@@ -205,6 +238,10 @@ void WavelogClient::postQso(const Config &config, const QString &callsign, const
 
 void WavelogClient::fetchStations(const Config &config)
 {
+    if (!config.allowInsecureHttp && isInsecureUrl(config.url)) {
+        emit stationsFetched(false, {}, insecureUrlMessage());
+        return;
+    }
     QNetworkRequest request(endpoint(config.url, QStringLiteral("station_info/") +
                                                  QString::fromLatin1(QUrl::toPercentEncoding(config.apiKey.trimmed()))));
     request.setRawHeader("Accept", "application/json");
@@ -233,6 +270,10 @@ void WavelogClient::fetchStations(const Config &config)
 void WavelogClient::sendRadio(const Config &config, const QString &radio, qint64 frequencyHz,
                               const QString &mode, double watts)
 {
+    if (!config.allowInsecureHttp && isInsecureUrl(config.url)) {
+        emit radioSent(false, insecureUrlMessage());
+        return;
+    }
     QNetworkReply *reply = postJson(endpoint(config.url, QStringLiteral("radio")),
                                     radioPayload(config.apiKey, radio, frequencyHz, mode, watts));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {

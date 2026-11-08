@@ -5,6 +5,11 @@
 #include <QtGlobal>
 #include <QRegularExpression>
 
+// Compiled once instead of on every call (several run per decode).
+namespace {
+const QRegularExpression kRegexCqTarget(QStringLiteral("^[A-Z]{1,4}$"));
+}
+
 namespace {
 
 QString normCall(QString s)
@@ -59,7 +64,7 @@ void FtStandardMessageSet::rebuild(const Inputs &inputs)
     }
 
     const QString target = inputs.cqTarget.trimmed().toUpper();
-    const QString cq = QRegularExpression(QStringLiteral("^[A-Z]{1,4}$")).match(target).hasMatch()
+    const QString cq = kRegexCqTarget.match(target).hasMatch()
         ? QStringLiteral("CQ %1").arg(target) : QStringLiteral("CQ");
     m_messages << QStringLiteral("%1 %2 %3").arg(cq, m_myCall, m_myGrid)
                << QStringLiteral("%1 %2 %3").arg(dx, m_myCall, m_myGrid)

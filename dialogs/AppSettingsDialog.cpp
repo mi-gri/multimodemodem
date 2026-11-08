@@ -1299,6 +1299,27 @@ QWidget *AppSettingsDialog::makeLogbookPage()
     loadStations->setObjectName(QStringLiteral("btnWavelogLoadStations"));
     m_lblWavelogStatus = new QLabel(wavelogGroup);
     m_lblWavelogStatus->setWordWrap(true);
+    m_chkWavelogInsecure = new QCheckBox(L(QStringLiteral("Allow unencrypted http (API key readable on the way)")), wavelogGroup);
+    m_chkWavelogInsecure->setObjectName(QStringLiteral("chkWavelogInsecureHttp"));
+    m_chkWavelogInsecure->setChecked(m_initialSettings.wavelogAllowInsecureHttp);
+    m_chkWavelogInsecure->setToolTip(L(QStringLiteral("Only needed for a server on the internet that offers no https. Prefer https.")));
+    connect(m_chkWavelogInsecure, &QCheckBox::toggled, this, [this](bool checked) {
+        if (!checked) return;
+        const auto answer = QMessageBox::warning(this, QStringLiteral("Wavelog / Cloudlog"),
+            L(QStringLiteral("With plain http your API key and all QSO data are sent unencrypted. Anyone on the network path can read the key and write to or read your log with it. Use this only if the server cannot offer https.\n\nAllow unencrypted http anyway?")),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (answer != QMessageBox::Yes) {
+            const QSignalBlocker block(m_chkWavelogInsecure);
+            m_chkWavelogInsecure->setChecked(false);
+        }
+    });
+    auto refreshInsecure = [this]() {
+        // Relevant only when the URL is plain http to a host on the internet.
+        const bool insecure = WavelogClient::isInsecureUrl(m_editWavelogUrl->text());
+        m_chkWavelogInsecure->setVisible(insecure || m_chkWavelogInsecure->isChecked());
+    };
+    connect(m_editWavelogUrl, &QLineEdit::textChanged, this, refreshInsecure);
+    refreshInsecure();
     m_chkWavelogRadio = new QCheckBox(L(QStringLiteral("Send CAT frequency, mode and power as radio")), wavelogGroup);
     m_chkWavelogRadio->setObjectName(QStringLiteral("chkWavelogRadio"));
     m_chkWavelogRadio->setChecked(m_initialSettings.wavelogRadioEnabled);
@@ -1313,19 +1334,21 @@ QWidget *AppSettingsDialog::makeLogbookPage()
     wavelogGrid->addWidget(m_cmbWavelogStation, 3, 1);
     wavelogGrid->addWidget(loadStations, 3, 2);
     wavelogGrid->addWidget(m_lblWavelogStatus, 4, 0, 1, 3);
-    wavelogGrid->addWidget(m_chkWavelogRadio, 5, 0, 1, 3);
-    wavelogGrid->addWidget(new QLabel(L(QStringLiteral("Radio name")), wavelogGroup), 6, 0);
-    wavelogGrid->addWidget(m_editWavelogRadioName, 6, 1, 1, 2);
+    wavelogGrid->addWidget(m_chkWavelogInsecure, 5, 0, 1, 3);
+    wavelogGrid->addWidget(m_chkWavelogRadio, 6, 0, 1, 3);
+    wavelogGrid->addWidget(new QLabel(L(QStringLiteral("Radio name")), wavelogGroup), 7, 0);
+    wavelogGrid->addWidget(m_editWavelogRadioName, 7, 1, 1, 2);
     wavelogGrid->setColumnStretch(1, 1);
     QLabel *wavelogInfo = new QLabel(L(QStringLiteral("Each QSO is sent after it has been saved in the local logbook. If the server cannot be reached, the upload is retried after 30 s, 2 min and 10 min.")), wavelogGroup);
     wavelogInfo->setWordWrap(true);
     wavelogInfo->setStyleSheet(QStringLiteral("color: palette(mid);"));
-    wavelogGrid->addWidget(wavelogInfo, 7, 0, 1, 3);
+    wavelogGrid->addWidget(wavelogInfo, 8, 0, 1, 3);
     m_wavelogProbe = new WavelogClient(this);
     connect(loadStations, &QPushButton::clicked, this, [this, loadStations]() {
         WavelogClient::Config config;
         config.url = m_editWavelogUrl->text();
         config.apiKey = m_editWavelogApiKey->text();
+        config.allowInsecureHttp = m_chkWavelogInsecure->isChecked();
         if (config.url.trimmed().isEmpty() || config.apiKey.trimmed().isEmpty()) {
             m_lblWavelogStatus->setText(L(QStringLiteral("Enter URL and API key first.")));
             return;
@@ -2717,6 +2740,7 @@ void AppSettingsDialog::collectSettings()
         merged.wavelogUrl = m_editWavelogUrl->text().trimmed();
         merged.wavelogApiKey = m_editWavelogApiKey->text().trimmed();
         merged.wavelogStationId = m_cmbWavelogStation->currentData().toString().trimmed();
+        merged.wavelogAllowInsecureHttp = m_chkWavelogInsecure->isChecked();
         merged.wavelogRadioEnabled = m_chkWavelogRadio->isChecked();
         merged.wavelogRadioName = m_editWavelogRadioName->text().trimmed();
         if (merged.wavelogRadioName.isEmpty()) merged.wavelogRadioName = QStringLiteral("MultiModeModem");

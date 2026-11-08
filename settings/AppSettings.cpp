@@ -200,6 +200,7 @@ void AppSettings::load()
     wavelogUrl = settings.value("Wavelog/url", wavelogUrl).toString().trimmed();
     wavelogApiKey = settings.value("Wavelog/apiKey", wavelogApiKey).toString().trimmed();
     wavelogStationId = settings.value("Wavelog/stationId", wavelogStationId).toString().trimmed();
+    wavelogAllowInsecureHttp = settings.value("Wavelog/allowInsecureHttp", wavelogAllowInsecureHttp).toBool();
     wavelogRadioEnabled = settings.value("Wavelog/radioEnabled", wavelogRadioEnabled).toBool();
     wavelogRadioName = settings.value("Wavelog/radioName", wavelogRadioName).toString().trimmed();
     if (wavelogRadioName.isEmpty()) wavelogRadioName = QStringLiteral("MultiModeModem");
@@ -838,6 +839,7 @@ bool AppSettings::save() const
     settings.setValue("Wavelog/url", wavelogUrl.trimmed());
     settings.setValue("Wavelog/apiKey", wavelogApiKey.trimmed());
     settings.setValue("Wavelog/stationId", wavelogStationId.trimmed());
+    settings.setValue("Wavelog/allowInsecureHttp", wavelogAllowInsecureHttp);
     settings.setValue("Wavelog/radioEnabled", wavelogRadioEnabled);
     settings.setValue("Wavelog/radioName", wavelogRadioName.trimmed());
     settings.setValue("Logbook/udpServer", logbookUdpServer.trimmed().isEmpty() ? QStringLiteral("127.0.0.1") : logbookUdpServer.trimmed());
@@ -1143,7 +1145,9 @@ bool AppSettings::save() const
     settings.sync();
 
 #ifndef Q_OS_WIN
-    if (!qrzPassword.isEmpty() && settings.status() == QSettings::NoError) {
+    // The file holds account secrets (QRZ password, Wavelog API key):
+    // readable by the owner only, whatever is configured.
+    if (settings.status() == QSettings::NoError) {
         QFile::setPermissions(settings.fileName(), QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     }
 #endif

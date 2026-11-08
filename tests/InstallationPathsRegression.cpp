@@ -62,6 +62,10 @@ int main(int argc, char **argv) {
     const QString contest = config + "/configs/contest.mad";
     check(MadModemInstallation::settingsFileFor(portable, config, "contest") == contest &&
           read(contest) == "central settings", "new named configuration starts as copy of default");
+#ifndef Q_OS_WIN
+    check(!(QFileInfo(contest).permissions() & (QFileDevice::ReadGroup | QFileDevice::ReadOther | QFileDevice::WriteGroup | QFileDevice::WriteOther)),
+          "copied configuration readable by the owner only");
+#endif
     check(write(contest, "contest settings") &&
           MadModemInstallation::settingsFileFor(portable, config, "contest") == contest &&
           read(contest) == "contest settings" && read(config + "/settings.mad") == "central settings",

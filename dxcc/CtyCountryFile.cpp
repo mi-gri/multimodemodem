@@ -22,8 +22,9 @@ CtyCountryFile::CtyCountryFile()
 
 QString CtyCountryFile::normalizeCallsignForDxcc(const QString &callsign)
 {
+    static const QRegularExpression invalid(QStringLiteral("[^A-Z0-9/]+"));
     QString c = callsign.trimmed().toUpper();
-    c.remove(QRegularExpression(QStringLiteral("[^A-Z0-9/]+")));
+    c.remove(invalid);
     while (c.contains(QStringLiteral("//"))) {
         c.replace(QStringLiteral("//"), QStringLiteral("/"));
     }
@@ -48,7 +49,8 @@ QString CtyCountryFile::cleanPrefixToken(const QString &token)
     if (bracket >= 0 && (cut < 0 || bracket < cut)) cut = bracket;
     if (cut >= 0) t = t.left(cut);
 
-    t.remove(QRegularExpression(QStringLiteral("[^=A-Z0-9/]+")));
+    static const QRegularExpression invalid(QStringLiteral("[^=A-Z0-9/]+"));
+    t.remove(invalid);
     return t;
 }
 
@@ -173,6 +175,14 @@ bool CtyCountryFile::loadFromFile(const QString &path)
         if (a.first.size() != b.first.size()) return a.first.size() > b.first.size();
         return a.first < b.first;
     });
+    // Longest-prefix lookup by hash: the first entry of each prefix in the
+    // sorted list wins, exactly as the former linear scan did.
+    m_prefixHash.clear();
+    m_maxPrefixLength = 0;
+    for (const auto &p : m_prefixIndex) {
+        if (!m_prefixHash.contains(p.first)) m_prefixHash.insert(p.first, p.second);
+        m_maxPrefixLength = qMax(m_maxPrefixLength, p.first.size());
+    }
 
     m_loaded = !m_entities.isEmpty();
     if (!m_loaded) {
@@ -302,11 +312,10 @@ CtyCountryFile::LookupResult CtyCountryFile::lookupCallsign(const QString &calls
     const QStringList parts = call.split('/', Qt::SkipEmptyParts);
     if (parts.size() > 1) {
         const QString suffix = parts.last();
+        static const QRegularExpression digitsOnly(QStringLiteral("^[0-9]+$"));
         if (suffix != "P" && suffix != "M" && suffix != "MM" && suffix != "AM" && suffix != "QRP" &&
-            !suffix.contains(QRegularExpression(QStringLiteral("^[0-9]+$")))) {
-            for (const auto &prefix : m_prefixIndex) {
-                if (suffix == prefix.first) { candidates << suffix; break; }
-            }
+            !digitsOnly.match(suffix).hasMatch() && m_prefixHash.contains(suffix)) {
+            candidates << suffix;
         }
     }
     candidates << call;
@@ -317,9 +326,10 @@ CtyCountryFile::LookupResult CtyCountryFile::lookupCallsign(const QString &calls
     }
 
     for (const QString &candidate : candidates) {
-        for (const auto &p : m_prefixIndex) {
-            if (candidate.startsWith(p.first)) {
-                useIndex(p.second, p.first, false);
+        for (int length = qMin(candidate.size(), m_maxPrefixLength); length > 0; --length) {
+            const auto it = m_prefixHash.constFind(candidate.left(length));
+            if (it != m_prefixHash.constEnd()) {
+                useIndex(it.value(), it.key(), false);
                 return result;
             }
         }

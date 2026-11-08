@@ -16,6 +16,7 @@ public:
     ~SessionDiagnostics();
     static SessionDiagnostics &instance();
     static QString defaultFolder();
+    static int pruneFolder(const QString &folder, qint64 maxBytes, int maxFiles);
     static void installQtCapture();
     static void restoreQtCapture();
     bool start(const QString &folder);

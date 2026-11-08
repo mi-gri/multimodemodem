@@ -75,6 +75,8 @@ private:
     QHash<QString, int> m_exactIndex;
     QHash<QString, QPair<int,int>> m_zoneOverrides;
     QVector<QPair<QString, int>> m_prefixIndex;
+    QHash<QString, int> m_prefixHash;    // prefix -> entity, for longest-prefix lookup
+    int m_maxPrefixLength = 0;
     bool m_loaded = false;
     QString m_sourcePath;
     QString m_errorString;

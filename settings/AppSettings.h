@@ -58,6 +58,7 @@ public:
     QString wavelogUrl;                 // e.g. https://log.example.com/index.php
     QString wavelogApiKey;              // never written to diagnostics
     QString wavelogStationId;           // station_profile_id
+    bool wavelogAllowInsecureHttp = false; // operator accepted plain http to a public host
     bool wavelogRadioEnabled = false;   // publish CAT frequency/mode/power
     QString wavelogRadioName = "MultiModeModem";
     int logbookUdpTextFormat = 0; // 0 bundle, 1 type 5, 2 type 12

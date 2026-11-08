@@ -26,6 +26,22 @@ int main(int argc, char **argv) {
     check(second.load() && second.count() == 1, "existing QSO retained");
     entry.callsign = "K1ABC";
     check(second.append(entry) && first.load() && first.count() == 2, "reload and append");
+    // New QSOs are appended; QSOs another program (WSJT-X) appended meanwhile
+    // are taken over, any other external change still requires a reload.
+    const QString path = dir.filePath("log.adi");
+    auto readFile = [&] { QFile f(path); f.open(QIODevice::ReadOnly); return f.readAll(); };
+    const QByteArray beforeAppend = readFile();
+    entry.callsign = "DL1AAA";
+    check(first.append(entry) && readFile().startsWith(beforeAppend) && first.count() == 3, "append keeps existing bytes");
+    {QFile f(path); f.open(QIODevice::Append); f.write("<call:6>G0JEIX <mode:3>FT8 <eor>");}   // no trailing newline
+    entry.callsign = "SP2XYZ";
+    check(first.append(entry) && first.count() == 5, "external append taken over");
+    AdifLogbook fresh(path);
+    check(fresh.load() && fresh.count() == 5 && fresh.containsCallsign("G0JEIX") && fresh.containsCallsign("SP2XYZ"), "file holds both QSOs intact");
+    const QByteArray full = readFile();
+    {QFile f(path); f.open(QIODevice::WriteOnly); f.write(QByteArray(full).replace("DL1AAA", "DL1AAB"));}
+    entry.callsign = "OK1ABC";
+    check(!first.append(entry, &error) && error.contains("externally"), "rewritten file still rejected");
     const auto malformed = AdifLogbook::parseAdif("<CALL:2147483647>X");
     check(malformed.isEmpty(), "oversized field rejected without overflow");
     return ok ? 0 : 1;

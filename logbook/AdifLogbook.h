@@ -109,6 +109,7 @@ private:
 
     QString m_fileName;
     mutable QByteArray m_fileDigest;
+    mutable qint64 m_fileSize = 0;   // file size belonging to m_fileDigest
     QString m_headerText;
     QVector<LogbookEntry> m_records;
     QSet<QString> m_callsignIndex;

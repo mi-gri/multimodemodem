@@ -47,6 +47,16 @@ inline QString userFile(const QString &executableDir, const QString &userDir, co
 // folders moved from …/MadModem to …/MultiModeModem. Copy the settings and the
 // default logbook from the MadModem folders once; never overwrite, never
 // delete, so MadModem itself keeps working. Diagnostics are not copied.
+// Settings files hold account secrets; keep them readable by the owner only.
+inline void restrictToOwner(const QString &file)
+{
+#ifndef Q_OS_WIN
+    QFile::setPermissions(file, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+#else
+    Q_UNUSED(file);
+#endif
+}
+
 // Folder of the settings files. M3_CONFIG_DIR overrides it (the tests use
 // this so they never touch the operator's settings).
 inline QString configDirectory()
@@ -102,7 +112,8 @@ inline QString settingsFileFor(const QString &executableDir, const QString &conf
         : QDir(configDir).filePath(QStringLiteral("configs/") + config + QStringLiteral(".mad"));
     if (!QFileInfo::exists(file)) {
         QDir().mkpath(QFileInfo(file).absolutePath());
-        if (QFileInfo::exists(defaultFile)) QFile::copy(defaultFile, file);
+        if (QFileInfo::exists(defaultFile) && QFile::copy(defaultFile, file))
+            restrictToOwner(file);
     }
     return file;
 }

@@ -15,6 +15,11 @@
 #include <QRegularExpression>
 #include <QXmlStreamReader>
 #include <memory>
+
+// Compiled once instead of on every call (several run per decode).
+namespace {
+const QRegularExpression kRegexQrzCallsign(QStringLiteral("^(?:[A-Z0-9]{1,4}/)?[A-Z0-9]{1,3}[0-9][A-Z]{1,4}(?:/[A-Z0-9]{1,4})?$"));
+}
 namespace {
 QString uiText(const char* key, const char* fallback) { return MadModemI18n::translate(QString::fromUtf8(key), QString::fromUtf8(fallback)); }
 }
@@ -69,7 +74,7 @@ void QrzLookupPanel::cancel() {
 }
 void QrzLookupPanel::setCallsign(const QString& raw) {
     const QString call = raw.trimmed().toUpper();
-    const bool valid = QRegularExpression("^(?:[A-Z0-9]{1,4}/)?[A-Z0-9]{1,3}[0-9][A-Z]{1,4}(?:/[A-Z0-9]{1,4})?$").match(call).hasMatch();
+    const bool valid = kRegexQrzCallsign.match(call).hasMatch();
     const QString selected = valid ? call : QString();
     if (!selected.isEmpty() && selected == m_call) return;
     cancel(); m_call = selected; m_open->setEnabled(!m_call.isEmpty());

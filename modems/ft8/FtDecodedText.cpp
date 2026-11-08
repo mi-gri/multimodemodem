@@ -3,6 +3,12 @@
 #include <QRegularExpression>
 #include <QtGlobal>
 
+// Compiled once instead of on every call (several run per decode).
+namespace {
+const QRegularExpression kRegexTrailingAqMarker(QStringLiteral("\\s+(?:\\?\\s*)?[AQ][0-9]\\s*$"));
+const QRegularExpression kRegexWhitespaceRun(QStringLiteral("\\s+"));
+}
+
 namespace {
 
 QString normalizeMessage(QString text)
@@ -28,7 +34,7 @@ QString normalizeMessage(QString text)
     // WSJT-X may append AP/confidence tags to formatted display lines.  Strip
     // only a trailing designator token; never scan the whole message because
     // valid callsigns can contain A/Q followed by a digit.
-    text.replace(QRegularExpression(QStringLiteral("\\s+(?:\\?\\s*)?[AQ][0-9]\\s*$")), QString());
+    text.replace(kRegexTrailingAqMarker, QString());
     text.remove(QLatin1Char('<'));
     text.remove(QLatin1Char('>'));
     const int cr = text.indexOf(QLatin1Char('\r'));
@@ -36,7 +42,7 @@ QString normalizeMessage(QString text)
         text = text.left(cr);
     }
     text = text.left(37).trimmed();
-    text.replace(QRegularExpression(QStringLiteral("\\s+")), QStringLiteral(" "));
+    text.replace(kRegexWhitespaceRun, QStringLiteral(" "));
     return text;
 }
 

@@ -32,6 +32,8 @@ public:
         QString url;
         QString apiKey;
         QString stationId;
+        // The operator explicitly accepted sending the key over plain http.
+        bool allowInsecureHttp = false;
         bool isComplete() const;
     };
 
@@ -54,6 +56,9 @@ public:
     explicit WavelogClient(QObject *parent = nullptr);
 
     static QUrl endpoint(const QString &baseUrl, const QString &path);
+    /// Plain http to a host outside this computer / the local network would
+    /// send the API key unencrypted; such URLs are refused.
+    static bool isInsecureUrl(const QString &baseUrl);
     static QByteArray qsoPayload(const Config &config, const QString &adifRecord);
     static QByteArray radioPayload(const QString &apiKey, const QString &radio, qint64 frequencyHz,
                                    const QString &mode, double watts);
@@ -77,6 +82,7 @@ signals:
 private:
     void postQso(const Config &config, const QString &callsign, const QString &adifRecord, int attempt);
     QNetworkReply *postJson(const QUrl &url, const QByteArray &body);
+    static QString insecureUrlMessage();
 
     QNetworkAccessManager m_network;
     QVector<int> m_retryDelaysMs{30000, 120000, 600000};

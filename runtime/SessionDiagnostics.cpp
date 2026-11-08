@@ -82,6 +82,20 @@ void SessionDiagnostics::restoreQtCapture() {qInstallMessageHandler(previousHand
 QString SessionDiagnostics::path() const {std::lock_guard<std::mutex> l(m_mutex);return m_path;}
 QString SessionDiagnostics::error() const {std::lock_guard<std::mutex> l(m_mutex);return m_error;}
 quint64 SessionDiagnostics::lost() const {std::lock_guard<std::mutex> l(m_mutex);return m_lost;}
+// Keeps the diagnostics folder bounded: the newest recordings are kept up to
+// maxBytes in total (and at most maxFiles), older ones are deleted. Only this
+// program's own recordings (MultiModeModem_* / MadModem_*.jsonl.gz) are touched.
+int SessionDiagnostics::pruneFolder(const QString &folder, qint64 maxBytes, int maxFiles) {
+    QDir dir(folder);
+    const QFileInfoList files=dir.entryInfoList({QStringLiteral("MultiModeModem_*.jsonl.gz"),QStringLiteral("MadModem_*.jsonl.gz")},
+                                                QDir::Files|QDir::NoSymLinks,QDir::Time);
+    qint64 total=0;int kept=0,removed=0;
+    for(const QFileInfo &file:files){
+        if(kept<maxFiles && total+file.size()<=maxBytes){total+=file.size();++kept;continue;}
+        if(QFile::remove(file.absoluteFilePath()))++removed;
+    }
+    return removed;
+}
 bool SessionDiagnostics::start(const QString &folder) {
     std::lock_guard<std::mutex> control(m_control);
     stopLocked();
@@ -89,6 +103,7 @@ bool SessionDiagnostics::start(const QString &folder) {
         std::lock_guard<std::mutex> l(m_mutex);
         m_queue.clear();m_bytes=0;m_sequence=0;m_lost=0;m_flushRequest=0;m_flushDone=0;m_stopping=false;m_ready=false;m_error.clear();
         const QString destination=folder.trimmed().isEmpty()?defaultFolder():QDir(folder).absolutePath();
+        pruneFolder(destination,qint64{2}*1024*1024*1024,50);
         m_path=QDir(destination).filePath("MultiModeModem_"+QDateTime::currentDateTimeUtc().toString("yyyyMMdd_HHmmss_zzz")+"_"+QUuid::createUuid().toString(QUuid::WithoutBraces)+".jsonl.gz");
     }
     m_thread=std::thread([this]{run();});
@@ -162,6 +177,10 @@ void SessionDiagnostics::audio(const QString &stage,const AudioBlock &block) {
     if(!enabled())return;
     double power=0,peak=0;int clipped=0;
     for(float x:block.samples){power+=double(x)*x;peak=std::max(peak,std::abs(double(x)));if(std::abs(x)>=.995f)++clipped;}
+    // Every audio block at every stage made recordings of gigabytes. Keep the
+    // start of the capture, then about one block per second (the same block
+    // at all stages, so its path stays traceable), and every clipped block.
+    if(block.captureSequence>50 && block.captureSequence%50!=0 && clipped==0)return;
     record("audio.block",{{"stage",stage},{"sequence",QString::number(block.captureSequence)},{"generation",QString::number(block.captureGeneration)},{"first_index",QString::number(block.firstSampleIndex)},{"utc_ns",QString::number(block.firstSampleUtcNs)},{"capture_mono_ns",QString::number(block.firstSampleMonotonicNs)},{"span_ns",QString::number(block.captureSpanNs)},{"queued_ns",QString::number(block.enqueuedSteadyNs)},{"rate",block.sampleRate},{"samples",block.samples.size()},{"rms",block.samples.isEmpty()?0:std::sqrt(power/block.samples.size())},{"peak",peak},{"clipped",clipped},{"sha256",QString::fromLatin1(QCryptographicHash::hash(QByteArray::fromRawData(reinterpret_cast<const char*>(block.samples.constData()),block.samples.size()*int(sizeof(float))),QCryptographicHash::Sha256).toHex())}});
 }
 void SessionDiagnostics::settings(const AppSettings &s) {

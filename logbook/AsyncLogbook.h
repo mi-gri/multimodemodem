@@ -34,8 +34,11 @@ public:
                 for (const auto &date : dates)
                     if (date.isValid() && qAbs(date.secsTo(entry.utc)) < 600) return 0;
             }
+            const int before = store.count();
             if (!store.append(entry, &error)) return -1;
-            indexEntry(entry);
+            // QSOs another program appended meanwhile were taken over too.
+            if (store.count() == before + 1) indexEntry(entry);
+            else m_indexesValid = false;
             return 1;
         };
         submit(request, operation, std::move(done), true);

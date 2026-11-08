@@ -80,7 +80,27 @@ int main(int argc, char **argv)
           "https://log.example.com/index.php/api/qso", "endpoint with index.php");
     check(WavelogClient::endpoint("log.example.com", "radio").toString() == "https://log.example.com/api/radio",
           "endpoint defaults to https");
+    check(WavelogClient::isInsecureUrl("http://log.example.com/index.php"), "public http refused");
+    check(WavelogClient::isInsecureUrl("http://93.184.216.34/index.php"), "public IP over http refused");
+    check(!WavelogClient::isInsecureUrl("https://log.example.com/index.php") && !WavelogClient::isInsecureUrl("log.example.com"),
+          "https allowed");
+    check(!WavelogClient::isInsecureUrl("http://127.0.0.1:8086/index.php") && !WavelogClient::isInsecureUrl("http://localhost/") &&
+          !WavelogClient::isInsecureUrl("http://192.168.1.20/wavelog") && !WavelogClient::isInsecureUrl("http://10.1.2.3") &&
+          !WavelogClient::isInsecureUrl("http://wavelog/index.php") && !WavelogClient::isInsecureUrl("http://nas.local/wavelog") &&
+          !WavelogClient::isInsecureUrl("http://[::1]:8080/"), "local http allowed");
     WavelogClient::Config config{"x", "KEY", "7"};
+    {   // Plain http to a public host is refused unless explicitly allowed.
+        WavelogClient guard;
+        WavelogClient::Config publicHttp{"http://log.example.invalid/index.php", "KEY", "7"};
+        QString refused;
+        QObject::connect(&guard, &WavelogClient::stationsFetched, [&](bool, const QVector<WavelogClient::Station> &, const QString &e) { refused = e; });
+        guard.fetchStations(publicHttp);
+        check(refused.contains("unencrypted"), "public http refused without override");
+        publicHttp.allowInsecureHttp = true; refused.clear();
+        guard.fetchStations(publicHttp);
+        waitFor(&guard, &WavelogClient::stationsFetched);
+        check(!refused.contains("unencrypted"), "override sends over http");
+    }
     const QJsonObject qso = QJsonDocument::fromJson(WavelogClient::qsoPayload(config, "<CALL:4>DL1X<EOR>\n")).object();
     check(qso.value("key").toString() == "KEY" && qso.value("station_profile_id").toString() == "7" &&
           qso.value("type").toString() == "adif" && qso.value("string").toString() == "<CALL:4>DL1X<EOR>", "qso payload");

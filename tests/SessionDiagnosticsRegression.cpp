@@ -10,6 +10,7 @@
 #include <QProcess>
 #include <QFileInfo>
 #include <QThread>
+#include <QDateTime>
 #ifdef Q_OS_UNIX
 #include <sys/resource.h>
 #endif
@@ -50,5 +51,12 @@ int main(int argc,char **argv){QCoreApplication app(argc,argv);app.setApplicatio
  const auto crashes=QDir(crashFolder).entryList({"*.jsonl.gz"},QDir::Files);check(crashes.size()==1,"fatal log preserved");
  const auto recovered=readGzipLog(QDir(crashFolder).filePath(crashes.first()),true);
  check(recovered.contains("diagnostic fatal regression")&&!recovered.contains("session.end"),"fatal barrier preserves readable prefix without a false complete footer");
+ {const auto keep=dir.path()+"/retention";QDir().mkpath(keep);const auto now=QDateTime::currentDateTimeUtc();
+  const QStringList names{"MultiModeModem_1.jsonl.gz","MultiModeModem_2.jsonl.gz","MadModem_3.jsonl.gz","MultiModeModem_4.jsonl.gz","notes.jsonl.gz","readme.txt"};
+  for(int i=0;i<names.size();++i){QFile f(keep+"/"+names[i]);check(f.open(QIODevice::WriteOnly)&&f.write(QByteArray(100,'x'))==100,"retention fixture");f.flush();f.setFileTime(now.addSecs(-3600*(names.size()-i)),QFileDevice::FileModificationTime);f.close();}
+  check(SessionDiagnostics::pruneFolder(keep,250,50)==2,"oldest recordings beyond the size limit removed");
+  check(!QFile::exists(keep+"/MultiModeModem_1.jsonl.gz")&&!QFile::exists(keep+"/MultiModeModem_2.jsonl.gz")&&QFile::exists(keep+"/MadModem_3.jsonl.gz")&&
+        QFile::exists(keep+"/MultiModeModem_4.jsonl.gz")&&QFile::exists(keep+"/notes.jsonl.gz")&&QFile::exists(keep+"/readme.txt"),"newest kept, foreign files untouched");
+  check(SessionDiagnostics::pruneFolder(keep,1000,1)==1&&QFile::exists(keep+"/MultiModeModem_4.jsonl.gz"),"file count limit keeps the newest");}
  std::cout<<"PASS gzip CRC/JSONL / live flush / fatal prefix / 3000 concurrent events / sequence / drain / Unicode / collision / error-recovery / decompressed redaction / overflow; plain="<<plain.size()<<" gzip="<<QFileInfo(first).size()<<'\n';
 }

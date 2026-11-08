@@ -266,8 +266,12 @@ inline int runArchitectureRegression(QApplication &app)
     store.drain();
     check(mirror.count() == 2 && saved == 4 && duplicates == 1, "delete and next append share ownership and rebuild duplicate indexes");
     {
-        QFile external(mirror.fileName()); external.open(QIODevice::Append);
-        external.write("\n# external edit\n"); external.close();
+        // A rewrite by another program (not a mere append, which is taken
+        // over) must stop the write until the log is reloaded.
+        QFile external(mirror.fileName()); external.open(QIODevice::ReadOnly);
+        const QByteArray original = external.readAll(); external.close();
+        external.open(QIODevice::WriteOnly | QIODevice::Truncate);
+        external.write("# external edit\n" + original); external.close();
         store.append(entry("EK1KE", "retry-id"), complete, true);
         store.drain();
         check(store.hasUnsaved() && mirror.count() == 2 && errors == 1,

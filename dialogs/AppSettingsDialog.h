@@ -206,6 +206,7 @@ private:
     QComboBox *m_cmbWavelogStation = nullptr;
     QLabel *m_lblWavelogStatus = nullptr;
     QCheckBox *m_chkWavelogRadio = nullptr;
+    QCheckBox *m_chkWavelogInsecure = nullptr;
     QLineEdit *m_editWavelogRadioName = nullptr;
     class WavelogClient *m_wavelogProbe = nullptr;
     QComboBox *m_comboUiTheme = nullptr;
