@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QStandardPaths>
 
 namespace MadModemInstallation {
@@ -46,8 +47,71 @@ inline QString userFile(const QString &executableDir, const QString &userDir, co
 // folders moved from …/MadModem to …/MultiModeModem. Copy the settings and the
 // default logbook from the MadModem folders once; never overwrite, never
 // delete, so MadModem itself keeps working. Diagnostics are not copied.
+// Folder of the settings files. M3_CONFIG_DIR overrides it (the tests use
+// this so they never touch the operator's settings).
+inline QString configDirectory()
+{
+    const QString overrideDir = qEnvironmentVariable("M3_CONFIG_DIR");
+    if (!overrideDir.isEmpty()) return overrideDir;
+    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+}
+
+// The configuration chosen with --config; empty = the default configuration.
+inline QString &activeConfig()
+{
+    static QString config;
+    return config;
+}
+
+// --config takes a name (letters, digits, '.', '_', '-') or a path to a .mad file.
+inline bool isConfigFileArgument(const QString &config)
+{
+    return config.contains(QLatin1Char('/')) || config.contains(QLatin1Char('\\')) ||
+           config.endsWith(QStringLiteral(".mad"), Qt::CaseInsensitive);
+}
+
+inline bool isValidConfigArgument(const QString &config)
+{
+    if (config.isEmpty()) return false;
+    if (isConfigFileArgument(config)) return true;
+    static const QRegularExpression name(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"));
+    return name.match(config).hasMatch();
+}
+
+// Short name for the title bar: the name itself or the file's base name.
+inline QString configLabel(const QString &config)
+{
+    return isConfigFileArgument(config) ? QFileInfo(config).completeBaseName() : config;
+}
+
+/**
+ * @brief Settings file of a configuration.
+ *
+ * The default configuration lives in @p configDir/settings.mad; settings.mad
+ * next to the program (portable builds, older versions) is copied there once
+ * and never deleted.  A named configuration is configDir/configs/NAME.mad, a
+ * path is used as given.  A configuration that does not exist yet starts as a
+ * copy of the default settings.
+ */
+inline QString settingsFileFor(const QString &executableDir, const QString &configDir, const QString &config)
+{
+    const QString defaultFile = userFile(executableDir, configDir, QStringLiteral("settings.mad"));
+    if (config.isEmpty()) return defaultFile;
+    const QString file = isConfigFileArgument(config)
+        ? QFileInfo(config).absoluteFilePath()
+        : QDir(configDir).filePath(QStringLiteral("configs/") + config + QStringLiteral(".mad"));
+    if (!QFileInfo::exists(file)) {
+        QDir().mkpath(QFileInfo(file).absolutePath());
+        if (QFileInfo::exists(defaultFile)) QFile::copy(defaultFile, file);
+    }
+    return file;
+}
+
 inline void adoptUpstreamUserData()
 {
+    // Settings next to the program take precedence over MadModem's folder.
+    if (!qEnvironmentVariableIsSet("M3_CONFIG_DIR"))
+        userFile(QCoreApplication::applicationDirPath(), configDirectory(), QStringLiteral("settings.mad"));
     const struct { QStandardPaths::StandardLocation location; const char *file; } items[] = {
         {QStandardPaths::AppConfigLocation, "settings.mad"},
         {QStandardPaths::AppLocalDataLocation, "logbook.adi"},
@@ -55,6 +119,7 @@ inline void adoptUpstreamUserData()
     for (const auto &item : items) {
         const QString target = QStandardPaths::writableLocation(item.location);
         if (target.isEmpty()) continue;
+        if (item.location == QStandardPaths::AppConfigLocation && qEnvironmentVariableIsSet("M3_CONFIG_DIR")) continue;
         QDir upstreamDir(target);
         if (upstreamDir.dirName() == QStringLiteral("MadModem")) continue;
         upstreamDir.cdUp();
@@ -66,11 +131,10 @@ inline void adoptUpstreamUserData()
     }
 }
 
+// Settings always live in the platform's config folder (Linux:
+// ~/.config/MultiModeModem), for installed and portable builds alike.
 inline QString settingsFilePath()
 {
-    const QString executableDir = QCoreApplication::applicationDirPath();
-    if (!isManaged(executableDir)) return QDir(executableDir).filePath(QStringLiteral("settings.mad"));
-    return userFile(executableDir, QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation),
-                    QStringLiteral("settings.mad"));
+    return settingsFileFor(QCoreApplication::applicationDirPath(), configDirectory(), activeConfig());
 }
 }

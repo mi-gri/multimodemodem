@@ -48,5 +48,30 @@ int main(int argc, char **argv) {
           read(migrated + "/settings.mad") == "current user settings", "Mac reinstall keeps newer user settings");
     check(MadModemInstallation::userFile(install, storage.filePath("blocked/child"), "settings.mad", backups) == saved,
           "failed Mac migration retains access to preserved data");
+
+    // Central settings and named configurations (--config).
+    const QString portable = storage.filePath("portable"), config = storage.filePath("config");
+    QDir().mkpath(portable);
+    check(write(portable + "/settings.mad", "portable settings"), "portable settings fixture");
+    check(MadModemInstallation::settingsFileFor(portable, config, QString()) == config + "/settings.mad" &&
+          read(config + "/settings.mad") == "portable settings" && read(portable + "/settings.mad") == "portable settings",
+          "default settings move to the config folder, portable file kept");
+    check(write(config + "/settings.mad", "central settings") &&
+          MadModemInstallation::settingsFileFor(portable, config, QString()) == config + "/settings.mad" &&
+          read(config + "/settings.mad") == "central settings", "central settings never overwritten by portable file");
+    const QString contest = config + "/configs/contest.mad";
+    check(MadModemInstallation::settingsFileFor(portable, config, "contest") == contest &&
+          read(contest) == "central settings", "new named configuration starts as copy of default");
+    check(write(contest, "contest settings") &&
+          MadModemInstallation::settingsFileFor(portable, config, "contest") == contest &&
+          read(contest) == "contest settings" && read(config + "/settings.mad") == "central settings",
+          "named configuration independent of default");
+    const QString explicitFile = storage.filePath("elsewhere/field.mad");
+    check(MadModemInstallation::settingsFileFor(portable, config, explicitFile) == explicitFile &&
+          read(explicitFile) == "central settings", "configuration given as file path");
+    check(MadModemInstallation::isValidConfigArgument("contest") && MadModemInstallation::isValidConfigArgument("field-2026.day1") &&
+          !MadModemInstallation::isValidConfigArgument("") && !MadModemInstallation::isValidConfigArgument("..") &&
+          !MadModemInstallation::isValidConfigArgument("a b") && MadModemInstallation::configLabel(explicitFile) == "field",
+          "configuration names validated");
     return all ? 0 : 1;
 }

@@ -2,6 +2,7 @@
 #include "MadModemVersion.h"
 #include "MadModemBuildInfo.h"
 #include "utils/BuildNumber.h"
+#include "utils/InstallationPaths.h"
 #include "utils/ProductName.h"
 #include <QString>
 
@@ -24,7 +25,11 @@ inline QString buildLabel()
 inline QString windowTitle()
 {
     // Fork name in the title bar; the version number stays MadModem's.
-    return QStringLiteral("%1 (%2) " MADMODEM_VERSION_STRING " — %3")
+    // A configuration chosen with --config is named in the title bar.
+    const QString config = MadModemInstallation::activeConfig();
+    const QString title = QStringLiteral("%1 (%2) " MADMODEM_VERSION_STRING " — %3")
         .arg(ProductName::longName(), ProductName::shortName(), buildLabel());
+    return config.isEmpty() ? title
+                            : title + QStringLiteral(" — [%1]").arg(MadModemInstallation::configLabel(config));
 }
 }

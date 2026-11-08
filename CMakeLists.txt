@@ -1582,3 +1582,10 @@ endif()
 if(TARGET m3_audio_flow_accounting)
     target_link_libraries(m3_audio_flow_accounting PRIVATE m3_diagnostics)
 endif()
+
+if(BUILD_TESTING)
+    # Tests read and write settings; keep them away from the operator's
+    # ~/.config/MultiModeModem (see MadModemInstallation::configDirectory).
+    get_property(_m3_all_tests DIRECTORY PROPERTY TESTS)
+    set_property(TEST ${_m3_all_tests} APPEND PROPERTY ENVIRONMENT "M3_CONFIG_DIR=${CMAKE_BINARY_DIR}/test-config")
+endif()

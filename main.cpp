@@ -123,6 +123,26 @@ int main(int argc, char *argv[])
     qRegisterMetaType<QVector<QPointF>>("QVector<QPointF>");
     app.setStyle(new DelayedToolTipStyle());
     QCoreApplication::setApplicationName(ProductName::longName());
+    // --config NAME|FILE picks the settings before anything reads them.
+    {
+        const QStringList arguments = app.arguments();
+        for (int i = 1; i < arguments.size(); ++i) {
+            const QString argument = arguments.at(i);
+            QString value;
+            if (argument == QStringLiteral("--config") || argument == QStringLiteral("-c")) {
+                value = i + 1 < arguments.size() ? arguments.at(++i) : QString();
+            } else if (argument.startsWith(QStringLiteral("--config="))) {
+                value = argument.mid(9);
+            } else {
+                continue;
+            }
+            if (!MadModemInstallation::isValidConfigArgument(value)) {
+                std::fprintf(stderr, "--config needs a name (letters, digits, . _ -) or a path to a .mad file\n");
+                return 2;
+            }
+            MadModemInstallation::activeConfig() = value;
+        }
+    }
     MadModemInstallation::adoptUpstreamUserData();
     QCoreApplication::setApplicationVersion(QStringLiteral(MADMODEM_VERSION_STRING));
     app.setApplicationDisplayName(MadModemIdentity::windowTitle());
@@ -171,6 +191,11 @@ int main(int argc, char *argv[])
         QStringLiteral("Check translated Settings layouts without connecting radio hardware."));
     const QCommandLineOption architectureRegressionOption(QStringLiteral("architecture-regression"), QStringLiteral("Check asynchronous FT generation and logbook persistence."));
     commandLine.addOption(architectureRegressionOption);
+    const QCommandLineOption configOption(QStringList{QStringLiteral("c"), QStringLiteral("config")},
+        QStringLiteral("Use another configuration: a name (stored as configs/<name>.mad in the settings folder, "
+                       "created as a copy of the default settings) or a path to a .mad file."),
+        QStringLiteral("name|file"));
+    commandLine.addOption(configOption);
     const QCommandLineOption runtimeRegressionOption(QStringLiteral("runtime-regression"),QStringLiteral("Check RX worker and asynchronous CAT without radio hardware."));
     const QCommandLineOption windowRegressionOption(QStringLiteral("window-rotator-regression"),QStringLiteral("Check main-window popups and manual rotator controls without radio hardware."));
     const QCommandLineOption portableRuntimeOption(QStringLiteral("portable-runtime-regression"), QStringLiteral("Verify bundled Linux plugins, QML and TLS without radio hardware."));

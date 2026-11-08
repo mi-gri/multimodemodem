@@ -5,6 +5,7 @@
 #include <QSignalBlocker>
 #include "QsoMapWidget.h"
 #include "../utils/RuntimeI18n.h"
+#include "../utils/InstallationPaths.h"
 #include "../utils/CockpitTheme.h"
 #include "../dxcc/CtyCountryFile.h"
 
@@ -667,7 +668,7 @@ void QsoMapWidget::printMap()
 
 void QsoMapWidget::loadDisplaySettings()
 {
-    QSettings settings(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("settings.mad")), QSettings::IniFormat);
+    QSettings settings(MadModemInstallation::settingsFilePath(), QSettings::IniFormat);
     const auto behavior=settings.value("QsoMap/displayBehavior").toString();
     m_displayBehavior=behavior=="heard_today"?DisplayBehavior::HeardToday:behavior=="worked_dxcc"?DisplayBehavior::WorkedDxcc:DisplayBehavior::LogbookQsos;
     m_mapFromDate=settings.value("QsoMap/fromDate",QDateTime::currentDateTimeUtc().date()).toDate();
@@ -691,7 +692,7 @@ void QsoMapWidget::loadDisplaySettings()
 
 void QsoMapWidget::saveDisplaySettings() const
 {
-    QSettings settings(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("settings.mad")), QSettings::IniFormat);
+    QSettings settings(MadModemInstallation::settingsFilePath(), QSettings::IniFormat);
     settings.setValue("QsoMap/fromDate",m_mapFromDate);
     settings.setValue("QsoMap/untilDate",m_mapUntilDate);
     settings.setValue(QStringLiteral("QsoMap/displayBehavior"), displayBehaviorName());
