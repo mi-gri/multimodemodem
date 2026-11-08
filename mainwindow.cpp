@@ -1612,12 +1612,15 @@ MainWindow::MainWindow(QWidget *parent)
     const int rotatorIndex = ui->sideTabWidget->indexOf(m_tabCatRotator);
     ui->sideTabWidget->insertTab(rotatorIndex >= 0 ? rotatorIndex : ui->sideTabWidget->count(),
                                 m_tabQrz, uiText("tab_qrz", "QRZ"));
+    setupRigReadoutPanel();
+    ui->modeTabLayout->addWidget(m_grpRigReadout, 0);
     if (m_grpFt8UtcClock != nullptr) {
         m_pageFt8Settings->layout()->removeWidget(m_grpFt8UtcClock);
         m_grpFt8UtcClock->setParent(ui->tabModeSettings);
         ui->modeTabLayout->addWidget(m_grpFt8UtcClock, 0);
         updateFtUtcClockVisibility(ui->cmbMode->currentText());
     }
+    updateRigReadout();
     m_qrzLookupPanel = new QrzLookupPanel(m_tabQrz);
     qrzLayout->addWidget(m_qrzLookupPanel, 1);
     auto refreshStation = [this] { refreshQrzStationPanel(); };
@@ -9937,6 +9940,14 @@ void MainWindow::setupProcessingConnections()
                     appendLog(enabled ? QStringLiteral("PTT: ON") : QStringLiteral("PTT: OFF"));
                 },
                 Qt::QueuedConnection);
+        connect(m_rigController, &HamlibController::txMetersChanged,
+                this, [this](bool transmitting, double watts, double swr) {
+                    m_rigTxMeterActive = transmitting;
+                    m_rigTxWatts = watts;
+                    m_rigTxSwr = swr;
+                    updateRigReadout();
+                },
+                Qt::QueuedConnection);
         connect(m_rigController, &HamlibController::errorOccurred,
                 this, [this](const QString &message) {
                     m_rigCatConnected = false;
@@ -12240,6 +12251,85 @@ void MainWindow::updateRigControlStatusUi()
         MadModemUi::setSemanticRole(m_lblRigPttStatus,
                                     m_lastRigPttOn ? QStringLiteral("negative")
                                                    : QStringLiteral("positive"));
+    }
+    updateRigReadout();
+}
+
+void MainWindow::setupRigReadoutPanel()
+{
+    auto *group = new QGroupBox(uiText("rig_readout_group", "Transceiver"), ui->tabModeSettings);
+    group->setObjectName(QStringLiteral("rigReadoutGroup"));
+    group->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    auto *layout = new QGridLayout(group);
+    layout->setContentsMargins(8, 8, 8, 8);
+    layout->setHorizontalSpacing(8);
+    layout->setVerticalSpacing(0);
+
+    m_lcdRigReadoutFrequency = new QLCDNumber(group);
+    m_lcdRigReadoutFrequency->setObjectName(QStringLiteral("rigReadoutFrequency"));
+    m_lcdRigReadoutFrequency->setSmallDecimalPoint(true);
+    m_lcdRigReadoutFrequency->setDigitCount(8);
+    m_lcdRigReadoutFrequency->setSegmentStyle(QLCDNumber::Filled);
+    m_lcdRigReadoutFrequency->setMinimumHeight(40);
+    m_lcdRigReadoutFrequency->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    auto *unit = new QLabel(QStringLiteral("MHz"), group);
+    unit->setObjectName(QStringLiteral("rigReadoutUnit"));
+
+    m_lblRigReadoutPower = new QLabel(group);
+    m_lblRigReadoutPower->setObjectName(QStringLiteral("rigReadoutPower"));
+    m_lblRigReadoutSwr = new QLabel(group);
+    m_lblRigReadoutSwr->setObjectName(QStringLiteral("rigReadoutSwr"));
+    for (QLabel *label : {m_lblRigReadoutPower, m_lblRigReadoutSwr}) {
+        QFont font = label->font();
+        font.setBold(true);
+        label->setFont(font);
+    }
+
+    // One row, as high as the clock below: frequency | MHz | PWR over SWR.
+    layout->addWidget(m_lcdRigReadoutFrequency, 0, 0, 2, 1);
+    layout->addWidget(unit, 0, 1, 2, 1, Qt::AlignLeft | Qt::AlignBottom);
+    layout->addWidget(m_lblRigReadoutPower, 0, 2, Qt::AlignLeft | Qt::AlignVCenter);
+    layout->addWidget(m_lblRigReadoutSwr, 1, 2, Qt::AlignLeft | Qt::AlignVCenter);
+    layout->setColumnStretch(0, 1);
+    layout->setColumnMinimumWidth(2, m_lblRigReadoutPower->fontMetrics().horizontalAdvance(uiText("rig_readout_power", "PWR %1 W").arg(100)) + 4);
+    group->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power and SWR reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
+    m_grpRigReadout = group;
+}
+
+void MainWindow::updateRigReadout()
+{
+    if (m_grpRigReadout == nullptr) return;
+    m_grpRigReadout->setVisible(m_settings.hamlibCatEnabled);
+
+    if (m_lcdRigReadoutFrequency != nullptr) {
+        const qint64 hz = qRound64(m_lastRigFrequencyHz);
+        QString text = QStringLiteral("--.---.---");
+        int digits = 8;
+        if (hz > 0) {
+            text = QStringLiteral("%1.%2.%3")
+                       .arg(hz / 1000000)
+                       .arg((hz / 1000) % 1000, 3, 10, QLatin1Char('0'))
+                       .arg(hz % 1000, 3, 10, QLatin1Char('0'));
+            digits = qMax(8, text.size() - 2);
+        }
+        if (m_lcdRigReadoutFrequency->digitCount() != digits) m_lcdRigReadoutFrequency->setDigitCount(digits);
+        m_lcdRigReadoutFrequency->display(text);
+    }
+
+    if (m_lblRigReadoutPower != nullptr && m_lblRigReadoutSwr != nullptr) {
+        const QString power = m_rigTxWatts < 0.0
+            ? QStringLiteral("--")
+            : QString::number(m_rigTxWatts, 'f', m_rigTxWatts < 10.0 ? 1 : 0);
+        const QString swr = m_rigTxSwr < 1.0 ? QStringLiteral("--") : QString::number(m_rigTxSwr, 'f', 1);
+        m_lblRigReadoutPower->setText(uiText("rig_readout_power", "PWR %1 W").arg(power));
+        m_lblRigReadoutSwr->setText(uiText("rig_readout_swr", "SWR %1").arg(swr));
+        // Red while transmitting, grey for the last reading after TX.
+        MadModemUi::setSemanticRole(m_lblRigReadoutPower,
+                                    m_rigTxMeterActive ? QStringLiteral("negative") : QStringLiteral("muted"));
+        QString swrRole = m_rigTxMeterActive ? QStringLiteral("positive") : QStringLiteral("muted");
+        if (m_rigTxSwr >= 3.0) swrRole = QStringLiteral("negative");
+        else if (m_rigTxSwr >= 2.0) swrRole = QStringLiteral("warning");
+        MadModemUi::setSemanticRole(m_lblRigReadoutSwr, swrRole);
     }
 }
 
@@ -25288,6 +25378,12 @@ void MainWindow::keyPttForTx(std::function<void(bool)> completion)
     appendLog(QString("TX %1 ON on %2.").arg(useDtr ? QStringLiteral("DTR") : QStringLiteral("RTS"), portName));
     return true;
     }();
+    // PTT outside CAT: still read power/SWR by CAT while transmitting.
+    if (keyed && m_rigController != nullptr && m_settings.hamlibCatEnabled) {
+        auto *controller = m_rigController;
+        QMetaObject::invokeMethod(controller, [controller] { controller->setExternalTransmit(true); },
+                                  Qt::QueuedConnection);
+    }
     completion(keyed);
 }
 
@@ -25306,6 +25402,11 @@ void MainWindow::unkeyPttAfterTx()
 
     if (m_pttSerial.isOpen()) {
         m_pttSerial.setRequestToSend(false);m_pttSerial.setDataTerminalReady(false);m_pttSerial.close();
+    }
+    if (m_rigController != nullptr) {
+        auto *controller = m_rigController;
+        QMetaObject::invokeMethod(controller, [controller] { controller->setExternalTransmit(false); },
+                                  Qt::QueuedConnection);
     }
     if (m_catCommand->busy()) {
         m_catCommand->cancel(); // In-flight command must unkey/restore before its gate reopens.

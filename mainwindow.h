@@ -1436,6 +1436,9 @@ private:
     void applyDecodeTableVisualSettings(QTableWidget *table);
 
     void updateRigControlStatusUi();
+    // Dial frequency and TX meters (power, SWR) read by CAT, beside the clock.
+    void setupRigReadoutPanel();
+    void updateRigReadout();
     void setupCatRotatorModule();
     void setupCatRotatorSideTab();
     void applyCatRotatorSettings();
@@ -2291,6 +2294,13 @@ private:
     QLabel *m_lblRigCatStatus = nullptr;
     QLabel *m_lblRigFrequency = nullptr;
     QLabel *m_lblRigPttStatus = nullptr;
+    QGroupBox *m_grpRigReadout = nullptr;
+    QLCDNumber *m_lcdRigReadoutFrequency = nullptr;
+    QLabel *m_lblRigReadoutPower = nullptr;
+    QLabel *m_lblRigReadoutSwr = nullptr;
+    bool m_rigTxMeterActive = false;
+    double m_rigTxWatts = -1.0;
+    double m_rigTxSwr = -1.0;
     FtSlotScheduler *m_ftSlotScheduler = nullptr;
     QThread *m_ftSlotThread = nullptr;
     bool m_ft8PendingTxArmed = false;

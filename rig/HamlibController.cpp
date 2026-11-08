@@ -613,6 +613,7 @@ bool HamlibController::disconnectRig()
     } else if (backendWasConnected) {
         m_lastPtt = true;
     }
+    txMeteringChanged();
 #ifdef MADMODEM_WITH_HAMLIB
     m_havePreTxMode = false;
     m_preTxMode = 0;
@@ -643,7 +644,12 @@ void HamlibController::pollNow()
 
     // Split/Fake-It temporarily changes a CAT frequency for TX. Never publish
     // that transient value as the station RX frequency or band selection.
-    if (m_ftSplitTxActive || m_lastPtt) {
+    // During CAT PTT only the TX meters are read.
+    if (m_lastPtt) {
+        pollTxMeters();
+        return;
+    }
+    if (m_ftSplitTxActive) {
         return;
     }
 
@@ -694,6 +700,8 @@ void HamlibController::pollNow()
                       .arg(QString::fromLocal8Bit(rigerror(freqRet))));
         setStatus(QStringLiteral("CAT frequency error"));
     }
+
+    if (m_externalTransmit) pollTxMeters();
 
     // Poll the active demodulation mode together with frequency.  RTTY uses
     // this only as a polarity prior; no mode-setting command is issued here.
@@ -759,6 +767,55 @@ void HamlibController::pollNow()
 #endif
 }
 
+
+void HamlibController::setExternalTransmit(bool active)
+{
+    if (m_externalTransmit == active) return;
+    m_externalTransmit = active;
+    txMeteringChanged();
+}
+
+// Called whenever CAT PTT or external TX changes. Starts or ends one metered
+// transmission and publishes its state.
+void HamlibController::txMeteringChanged()
+{
+    const bool transmitting = m_lastPtt || m_externalTransmit;
+    if (transmitting == m_txMetering) return;
+    m_txMetering = transmitting;
+    if (transmitting) {
+        m_txWatts = -1.0;
+        m_txSwr = -1.0;
+    }
+    emit txMetersChanged(transmitting, m_txWatts, m_txSwr);
+}
+
+// Output power and SWR during TX, read as JTDX does: RFPOWER_METER_WATTS and
+// SWR, each only when the backend reports it. A failed read is not a CAT
+// error; it must never interfere with PTT.
+void HamlibController::pollTxMeters()
+{
+#ifdef MADMODEM_WITH_HAMLIB
+    if (!m_txMetering || m_rig == nullptr) return;
+    RIG *rig = static_cast<RIG *>(m_rig);
+    double watts = -1.0;
+    double swr = -1.0;
+    value_t value;
+    if (rig_has_get_level(rig, RIG_LEVEL_RFPOWER_METER_WATTS) &&
+        rig_get_level(rig, RIG_VFO_CURR, RIG_LEVEL_RFPOWER_METER_WATTS, &value) == RIG_OK &&
+        value.f >= 0.0f && value.f < 10000.0f) {
+        watts = value.f;
+    }
+    if (rig_has_get_level(rig, RIG_LEVEL_SWR) &&
+        rig_get_level(rig, RIG_VFO_CURR, RIG_LEVEL_SWR, &value) == RIG_OK &&
+        value.f >= 1.0f && value.f < 100.0f) {
+        swr = value.f;
+    }
+    if (watts == m_txWatts && swr == m_txSwr) return;
+    m_txWatts = watts;
+    m_txSwr = swr;
+    emit txMetersChanged(true, watts, swr);
+#endif
+}
 
 bool HamlibController::setFrequencyHz(double frequencyHz)
 {
@@ -1291,6 +1348,7 @@ bool HamlibController::setHamlibPttMode(bool enabled, int onMode, const QString 
     if (m_lastPtt != enabled) {
         m_lastPtt = enabled;
         emit pttChanged(enabled);
+        txMeteringChanged();
     }
     if (enabled) {
         setStatus(QStringLiteral("CAT connected / %1 ON").arg(label));
@@ -1748,6 +1806,7 @@ bool HamlibController::setHrdPtt(bool enabled)
     if (m_lastPtt != enabled) {
         m_lastPtt = enabled;
         emit pttChanged(enabled);
+        txMeteringChanged();
     }
     setStatus(enabled ? QStringLiteral("HRD CAT connected / PTT ON") : QStringLiteral("HRD CAT connected"));
     return true;

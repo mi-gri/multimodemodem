@@ -87,6 +87,9 @@ public slots:
     // 500 Hz-quantized dial correction that keeps TX audio in 1500..2000 Hz.
     bool beginFtSplitTx(const QString &operation, int rfShiftHz);
     bool endFtSplitTx();
+    // Transmission keyed outside this controller (serial RTS/DTR, VOX, audio
+    // only): read the TX meters during it as for CAT PTT.
+    void setExternalTransmit(bool active);
 
 signals:
     void statusChanged(const QString &status);
@@ -96,6 +99,11 @@ signals:
     // source: 0 unavailable, 1 backend-reported (may be nominal), 2 direct CAT.
     void receiverFilterChanged(const QString &modeName, int widthHz, int source);
     void pttChanged(bool enabled);
+    // TX meters read by CAT, as JTDX shows them. transmitting=true with
+    // negative values: TX started, no reading yet. Readings arrive once per
+    // poll interval; transmitting=false repeats the last reading after TX.
+    // watts < 0 or swr < 1 means the rig does not report that value.
+    void txMetersChanged(bool transmitting, double watts, double swr);
 
 private:
     void setStatus(const QString &status);
@@ -110,6 +118,8 @@ private:
     bool sendRawCatCommand(const QByteArray &command);
     bool setHamlibPttMode(bool enabled, int onMode, const QString &label, bool reportErrors = true);
     bool setWsjtLikeCatPtt(bool enabled);
+    void pollTxMeters();
+    void txMeteringChanged();
 
     bool connectHrd();
     void disconnectHrd();
@@ -136,6 +146,10 @@ private:
     QElapsedTimer m_filterRetryClock;
     bool m_lastPtt = false;
     QString m_lastStatus;
+    bool m_externalTransmit = false;
+    bool m_txMetering = false;
+    double m_txWatts = -1.0;
+    double m_txSwr = -1.0;
 
     QTcpSocket *m_hrdSocket = nullptr;
     int m_hrdProtocol = 0;
