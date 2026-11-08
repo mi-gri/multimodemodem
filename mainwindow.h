@@ -88,6 +88,7 @@ class QTableWidget;
 class QTableWidgetItem;
 class QRadioButton;
 class QLCDNumber;
+class WavelogClient;
 class Ft8SlotClockWidget;
 class QAction;
 class QActionGroup;
@@ -1297,6 +1298,9 @@ private:
      * @brief Best-effort WSJT-X/JTDX UDP notification after a QSO is saved locally.
      */
     void broadcastLoggedQsoUdp(const LogbookEntry &entry);
+    void setupWavelog();
+    void uploadLoggedQsoToWavelog(const LogbookEntry &entry);
+    void publishWavelogRadio();
 
     /**
      * @brief Installs right-click helpers on one RX text terminal.
@@ -2301,6 +2305,13 @@ private:
     QGroupBox *m_grpRigReadout = nullptr;
     QWidget *m_rigReadoutWidget = nullptr;   // moved between the FT "Frequency" row and m_grpRigReadout
     QWidget *m_ftFrequencySlot = nullptr;
+    WavelogClient *m_wavelog = nullptr;
+    QTimer *m_wavelogRadioTimer = nullptr;
+    qint64 m_wavelogRadioSentHz = 0;
+    QString m_wavelogRadioSentMode;
+    double m_wavelogRadioSentWatts = -2.0;
+    qint64 m_wavelogRadioSentMs = 0;
+    bool m_wavelogRadioErrorLogged = false;
     QLCDNumber *m_lcdRigReadoutFrequency = nullptr;
     QLabel *m_lblRigReadoutPower = nullptr;
     QLabel *m_lblRigReadoutSwr = nullptr;

@@ -53,6 +53,13 @@ public:
     QString logbookUdpServer = "127.0.0.1";
     int logbookUdpPort = 2237;
     bool pskReporterEnabled = false;   // spot received FT8/FT4 stations to pskreporter.info
+    // Direct upload to Wavelog / Cloudlog (HTTP API, like WaveLogGate).
+    bool wavelogEnabled = false;
+    QString wavelogUrl;                 // e.g. https://log.example.com/index.php
+    QString wavelogApiKey;              // never written to diagnostics
+    QString wavelogStationId;           // station_profile_id
+    bool wavelogRadioEnabled = false;   // publish CAT frequency/mode/power
+    QString wavelogRadioName = "MultiModeModem";
     int logbookUdpTextFormat = 0; // 0 bundle, 1 type 5, 2 type 12
     bool logbookVisibleFieldsConfigured = false;
     QStringList logbookVisibleFields;

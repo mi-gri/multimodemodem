@@ -57,6 +57,7 @@
 #include "audio/WavFileReader.h"
 #include "audio/TxLevel.h"
 #include "network/QsoUdpBroadcaster.h"
+#include "network/WavelogClient.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -1613,6 +1614,7 @@ MainWindow::MainWindow(QWidget *parent)
     const int rotatorIndex = ui->sideTabWidget->indexOf(m_tabCatRotator);
     ui->sideTabWidget->insertTab(rotatorIndex >= 0 ? rotatorIndex : ui->sideTabWidget->count(),
                                 m_tabQrz, uiText("tab_qrz", "QRZ"));
+    setupWavelog();
     setupRigReadoutPanel();
     ui->modeTabLayout->addWidget(m_grpRigReadout, 0);
     if (m_grpFt8UtcClock != nullptr) {
@@ -3344,6 +3346,71 @@ void MainWindow::broadcastLoggedQsoUdp(const LogbookEntry &entry)
 }
 
 
+void MainWindow::setupWavelog()
+{
+    m_wavelog = new WavelogClient(this);
+    connect(m_wavelog, &WavelogClient::qsoUploaded, this,
+            [this](const QString &callsign, bool ok, const QString &message, bool willRetry) {
+        if (ok) {
+            appendLog(uiText("wavelog_qso_sent", "Wavelog/Cloudlog: %1 logged.").arg(callsign));
+        } else if (willRetry) {
+            appendLog(uiText("wavelog_qso_retry", "Wavelog/Cloudlog: %1 not sent yet (%2); will retry.").arg(callsign, message));
+        } else {
+            appendLog(uiText("wavelog_qso_failed", "Wavelog/Cloudlog: %1 was saved locally, but the upload failed: %2").arg(callsign, message));
+        }
+    });
+    connect(m_wavelog, &WavelogClient::radioSent, this, [this](bool ok, const QString &error) {
+        // Report a failing radio update once, not every few seconds.
+        if (ok) {
+            m_wavelogRadioErrorLogged = false;
+        } else if (!m_wavelogRadioErrorLogged) {
+            m_wavelogRadioErrorLogged = true;
+            appendLog(uiText("wavelog_radio_failed", "Wavelog/Cloudlog: radio update failed: %1").arg(error));
+        }
+    });
+    m_wavelogRadioTimer = new QTimer(this);
+    m_wavelogRadioTimer->setInterval(2000);
+    connect(m_wavelogRadioTimer, &QTimer::timeout, this, &MainWindow::publishWavelogRadio);
+    m_wavelogRadioTimer->start();
+}
+
+void MainWindow::uploadLoggedQsoToWavelog(const LogbookEntry &entry)
+{
+    if (!m_settings.wavelogEnabled || m_wavelog == nullptr) return;
+    WavelogClient::Config config;
+    config.url = m_settings.wavelogUrl;
+    config.apiKey = m_settings.wavelogApiKey;
+    config.stationId = m_settings.wavelogStationId;
+    if (!config.isComplete()) {
+        appendLog(uiText("wavelog_incomplete", "Wavelog/Cloudlog: %1 not sent - URL, API key or station location missing in Settings.").arg(entry.callsign));
+        return;
+    }
+    m_wavelog->uploadQso(config, entry.callsign, AdifLogbook::entryToAdif(entry));
+}
+
+// Radio status as WaveLogGate sends it: on every change of frequency, mode
+// or TX power, and at least once a minute so the server keeps it current.
+void MainWindow::publishWavelogRadio()
+{
+    if (!m_settings.wavelogRadioEnabled || m_wavelog == nullptr || !m_settings.hamlibCatEnabled) return;
+    const qint64 hz = qRound64(m_lastRigFrequencyHz);
+    if (hz <= 0 || m_settings.wavelogUrl.trimmed().isEmpty() || m_settings.wavelogApiKey.trimmed().isEmpty()) return;
+    const QString mode = currentAdifMode().trimmed().toUpper();
+    const double watts = m_rigTxWatts > 0.0 ? m_rigTxWatts : -1.0;
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    const bool changed = hz != m_wavelogRadioSentHz || mode != m_wavelogRadioSentMode ||
+                         qAbs(watts - m_wavelogRadioSentWatts) >= 1.0;
+    if (!changed && nowMs - m_wavelogRadioSentMs < 60000) return;
+    m_wavelogRadioSentHz = hz;
+    m_wavelogRadioSentMode = mode;
+    m_wavelogRadioSentWatts = watts;
+    m_wavelogRadioSentMs = nowMs;
+    WavelogClient::Config config;
+    config.url = m_settings.wavelogUrl;
+    config.apiKey = m_settings.wavelogApiKey;
+    m_wavelog->sendRadio(config, m_settings.wavelogRadioName, hz, mode, watts);
+}
+
 void MainWindow::updateQsoUtcFields()
 {
     const QString utc = QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd HH:mm:ss 'UTC'");
@@ -3498,6 +3565,7 @@ bool MainWindow::addQsoToLogFromForm(QsoFormWidgets *form)
         if (count > 0) {
             queueLogbookIndexAdd(entry);
             broadcastLoggedQsoUdp(entry);
+            uploadLoggedQsoToWavelog(entry);
         }
         appendLog(QStringLiteral("Logged QSO: %1 %2 %3 %4%5")
             .arg(entry.callsign, entry.rstSent, entry.rstReceived, entry.mode,
@@ -18904,6 +18972,7 @@ void MainWindow::finishAutoLogFt8Qso(const LogbookEntry &entry, const QString &r
         if (count > 0) {
             queueLogbookIndexAdd(entry);
             broadcastLoggedQsoUdp(entry);
+            uploadLoggedQsoToWavelog(entry);
             refreshLogbookHighlights(true);
             refreshQsoMaps();
         }

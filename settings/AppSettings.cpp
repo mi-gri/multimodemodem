@@ -196,6 +196,13 @@ void AppSettings::load()
     logbookStrikeWorkedCalls = settings.value("Logbook/strikeWorkedCalls", logbookStrikeWorkedCalls).toBool();
     logbookUdpTextFormat = qBound(0, settings.value("Logbook/udpTextFormat", 0).toInt(), 2);
     logbookUdpEnabled = settings.value("Logbook/udpEnabled", logbookUdpEnabled).toBool();
+    wavelogEnabled = settings.value("Wavelog/enabled", wavelogEnabled).toBool();
+    wavelogUrl = settings.value("Wavelog/url", wavelogUrl).toString().trimmed();
+    wavelogApiKey = settings.value("Wavelog/apiKey", wavelogApiKey).toString().trimmed();
+    wavelogStationId = settings.value("Wavelog/stationId", wavelogStationId).toString().trimmed();
+    wavelogRadioEnabled = settings.value("Wavelog/radioEnabled", wavelogRadioEnabled).toBool();
+    wavelogRadioName = settings.value("Wavelog/radioName", wavelogRadioName).toString().trimmed();
+    if (wavelogRadioName.isEmpty()) wavelogRadioName = QStringLiteral("MultiModeModem");
     logbookUdpServer = settings.value("Logbook/udpServer", logbookUdpServer).toString().trimmed();
     if (logbookUdpServer.isEmpty()) logbookUdpServer = QStringLiteral("127.0.0.1");
     logbookUdpPort = qBound(1, settings.value("Logbook/udpPort", logbookUdpPort).toInt(), 65535);
@@ -827,6 +834,12 @@ bool AppSettings::save() const
     settings.setValue("Logbook/strikeWorkedCalls", logbookStrikeWorkedCalls);
     settings.setValue("Logbook/udpTextFormat", logbookUdpTextFormat);
     settings.setValue("Logbook/udpEnabled", logbookUdpEnabled);
+    settings.setValue("Wavelog/enabled", wavelogEnabled);
+    settings.setValue("Wavelog/url", wavelogUrl.trimmed());
+    settings.setValue("Wavelog/apiKey", wavelogApiKey.trimmed());
+    settings.setValue("Wavelog/stationId", wavelogStationId.trimmed());
+    settings.setValue("Wavelog/radioEnabled", wavelogRadioEnabled);
+    settings.setValue("Wavelog/radioName", wavelogRadioName.trimmed());
     settings.setValue("Logbook/udpServer", logbookUdpServer.trimmed().isEmpty() ? QStringLiteral("127.0.0.1") : logbookUdpServer.trimmed());
     settings.setValue("Logbook/udpPort", qBound(1, logbookUdpPort, 65535));
     settings.setValue("PskReporter/enabled", pskReporterEnabled);

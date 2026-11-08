@@ -197,6 +197,14 @@ private:
     QLineEdit *m_editLogbookUdpServer = nullptr;
     QSpinBox *m_spinLogbookUdpPort = nullptr;
     QComboBox *m_comboLogbookUdpFormat = nullptr;
+    QCheckBox *m_chkWavelogEnabled = nullptr;
+    QLineEdit *m_editWavelogUrl = nullptr;
+    QLineEdit *m_editWavelogApiKey = nullptr;
+    QComboBox *m_cmbWavelogStation = nullptr;
+    QLabel *m_lblWavelogStatus = nullptr;
+    QCheckBox *m_chkWavelogRadio = nullptr;
+    QLineEdit *m_editWavelogRadioName = nullptr;
+    class WavelogClient *m_wavelogProbe = nullptr;
     QComboBox *m_comboUiTheme = nullptr;
     QCheckBox *m_chkSessionDiagnostics = nullptr;
     QLineEdit *m_editDiagnosticsFolder = nullptr;

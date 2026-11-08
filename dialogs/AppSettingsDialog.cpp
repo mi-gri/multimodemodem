@@ -4,6 +4,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include "AppSettingsDialog.h"
+#include "../network/WavelogClient.h"
 #include <QFormLayout>
 #include "../utils/RuntimeI18n.h"
 #include "../utils/CockpitTheme.h"
@@ -1278,6 +1279,98 @@ QWidget *AppSettingsDialog::makeLogbookPage()
     connect(m_chkLogbookUdpEnabled, &QCheckBox::toggled, this, refreshUdpControls);
     refreshUdpControls(m_chkLogbookUdpEnabled->isChecked());
     layout->addWidget(udpGroup);
+
+    // Direct upload to Wavelog / Cloudlog through their HTTP API.
+    QGroupBox *wavelogGroup = new QGroupBox(QStringLiteral("Wavelog / Cloudlog"), holder);
+    wavelogGroup->setObjectName(QStringLiteral("wavelogGroup"));
+    wavelogGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+    QGridLayout *wavelogGrid = new QGridLayout(wavelogGroup);
+    wavelogGrid->setContentsMargins(10, 8, 10, 10);
+    wavelogGrid->setHorizontalSpacing(10);
+    wavelogGrid->setVerticalSpacing(6);
+    m_chkWavelogEnabled = new QCheckBox(L(QStringLiteral("Upload logged QSOs to Wavelog / Cloudlog")), wavelogGroup);
+    m_chkWavelogEnabled->setObjectName(QStringLiteral("chkWavelogEnabled"));
+    m_chkWavelogEnabled->setChecked(m_initialSettings.wavelogEnabled);
+    wavelogGrid->addWidget(m_chkWavelogEnabled, 0, 0, 1, 3);
+    m_editWavelogUrl = new QLineEdit(m_initialSettings.wavelogUrl, wavelogGroup);
+    m_editWavelogUrl->setObjectName(QStringLiteral("editWavelogUrl"));
+    m_editWavelogUrl->setPlaceholderText(L(QStringLiteral("https://log.example.com/index.php")));
+    m_editWavelogUrl->setToolTip(L(QStringLiteral("Address of your Wavelog or Cloudlog. Most servers need /index.php at the end, as in WaveLogGate.")));
+    m_editWavelogApiKey = new QLineEdit(m_initialSettings.wavelogApiKey, wavelogGroup);
+    m_editWavelogApiKey->setObjectName(QStringLiteral("editWavelogApiKey"));
+    m_editWavelogApiKey->setEchoMode(QLineEdit::PasswordEchoOnEdit);
+    m_editWavelogApiKey->setToolTip(L(QStringLiteral("API key with read and write rights, created in Wavelog/Cloudlog under Account > API keys.")));
+    m_cmbWavelogStation = new QComboBox(wavelogGroup);
+    m_cmbWavelogStation->setObjectName(QStringLiteral("cmbWavelogStation"));
+    m_cmbWavelogStation->setToolTip(L(QStringLiteral("Station location the QSOs are logged to. Its callsign must match the station callsign of the QSO.")));
+    if (!m_initialSettings.wavelogStationId.isEmpty())
+        m_cmbWavelogStation->addItem(QStringLiteral("ID %1").arg(m_initialSettings.wavelogStationId), m_initialSettings.wavelogStationId);
+    auto *loadStations = new QPushButton(L(QStringLiteral("Load stations / test")), wavelogGroup);
+    loadStations->setObjectName(QStringLiteral("btnWavelogLoadStations"));
+    m_lblWavelogStatus = new QLabel(wavelogGroup);
+    m_lblWavelogStatus->setWordWrap(true);
+    m_chkWavelogRadio = new QCheckBox(L(QStringLiteral("Send CAT frequency, mode and power as radio")), wavelogGroup);
+    m_chkWavelogRadio->setObjectName(QStringLiteral("chkWavelogRadio"));
+    m_chkWavelogRadio->setChecked(m_initialSettings.wavelogRadioEnabled);
+    m_chkWavelogRadio->setToolTip(L(QStringLiteral("Wavelog/Cloudlog show the radio in the live QSO form and fill frequency and mode from it, as with WaveLogGate.")));
+    m_editWavelogRadioName = new QLineEdit(m_initialSettings.wavelogRadioName, wavelogGroup);
+    m_editWavelogRadioName->setObjectName(QStringLiteral("editWavelogRadioName"));
+    wavelogGrid->addWidget(new QLabel(L(QStringLiteral("URL")), wavelogGroup), 1, 0);
+    wavelogGrid->addWidget(m_editWavelogUrl, 1, 1, 1, 2);
+    wavelogGrid->addWidget(new QLabel(L(QStringLiteral("API key")), wavelogGroup), 2, 0);
+    wavelogGrid->addWidget(m_editWavelogApiKey, 2, 1, 1, 2);
+    wavelogGrid->addWidget(new QLabel(L(QStringLiteral("Station location")), wavelogGroup), 3, 0);
+    wavelogGrid->addWidget(m_cmbWavelogStation, 3, 1);
+    wavelogGrid->addWidget(loadStations, 3, 2);
+    wavelogGrid->addWidget(m_lblWavelogStatus, 4, 0, 1, 3);
+    wavelogGrid->addWidget(m_chkWavelogRadio, 5, 0, 1, 3);
+    wavelogGrid->addWidget(new QLabel(L(QStringLiteral("Radio name")), wavelogGroup), 6, 0);
+    wavelogGrid->addWidget(m_editWavelogRadioName, 6, 1, 1, 2);
+    wavelogGrid->setColumnStretch(1, 1);
+    QLabel *wavelogInfo = new QLabel(L(QStringLiteral("Each QSO is sent after it has been saved in the local logbook. If the server cannot be reached, the upload is retried after 30 s, 2 min and 10 min.")), wavelogGroup);
+    wavelogInfo->setWordWrap(true);
+    wavelogInfo->setStyleSheet(QStringLiteral("color: palette(mid);"));
+    wavelogGrid->addWidget(wavelogInfo, 7, 0, 1, 3);
+    m_wavelogProbe = new WavelogClient(this);
+    connect(loadStations, &QPushButton::clicked, this, [this, loadStations]() {
+        WavelogClient::Config config;
+        config.url = m_editWavelogUrl->text();
+        config.apiKey = m_editWavelogApiKey->text();
+        if (config.url.trimmed().isEmpty() || config.apiKey.trimmed().isEmpty()) {
+            m_lblWavelogStatus->setText(L(QStringLiteral("Enter URL and API key first.")));
+            return;
+        }
+        loadStations->setEnabled(false);
+        m_lblWavelogStatus->setText(L(QStringLiteral("Connecting...")));
+        m_wavelogProbe->fetchStations(config);
+    });
+    connect(m_wavelogProbe, &WavelogClient::stationsFetched, this,
+            [this, loadStations](bool ok, const QVector<WavelogClient::Station> &stations, const QString &error) {
+        loadStations->setEnabled(true);
+        if (!ok) {
+            m_lblWavelogStatus->setText(L(QStringLiteral("Connection failed: %1")).arg(error));
+            return;
+        }
+        const QString selected = m_cmbWavelogStation->currentData().toString();
+        m_cmbWavelogStation->clear();
+        int selectIndex = -1;
+        for (const WavelogClient::Station &station : stations) {
+            QString label = QStringLiteral("%1 - %2").arg(station.callsign, station.name);
+            if (!station.grid.isEmpty()) label += QStringLiteral(" (%1)").arg(station.grid);
+            m_cmbWavelogStation->addItem(label, station.id);
+            if (station.id == selected || (selected.isEmpty() && station.active)) selectIndex = m_cmbWavelogStation->count() - 1;
+        }
+        m_cmbWavelogStation->setCurrentIndex(qMax(0, selectIndex));
+        m_lblWavelogStatus->setText(L(QStringLiteral("Connected: %1 station location(s) found.")).arg(stations.size()));
+    });
+    auto refreshWavelogControls = [this]() {
+        m_editWavelogRadioName->setEnabled(m_chkWavelogRadio->isChecked());
+        m_cmbWavelogStation->setEnabled(m_chkWavelogEnabled->isChecked());
+    };
+    connect(m_chkWavelogEnabled, &QCheckBox::toggled, this, refreshWavelogControls);
+    connect(m_chkWavelogRadio, &QCheckBox::toggled, this, refreshWavelogControls);
+    refreshWavelogControls();
+    layout->addWidget(wavelogGroup);
 
     // PSK Reporter (as in JTDX/WSJT-X).
     QGroupBox *pskGroup = new QGroupBox(QStringLiteral("PSK Reporter"), holder);
@@ -2600,6 +2693,15 @@ void AppSettingsDialog::collectSettings()
         merged.logbookUdpEnabled = m_chkLogbookUdpEnabled->isChecked();
     }
     if (m_chkPskReporterEnabled != nullptr) merged.pskReporterEnabled = m_chkPskReporterEnabled->isChecked();
+    if (m_chkWavelogEnabled != nullptr) {
+        merged.wavelogEnabled = m_chkWavelogEnabled->isChecked();
+        merged.wavelogUrl = m_editWavelogUrl->text().trimmed();
+        merged.wavelogApiKey = m_editWavelogApiKey->text().trimmed();
+        merged.wavelogStationId = m_cmbWavelogStation->currentData().toString().trimmed();
+        merged.wavelogRadioEnabled = m_chkWavelogRadio->isChecked();
+        merged.wavelogRadioName = m_editWavelogRadioName->text().trimmed();
+        if (merged.wavelogRadioName.isEmpty()) merged.wavelogRadioName = QStringLiteral("MultiModeModem");
+    }
 
     if (m_editLogbookUdpServer != nullptr) {
         merged.logbookUdpServer = m_editLogbookUdpServer->text().trimmed();
