@@ -213,6 +213,9 @@ private:
     QPlainTextEdit *m_editFtWatchList = nullptr;
     QComboBox *m_cmbAutoQsoDuplicatePolicy = nullptr;
     QSpinBox *m_spinAutoQsoRecentHours = nullptr;
+    QCheckBox *m_chkAutoQsoRespectCqDirective = nullptr;
+    QComboBox *m_cmbAutoQsoCqDxRule = nullptr;
+    QCheckBox *m_chkAutoQsoOnlyCqTarget = nullptr;
     QSpinBox *m_spinCqRepeatCount = nullptr;
 
     QCheckBox *m_chkRotatorEnabled = nullptr;

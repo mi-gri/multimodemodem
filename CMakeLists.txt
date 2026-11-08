@@ -460,6 +460,7 @@ add_executable(MadModem
     audio/AudioBlock.h
     widgets/WaterfallWidget.h
     widgets/CqSpots.h
+    modems/ft8/FtCqDirective.h
     modems/ft8/FtDecodeFilter.h
     modems/ft8/FtDecodeColours.h
     widgets/SkimmerOverlay.cpp widgets/SkimmerOverlay.h
@@ -1133,6 +1134,11 @@ if(BUILD_TESTING)
     target_link_libraries(madmodem_decode_clipboard PRIVATE ${QT}::Widgets ${QT}::Test)
     add_test(NAME madmodem_decode_clipboard COMMAND madmodem_decode_clipboard)
     set_tests_properties(madmodem_decode_clipboard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 10)
+    add_executable(madmodem_ft_cq_directive tests/FtCqDirectiveRegression.cpp)
+    target_include_directories(madmodem_ft_cq_directive PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(madmodem_ft_cq_directive PRIVATE ${QT}::Core)
+    set_target_properties(madmodem_ft_cq_directive PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME madmodem_ft_cq_directive COMMAND madmodem_ft_cq_directive)
     add_executable(madmodem_ft_cq_worklist tests/FtCqWorkListRegression.cpp)
     target_include_directories(madmodem_ft_cq_worklist PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(madmodem_ft_cq_worklist PRIVATE ${QT}::Core)

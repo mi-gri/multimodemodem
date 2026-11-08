@@ -1010,6 +1010,10 @@ private:
      * @brief Builds the worked-needed priority record for one decoded CQ.
      */
     Ft8FullAutoCqCandidate buildFt8FullAutoCqCandidate(const Ft8RxDecoder::Decode &decode, const QVariantMap &logbookStatus) const;
+    /// Why Auto QSO must not answer this directed CQ ("CQ NA" while in EU ...); empty = may answer.
+    QString ftCqDirectiveSkipReason(const QStringList &cqParts, const QString &cqCall) const;
+    /// Why @p call is outside the own CQ destination (CQ USA ...); empty = inside or no destination.
+    QString ftCqTargetSkipReason(const QString &call) const;
 
     /**
      * @brief Collects a decoded CQ in the persistent, bounded Auto QSO priority queue.
@@ -2295,6 +2299,8 @@ private:
     QLabel *m_lblRigFrequency = nullptr;
     QLabel *m_lblRigPttStatus = nullptr;
     QGroupBox *m_grpRigReadout = nullptr;
+    QWidget *m_rigReadoutWidget = nullptr;   // moved between the FT "Frequency" row and m_grpRigReadout
+    QWidget *m_ftFrequencySlot = nullptr;
     QLCDNumber *m_lcdRigReadoutFrequency = nullptr;
     QLabel *m_lblRigReadoutPower = nullptr;
     QLabel *m_lblRigReadoutSwr = nullptr;

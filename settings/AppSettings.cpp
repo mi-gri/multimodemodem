@@ -640,6 +640,12 @@ void AppSettings::load()
     if (ftAutoQsoDuplicatePolicy != "none" && ftAutoQsoDuplicatePolicy != "never_worked" && ftAutoQsoDuplicatePolicy != "recent") {
         ftAutoQsoDuplicatePolicy = "never_worked";
     }
+    ftAutoQsoRespectCqDirective = settings.value("FT8/autoQsoRespectCqDirective", ftAutoQsoRespectCqDirective).toBool();
+    ftAutoQsoCqDxRule = settings.value("FT8/autoQsoCqDxRule", ftAutoQsoCqDxRule).toString().trimmed().toLower();
+    if (ftAutoQsoCqDxRule != "continent" && ftAutoQsoCqDxRule != "country") {
+        ftAutoQsoCqDxRule = "continent";
+    }
+    ftAutoQsoOnlyCqTarget = settings.value("FT8/autoQsoOnlyCqTarget", ftAutoQsoOnlyCqTarget).toBool();
     ftAutoQsoRecentHours = settings.value("FT8/autoQsoRecentHours", ftAutoQsoRecentHours).toInt();
     if (ftAutoQsoRecentHours < 1 || ftAutoQsoRecentHours > 168) {
         ftAutoQsoRecentHours = 24;
@@ -1032,6 +1038,9 @@ bool AppSettings::save() const
     settings.setValue("FT8/watchListCalls", ftWatchListCalls);
     settings.setValue("FT8/autoQsoDuplicatePolicy", ftAutoQsoDuplicatePolicy);
     settings.setValue("FT8/autoQsoRecentHours", ftAutoQsoRecentHours);
+    settings.setValue("FT8/autoQsoRespectCqDirective", ftAutoQsoRespectCqDirective);
+    settings.setValue("FT8/autoQsoCqDxRule", ftAutoQsoCqDxRule);
+    settings.setValue("FT8/autoQsoOnlyCqTarget", ftAutoQsoOnlyCqTarget);
     settings.setValue("FT8/cqRepeatCount", ft8CqRepeatCount);
     settings.setValue("FT8/noResponseRetryCount", ft8NoResponseRetryCount);
 

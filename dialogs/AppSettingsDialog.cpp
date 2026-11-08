@@ -1682,12 +1682,38 @@ QWidget *AppSettingsDialog::makeFtColourEditor()
     grid->addWidget(m_cmbAutoQsoDuplicatePolicy, 12, 1, 1, 3);
     grid->addWidget(m_spinAutoQsoRecentHours, 12, 4);
 
+    // Directed CQs (CQ DX, CQ NA, CQ USA ...) and the own CQ destination.
+    m_chkAutoQsoRespectCqDirective = new QCheckBox(L(QStringLiteral("Answer directed CQs only if my station fits")), group);
+    m_chkAutoQsoRespectCqDirective->setObjectName(QStringLiteral("chkAutoQsoRespectCqDirective"));
+    m_chkAutoQsoRespectCqDirective->setChecked(m_initialSettings.ftAutoQsoRespectCqDirective);
+    m_chkAutoQsoRespectCqDirective->setToolTip(L(QStringLiteral("Auto QSO skips CQ NA, CQ EU, CQ JA, CQ USA and similar calls when your station is outside that area. Unknown additions such as CQ POTA or CQ TEST are answered.")));
+    QLabel *dxRuleLabel = new QLabel(L(QStringLiteral("Do not answer CQ DX from")), group);
+    m_cmbAutoQsoCqDxRule = new QComboBox(group);
+    m_cmbAutoQsoCqDxRule->setObjectName(QStringLiteral("cmbAutoQsoCqDxRule"));
+    m_cmbAutoQsoCqDxRule->addItem(L(QStringLiteral("my continent")), QStringLiteral("continent"));
+    m_cmbAutoQsoCqDxRule->addItem(L(QStringLiteral("my country (DXCC)")), QStringLiteral("country"));
+    const int dxRuleIndex = m_cmbAutoQsoCqDxRule->findData(m_initialSettings.ftAutoQsoCqDxRule);
+    m_cmbAutoQsoCqDxRule->setCurrentIndex(dxRuleIndex >= 0 ? dxRuleIndex : 0);
+    const QString dxRuleTip = L(QStringLiteral("A station calling CQ DX wants contacts outside its own continent or country. Auto QSO does not answer it from there."));
+    dxRuleLabel->setToolTip(dxRuleTip);
+    m_cmbAutoQsoCqDxRule->setToolTip(dxRuleTip);
+    m_cmbAutoQsoCqDxRule->setEnabled(m_chkAutoQsoRespectCqDirective->isChecked());
+    connect(m_chkAutoQsoRespectCqDirective, &QCheckBox::toggled, m_cmbAutoQsoCqDxRule, &QWidget::setEnabled);
+    grid->addWidget(m_chkAutoQsoRespectCqDirective, 13, 0, 1, 2);
+    grid->addWidget(dxRuleLabel, 13, 2, Qt::AlignRight);
+    grid->addWidget(m_cmbAutoQsoCqDxRule, 13, 3, 1, 2);
+    m_chkAutoQsoOnlyCqTarget = new QCheckBox(L(QStringLiteral("Work only stations in my CQ destination")), group);
+    m_chkAutoQsoOnlyCqTarget->setObjectName(QStringLiteral("chkAutoQsoOnlyCqTarget"));
+    m_chkAutoQsoOnlyCqTarget->setChecked(m_initialSettings.ftAutoQsoOnlyCqTarget);
+    m_chkAutoQsoOnlyCqTarget->setToolTip(L(QStringLiteral("With a CQ destination such as CQ USA selected, Auto QSO answers only CQs from that area and the sequencer ignores callers from outside it. General CQ works everyone.")));
+    grid->addWidget(m_chkAutoQsoOnlyCqTarget, 14, 0, 1, 5);
+
     QLabel *cqRepeatLabel = new QLabel(L(QStringLiteral("CQ retry count")), group);
     m_spinCqRepeatCount = new QSpinBox(group);
     m_spinCqRepeatCount->setRange(1, 99);
     m_spinCqRepeatCount->setValue(qBound(1, m_initialSettings.ft8CqRepeatCount, 99));
-    grid->addWidget(cqRepeatLabel, 13, 0);
-    grid->addWidget(m_spinCqRepeatCount, 13, 1);
+    grid->addWidget(cqRepeatLabel, 15, 0);
+    grid->addWidget(m_spinCqRepeatCount, 15, 1);
 
     // Waterfall speed in FT8/FT4: one row averages the spectra of this time
     // (JTDX ~290 ms). Shorter = faster scrolling, less history on screen.
@@ -1701,8 +1727,8 @@ QWidget *AppSettingsDialog::makeFtColourEditor()
     const QString rowTip = L(QStringLiteral("Waterfall speed in FT8: each row averages the spectrum over this time. Less is faster, more shows a longer history and calmer noise. FT4 uses half of it. JTDX: about 290 ms."));
     rowLabel->setToolTip(rowTip);
     m_spinFtWaterfallRowMs->setToolTip(rowTip);
-    grid->addWidget(rowLabel, 14, 0);
-    grid->addWidget(m_spinFtWaterfallRowMs, 14, 1);
+    grid->addWidget(rowLabel, 16, 0);
+    grid->addWidget(m_spinFtWaterfallRowMs, 16, 1);
 
     // CQ calls on the waterfall (as in JTDX 3box): seconds shown, 0 = off.
     QLabel *cqLabel = new QLabel(L(QStringLiteral("CQ calls on the waterfall")), group);
@@ -1716,8 +1742,8 @@ QWidget *AppSettingsDialog::makeFtColourEditor()
     const QString cqTip = L(QStringLiteral("Shows the callsigns of stations calling CQ at the bottom of the waterfall, over their signal, for this many seconds; they fade out towards the end. 0 switches it off."));
     cqLabel->setToolTip(cqTip);
     m_spinFtWaterfallCqSeconds->setToolTip(cqTip);
-    grid->addWidget(cqLabel, 15, 0);
-    grid->addWidget(m_spinFtWaterfallCqSeconds, 15, 1);
+    grid->addWidget(cqLabel, 17, 0);
+    grid->addWidget(m_spinFtWaterfallCqSeconds, 17, 1);
 
 
     QPushButton *reset = new QPushButton(L(QStringLiteral("Default colours")), group);
@@ -1748,7 +1774,7 @@ QWidget *AppSettingsDialog::makeFtColourEditor()
             }
         }
     });
-    grid->addWidget(reset, 16, 0, 1, 5, Qt::AlignLeft);
+    grid->addWidget(reset, 18, 0, 1, 5, Qt::AlignLeft);
     grid->setColumnStretch(0, 1);
     grid->setColumnStretch(5, 2);
     return group;
@@ -2640,6 +2666,15 @@ void AppSettingsDialog::collectSettings()
     }
     if (m_spinAutoQsoRecentHours != nullptr) {
         merged.ftAutoQsoRecentHours = m_spinAutoQsoRecentHours->value();
+    }
+    if (m_chkAutoQsoRespectCqDirective != nullptr) {
+        merged.ftAutoQsoRespectCqDirective = m_chkAutoQsoRespectCqDirective->isChecked();
+    }
+    if (m_cmbAutoQsoCqDxRule != nullptr) {
+        merged.ftAutoQsoCqDxRule = m_cmbAutoQsoCqDxRule->currentData().toString();
+    }
+    if (m_chkAutoQsoOnlyCqTarget != nullptr) {
+        merged.ftAutoQsoOnlyCqTarget = m_chkAutoQsoOnlyCqTarget->isChecked();
     }
     if (m_spinCqRepeatCount != nullptr) {
         merged.ft8CqRepeatCount = m_spinCqRepeatCount->value();

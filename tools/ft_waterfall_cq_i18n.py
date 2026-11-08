@@ -213,3 +213,43 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Avstemt frekvens lest fra transceiveren via CAT. Under sending vises utgangseffekten og SWR som transceiveren rapporterer; etterpå blir siste avlesning stående i grått. -- betyr at transceiveren ikke rapporterer verdien.',
   'Frekvence načtená z transceiveru přes CAT. Během vysílání se zobrazuje výstupní výkon a PSV hlášené transceiverem; poté zůstane poslední hodnota zobrazena šedě. -- znamená, že transceiver hodnotu neposkytuje.'),
 }.items()})
+# Auto QSO: directed CQs and own CQ destination
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Answer directed CQs only if my station fits':(
+  'Answer directed CQs only if my station fits',
+  'Rispondi ai CQ diretti solo se la mia stazione rientra',
+  'Répondre aux CQ dirigés seulement si ma station correspond',
+  'Gerichtete CQs nur beantworten, wenn meine Station passt',
+  'Svar på rettede CQ bare hvis stasjonen min passer',
+  'Odpovídat na směrované CQ, jen když moje stanice odpovídá'),
+ 'Auto QSO skips CQ NA, CQ EU, CQ JA, CQ USA and similar calls when your station is outside that area. Unknown additions such as CQ POTA or CQ TEST are answered.':(
+  'Auto QSO skips CQ NA, CQ EU, CQ JA, CQ USA and similar calls when your station is outside that area. Unknown additions such as CQ POTA or CQ TEST are answered.',
+  'Auto QSO salta CQ NA, CQ EU, CQ JA, CQ USA e chiamate simili quando la tua stazione è fuori da quell’area. Aggiunte sconosciute come CQ POTA o CQ TEST ricevono risposta.',
+  'Auto QSO ignore CQ NA, CQ EU, CQ JA, CQ USA et appels semblables lorsque votre station est hors de cette zone. Les ajouts inconnus comme CQ POTA ou CQ TEST reçoivent une réponse.',
+  'Auto QSO überspringt CQ NA, CQ EU, CQ JA, CQ USA und ähnliche Rufe, wenn deine Station außerhalb dieses Gebiets liegt. Unbekannte Zusätze wie CQ POTA oder CQ TEST werden beantwortet.',
+  'Auto QSO hopper over CQ NA, CQ EU, CQ JA, CQ USA og lignende anrop når stasjonen din er utenfor området. Ukjente tillegg som CQ POTA eller CQ TEST besvares.',
+  'Auto QSO přeskočí CQ NA, CQ EU, CQ JA, CQ USA a podobné výzvy, když je vaše stanice mimo tuto oblast. Neznámé doplňky jako CQ POTA nebo CQ TEST jsou zodpovězeny.'),
+ 'Do not answer CQ DX from':(
+  'Do not answer CQ DX from','Non rispondere a CQ DX dal','Ne pas répondre à CQ DX depuis',
+  'Nicht auf CQ DX antworten aus','Ikke svar på CQ DX fra','Neodpovídat na CQ DX z'),
+ 'my continent':('my continent','mio continente','mon continent','meinem Kontinent','mitt kontinent','mého kontinentu'),
+ 'my country (DXCC)':('my country (DXCC)','mio paese (DXCC)','mon pays (DXCC)','meinem Land (DXCC)','mitt land (DXCC)','mé země (DXCC)'),
+ 'A station calling CQ DX wants contacts outside its own continent or country. Auto QSO does not answer it from there.':(
+  'A station calling CQ DX wants contacts outside its own continent or country. Auto QSO does not answer it from there.',
+  'Una stazione che chiama CQ DX cerca collegamenti fuori dal proprio continente o paese. Auto QSO non le risponde da lì.',
+  'Une station qui lance CQ DX cherche des contacts hors de son continent ou pays. Auto QSO ne lui répond pas depuis là.',
+  'Eine Station, die CQ DX ruft, sucht Verbindungen außerhalb ihres Kontinents oder Landes. Auto QSO antwortet ihr nicht von dort.',
+  'En stasjon som roper CQ DX ønsker forbindelser utenfor eget kontinent eller land. Auto QSO svarer den ikke derfra.',
+  'Stanice volající CQ DX hledá spojení mimo svůj kontinent nebo zemi. Auto QSO jí odtud neodpoví.'),
+ 'Work only stations in my CQ destination':(
+  'Work only stations in my CQ destination','Collega solo stazioni nella mia destinazione CQ',
+  'Contacter seulement les stations de ma destination CQ','Nur Stationen aus meinem CQ-Ziel arbeiten',
+  'Kjør bare stasjoner i mitt CQ-mål','Navazovat jen stanice z mého cíle CQ'),
+ 'With a CQ destination such as CQ USA selected, Auto QSO answers only CQs from that area and the sequencer ignores callers from outside it. General CQ works everyone.':(
+  'With a CQ destination such as CQ USA selected, Auto QSO answers only CQs from that area and the sequencer ignores callers from outside it. General CQ works everyone.',
+  'Con una destinazione CQ come CQ USA, Auto QSO risponde solo ai CQ di quell’area e il sequencer ignora chi chiama da fuori. CQ generale collega tutti.',
+  'Avec une destination CQ comme CQ USA, Auto QSO ne répond qu’aux CQ de cette zone et le séquenceur ignore les appelants extérieurs. CQ général contacte tout le monde.',
+  'Mit einem CQ-Ziel wie CQ USA beantwortet Auto QSO nur CQs aus diesem Gebiet, und der Sequencer ignoriert Anrufer von außerhalb. Allgemeiner CQ arbeitet alle.',
+  'Med et CQ-mål som CQ USA svarer Auto QSO bare på CQ fra det området, og sekvenseren ignorerer anrop utenfra. Generell CQ kjører alle.',
+  'S cílem CQ jako CQ USA odpovídá Auto QSO jen na CQ z této oblasti a sekvencer ignoruje volající zvenčí. Obecné CQ navazuje se všemi.'),
+}.items()})

@@ -280,6 +280,13 @@ public:
     // worked within ftAutoQsoRecentHours; none = answer any CQ not blacklisted.
     QString ftAutoQsoDuplicatePolicy = "never_worked";
     int ftAutoQsoRecentHours = 24;
+    // Directed CQs: Auto QSO answers "CQ DX/NA/USA ..." only when my station
+    // fits; "CQ DX" from my own continent (or country) is skipped.
+    bool ftAutoQsoRespectCqDirective = true;
+    QString ftAutoQsoCqDxRule = "continent";   // continent | country
+    // With a CQ destination set (e.g. CQ USA), Auto QSO and the sequencer work
+    // only stations inside that destination.
+    bool ftAutoQsoOnlyCqTarget = true;
     int ft8CqRepeatCount = 3;
     // Maximum number of unanswered FT TX attempts during a started QSO.
     // Counts the first call plus automatic retries; after this MM stops and returns to RX standby.

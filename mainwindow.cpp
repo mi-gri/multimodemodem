@@ -25,6 +25,7 @@
 #include "modems/ft8/Ft8Mode.h"
 #include "modems/ft8/FtTimingPolicy.h"
 #include "modems/ft8/Ft8RxDecoder.h"
+#include "modems/ft8/FtCqDirective.h"
 #include "modems/ft8/FtDecodedText.h"
 #include "modems/ft8/FtQsoSequencer.h"
 #include "modems/ft8/FtStandardMessageSet.h"
@@ -8959,8 +8960,16 @@ void MainWindow::setupFt8Page()
     m_cmbFt8Band->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_cmbFt8Band->setMinimumWidth(150);
 
-    qsoGrid->addWidget(new QLabel(uiText("frequency", "Frequency"), qsoGroup), 0, 0);
-    qsoGrid->addWidget(m_lblFt8BandStatus, 0, 1);
+    // The CAT readout (frequency, TX power, SWR) is placed above the status
+    // line in FT modes; see updateRigReadout().
+    m_ftFrequencySlot = new QWidget(qsoGroup);
+    m_ftFrequencySlot->setObjectName(QStringLiteral("ftFrequencySlot"));
+    auto *frequencySlotLayout = new QVBoxLayout(m_ftFrequencySlot);
+    frequencySlotLayout->setContentsMargins(0, 0, 0, 0);
+    frequencySlotLayout->setSpacing(2);
+    frequencySlotLayout->addWidget(m_lblFt8BandStatus);
+    qsoGrid->addWidget(new QLabel(uiText("frequency", "Frequency"), qsoGroup), 0, 0, Qt::AlignLeft | Qt::AlignTop);
+    qsoGrid->addWidget(m_ftFrequencySlot, 0, 1);
     qsoGrid->addWidget(new QLabel(uiText("band", "Band"), qsoGroup), 1, 0);
     qsoGrid->addWidget(m_cmbFt8Band, 1, 1);
     qsoGrid->addWidget(new QLabel(uiText("dx_call", "DX Call"), qsoGroup), 2, 0);
@@ -12260,24 +12269,30 @@ void MainWindow::setupRigReadoutPanel()
     auto *group = new QGroupBox(uiText("rig_readout_group", "Transceiver"), ui->tabModeSettings);
     group->setObjectName(QStringLiteral("rigReadoutGroup"));
     group->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    auto *layout = new QGridLayout(group);
-    layout->setContentsMargins(8, 8, 8, 8);
+    auto *groupLayout = new QVBoxLayout(group);
+    groupLayout->setContentsMargins(8, 8, 8, 8);
+    m_rigReadoutWidget = new QWidget(group);
+    m_rigReadoutWidget->setObjectName(QStringLiteral("rigReadout"));
+    groupLayout->addWidget(m_rigReadoutWidget);
+    QWidget *readout = m_rigReadoutWidget;
+    auto *layout = new QGridLayout(readout);
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setHorizontalSpacing(8);
     layout->setVerticalSpacing(0);
 
-    m_lcdRigReadoutFrequency = new QLCDNumber(group);
+    m_lcdRigReadoutFrequency = new QLCDNumber(readout);
     m_lcdRigReadoutFrequency->setObjectName(QStringLiteral("rigReadoutFrequency"));
     m_lcdRigReadoutFrequency->setSmallDecimalPoint(true);
     m_lcdRigReadoutFrequency->setDigitCount(8);
     m_lcdRigReadoutFrequency->setSegmentStyle(QLCDNumber::Filled);
     m_lcdRigReadoutFrequency->setMinimumHeight(40);
     m_lcdRigReadoutFrequency->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    auto *unit = new QLabel(QStringLiteral("MHz"), group);
+    auto *unit = new QLabel(QStringLiteral("MHz"), readout);
     unit->setObjectName(QStringLiteral("rigReadoutUnit"));
 
-    m_lblRigReadoutPower = new QLabel(group);
+    m_lblRigReadoutPower = new QLabel(readout);
     m_lblRigReadoutPower->setObjectName(QStringLiteral("rigReadoutPower"));
-    m_lblRigReadoutSwr = new QLabel(group);
+    m_lblRigReadoutSwr = new QLabel(readout);
     m_lblRigReadoutSwr->setObjectName(QStringLiteral("rigReadoutSwr"));
     for (QLabel *label : {m_lblRigReadoutPower, m_lblRigReadoutSwr}) {
         QFont font = label->font();
@@ -12285,21 +12300,31 @@ void MainWindow::setupRigReadoutPanel()
         label->setFont(font);
     }
 
-    // One row, as high as the clock below: frequency | MHz | PWR over SWR.
+    // One row: frequency | MHz | PWR over SWR.
     layout->addWidget(m_lcdRigReadoutFrequency, 0, 0, 2, 1);
     layout->addWidget(unit, 0, 1, 2, 1, Qt::AlignLeft | Qt::AlignBottom);
     layout->addWidget(m_lblRigReadoutPower, 0, 2, Qt::AlignLeft | Qt::AlignVCenter);
     layout->addWidget(m_lblRigReadoutSwr, 1, 2, Qt::AlignLeft | Qt::AlignVCenter);
     layout->setColumnStretch(0, 1);
     layout->setColumnMinimumWidth(2, m_lblRigReadoutPower->fontMetrics().horizontalAdvance(uiText("rig_readout_power", "PWR %1 W").arg(100)) + 4);
-    group->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power and SWR reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
+    readout->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power and SWR reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
     m_grpRigReadout = group;
 }
 
 void MainWindow::updateRigReadout()
 {
-    if (m_grpRigReadout == nullptr) return;
-    m_grpRigReadout->setVisible(m_settings.hamlibCatEnabled);
+    if (m_grpRigReadout == nullptr || m_rigReadoutWidget == nullptr) return;
+    // FT modes show the readout in the "Frequency" row above the band; the
+    // other modes in its own group at the bottom of the Mode tab.
+    const bool ftMode = m_ftFrequencySlot != nullptr && ui != nullptr && ui->cmbMode != nullptr &&
+                        Ft8Mode::isFamilyMode(ui->cmbMode->currentText());
+    QWidget *host = ftMode ? m_ftFrequencySlot : m_grpRigReadout;
+    if (m_rigReadoutWidget->parentWidget() != host) {
+        auto *hostLayout = qobject_cast<QBoxLayout *>(host->layout());
+        if (hostLayout != nullptr) hostLayout->insertWidget(0, m_rigReadoutWidget);
+    }
+    m_rigReadoutWidget->setVisible(m_settings.hamlibCatEnabled);
+    m_grpRigReadout->setVisible(m_settings.hamlibCatEnabled && !ftMode);
 
     if (m_lcdRigReadoutFrequency != nullptr) {
         const qint64 hz = qRound64(m_lastRigFrequencyHz);
@@ -12582,7 +12607,10 @@ void MainWindow::updateFtBandFrequencyUi()
         const QString stdText = standard > 0.0 ? formatRigFrequency(standard) : QStringLiteral("--");
         QString text = uiText("ft_standard_frequency", "Standard FT frequency") + QStringLiteral(": ") + stdText;
         if (haveCat) {
-            text += QStringLiteral(" — CAT: ") + formatRigFrequency(m_lastRigFrequencyHz);
+            // With CAT enabled the readout above already shows the dial frequency.
+            if (!m_settings.hamlibCatEnabled) {
+                text += QStringLiteral(" — CAT: ") + formatRigFrequency(m_lastRigFrequencyHz);
+            }
             if (!onSlot) {
                 text += QStringLiteral(" — ") + uiText("off_ft_standard_frequency", "off standard FT frequency");
             }
@@ -16253,6 +16281,7 @@ void MainWindow::updateFtUtcClockVisibility(const QString &modeName)
     if (m_grpFt8UtcClock != nullptr) {
         m_grpFt8UtcClock->setVisible(showFtClock);
     }
+    updateRigReadout();
 }
 
 
@@ -17623,6 +17652,49 @@ bool MainWindow::canStartFt8FullAutoQsoNow() const
     return !myCall.trimmed().isEmpty() && !myGrid.trimmed().isEmpty();
 }
 
+namespace {
+FtCqDirective::Station ftCqStationForCall(const QString &call)
+{
+    FtCqDirective::Station station;
+    const CtyCountryFile::LookupResult cty = CtyCountryFile::instance().lookupCallsign(call);
+    if (cty.valid) {
+        station.continent = cty.entity.continent.trimmed().toUpper();
+        station.dxcc = cty.entity.dxcc.trimmed();
+    }
+    return station;
+}
+}
+
+QString MainWindow::ftCqDirectiveSkipReason(const QStringList &cqParts, const QString &cqCall) const
+{
+    if (!m_settings.ftAutoQsoRespectCqDirective) return QString();
+    const QString directive = FtCqDirective::modifier(cqParts, cqCall);
+    const FtCqDirective::Target target = FtCqDirective::targetFor(directive);
+    if (target.scope == FtCqDirective::Scope::Any) return QString();
+    const FtCqDirective::DxRule rule = m_settings.ftAutoQsoCqDxRule == QStringLiteral("country")
+        ? FtCqDirective::DxRule::Country : FtCqDirective::DxRule::Continent;
+    const FtCqDirective::Fit fit = FtCqDirective::fits(target, ftCqStationForCall(stationCallsign()),
+                                                       ftCqStationForCall(cqCall), rule);
+    return fit == FtCqDirective::Fit::No
+        ? QStringLiteral("CQ %1 is not for my station").arg(directive)
+        : QString();
+}
+
+QString MainWindow::ftCqTargetSkipReason(const QString &call) const
+{
+    const QString destination = m_settings.ft8CqTarget.trimmed().toUpper();
+    if (!m_settings.ftAutoQsoOnlyCqTarget || destination.isEmpty()) return QString();
+    const FtCqDirective::Target target = FtCqDirective::targetFor(destination);
+    if (target.scope == FtCqDirective::Scope::Any) return QString();
+    const FtCqDirective::DxRule rule = m_settings.ftAutoQsoCqDxRule == QStringLiteral("country")
+        ? FtCqDirective::DxRule::Country : FtCqDirective::DxRule::Continent;
+    const FtCqDirective::Fit fit = FtCqDirective::fits(target, ftCqStationForCall(call),
+                                                       ftCqStationForCall(stationCallsign()), rule);
+    return fit == FtCqDirective::Fit::No
+        ? QStringLiteral("outside my CQ destination %1").arg(destination)
+        : QString();
+}
+
 Ft8FullAutoCqCandidate MainWindow::buildFt8FullAutoCqCandidate(const Ft8RxDecoder::Decode &decode,
                                                                     const QVariantMap &logbookStatus) const
 {
@@ -17642,6 +17714,17 @@ Ft8FullAutoCqCandidate MainWindow::buildFt8FullAutoCqCandidate(const Ft8RxDecode
 
     if (isFtCallBlacklisted(candidate.call)) {
         candidate.priorityText = QStringLiteral("blacklisted");
+        return candidate;
+    }
+
+    const QString directiveSkip = ftCqDirectiveSkipReason(parsed.parts, candidate.call);
+    if (!directiveSkip.isEmpty()) {
+        candidate.priorityText = directiveSkip;
+        return candidate;
+    }
+    const QString targetSkip = ftCqTargetSkipReason(candidate.call);
+    if (!targetSkip.isEmpty()) {
+        candidate.priorityText = targetSkip;
         return candidate;
     }
 
@@ -17877,20 +17960,13 @@ bool MainWindow::startFt8FullAutoQsoFromCandidate(const Ft8FullAutoCqCandidate &
         m_settings.ft8DxGrid = grid;
     }
     if (candidate.decode.frequencyHz >= 100 && candidate.decode.frequencyHz <= 3000) {
+        // TX follows the operator's TX strategy: Hold TX frequency (fixed)
+        // keeps the marker, follow-RX moves to the correspondent and
+        // auto-free picks a clear slot.  Auto QSO never overrides it.
         const int correspondentHz = qBound(100, candidate.decode.frequencyHz, 3000);
-        if (!fromCqWorkList && m_spinFt8TxFreq != nullptr) {
-            const QSignalBlocker blockTx(m_spinFt8TxFreq);
-            m_spinFt8TxFreq->setValue(qBound(m_spinFt8TxFreq->minimum(), correspondentHz, m_spinFt8TxFreq->maximum()));
-            m_settings.ft8TxFrequencyHz = m_spinFt8TxFreq->value();
-        } else if (!fromCqWorkList) {
-            m_settings.ft8TxFrequencyHz = correspondentHz;
-        }
         applyFt8RuntimeFrequencySelection(correspondentHz,
-                                          QStringLiteral("Selected CQ from %1").arg(call),
-                                          fromCqWorkList);
-        if (!fromCqWorkList) appendLog(QStringLiteral("FT AutoQSO frequency: TX marker moved to correspondent %1 at %2 Hz.")
-                      .arg(call)
-                      .arg(m_settings.ft8TxFrequencyHz));
+                                          QStringLiteral("AutoQSO selected CQ from %1").arg(call),
+                                          true);
     }
 
     m_ftSession.clearQso();
@@ -18152,6 +18228,9 @@ void MainWindow::considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, b
 
     const QString call = parsed.senderCall.trimmed().toUpper();
     if (call.isEmpty() || FtDecodedText::callMatches(call, myCall)) {
+        return;
+    }
+    if (!ftCqTargetSkipReason(call).isEmpty()) {
         return;
     }
 
@@ -18446,6 +18525,19 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         // WSJT-X style: while a QSO is active, ignore third-party callers for the
         // auto-sequencer.  They still remain visible in the decode/history table.
         return;
+    }
+
+    const bool operatorChoseSender = m_editFt8DxCall != nullptr &&
+        FtDecodedText::callMatches(parsed.senderCall, m_editFt8DxCall->text().trimmed().toUpper());
+    if (!m_ftSession.qsoActive && !operatorChoseSender) {
+        // A new caller after my directed CQ (CQ USA ...) from outside that
+        // destination is not answered automatically; a double-click still works.
+        const QString targetSkip = ftCqTargetSkipReason(parsed.senderCall);
+        if (!targetSkip.isEmpty()) {
+            traceFtAutomation("caller.ignore", "outside_cq_destination", {{"candidate_call", parsed.senderCall}, {"rx_message", decode.message}}, true);
+            appendLog(QStringLiteral("FT sequencer: caller %1 ignored (%2).").arg(parsed.senderCall, targetSkip));
+            return;
+        }
     }
 
     const QString parsedSenderKey = parsed.senderCall.trimmed().toUpper();
