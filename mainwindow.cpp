@@ -9124,12 +9124,13 @@ void MainWindow::setupFt8Page()
     controlGrid->addWidget(m_cmbFt8TxStrategy, 2, 1, 1, 2);
     controlGrid->addWidget(m_chkFt8AutoLog, 1, 4, 1, 2);
 
-    auto *callerRow=new QHBoxLayout;
-    callerRow->addWidget(m_chkFt8CallerQueue);
+    // Auto QSO sits directly below Auto log; the caller queue gets its own
+    // row laid out like the CQ queue row (checkbox left, list button right).
+    controlGrid->addWidget(m_chkFt8FullAutoQso, 2, 4, 1, 2);
     m_btnFt8CallerList=new QPushButton(controlGroup);
     m_btnFt8CallerList->setObjectName(QStringLiteral("ftCallerQueueOpen"));
-    callerRow->addWidget(m_btnFt8CallerList);callerRow->addWidget(m_chkFt8FullAutoQso);callerRow->addStretch(1);
-    controlGrid->addLayout(callerRow,2,3,1,3);
+    controlGrid->addWidget(m_chkFt8CallerQueue, 4, 0, 1, 4);
+    controlGrid->addWidget(m_btnFt8CallerList, 4, 4, 1, 2);
     connect(m_btnFt8CallerList,&QPushButton::clicked,this,&MainWindow::showFt8CallerQueue);
 
     m_btnFtCqAdd = new QPushButton(uiText("ft_cq_list_add", "Add selected CQs"), controlGroup);
@@ -18929,9 +18930,8 @@ void MainWindow::autoLogFt8QsoFor(const FtQsoSession &session, const QString &re
     }
     entry.utc = session.qsoStartUtc.isValid() ? session.qsoStartUtc : QDateTime::currentDateTimeUtc();
     entry.utcEnd = QDateTime::currentDateTimeUtc();
-    entry.comment = QString("%1 auto-sequence: %2; RX audio %3 Hz; TX audio %4 Hz; final %5")
-                        .arg(entry.mode,
-                             reason,
+    entry.comment = QString("%1; RX audio %2 Hz; TX audio %3 Hz; final: %4")
+                        .arg(reason,
                              QString::number(session.audioFreqHz > 0 ? session.audioFreqHz : (m_spinFt8RxFreq != nullptr ? m_spinFt8RxFreq->value() : 0)),
                              QString::number(m_spinFt8TxFreq != nullptr ? m_spinFt8TxFreq->value() : m_settings.ft8TxFrequencyHz),
                              session.lastTxPlan.message.isEmpty() ? QStringLiteral("--") : session.lastTxPlan.message);
