@@ -204,14 +204,15 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
 KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'rig_readout_power':('PWR %1 W','Pot %1 W','Puiss %1 W','PWR %1 W','Eff %1 W','Výk %1 W'),
  'rig_readout_swr':('SWR %1','ROS %1','ROS %1','SWR %1','SWR %1','PSV %1'),
+ 'rig_readout_alc':('ALC %1 %','ALC %1 %','ALC %1 %','ALC %1 %','ALC %1 %','ALC %1 %'),
  'rig_readout_group':('Transceiver','Ricetrasmettitore','Émetteur-récepteur','Transceiver','Transceiver','Transceiver'),
  'rig_readout_tooltip':(
-  'Dial frequency read from the transceiver by CAT. During transmission the output power and SWR reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value.',
-  'Frequenza di sintonia letta dal ricetrasmettitore via CAT. Durante la trasmissione vengono mostrati la potenza di uscita e il ROS riportati dal ricetrasmettitore; dopo, l’ultima lettura resta visibile in grigio. -- indica che il ricetrasmettitore non fornisce il valore.',
-  'Fréquence d’accord lue sur l’émetteur-récepteur par CAT. Pendant l’émission, la puissance de sortie et le ROS indiqués par l’émetteur-récepteur sont affichés ; ensuite la dernière lecture reste visible en gris. -- signifie que l’émetteur-récepteur ne fournit pas la valeur.',
-  'Per CAT vom Transceiver gelesene Dial-Frequenz. Während des Sendens werden die vom Transceiver gemeldete Ausgangsleistung und das SWR angezeigt; danach bleibt der letzte Messwert grau sichtbar. -- bedeutet, dass der Transceiver den Wert nicht liefert.',
-  'Avstemt frekvens lest fra transceiveren via CAT. Under sending vises utgangseffekten og SWR som transceiveren rapporterer; etterpå blir siste avlesning stående i grått. -- betyr at transceiveren ikke rapporterer verdien.',
-  'Frekvence načtená z transceiveru přes CAT. Během vysílání se zobrazuje výstupní výkon a PSV hlášené transceiverem; poté zůstane poslední hodnota zobrazena šedě. -- znamená, že transceiver hodnotu neposkytuje.'),
+  'Dial frequency read from the transceiver by CAT. During transmission the output power, SWR and ALC reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value.',
+  'Frequenza di sintonia letta dal ricetrasmettitore via CAT. Durante la trasmissione vengono mostrati la potenza di uscita, il ROS e l’ALC riportati dal ricetrasmettitore; dopo, l’ultima lettura resta visibile in grigio. -- indica che il ricetrasmettitore non fornisce il valore.',
+  'Fréquence d’accord lue sur l’émetteur-récepteur par CAT. Pendant l’émission, la puissance de sortie, le ROS et l’ALC indiqués par l’émetteur-récepteur sont affichés ; ensuite la dernière lecture reste visible en gris. -- signifie que l’émetteur-récepteur ne fournit pas la valeur.',
+  'Per CAT vom Transceiver gelesene Dial-Frequenz. Während des Sendens werden die vom Transceiver gemeldete Ausgangsleistung, das SWR und die ALC angezeigt; danach bleibt der letzte Messwert grau sichtbar. -- bedeutet, dass der Transceiver den Wert nicht liefert.',
+  'Avstemt frekvens lest fra transceiveren via CAT. Under sending vises utgangseffekten, SWR og ALC som transceiveren rapporterer; etterpå blir siste avlesning stående i grått. -- betyr at transceiveren ikke rapporterer verdien.',
+  'Frekvence načtená z transceiveru přes CAT. Během vysílání se zobrazuje výstupní výkon, PSV a ALC hlášené transceiverem; poté zůstane poslední hodnota zobrazena šedě. -- znamená, že transceiver hodnotu neposkytuje.'),
 }.items()})
 # Auto QSO: directed CQs and own CQ destination
 SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {

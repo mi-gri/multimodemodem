@@ -103,7 +103,7 @@ signals:
     // negative values: TX started, no reading yet. Readings arrive once per
     // poll interval; transmitting=false repeats the last reading after TX.
     // watts < 0 or swr < 1 means the rig does not report that value.
-    void txMetersChanged(bool transmitting, double watts, double swr);
+    void txMetersChanged(bool transmitting, double watts, double swr, double alc);
 
 private:
     void setStatus(const QString &status);
@@ -150,6 +150,7 @@ private:
     bool m_txMetering = false;
     double m_txWatts = -1.0;
     double m_txSwr = -1.0;
+    double m_txAlc = -1.0;
 
     QTcpSocket *m_hrdSocket = nullptr;
     int m_hrdProtocol = 0;

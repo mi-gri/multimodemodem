@@ -9950,10 +9950,11 @@ void MainWindow::setupProcessingConnections()
                 },
                 Qt::QueuedConnection);
         connect(m_rigController, &HamlibController::txMetersChanged,
-                this, [this](bool transmitting, double watts, double swr) {
+                this, [this](bool transmitting, double watts, double swr, double alc) {
                     m_rigTxMeterActive = transmitting;
                     m_rigTxWatts = watts;
                     m_rigTxSwr = swr;
+                    m_rigTxAlc = alc;
                     updateRigReadout();
                 },
                 Qt::QueuedConnection);
@@ -12294,20 +12295,23 @@ void MainWindow::setupRigReadoutPanel()
     m_lblRigReadoutPower->setObjectName(QStringLiteral("rigReadoutPower"));
     m_lblRigReadoutSwr = new QLabel(readout);
     m_lblRigReadoutSwr->setObjectName(QStringLiteral("rigReadoutSwr"));
-    for (QLabel *label : {m_lblRigReadoutPower, m_lblRigReadoutSwr}) {
+    m_lblRigReadoutAlc = new QLabel(readout);
+    m_lblRigReadoutAlc->setObjectName(QStringLiteral("rigReadoutAlc"));
+    for (QLabel *label : {m_lblRigReadoutPower, m_lblRigReadoutSwr, m_lblRigReadoutAlc}) {
         QFont font = label->font();
         font.setBold(true);
         label->setFont(font);
     }
 
-    // One row: frequency | MHz | PWR over SWR.
-    layout->addWidget(m_lcdRigReadoutFrequency, 0, 0, 2, 1);
-    layout->addWidget(unit, 0, 1, 2, 1, Qt::AlignLeft | Qt::AlignBottom);
+    // One row: frequency | MHz | PWR over SWR over ALC.
+    layout->addWidget(m_lcdRigReadoutFrequency, 0, 0, 3, 1);
+    layout->addWidget(unit, 0, 1, 3, 1, Qt::AlignLeft | Qt::AlignBottom);
     layout->addWidget(m_lblRigReadoutPower, 0, 2, Qt::AlignLeft | Qt::AlignVCenter);
     layout->addWidget(m_lblRigReadoutSwr, 1, 2, Qt::AlignLeft | Qt::AlignVCenter);
+    layout->addWidget(m_lblRigReadoutAlc, 2, 2, Qt::AlignLeft | Qt::AlignVCenter);
     layout->setColumnStretch(0, 1);
     layout->setColumnMinimumWidth(2, m_lblRigReadoutPower->fontMetrics().horizontalAdvance(uiText("rig_readout_power", "PWR %1 W").arg(100)) + 4);
-    readout->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power and SWR reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
+    readout->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power, SWR and ALC reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
     m_grpRigReadout = group;
 }
 
@@ -12355,6 +12359,15 @@ void MainWindow::updateRigReadout()
         if (m_rigTxSwr >= 3.0) swrRole = QStringLiteral("negative");
         else if (m_rigTxSwr >= 2.0) swrRole = QStringLiteral("warning");
         MadModemUi::setSemanticRole(m_lblRigReadoutSwr, swrRole);
+    }
+    if (m_lblRigReadoutAlc != nullptr) {
+        // Hamlib reports ALC on a 0..1 scale; shown in percent of full scale.
+        // Digital modes want little or no ALC action: yellow from half scale.
+        const QString alc = m_rigTxAlc < 0.0 ? QStringLiteral("--") : QString::number(qRound(m_rigTxAlc * 100.0));
+        m_lblRigReadoutAlc->setText(uiText("rig_readout_alc", "ALC %1 %").arg(alc));
+        QString alcRole = m_rigTxMeterActive ? QStringLiteral("positive") : QStringLiteral("muted");
+        if (m_rigTxAlc >= 0.5) alcRole = QStringLiteral("warning");
+        MadModemUi::setSemanticRole(m_lblRigReadoutAlc, alcRole);
     }
 }
 

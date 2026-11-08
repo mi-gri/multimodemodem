@@ -2304,9 +2304,11 @@ private:
     QLCDNumber *m_lcdRigReadoutFrequency = nullptr;
     QLabel *m_lblRigReadoutPower = nullptr;
     QLabel *m_lblRigReadoutSwr = nullptr;
+    QLabel *m_lblRigReadoutAlc = nullptr;
     bool m_rigTxMeterActive = false;
     double m_rigTxWatts = -1.0;
     double m_rigTxSwr = -1.0;
+    double m_rigTxAlc = -1.0;
     FtSlotScheduler *m_ftSlotScheduler = nullptr;
     QThread *m_ftSlotThread = nullptr;
     bool m_ft8PendingTxArmed = false;

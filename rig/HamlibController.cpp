@@ -785,12 +785,13 @@ void HamlibController::txMeteringChanged()
     if (transmitting) {
         m_txWatts = -1.0;
         m_txSwr = -1.0;
+        m_txAlc = -1.0;
     }
-    emit txMetersChanged(transmitting, m_txWatts, m_txSwr);
+    emit txMetersChanged(transmitting, m_txWatts, m_txSwr, m_txAlc);
 }
 
 // Output power and SWR during TX, read as JTDX does: RFPOWER_METER_WATTS and
-// SWR, each only when the backend reports it. A failed read is not a CAT
+// SWR, plus ALC (Hamlib scale 0..1), each only when the backend reports it. A failed read is not a CAT
 // error; it must never interfere with PTT.
 void HamlibController::pollTxMeters()
 {
@@ -799,6 +800,7 @@ void HamlibController::pollTxMeters()
     RIG *rig = static_cast<RIG *>(m_rig);
     double watts = -1.0;
     double swr = -1.0;
+    double alc = -1.0;
     value_t value;
     if (rig_has_get_level(rig, RIG_LEVEL_RFPOWER_METER_WATTS) &&
         rig_get_level(rig, RIG_VFO_CURR, RIG_LEVEL_RFPOWER_METER_WATTS, &value) == RIG_OK &&
@@ -810,10 +812,16 @@ void HamlibController::pollTxMeters()
         value.f >= 1.0f && value.f < 100.0f) {
         swr = value.f;
     }
-    if (watts == m_txWatts && swr == m_txSwr) return;
+    if (rig_has_get_level(rig, RIG_LEVEL_ALC) &&
+        rig_get_level(rig, RIG_VFO_CURR, RIG_LEVEL_ALC, &value) == RIG_OK &&
+        value.f >= 0.0f && value.f <= 1.0f) {
+        alc = value.f;
+    }
+    if (watts == m_txWatts && swr == m_txSwr && alc == m_txAlc) return;
     m_txWatts = watts;
     m_txSwr = swr;
-    emit txMetersChanged(true, watts, swr);
+    m_txAlc = alc;
+    emit txMetersChanged(true, watts, swr, alc);
 #endif
 }
 
