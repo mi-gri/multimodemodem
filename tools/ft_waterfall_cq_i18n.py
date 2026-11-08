@@ -331,3 +331,7 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Wavelog/Cloudlog: %1 ikke sendt - URL, API-nøkkel eller stasjonsplassering mangler i Innstillinger.',
   'Wavelog/Cloudlog: %1 neodesláno - v Nastavení chybí URL, klíč API nebo umístění stanice.'),
 }.items()})
+# Settings tab for display: theme, decode table, FT colours
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Display / FT colours':('Display / FT colours','Aspetto / colori FT','Affichage / couleurs FT','Darstellung / FT-Farben','Visning / FT-farger','Zobrazení / barvy FT'),
+}.items()})

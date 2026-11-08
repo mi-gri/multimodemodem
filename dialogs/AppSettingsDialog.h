@@ -27,6 +27,7 @@ class QTabWidget;
 class QWidget;
 class QCheckBox;
 class QComboBox;
+class QGroupBox;
 class QSpinBox;
 class QDoubleSpinBox;
 class QLineEdit;
@@ -62,7 +63,8 @@ public:
         QrzAccount,
         FtDecoder,
         SoundCardCalibration,
-        Diagnostics
+        Diagnostics,
+        Display
     };
 
     explicit AppSettingsDialog(const AppSettings &settings,
@@ -115,7 +117,8 @@ private:
     QWidget *makeDiagnosticsPage();
     QWidget *makeFtColourEditor();
     QWidget *makeRotatorPage();
-    QWidget *makeQrzAccountPage();
+    QGroupBox *makeQrzAccountGroup(QWidget *parent);
+    QWidget *makeDisplayPage();
     QWidget *makeFtDecoderPage();
     void prepareEmbeddedDialog(QDialog *dialog);
     void setInitialPage(InitialPage page);

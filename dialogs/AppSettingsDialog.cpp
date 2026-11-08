@@ -632,7 +632,8 @@ AppSettingsDialog::AppSettingsDialog(const AppSettings &settings,
     auto shouldBuildNow = [initialPage](InitialPage tabPage) {
         if (tabPage == InitialPage::UserQthMacros ||
             tabPage == InitialPage::AudioPtt ||
-            tabPage == InitialPage::Logbook) {
+            tabPage == InitialPage::Logbook ||
+            tabPage == InitialPage::Display) {
             return true;
         }
         if (tabPage == initialPage) {
@@ -641,7 +642,7 @@ AppSettingsDialog::AppSettingsDialog(const AppSettings &settings,
         if (tabPage == InitialPage::AudioPtt && initialPage == InitialPage::RadioCat) {
             return true;
         }
-        if (tabPage == InitialPage::Logbook && initialPage == InitialPage::Appearance) {
+        if (tabPage == InitialPage::Logbook && initialPage == InitialPage::QrzAccount) {
             return true;
         }
         return false;
@@ -649,8 +650,8 @@ AppSettingsDialog::AppSettingsDialog(const AppSettings &settings,
 
     addSettingsTab(InitialPage::UserQthMacros, L(QStringLiteral("User / QTH / Macros")), shouldBuildNow(InitialPage::UserQthMacros));
     addSettingsTab(InitialPage::AudioPtt, L(QStringLiteral("Audio / PTT / CAT")), shouldBuildNow(InitialPage::AudioPtt));
-    addSettingsTab(InitialPage::Logbook, L(QStringLiteral("Logbook / FT colours")), shouldBuildNow(InitialPage::Logbook));
-    addSettingsTab(InitialPage::QrzAccount, QStringLiteral("QRZ.com"), shouldBuildNow(InitialPage::QrzAccount));
+    addSettingsTab(InitialPage::Logbook, L(QStringLiteral("Logbook")), shouldBuildNow(InitialPage::Logbook));
+    addSettingsTab(InitialPage::Display, L(QStringLiteral("Display / FT colours")), shouldBuildNow(InitialPage::Display));
     addSettingsTab(InitialPage::FtDecoder, QStringLiteral("FT8 / FT4"), shouldBuildNow(InitialPage::FtDecoder));
     addSettingsTab(InitialPage::Rotator, L(QStringLiteral("Rotator")), shouldBuildNow(InitialPage::Rotator));
     addSettingsTab(InitialPage::Scheduler, L(QStringLiteral("Scheduler")), shouldBuildNow(InitialPage::Scheduler));
@@ -800,14 +801,15 @@ QWidget *AppSettingsDialog::buildSettingsPage(InitialPage page)
     case InitialPage::RadioCat:
         return makeAudioCatPage();
     case InitialPage::Logbook:
-    case InitialPage::Appearance:
+    case InitialPage::QrzAccount:
         return makeLogbookPage();
+    case InitialPage::Display:
+    case InitialPage::Appearance:
+        return makeDisplayPage();
     case InitialPage::Rotator:
         m_rotatorPage = makeRotatorPage();
         applyStoredRotatorConnectionStatuses();
         return m_rotatorPage;
-    case InitialPage::QrzAccount:
-        return makeQrzAccountPage();
     case InitialPage::Diagnostics:
         return makeDiagnosticsPage();
     case InitialPage::FtDecoder:
@@ -858,12 +860,11 @@ void AppSettingsDialog::ensureSettingsTabBuilt(int index)
     m_tabs->setCurrentIndex(index);
 }
 
-QWidget *AppSettingsDialog::makeQrzAccountPage()
+QGroupBox *AppSettingsDialog::makeQrzAccountGroup(QWidget *parent)
 {
-    auto *page = new QWidget(this);
-    page->setObjectName(QStringLiteral("qrzAccountSettings"));
-    auto *layout = new QVBoxLayout(page);
-    auto *group = new QGroupBox(QStringLiteral("QRZ.com"), page);
+    auto *group = new QGroupBox(QStringLiteral("QRZ.com"), parent);
+    group->setObjectName(QStringLiteral("qrzAccountSettings"));
+    group->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
     auto *form = new QFormLayout(group);
     m_editQrzUsername = new QLineEdit(m_initialSettings.qrzUsername, group);
     m_editQrzUsername->setObjectName(QStringLiteral("qrzUsername"));
@@ -875,9 +876,7 @@ QWidget *AppSettingsDialog::makeQrzAccountPage()
     auto *info = new QLabel(L(QStringLiteral("The account is saved in the local profile and reused after restart. QRZ XML access is required for complete station data.")), group);
     info->setWordWrap(true);
     form->addRow(info);
-    layout->addWidget(group);
-    layout->addStretch();
-    return page;
+    return group;
 }
 
 QWidget *AppSettingsDialog::makeFtDecoderPage()
@@ -1211,16 +1210,7 @@ QWidget *AppSettingsDialog::makeLogbookPage()
     compactEmbeddedSettingsWidgets(m_logbookPage);
     logbookLayout->addWidget(m_logbookPage);
 
-    QVBoxLayout *topRow = new QVBoxLayout;
-    topRow->setContentsMargins(0, 0, 0, 0);
-    topRow->setSpacing(10);
-    QWidget *appearancePanel = makeAppearancePage();
-    appearancePanel->setParent(holder);
-    appearancePanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
-    logbookGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
-    topRow->addWidget(logbookGroup, 1);
-    topRow->addWidget(appearancePanel, 1);
-    layout->addLayout(topRow);
+    layout->addWidget(logbookGroup);
 
     QGroupBox *displayGroup = new QGroupBox(L(QStringLiteral("Logbook display")), holder);
     displayGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
@@ -1387,6 +1377,34 @@ QWidget *AppSettingsDialog::makeLogbookPage()
     pskInfo->setStyleSheet(QStringLiteral("color: palette(mid);"));
     pskGrid->addWidget(pskInfo, 1, 0, 1, 2);
     layout->addWidget(pskGroup);
+
+    // QRZ.com account (callsign lookup) belongs with the logbook services.
+    layout->addWidget(makeQrzAccountGroup(holder));
+    layout->addStretch(1);
+
+    fitSettingsButtons(holder);
+    layout->setSizeConstraint(QLayout::SetMinAndMaxSize);
+    scroll->setWidget(holder);
+    return scroll;
+}
+
+QWidget *AppSettingsDialog::makeDisplayPage()
+{
+    QScrollArea *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+
+    QWidget *holder = new QWidget(scroll);
+    QVBoxLayout *layout = new QVBoxLayout(holder);
+    layout->setContentsMargins(12, 10, 12, 10);
+    layout->setSpacing(10);
+
+    QWidget *appearancePanel = makeAppearancePage();
+    appearancePanel->setParent(holder);
+    appearancePanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+    layout->addWidget(appearancePanel);
 
     QGroupBox *decodeTableGroup = new QGroupBox(L(QStringLiteral("Decode table readability")), holder);
     decodeTableGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
@@ -2390,8 +2408,9 @@ void AppSettingsDialog::setInitialPage(InitialPage page)
     case InitialPage::AudioPtt: index = 1; break;
     case InitialPage::RadioCat: index = 1; break;
     case InitialPage::Logbook: index = 2; break;
-    case InitialPage::Appearance: index = 2; break;
-    case InitialPage::QrzAccount: index = 3; break;
+    case InitialPage::QrzAccount: index = 2; break;
+    case InitialPage::Display: index = 3; break;
+    case InitialPage::Appearance: index = 3; break;
     case InitialPage::FtDecoder: index = 4; break;
     case InitialPage::Rotator: index = 5; break;
     case InitialPage::Scheduler: index = 6; break;
