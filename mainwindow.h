@@ -39,6 +39,7 @@
 #include "modems/q65/Q65Mode.h"
 #include "modems/q65/Q65Decoder.h"
 #include "modems/js8/Js8Decoder.h"
+#include "dsp/text/TextCallSpotter.h"
 #include "modems/js8/Js8AutoReply.h"
 #include "modems/js8/Js8CommandBuffer.h"
 #include "modems/js8/Js8Inbox.h"
@@ -1009,6 +1010,14 @@ private slots:
      */
     void showAboutM3();
     void restoreLastSession();
+    /// PSK Reporter spot for any mode: dial + audio offset; grid optional
+    /// unless @p requireGrid; @p hasSnr false for text modes.
+    bool reportPskSpot(const QString &call, const QString &grid, double audioHz, const QString &mode,
+                       int snrDb, bool hasSnr, bool requireGrid);
+    /// Callsign spotting in decoded text of RTTY/PSK/MFSK/CW (per channel key).
+    void spotFromDecodedText(const QString &channel, const QString &text, double audioHz, const QString &mode);
+    void spotFromSkimmer(const QVector<SkimmerSpot> &spots, const QString &mode);
+    void spotWeakSignalMessage(const QString &message, double audioHz, int snrDb, const QString &mode);
     void spotFt8ToPskReporter(const Ft8RxDecoder::Decode &decode, const QString &call, const QString &grid,
                               const QString &mode);
     void saveLastSession();
@@ -2503,6 +2512,7 @@ private:
     bool m_lastRigPttOn = false;
     double m_lastRxDialHz = 0.0;              // dial while receiving (not the split-shifted TX dial)
     class PskReporter *m_pskReporter = nullptr;
+    QHash<QString, TextCallSpotter> m_textCallSpotters;   // RTTY/PSK/MFSK/CW A/B
     mm::CatRotatorController *m_catRotatorController = nullptr;
     QWidget *m_tabCatRotator = nullptr;
     mm::CatRotatorPanel *m_catRotatorSidePanel = nullptr;

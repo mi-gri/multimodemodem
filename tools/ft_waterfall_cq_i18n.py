@@ -168,10 +168,17 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 }.items()})
 # PSK Reporter (JTDX)
 SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
- 'Report received FT8/FT4 stations to PSK Reporter':(
-  'Report received FT8/FT4 stations to PSK Reporter','Segnala a PSK Reporter le stazioni FT8/FT4 ricevute',
-  'Signaler à PSK Reporter les stations FT8/FT4 reçues','Empfangene FT8/FT4-Stationen an PSK Reporter melden',
-  'Rapporter mottatte FT8/FT4-stasjoner til PSK Reporter','Hlásit přijaté stanice FT8/FT4 do PSK Reporteru'),
+ 'Report received stations to PSK Reporter':(
+  'Report received stations to PSK Reporter','Segnala a PSK Reporter le stazioni ricevute',
+  'Signaler à PSK Reporter les stations reçues','Empfangene Stationen an PSK Reporter melden',
+  'Rapporter mottatte stasjoner til PSK Reporter','Hlásit přijaté stanice do PSK Reporteru'),
+ 'Received stations are reported to pskreporter.info every five minutes, with your callsign, locator, the antenna of the band (User / station / QTH), frequency and SNR. FT8, FT4, MSK144 and Q65: stations that send their locator. JS8: every station heard. RTTY, PSK, MFSK and CW: a call sent twice after CQ or DE, without SNR. Requires CAT for the frequency.':(
+  'Received stations are reported to pskreporter.info every five minutes, with your callsign, locator, the antenna of the band (User / station / QTH), frequency and SNR. FT8, FT4, MSK144 and Q65: stations that send their locator. JS8: every station heard. RTTY, PSK, MFSK and CW: a call sent twice after CQ or DE, without SNR. Requires CAT for the frequency.',
+  'Le stazioni ricevute vengono segnalate a pskreporter.info ogni cinque minuti, con nominativo, locatore, antenna della banda (Utente / stazione / QTH), frequenza e SNR. FT8, FT4, MSK144 e Q65: stazioni che inviano il locatore. JS8: ogni stazione ascoltata. RTTY, PSK, MFSK e CW: un nominativo inviato due volte dopo CQ o DE, senza SNR. Serve il CAT per la frequenza.',
+  'Les stations reçues sont signalées à pskreporter.info toutes les cinq minutes, avec votre indicatif, locator, l’antenne de la bande (Utilisateur / station / QTH), la fréquence et le SNR. FT8, FT4, MSK144 et Q65 : stations qui envoient leur locator. JS8 : chaque station entendue. RTTY, PSK, MFSK et CW : un indicatif envoyé deux fois après CQ ou DE, sans SNR. Nécessite le CAT pour la fréquence.',
+  'Empfangene Stationen werden alle fünf Minuten an pskreporter.info gemeldet, mit Rufzeichen, Locator, der Antenne des Bandes (Benutzer / Station / QTH), Frequenz und SNR. FT8, FT4, MSK144 und Q65: Stationen, die ihren Locator senden. JS8: jede gehörte Station. RTTY, PSK, MFSK und CW: ein Rufzeichen, das nach CQ oder DE zweimal gesendet wird, ohne SNR. Für die Frequenz ist CAT nötig.',
+  'Mottatte stasjoner rapporteres til pskreporter.info hvert femte minutt, med kallesignal, lokator, båndets antenne (Bruker / stasjon / QTH), frekvens og SNR. FT8, FT4, MSK144 og Q65: stasjoner som sender lokatoren sin. JS8: hver stasjon som høres. RTTY, PSK, MFSK og CW: et kallesignal sendt to ganger etter CQ eller DE, uten SNR. Krever CAT for frekvensen.',
+  'Přijaté stanice se každých pět minut hlásí na pskreporter.info, se značkou, lokátorem, anténou pásma (Uživatel / stanice / QTH), kmitočtem a SNR. FT8, FT4, MSK144 a Q65: stanice, které vysílají lokátor. JS8: každá slyšená stanice. RTTY, PSK, MFSK a CW: značka vyslaná dvakrát po CQ nebo DE, bez SNR. Pro kmitočet je potřeba CAT.'),
 }.items()})
 # Antenna per band
 SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {

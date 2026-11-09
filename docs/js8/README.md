@@ -77,6 +77,10 @@ scheduler; there is no even/odd sequence in JS8.
   follows RX offset" is on); right click sets only TX.  The waterfall marks
   the period starts of the selected speed.
 - QSOs are logged with mode `JS8`.
+- With *Report received stations to PSK Reporter* (Settings → Logbook) every
+  station heard is spotted as mode `JS8`, with its grid when known, as JS8Call
+  does.  The same option also spots MSK144/Q65 (stations with locator) and
+  RTTY, PSK, MFSK and CW (a call sent twice after CQ or DE, without SNR).
 
 ## Frequencies
 

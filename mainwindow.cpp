@@ -1689,26 +1689,60 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::spotFt8ToPskReporter(const Ft8RxDecoder::Decode &decode, const QString &call,
                                       const QString &grid, const QString &mode)
 {
+    if (mode != QLatin1String("FT8") && mode != QLatin1String("FT4")) return;
+    reportPskSpot(call, grid, decode.frequencyHz, mode, decode.snrDb, true, true);
+}
+
+bool MainWindow::reportPskSpot(const QString &call, const QString &grid, double audioHz, const QString &mode,
+                               int snrDb, bool hasSnr, bool requireGrid)
+{
+    if (!m_settings.pskReporterEnabled || m_offlineAnalysisActive || m_txRunning) return false;
     const QString myCall = stationCallsign();
     const QString myGrid = stationLocator();
-    if (myCall.isEmpty() || myGrid.size() < 4) return;
-    if (mode != QLatin1String("FT8") && mode != QLatin1String("FT4")) return;
-    const qint64 frequencyHz = m_lastRxDialHz > 0 ? qint64(std::llround(m_lastRxDialHz)) + decode.frequencyHz : 0;
+    if (myCall.isEmpty() || myGrid.size() < 4 || mode.trimmed().isEmpty()) return false;
+    const qint64 frequencyHz = m_lastRxDialHz > 0 ? qint64(std::llround(m_lastRxDialHz + audioHz)) : 0;
     const QString station = AdifLogbook::normalizeCallsign(call);
-    if (!PskReport::isReportable(station, grid, frequencyHz, myCall)) return;
-    if (!CtyCountryFile::instance().lookupCallsign(station).valid) return;
+    const QString locator = grid.trimmed().toUpper();
+    if (!PskReport::isReportable(station, locator, frequencyHz, myCall, requireGrid)) return false;
+    if (!CtyCountryFile::instance().lookupCallsign(station).valid) return false;
     if (m_pskReporter == nullptr) m_pskReporter = new PskReporter(this);
     m_pskReporter->setLocalStation({myCall, myGrid, m_settings.antennaForBand(bandFromFrequencyHz(double(frequencyHz))),
         QStringLiteral("%1 %2 build %3").arg(ProductName::longName(), QStringLiteral(M3_VERSION_STRING),
                                              QString::fromLatin1(M3Build::number()))});
     PskReport::Spot spot;
     spot.call = station;
-    spot.grid = grid.trimmed().toUpper();
+    spot.grid = locator;
     spot.frequencyHz = frequencyHz;
-    spot.mode = mode;
-    spot.snr = decode.snrDb;
+    spot.mode = mode.trimmed().toUpper();
+    spot.snr = snrDb;
+    spot.hasSnr = hasSnr;
     spot.unixTime = quint32(QDateTime::currentSecsSinceEpoch());
-    m_pskReporter->addSpot(spot);
+    return m_pskReporter->addSpot(spot);
+}
+
+void MainWindow::spotFromDecodedText(const QString &channel, const QString &text, double audioHz, const QString &mode)
+{
+    if (!m_settings.pskReporterEnabled || m_offlineAnalysisActive || m_txRunning || text.isEmpty()) return;
+    TextCallSpotter &spotter = m_textCallSpotters[channel];
+    for (const QString &call : spotter.append(text)) reportPskSpot(call, QString(), audioHz, mode, 0, false, false);
+}
+
+void MainWindow::spotFromSkimmer(const QVector<SkimmerSpot> &spots, const QString &mode)
+{
+    if (!m_settings.pskReporterEnabled || m_offlineAnalysisActive || m_txRunning) return;
+    for (const SkimmerSpot &spot : spots)
+        if (!spot.cqCall.isEmpty()) reportPskSpot(spot.cqCall, QString(), spot.frequencyHz, mode, 0, false, false);
+}
+
+void MainWindow::spotWeakSignalMessage(const QString &message, double audioHz, int snrDb, const QString &mode)
+{
+    if (!m_settings.pskReporterEnabled || m_offlineAnalysisActive) return;
+    // MSK144/Q65 carry the same 77-bit messages as FT8: the CQ caller or the
+    // sender, with its locator.
+    const ParsedFt8Message parsed = parseFt8MessageText(message, stationCallsign());
+    const QString call = parsed.cq ? ft8CqCallsignFromMessage(parsed) : parsed.senderCall;
+    if (FtDecodedText::isAckLikeGridTrap(parsed.grid.left(4))) return;
+    reportPskSpot(call, parsed.grid, audioHz, mode, snrDb, true, true);
 }
 
 // Headless test runs (offscreen/minimal platform) share settings.mad with the
@@ -10191,6 +10225,7 @@ void MainWindow::setupProcessingConnections()
                     if (m_txRunning || ui->cmbMode->currentText() != RttyDecoder::modeName()) return;
                     m_rttySkimmerSpots = spots;
                     updateRttyWaterfallOverlays();
+                    spotFromSkimmer(spots, QStringLiteral("RTTY"));
                 });
     }
 
@@ -10228,6 +10263,10 @@ void MainWindow::setupProcessingConnections()
     // full-passband scanner supplies carrier lanes only, never random glyphs.
     connect(m_cwDecoder, &CwDecoder::priorityTextReceived,
             this, [this](int rank, const QString &text) {
+                spotFromDecodedText(rank <= 0 ? QStringLiteral("CW-A") : QStringLiteral("CW-B"), text,
+                                    rank <= 0 ? (m_spinCwToneHz != nullptr ? m_spinCwToneHz->value() : 700)
+                                              : m_cwSecondaryToneHz,
+                                    QStringLiteral("CW"));
                 if (rank <= 0) {
                     appendCwDecoderText(QStringLiteral("A"), text,
                                         M3Ui::themeColor(M3Ui::ThemeColorRole::RxPrimary),
@@ -10245,6 +10284,7 @@ void MainWindow::setupProcessingConnections()
                 if (!m_waterfallWidget || !ui || !ui->cmbMode || m_txRunning ||
                     ui->cmbMode->currentText() != CwDecoder::modeName() || !m_settings.cwSkimmerEnabled) return;
                 m_waterfallWidget->setSkimmerSpots(spots, m_settings.cwSkimmerCqOnly);
+                spotFromSkimmer(spots, QStringLiteral("CW"));
             }, Qt::QueuedConnection);
 
     connect(m_cwDecoder, &CwDecoder::diagnosticSamplesReady,
@@ -14686,6 +14726,7 @@ void MainWindow::stopMsk144Shell()
 void MainWindow::handleMsk144DecodeReady(const Msk144Decode &decode)
 {
     SessionDiagnostics::instance().record("rx.message.delivery",{{"mode","MSK144"},{"message",decode.message},{"snr",decode.snrDb},{"frequency",decode.frequencyHz}});
+    spotWeakSignalMessage(decode.message, decode.frequencyHz, decode.snrDb, QStringLiteral("MSK144"));
     if (m_tableMsk144Rx != nullptr) {
         const int row = m_tableMsk144Rx->rowCount();
         m_tableMsk144Rx->insertRow(row);
@@ -15116,6 +15157,7 @@ void MainWindow::handleNativeWeakSignalPeriodTxDue()
 void MainWindow::handleQ65DecodeReady(const Q65Decode &decode)
 {
     SessionDiagnostics::instance().record("rx.message.delivery",{{"mode","Q65"},{"message",decode.message},{"snr",decode.snrDb},{"frequency",decode.frequencyHz}});
+    spotWeakSignalMessage(decode.message, decode.frequencyHz, decode.snrDb, QStringLiteral("Q65"));
     if (m_tableQ65Rx != nullptr) {
         const int row = m_tableQ65Rx->rowCount();
         m_tableQ65Rx->insertRow(row);
@@ -15461,6 +15503,11 @@ void MainWindow::handleRttyTextUpdated(const QString &text)
      * of turning every received character into a vertical column.
      */
     appendRxTextTerminal(m_txtRttyRx, text, true, &m_rttyPendingRxLineBreak);
+    {
+        const int mark = m_spinRttyMarkHz != nullptr ? m_spinRttyMarkHz->value() : 2125;
+        const int shift = m_spinRttyShiftHz != nullptr ? m_spinRttyShiftHz->value() : 170;
+        spotFromDecodedText(QStringLiteral("RTTY"), text, mark + shift / 2.0, QStringLiteral("RTTY"));
+    }
 
     // Keep the waterfall text trail from the incremental character stream.
     // The old textUpdated connection queued the decoder's complete growing
@@ -15626,6 +15673,12 @@ void MainWindow::handleBpsk31TextUpdated(const QString &text)
      * them to the terminal as a stream and only honour explicit line controls.
      */
     appendRxTextTerminal(m_txtBpsk31Rx, text, false, &m_bpsk31PendingRxLineBreak);
+    // PSK Reporter names PSK31/PSK63... without the leading B.
+    QString pskMode = m_cmbBpsk31Variant != nullptr ? m_cmbBpsk31Variant->currentData().toString().toUpper()
+                                                    : QStringLiteral("BPSK31");
+    if (pskMode.startsWith(QLatin1String("BPSK"))) pskMode.remove(0, 1);
+    spotFromDecodedText(QStringLiteral("PSK"), text, m_spinBpsk31ToneHz != nullptr ? m_spinBpsk31ToneHz->value() : 1000,
+                        pskMode);
 }
 
 
@@ -15729,6 +15782,9 @@ void MainWindow::handleMfskTextUpdated(const QString &text)
     }
 
     appendRxTextTerminal(m_txtMfskRx, text, false, &m_mfskPendingRxLineBreak);
+    spotFromDecodedText(QStringLiteral("MFSK"), text, m_spinMfskCenterHz != nullptr ? m_spinMfskCenterHz->value() : 1000,
+                        m_cmbMfskVariant != nullptr ? m_cmbMfskVariant->currentData().toString().toUpper()
+                                                    : QStringLiteral("MFSK16"));
 }
 
 void MainWindow::applyCwSettings()

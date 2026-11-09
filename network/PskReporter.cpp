@@ -27,6 +27,15 @@ const char *const kTxDescriptorHex =
     "8003FFFF0000768F"   // sender locator
     "800B00010000768F"   // information source
     "00960004";          // flow start seconds
+// The same without SNR, for text modes (RTTY, PSK, MFSK, CW).
+const char *const kTxNoSnrDescriptorHex =
+    "0002003450E40006"
+    "8001FFFF0000768F"   // sender callsign
+    "800500050000768F"   // frequency, 5 bytes
+    "800AFFFF0000768F"   // mode
+    "8003FFFF0000768F"   // sender locator
+    "800B00010000768F"   // information source
+    "00960004";          // flow start seconds
 
 void putU8(QByteArray &b, quint8 v) { b.append(char(v)); }
 void putU16(QByteArray &b, quint16 v) { putU8(b, quint8(v >> 8)); putU8(b, quint8(v)); }
@@ -45,7 +54,7 @@ QByteArray spotRecord(const Spot &s)
     const quint64 f = quint64(s.frequencyHz) & 0xFFFFFFFFFFULL;
     putU8(r, quint8(f >> 32));
     putU32(r, quint32(f));
-    putU8(r, quint8(qint8(qBound(-128, s.snr, 127))));
+    if (s.hasSnr) putU8(r, quint8(qint8(qBound(-128, s.snr, 127))));
     putText(r, s.mode);
     putText(r, s.grid);
     putU8(r, 1);   // REPORTER_SOURCE_AUTOMATIC
@@ -72,6 +81,7 @@ QByteArray takeDatagram(QQueue<Spot> &queue, const LocalStation &local, quint32 
     putU32(d, randomId);
     d.append(QByteArray::fromHex(kRxDescriptorHex));
     d.append(QByteArray::fromHex(kTxDescriptorHex));
+    d.append(QByteArray::fromHex(kTxNoSnrDescriptorHex));
 
     const int rxAt = d.size();
     putU16(d, 0x50E2);
@@ -84,10 +94,11 @@ QByteArray takeDatagram(QQueue<Spot> &queue, const LocalStation &local, quint32 
     patchLength(d, rxAt + 2, d.size() - rxAt);
 
     const int txAt = d.size();
-    putU16(d, 0x50E3);
+    const bool withSnr = queue.isEmpty() || queue.head().hasSnr;
+    putU16(d, withSnr ? 0x50E3 : 0x50E4);
     putU16(d, 0);
     bool first = true;
-    while (!queue.isEmpty()) {
+    while (!queue.isEmpty() && queue.head().hasSnr == withSnr) {
         const QByteArray record = spotRecord(queue.head());
         // The first spot always goes in, or it would stay queued for ever.
         if (!first && d.size() + record.size() + 2 > kMaxPayloadBytes) break;
@@ -101,7 +112,8 @@ QByteArray takeDatagram(QQueue<Spot> &queue, const LocalStation &local, quint32 
     return d;
 }
 
-bool isReportable(const QString &call, const QString &grid, qint64 frequencyHz, const QString &myCall)
+bool isReportable(const QString &call, const QString &grid, qint64 frequencyHz, const QString &myCall,
+                  bool requireGrid)
 {
     static const QRegularExpression callRe(QStringLiteral("^[A-Z0-9/]{3,13}$"));
     static const QRegularExpression gridRe(QStringLiteral("^[A-R]{2}[0-9]{2}([A-X]{2})?$"));
@@ -110,6 +122,7 @@ bool isReportable(const QString &call, const QString &grid, qint64 frequencyHz, 
     if (frequencyHz <= 0 || !callRe.match(c).hasMatch() || !c.contains(QRegularExpression(QStringLiteral("[0-9]"))))
         return false;
     if (!myCall.isEmpty() && c == myCall.trimmed().toUpper()) return false;
+    if (g.isEmpty()) return !requireGrid;
     return gridRe.match(g).hasMatch() && g != QLatin1String("RR73");
 }
 

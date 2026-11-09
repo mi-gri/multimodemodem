@@ -1440,10 +1440,10 @@ QWidget *AppSettingsDialog::makeLogbookPage()
     pskGrid->setContentsMargins(10, 8, 10, 10);
     pskGrid->setHorizontalSpacing(10);
     pskGrid->setVerticalSpacing(6);
-    m_chkPskReporterEnabled = new QCheckBox(L(QStringLiteral("Report received FT8/FT4 stations to PSK Reporter")), pskGroup);
+    m_chkPskReporterEnabled = new QCheckBox(L(QStringLiteral("Report received stations to PSK Reporter")), pskGroup);
     m_chkPskReporterEnabled->setChecked(m_initialSettings.pskReporterEnabled);
     pskGrid->addWidget(m_chkPskReporterEnabled, 0, 0, 1, 2);
-    QLabel *pskInfo = new QLabel(L(QStringLiteral("Stations that send their locator are reported to pskreporter.info every five minutes, with your callsign, locator, the antenna of the band (User / station / QTH), frequency and SNR. Requires CAT for the frequency.")), pskGroup);
+    QLabel *pskInfo = new QLabel(L(QStringLiteral("Received stations are reported to pskreporter.info every five minutes, with your callsign, locator, the antenna of the band (User / station / QTH), frequency and SNR. FT8, FT4, MSK144 and Q65: stations that send their locator. JS8: every station heard. RTTY, PSK, MFSK and CW: a call sent twice after CQ or DE, without SNR. Requires CAT for the frequency.")), pskGroup);
     pskInfo->setWordWrap(true);
     pskInfo->setStyleSheet(QStringLiteral("color: palette(mid);"));
     pskGrid->addWidget(pskInfo, 1, 0, 1, 2);

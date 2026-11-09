@@ -680,6 +680,8 @@ void MainWindow::handleJs8Decode(const Js8Decode &decode)
         h.snrDb = decode.snrDb;
         h.utc = decode.utc;
         h.offsetHz = decode.frequencyHz;
+        // PSK Reporter, as JS8Call: every station heard, with its grid when known.
+        reportPskSpot(from, h.grid, decode.frequencyHz, QStringLiteral("JS8"), decode.snrDb, true, false);
         if (m_js8Heard.size() > kJs8MaxHeard) {
             auto oldest = m_js8Heard.begin();
             for (auto it = m_js8Heard.begin(); it != m_js8Heard.end(); ++it)

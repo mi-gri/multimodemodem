@@ -27,9 +27,10 @@ struct Spot
     QString call;
     QString grid;
     qint64 frequencyHz = 0;   // dial + audio offset
-    QString mode;             // "FT8", "FT4"
+    QString mode;             // "FT8", "FT4", "JS8", "RTTY", "CW" ...
     int snr = 0;
     quint32 unixTime = 0;
+    bool hasSnr = true;       // false: text modes without an SNR estimate
 };
 
 struct LocalStation
@@ -43,14 +44,18 @@ struct LocalStation
 constexpr int kMaxPayloadBytes = 1200;   // one datagram, IPFIX payload
 constexpr quint16 kPort = 4739;
 
-// Builds one datagram from the front of the queue: as many spots as fit within
-// kMaxPayloadBytes, at least one. Removes the spots it took.
+// Builds one datagram from the front of the queue: as many spots of the same
+// kind (with or without SNR) as fit within kMaxPayloadBytes, at least one.
+// Removes the spots it took.  Spots without SNR use a second sender template
+// (0x50E4) that leaves the SNR field out, as fldigi does for text modes.
 QByteArray takeDatagram(QQueue<Spot> &queue, const LocalStation &local, quint32 sequence,
                         quint32 randomId, quint32 exportTime);
 
 // A spot worth reporting: a plain callsign (no <hash>, no own call) with a real
-// locator (not RR73), and a known dial frequency.
-bool isReportable(const QString &call, const QString &grid, qint64 frequencyHz, const QString &myCall);
+// locator (not RR73), and a known dial frequency.  With requireGrid false an
+// empty locator is accepted (JS8 and text modes); a given one must be valid.
+bool isReportable(const QString &call, const QString &grid, qint64 frequencyHz, const QString &myCall,
+                  bool requireGrid = true);
 
 } // namespace PskReport
 
