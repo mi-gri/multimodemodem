@@ -41,6 +41,7 @@
 #include "rotator/RotatorPeakSearch.h"
 #include "modems/msk144/Msk144Mode.h"
 #include "modems/msk144/tx/Msk144Transmitter.h"
+#include "modems/js8/Js8Mode.h"
 #include "modems/q65/tx/Q65Transmitter.h"
 #include "utils/UiScale.h"
 #include "utils/RuntimeI18n.h"
@@ -1648,7 +1649,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_qrzLookupPanel = new QrzLookupPanel(m_tabQrz);
     qrzLayout->addWidget(m_qrzLookupPanel, 1);
     auto refreshStation = [this] { refreshQrzStationPanel(); };
-    for (auto *form : {m_rttyQsoForm, m_bpsk31QsoForm, m_mfskQsoForm, m_cwQsoForm, m_hellQsoForm, m_msk144QsoForm, m_q65QsoForm})
+    for (auto *form : {m_rttyQsoForm, m_bpsk31QsoForm, m_mfskQsoForm, m_cwQsoForm, m_hellQsoForm, m_msk144QsoForm, m_q65QsoForm, m_js8QsoForm})
         if (form && form->callsign) connect(form->callsign, &QLineEdit::textChanged, this, [refreshStation](const QString&) { refreshStation(); });
     if (m_editFt8DxCall) connect(m_editFt8DxCall, &QLineEdit::textChanged, this, [refreshStation](const QString&) { refreshStation(); });
     connect(ui->cmbMode, &QComboBox::currentTextChanged, this, [refreshStation](const QString&) { refreshStation(); });
@@ -1765,6 +1766,7 @@ MainWindow::~MainWindow()
     delete m_hellQsoForm;
     delete m_msk144QsoForm;
     delete m_q65QsoForm;
+    delete m_js8QsoForm;
     m_rttyQsoForm = nullptr;
     m_bpsk31QsoForm = nullptr;
     m_mfskQsoForm = nullptr;
@@ -1772,6 +1774,7 @@ MainWindow::~MainWindow()
     m_hellQsoForm = nullptr;
     m_msk144QsoForm = nullptr;
     m_q65QsoForm = nullptr;
+    m_js8QsoForm = nullptr;
     qWarning().noquote() << QStringLiteral("[shutdown] deleting UI");
     delete ui;
     ui = nullptr;
@@ -1903,6 +1906,7 @@ void MainWindow::shutdownRuntime(const char *reason)
     if (m_cwDecoder != nullptr) disconnect(m_cwDecoder, nullptr, this, nullptr);
     if (m_msk144Decoder != nullptr) disconnect(m_msk144Decoder, nullptr, this, nullptr);
     if (m_q65Decoder != nullptr) disconnect(m_q65Decoder, nullptr, this, nullptr);
+    if (m_js8Decoder != nullptr) disconnect(m_js8Decoder, nullptr, this, nullptr);
     if (m_textAssistWorker != nullptr) disconnect(m_textAssistWorker, nullptr, this, nullptr);
     if (m_logbookIndexWorker != nullptr) disconnect(m_logbookIndexWorker, nullptr, this, nullptr);
 
@@ -1967,6 +1971,7 @@ void MainWindow::shutdownRuntime(const char *reason)
         {m_ftSlotThread, QStringLiteral("FT slot scheduler")},
         {m_ft8RxThread, QStringLiteral("FT RX decoder")},
         {m_q65Thread, QStringLiteral("Q65 RX decoder")},
+        {m_js8Thread, QStringLiteral("JS8 RX decoder")},
         {m_textAssistThread, QStringLiteral("Text assistance")},
         {m_logbookIndexThread, QStringLiteral("Logbook index")},
         {m_rigThread, QStringLiteral("CAT/Hamlib")},
@@ -2034,6 +2039,8 @@ void MainWindow::shutdownRuntime(const char *reason)
     m_ft8RxDecoder = nullptr;
     m_q65Thread = nullptr;
     m_q65Decoder = nullptr;
+    m_js8Thread = nullptr;
+    m_js8Decoder = nullptr;
     m_textAssistThread = nullptr;
     m_textAssistWorker = nullptr;
     m_logbookIndexThread = nullptr;
@@ -2084,6 +2091,7 @@ void MainWindow::setupUiState()
     ui->cmbMode->addItem(RadioTelescopeMode::modeName());
     ui->cmbMode->addItem(Msk144Mode::modeName());
     ui->cmbMode->addItem(Q65Mode::familyName());
+    ui->cmbMode->addItem(Js8Mode::familyName());
     for (const QString &ftModeName : Ft8Mode::allModeNames()) {
         ui->cmbMode->addItem(ftModeName);
     }
@@ -2353,6 +2361,7 @@ void MainWindow::setupCustomWidgets()
     setupRadioTelescopePage();
     setupMsk144Page();
     setupQ65Page();
+    setupJs8Page();
     // Useful per-mode conditioning lives inside the relevant Mode pages.
     setupFt8Page();
 
@@ -2625,7 +2634,8 @@ void MainWindow::setupCustomWidgets()
         ui->modeTabLayout->addWidget(m_btnShowRuntimeLog, 0);
         const QString modeName = (ui != nullptr && ui->cmbMode != nullptr) ? ui->cmbMode->currentText() : QString();
         m_btnShowRuntimeLog->setVisible(Ft8Mode::isFamilyMode(modeName) || Msk144Mode::isMode(modeName) ||
-                                         Q65Mode::isFamilyMode(modeName) || modeName == CwDecoder::modeName());
+                                         Q65Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName) ||
+                                         modeName == CwDecoder::modeName());
     }
 
     m_settings.waterfallColorScalePercent = 80;
@@ -3221,6 +3231,9 @@ MainWindow::QsoFormWidgets *MainWindow::activeQsoForm() const
     if (Q65Mode::isFamilyMode(modeName)) {
         return m_q65QsoForm;
     }
+    if (Js8Mode::isMode(modeName)) {
+        return m_js8QsoForm;
+    }
     return nullptr;
 }
 
@@ -3282,6 +3295,9 @@ QString MainWindow::currentAdifMode() const
     if (Q65Mode::isFamilyMode(modeName)) {
         return QStringLiteral("Q65");
     }
+    if (Js8Mode::isMode(modeName)) {
+        return QStringLiteral("JS8");
+    }
     return shortModeLabel(modeName).toUpper();
 }
 
@@ -3306,6 +3322,8 @@ void MainWindow::populateQsoFormDefaults(QsoFormWidgets *form, const QString &mo
         adifMode = QStringLiteral("MSK144");
     } else if (Q65Mode::isFamilyMode(modeName)) {
         adifMode = QStringLiteral("Q65");
+    } else if (Js8Mode::isMode(modeName)) {
+        adifMode = QStringLiteral("JS8");
     } else {
         adifMode = currentAdifMode().isEmpty() ? shortModeLabel(modeName).toUpper() : currentAdifMode();
     }
@@ -3437,7 +3455,7 @@ void MainWindow::publishWavelogRadio()
 void MainWindow::updateQsoUtcFields()
 {
     const QString utc = QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd HH:mm:ss 'UTC'");
-    const QList<QsoFormWidgets *> forms = {m_rttyQsoForm, m_bpsk31QsoForm, m_mfskQsoForm, m_cwQsoForm, m_hellQsoForm, m_msk144QsoForm, m_q65QsoForm};
+    const QList<QsoFormWidgets *> forms = {m_rttyQsoForm, m_bpsk31QsoForm, m_mfskQsoForm, m_cwQsoForm, m_hellQsoForm, m_msk144QsoForm, m_q65QsoForm, m_js8QsoForm};
     for (QsoFormWidgets *form : forms) {
         if (form != nullptr && form->utc != nullptr) {
             form->utc->setText(utc);
@@ -4533,6 +4551,8 @@ void MainWindow::setupTextTerminalPages()
     m_mainDisplayStack->addWidget(m_q65DisplayPage);
     refreshQ65StandardMessages();
 
+    setupJs8DisplayPage();
+
     m_radioTelescopeDisplayPage = new QWidget(m_mainDisplayStack);
     QVBoxLayout *rtLayout = new QVBoxLayout(m_radioTelescopeDisplayPage);
     rtLayout->setContentsMargins(6, 6, 6, 6);
@@ -4665,7 +4685,8 @@ void MainWindow::updateCentralDisplayForMode(const QString &modeName)
                            RadioTelescopeMode::isMode(modeName) ||
                            Ft8Mode::isFamilyMode(modeName) ||
                            Msk144Mode::isMode(modeName) ||
-                           Q65Mode::isFamilyMode(modeName));
+                           Q65Mode::isFamilyMode(modeName) ||
+                           Js8Mode::isMode(modeName));
 
     if (ui->frameSstvImage != nullptr) {
         // Keep the surrounding SSTV/WEFAX page on the native Qt palette.
@@ -4744,6 +4765,11 @@ void MainWindow::updateCentralDisplayForMode(const QString &modeName)
         return;
     }
 
+    if (Js8Mode::isMode(modeName) && m_js8DisplayPage != nullptr) {
+        m_mainDisplayStack->setCurrentWidget(m_js8DisplayPage);
+        return;
+    }
+
     if (sstvMode && m_imageDisplayPage != nullptr) {
         setSstvQsoMapVisible(true);
         m_mainDisplayStack->setCurrentWidget(m_imageDisplayPage);
@@ -4799,6 +4825,9 @@ QString MainWindow::shortModeLabel(const QString &modeName) const
     if (Msk144Mode::isMode(modeName)) {
         return QStringLiteral("MSK144");
     }
+    if (Js8Mode::isMode(modeName)) {
+        return Js8Mode::familyName();
+    }
     if (Q65Mode::isFamilyMode(modeName)) {
         if (modeName.trimmed().compare(Q65Mode::familyName(), Qt::CaseInsensitive) == 0) {
             return Q65Mode::familyName();
@@ -4848,6 +4877,7 @@ void MainWindow::setupModeMenu()
     addModeAction(RadioTelescopeMode::modeName());
     addModeAction(Msk144Mode::modeName());
     addModeAction(Q65Mode::familyName());
+    addModeAction(Js8Mode::familyName());
     for (const QString &ftModeName : Ft8Mode::allModeNames()) {
         addModeAction(ftModeName);
     }
@@ -10533,6 +10563,14 @@ void MainWindow::translateObjectTree(QObject *object)
         return;
     }
 
+    // Fixed protocol labels (dB, SNR?, CQ ...) keep their text; children
+    // are still translated.
+    if (object->property("i18nSkipSelf").toBool()) {
+        const QList<QObject *> children = object->children();
+        for (QObject *child : children) translateObjectTree(child);
+        return;
+    }
+
     if (QAction *action = qobject_cast<QAction *>(object)) {
         const QString source = action->property("i18nSourceText").toString().isEmpty()
                                    ? action->text()
@@ -13328,6 +13366,7 @@ void MainWindow::setReceiverRunning(bool running)
     m_rxRunning = running;
     scheduleLiveRxConfig();
     if (m_q65Decoder) m_q65Decoder->setLiveInputEnabled(running && !m_offlineAnalysisActive && Q65Mode::isFamilyMode(ui->cmbMode->currentText()));
+    if (m_js8Decoder) m_js8Decoder->setLiveInputEnabled(running && !m_offlineAnalysisActive && Js8Mode::isMode(ui->cmbMode->currentText()));
 
     if (!m_rxRunning && !m_txRunning && m_rttyScopeWidget != nullptr) {
         m_rttyScopeWidget->setTrace(QVector<QPointF>(), 0.0, false);
@@ -13719,7 +13758,8 @@ void MainWindow::handleModeChanged(const QString &modeName)
     if (m_nativeWeakSignalTxPending) {
         const bool sameFamily =
             (Msk144Mode::isMode(modeName) && Msk144Mode::isMode(m_nativeWeakSignalTxMode)) ||
-            (Q65Mode::isFamilyMode(modeName) && Q65Mode::isFamilyMode(m_nativeWeakSignalTxMode));
+            (Q65Mode::isFamilyMode(modeName) && Q65Mode::isFamilyMode(m_nativeWeakSignalTxMode)) ||
+            (Js8Mode::isMode(modeName) && Js8Mode::isMode(m_nativeWeakSignalTxMode));
         if (!sameFamily) {
             cancelNativeWeakSignalPeriodTx(QStringLiteral("mode changed"));
         }
@@ -13830,6 +13870,12 @@ void MainWindow::handleModeChanged(const QString &modeName)
         }
         applyQ65Settings();
         setDecoderReady(Q65Mode::modeName(currentQ65Submode()));
+    } else if (Js8Mode::isMode(modeName)) {
+        if (m_pageJs8Settings != nullptr) {
+            ui->stkModeSettings->setCurrentWidget(m_pageJs8Settings);
+        }
+        applyJs8Settings();
+        setDecoderReady(QStringLiteral("JS8 ") + Js8Mode::submodeName(currentJs8Submode()));
     } else if (Ft8Mode::isFamilyMode(modeName)) {
         if (m_pageFt8Settings != nullptr) {
             ui->stkModeSettings->setCurrentWidget(m_pageFt8Settings);
@@ -13848,7 +13894,8 @@ void MainWindow::handleModeChanged(const QString &modeName)
 
     if (m_btnShowRuntimeLog != nullptr) {
         m_btnShowRuntimeLog->setVisible(Ft8Mode::isFamilyMode(modeName) || Msk144Mode::isMode(modeName) ||
-                                         Q65Mode::isFamilyMode(modeName) || modeName == CwDecoder::modeName());
+                                         Q65Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName) ||
+                                         modeName == CwDecoder::modeName());
     }
 
     updateWaterfallMarkers();
@@ -14067,6 +14114,11 @@ void MainWindow::updateWaterfallMarkers()
         return;
     }
 
+    if (Js8Mode::isMode(mode)) {
+        updateJs8WaterfallMarkers();
+        return;
+    }
+
     if (Q65Mode::isFamilyMode(mode)) {
         // Q65: 65 tones from the base tone, spaced baud x submode multiplier.
         const int q65Period = (m_cmbQ65Period != nullptr) ? m_cmbQ65Period->currentData().toInt()
@@ -14120,6 +14172,13 @@ void MainWindow::handleWaterfallFrequencyClicked(double frequencyHz, Qt::MouseBu
         m_spinMsk144RxFreq->setValue(hz);
         applyMsk144Settings();
         appendLog(QStringLiteral("MSK144 RX frequency from waterfall: %1 Hz.").arg(hz));
+        return;
+    }
+
+    if (Js8Mode::isMode(mode) && m_spinJs8RxFreq != nullptr) {
+        const bool tx = button == Qt::RightButton || (m_chkJs8TxFollowsRx != nullptr && m_chkJs8TxFollowsRx->isChecked());
+        js8SetOffset(roundedHz, button != Qt::RightButton, tx);
+        appendLog(QStringLiteral("JS8 offset from waterfall: %1 Hz.").arg(roundedHz));
         return;
     }
 
@@ -14740,9 +14799,12 @@ void MainWindow::scheduleNativeWeakSignalPeriodTx()
     const QString modeName = ui->cmbMode->currentText();
     const bool msk144 = Msk144Mode::isMode(modeName);
     const bool q65 = Q65Mode::isFamilyMode(modeName);
-    if (!msk144 && !q65) return;
+    const bool js8 = Js8Mode::isMode(modeName);
+    if (!msk144 && !q65 && !js8) return;
+    if (js8 && m_js8PendingFrames.isEmpty()) return;
 
-    const int periodSeconds = msk144
+    const int periodSeconds = js8 ? Js8Mode::parameters(currentJs8Submode()).periodSeconds
+        : msk144
         ? ((m_cmbMsk144Period != nullptr) ? m_cmbMsk144Period->currentData().toInt() : 15)
         : ((m_cmbQ65Period != nullptr) ? m_cmbQ65Period->currentData().toInt() : 60);
     const bool txFirst = msk144
@@ -14758,12 +14820,30 @@ void MainWindow::scheduleNativeWeakSignalPeriodTx()
     // this is the single rule for both Q65 and MSK144 and guarantees that TX
     // never begins with a protocol frame already shortened at its front edge.
     qint64 targetPeriod = currentPeriod + 1;
-    if ((targetPeriod & 1LL) != requestedParity) ++targetPeriod;
+    // JS8 has no even/odd sequence: every frame goes out in the next period.
+    if (!js8 && (targetPeriod & 1LL) != requestedParity) ++targetPeriod;
 
     m_nativeWeakSignalTxMode = modeName;
     m_nativeWeakSignalTxBoundaryUtcMs = targetPeriod * periodMs;
     m_nativeWeakSignalTxPending = true;
-    if (!m_nativeWeakSignalPreparedModulator) {
+    if (!m_nativeWeakSignalPreparedModulator && js8) {
+        const int sampleRate = (m_settings.audioSampleRate == 44100 || m_settings.audioSampleRate == 48000 ||
+                                m_settings.audioSampleRate == 96000) ? m_settings.audioSampleRate : 48000;
+        const double hz = m_spinJs8TxFreq != nullptr ? m_spinJs8TxFreq->value() : 1500;
+        const auto generation = ++m_nativeTxPreparationGeneration;
+        m_txWaveformPreparer->prepareJs8(m_js8PendingFrames, currentJs8Submode(), sampleRate, hz,
+            [this, generation, modeName](std::unique_ptr<TxModulator> waveform, const QString &error) {
+                if (m_shutdownInProgress || generation != m_nativeTxPreparationGeneration ||
+                    !m_nativeWeakSignalTxPending || modeName != m_nativeWeakSignalTxMode) return;
+                if (!waveform) {
+                    appendLog(QStringLiteral("JS8 waveform preparation failed: ") + error);
+                    cancelNativeWeakSignalPeriodTx(error);
+                    return;
+                }
+                m_nativeWeakSignalPreparedModulator = std::move(waveform);
+                m_txPreparedImage = m_nativeWeakSignalPreparedModulator->previewImage();
+            });
+    } else if (!m_nativeWeakSignalPreparedModulator) {
         auto *table = msk144 ? m_tableMsk144TxMessages : m_tableQ65TxMessages;
         const int row = table ? qMax(0, table->currentRow()) : 0;
         const auto *item = table ? table->item(row, 1) : nullptr;
@@ -14796,17 +14876,19 @@ void MainWindow::scheduleNativeWeakSignalPeriodTx()
         static_cast<qint64>(std::numeric_limits<int>::max()));
     m_nativeWeakSignalTxTimer.start(static_cast<int>(delayMs));
 
-    const QString label = msk144 ? QStringLiteral("MSK144")
+    const QString label = js8 ? QStringLiteral("JS8 ") + Js8Mode::submodeName(currentJs8Submode())
+                        : msk144 ? QStringLiteral("MSK144")
                                  : Q65Mode::modeName(currentQ65Submode());
     const QString boundary = QDateTime::fromMSecsSinceEpoch(
                                  m_nativeWeakSignalTxBoundaryUtcMs, Qt::UTC)
                                  .time().toString(QStringLiteral("HH:mm:ss.zzz"));
-    const QString armed = M3I18n::text(
-        QStringLiteral("%1 TX armed: UTC %2, period %3"))
-        .arg(label, boundary)
-        .arg(txFirst ? 1 : 2);
+    const QString armed = js8
+        ? M3I18n::text(QStringLiteral("%1 TX armed: UTC %2")).arg(label, boundary)
+        : M3I18n::text(QStringLiteral("%1 TX armed: UTC %2, period %3")).arg(label, boundary).arg(txFirst ? 1 : 2);
     appendLog(armed);
-    if (msk144 && m_lblMsk144PeriodStatus != nullptr) {
+    if (js8 && m_lblJs8TxStatus != nullptr) {
+        m_lblJs8TxStatus->setText(armed + QStringLiteral(" – ") + m_js8PendingText);
+    } else if (msk144 && m_lblMsk144PeriodStatus != nullptr) {
         m_lblMsk144PeriodStatus->setText(armed);
     } else if (q65 && m_lblQ65Status != nullptr) {
         m_lblQ65Status->setText(armed);
@@ -14840,7 +14922,8 @@ void MainWindow::handleNativeWeakSignalPeriodTxDue()
     const QString activeMode = ui->cmbMode->currentText();
     const bool sameFamily =
         (Msk144Mode::isMode(activeMode) && Msk144Mode::isMode(m_nativeWeakSignalTxMode)) ||
-        (Q65Mode::isFamilyMode(activeMode) && Q65Mode::isFamilyMode(m_nativeWeakSignalTxMode));
+        (Q65Mode::isFamilyMode(activeMode) && Q65Mode::isFamilyMode(m_nativeWeakSignalTxMode)) ||
+        (Js8Mode::isMode(activeMode) && Js8Mode::isMode(m_nativeWeakSignalTxMode));
     if (!sameFamily || m_txRunning || m_offlineAnalysisActive) {
         cancelNativeWeakSignalPeriodTx(QStringLiteral("mode or runtime state changed"));
         return;
@@ -14875,6 +14958,12 @@ void MainWindow::handleNativeWeakSignalPeriodTxDue()
     updateTxControlState();
     startImageTx();
     m_nativeWeakSignalTxBoundaryStart = false;
+    if (Js8Mode::isMode(activeMode) && !m_nativeWeakSignalTxPending) {
+        // The frames are on air now; a new Send builds the next message.
+        m_js8PendingFrames.clear();
+        if (m_lblJs8TxStatus != nullptr)
+            m_lblJs8TxStatus->setText(M3I18n::text(QStringLiteral("JS8 TX: %1")).arg(m_js8PendingText));
+    }
     // Preserve a newly deferred period; only discard an unconsumed old plan.
     if (!m_nativeWeakSignalTxPending) {
         m_nativeWeakSignalTxBoundaryUtcMs = 0;
@@ -21902,7 +21991,7 @@ void MainWindow::scheduleLiveRxConfig()
 bool MainWindow::keepWaterfallHistory(const QString &modeName) const
 {
     const bool periodic = Ft8Mode::isFamilyMode(modeName) || Msk144Mode::isMode(modeName) ||
-                          Q65Mode::isFamilyMode(modeName);
+                          Q65Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName);
     return periodic && !m_offlineAnalysisActive && modeName == m_waterfallHistoryMode;
 }
 
@@ -23027,6 +23116,7 @@ int MainWindow::qsoSignalPeakAudioCenterHz() const
     if (mode == HellschreiberDecoder::modeName()) return m_spinHellToneHz != nullptr ? m_spinHellToneHz->value() : 1000;
     if (Msk144Mode::isMode(mode)) return m_spinMsk144RxFreq != nullptr ? m_spinMsk144RxFreq->value() : 1500;
     if (Q65Mode::isFamilyMode(mode)) return m_spinQ65RxFreq != nullptr ? m_spinQ65RxFreq->value() : 1500;
+    if (Js8Mode::isMode(mode)) return m_spinJs8RxFreq != nullptr ? m_spinJs8RxFreq->value() : 1500;
     if (Ft8Mode::isFamilyMode(mode)) {
         if (m_ftSession.audioFreqHz > 0) return m_ftSession.audioFreqHz;
         return m_spinFt8RxFreq != nullptr ? m_spinFt8RxFreq->value() : m_settings.ft8RxFrequencyHz;
@@ -24369,6 +24459,8 @@ void MainWindow::startRx()
         applyMsk144Settings();
     } else if (Q65Mode::isFamilyMode(modeName)) {
         applyQ65Settings();
+    } else if (Js8Mode::isMode(modeName)) {
+        applyJs8Settings();
     } else {
         appendLog(modeName + " is not implemented yet.");
         return;
@@ -24474,6 +24566,9 @@ void MainWindow::startRx()
         if (m_lblQ65SequencerStatus != nullptr) {
             m_lblQ65SequencerStatus->setText(uiText("q65_seq_idle", "Sequencer: idle"));
         }
+    } else if (Js8Mode::isMode(modeName)) {
+        // Band activity and the conversation survive RX restarts (TX turns).
+        if (m_js8Decoder != nullptr) invokeRxDecoder(m_js8Decoder, &Js8Decoder::reset);
     } else if (Ft8Mode::isFamilyMode(modeName)) {
         if (m_tableFt8Rx != nullptr && !preserveTextTerminal) {
             m_tableFt8Rx->setRowCount(0);
@@ -24989,7 +25084,8 @@ std::unique_ptr<TxModulator> MainWindow::buildCurrentTxModulator(const QString &
                           modeName == HellschreiberDecoder::modeName() ||
                           Ft8Mode::isFamilyMode(modeName) ||
                           Msk144Mode::isMode(modeName) ||
-                          Q65Mode::isFamilyMode(modeName);
+                          Q65Mode::isFamilyMode(modeName) ||
+                          Js8Mode::isMode(modeName);
 
     if (!textMode && (m_txSourceImage.isNull() || m_txImageOwnerMode != modeName)) {
         return nullptr;
@@ -25088,7 +25184,7 @@ std::unique_ptr<TxModulator> MainWindow::buildCurrentTxModulator(const QString &
             ));
     }
 
-    if (Msk144Mode::isMode(modeName) || Q65Mode::isFamilyMode(modeName))
+    if (Msk144Mode::isMode(modeName) || Q65Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName))
         return std::move(m_nativeWeakSignalPreparedModulator);
 
     if (Ft8Mode::isFamilyMode(modeName)) {
@@ -25211,6 +25307,15 @@ void MainWindow::updateTxPreview()
             M3I18n::text(QStringLiteral("%1: RX %2 Hz, TX %3 Hz, %4 s"))
                 .arg(Q65Mode::modeName(currentQ65Submode())).arg(rx).arg(tx).arg(period));
         m_txPreparedImage = QImage();
+    } else if (Js8Mode::isMode(modeName)) {
+        const Js8Mode::Submode submode = currentJs8Submode();
+        m_lblTxMode->setText(
+            M3I18n::text(QStringLiteral("%1: RX %2 Hz, TX %3 Hz, %4 s"))
+                .arg(QStringLiteral("JS8 ") + Js8Mode::submodeName(submode))
+                .arg(m_spinJs8RxFreq != nullptr ? m_spinJs8RxFreq->value() : 1500)
+                .arg(m_spinJs8TxFreq != nullptr ? m_spinJs8TxFreq->value() : 1500)
+                .arg(Js8Mode::parameters(submode).periodSeconds));
+        m_txPreparedImage = QImage();
     } else if (Ft8Mode::isFamilyMode(modeName)) {
         const Ft8Mode::Profile profile = Ft8Mode::profileForMode(modeName);
         const int rx = m_spinFt8RxFreq != nullptr ? m_spinFt8RxFreq->value() : 1500;
@@ -25277,6 +25382,9 @@ void MainWindow::updateTxPreview()
         }
         m_lblTxImageName->setText(msg.trimmed().isEmpty() ? QStringLiteral("Q65: no TX message selected")
                                                           : QStringLiteral("%1 selected: %2").arg(Q65Mode::modeName(currentQ65Submode()), msg.left(48)));
+    } else if (Js8Mode::isMode(modeName)) {
+        m_lblTxImageName->setText(m_js8PendingText.isEmpty() ? QStringLiteral("JS8: no message queued")
+                                                              : QStringLiteral("JS8: %1").arg(m_js8PendingText.left(48)));
     } else if (Ft8Mode::isFamilyMode(modeName)) {
         const Ft8Mode::Profile profile = Ft8Mode::profileForMode(modeName);
         const QString msg = selectedFt8TxMessage();
@@ -25324,7 +25432,8 @@ void MainWindow::updateTxControlState()
     const bool radioTelescopeMode = RadioTelescopeMode::isMode(modeName);
     const bool msk144Mode = Msk144Mode::isMode(modeName);
     const bool q65Mode = Q65Mode::isFamilyMode(modeName);
-    const bool textMode = rttyMode || bpskMode || mfskMode || cwMode || hellMode || msk144Mode || q65Mode;
+    const bool js8Mode = Js8Mode::isMode(modeName);
+    const bool textMode = rttyMode || bpskMode || mfskMode || cwMode || hellMode || msk144Mode || q65Mode || js8Mode;
     const bool rxOnlyTextMode = ft8Mode || radioTelescopeMode;
     const bool hasImage = !m_txSourceImage.isNull() && m_txImageOwnerMode == modeName;
     const bool hasRttyText = rttyMode && m_txtRttyTx != nullptr && !m_txtRttyTx->toPlainText().trimmed().isEmpty();
@@ -25334,7 +25443,8 @@ void MainWindow::updateTxControlState()
     const bool hasHellText = hellMode && m_txtHellTx != nullptr && !m_txtHellTx->toPlainText().trimmed().isEmpty();
     const bool hasMskMessage = msk144Mode && m_tableMsk144TxMessages != nullptr && m_tableMsk144TxMessages->rowCount() > 0;
     const bool hasQ65Message = q65Mode && m_tableQ65TxMessages != nullptr && m_tableQ65TxMessages->rowCount() > 0;
-    const bool hasSource = textMode ? (hasRttyText || hasBpskText || hasMfskText || hasCwText || hasHellText || hasMskMessage || hasQ65Message) : hasImage;
+    const bool hasJs8Message = js8Mode && !m_js8PendingFrames.isEmpty();
+    const bool hasSource = textMode ? (hasRttyText || hasBpskText || hasMfskText || hasCwText || hasHellText || hasMskMessage || hasQ65Message || hasJs8Message) : hasImage;
     const bool rxBusy = m_rxRunning || (m_audioEngine != nullptr && m_audioEngine->isRunning());
     const bool canStartTx = textMode
                                 ? (hasSource && !txBusy && !m_nativeWeakSignalTxPending && !m_offlineAnalysisActive)
@@ -25740,7 +25850,8 @@ void MainWindow::startImageTx()
     const bool ft8Mode = Ft8Mode::isFamilyMode(activeModeName);
     const bool msk144Mode = Msk144Mode::isMode(activeModeName);
     const bool q65Mode = Q65Mode::isFamilyMode(activeModeName);
-    const bool textMode = rttyMode || bpskMode || mfskMode || cwMode || hellMode || ft8Mode || msk144Mode || q65Mode;
+    const bool js8Mode = Js8Mode::isMode(activeModeName);
+    const bool textMode = rttyMode || bpskMode || mfskMode || cwMode || hellMode || ft8Mode || msk144Mode || q65Mode || js8Mode;
 
     const bool liveRxRunning = m_rxStartPending || m_rxRunning ||
                                (m_audioEngine != nullptr && m_audioEngine->isRunning());
@@ -25829,7 +25940,13 @@ void MainWindow::startImageTx()
         }
     }
 
-    if ((msk144Mode || q65Mode) && !m_nativeWeakSignalTxBoundaryStart) {
+    if (js8Mode && m_js8PendingFrames.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("JS8 TX"),
+                                 M3I18n::text(QStringLiteral("Type a message and press Send.")));
+        return;
+    }
+
+    if ((msk144Mode || q65Mode || js8Mode) && !m_nativeWeakSignalTxBoundaryStart) {
         scheduleNativeWeakSignalPeriodTx();
         return;
     }
@@ -25849,7 +25966,7 @@ void MainWindow::startImageTx()
     const QString textSnapshot = rttyMode && !m_rttyTxOverrideText.isNull() ? m_rttyTxOverrideText :
         textEditor ? textEditor->toPlainText() : QString();
     const auto captureStopGeneration = m_txRequestGeneration;
-    const bool nativeBoundaryStart = (msk144Mode || q65Mode) && m_nativeWeakSignalTxBoundaryStart;
+    const bool nativeBoundaryStart = (msk144Mode || q65Mode || js8Mode) && m_nativeWeakSignalTxBoundaryStart;
     const qint64 nativeBoundaryUtcMs = m_nativeWeakSignalTxBoundaryUtcMs;
     const auto nativeWaveform = std::make_shared<std::unique_ptr<TxModulator>>();
     if (nativeBoundaryStart) *nativeWaveform = std::move(m_nativeWeakSignalPreparedModulator);
@@ -25888,6 +26005,8 @@ void MainWindow::startImageTx()
         applyMsk144Settings();
     } else if (Q65Mode::isFamilyMode(activeModeName)) {
         applyQ65Settings();
+    } else if (js8Mode) {
+        applyJs8Settings();
     }
 
     std::unique_ptr<TxModulator> modulator;

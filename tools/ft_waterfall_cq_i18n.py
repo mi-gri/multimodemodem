@@ -359,3 +359,76 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
   'Med vanlig http sendes API-nøkkelen og alle QSO-data ukryptert. Alle på nettverksveien kan lese nøkkelen og lese eller skrive i loggen din med den. Bruk dette bare hvis serveren ikke kan tilby https.\n\nTillate ukryptert http likevel?',
   'Při prostém http se klíč API i všechna data spojení posílají nešifrovaně. Kdokoli na síťové cestě může klíč přečíst a s ním číst nebo zapisovat do vašeho deníku. Použijte to jen tehdy, když server nemůže nabídnout https.\n\nPřesto povolit nešifrované http?'),
 }.items()})
+# JS8 page (Js8Ui.cpp); LANGS order: en, it, fr, de, no, cs
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'js8_band_activity':('Band activity','Attività di banda','Activité de bande','Bandaktivität','Båndaktivitet','Aktivita na pásmu'),
+ 'js8_call_activity':('Heard stations','Stazioni ascoltate','Stations entendues','Gehörte Stationen','Hørte stasjoner','Slyšené stanice'),
+ 'js8_call_column':('Call','Nominativo','Indicatif','Rufzeichen','Kallesignal','Značka'),
+ 'js8_text_column':('Text','Testo','Texte','Text','Tekst','Text'),
+ 'js8_conversation':('Messages (RX offset, to me, @ALLCALL)','Messaggi (offset RX, a me, @ALLCALL)','Messages (décalage RX, pour moi, @ALLCALL)','Nachrichten (RX-Ablage, an mich, @ALLCALL)','Meldinger (RX-forskyvning, til meg, @ALLCALL)','Zprávy (posun RX, pro mě, @ALLCALL)'),
+ 'js8_to':('To:','A:','À :','An:','Til:','Pro:'),
+ 'js8_to_placeholder':('call or @GROUP','nominativo o @GRUPPO','indicatif ou @GROUPE','Rufzeichen oder @GRUPPE','kallesignal eller @GRUPPE','značka nebo @SKUPINA'),
+ 'js8_to_tooltip':(
+  'Selected station. Your text is sent directed to it unless the text already starts with a call, @group, CQ or HEARTBEAT.',
+  'Stazione selezionata. Il testo le viene inviato in modo diretto, a meno che non inizi già con un nominativo, un @gruppo, CQ o HEARTBEAT.',
+  'Station sélectionnée. Votre texte lui est adressé, sauf s’il commence déjà par un indicatif, un @groupe, CQ ou HEARTBEAT.',
+  'Gewählte Station. Dein Text geht gerichtet an sie, außer er beginnt schon mit einem Rufzeichen, einer @Gruppe, CQ oder HEARTBEAT.',
+  'Valgt stasjon. Teksten sendes direkte til den, med mindre den allerede starter med et kallesignal, en @gruppe, CQ eller HEARTBEAT.',
+  'Vybraná stanice. Text se jí pošle adresně, pokud už nezačíná značkou, @skupinou, CQ nebo HEARTBEAT.'),
+ 'js8_clear_to':('Deselect the station','Deseleziona la stazione','Désélectionner la station','Station abwählen','Fjern valgt stasjon','Zrušit výběr stanice'),
+ 'js8_tx_placeholder':('Message, e.g. HW CPY? or free text','Messaggio, ad es. HW CPY? o testo libero','Message, p. ex. HW CPY? ou texte libre','Nachricht, z. B. HW CPY? oder freier Text','Melding, f.eks. HW CPY? eller fritekst','Zpráva, např. HW CPY? nebo volný text'),
+ 'js8_send':('Send','Invia','Envoyer','Senden','Send','Odeslat'),
+ 'js8_send_tooltip':(
+  'Transmit the message from the next period on (one frame per period).',
+  'Trasmette il messaggio dal prossimo periodo (un frame per periodo).',
+  'Émet le message à partir de la prochaine période (une trame par période).',
+  'Sendet die Nachricht ab der nächsten Periode (ein Frame pro Periode).',
+  'Sender meldingen fra neste periode (én ramme per periode).',
+  'Vysílá zprávu od příští periody (jeden rámec za periodu).'),
+ 'js8_hb_tooltip':('Send a heartbeat with your grid.','Invia un heartbeat con il tuo locatore.','Envoie un heartbeat avec votre locator.','Sendet einen Heartbeat mit deinem Locator.','Sender en heartbeat med lokatoren din.','Odešle heartbeat s vaším lokátorem.'),
+ 'js8_snr_tooltip':('Ask the selected station for a signal report.','Chiede un rapporto alla stazione selezionata.','Demande un report à la station sélectionnée.','Fragt die gewählte Station nach einem Rapport.','Ber valgt stasjon om en rapport.','Požádá vybranou stanici o report.'),
+ 'js8_select_station':(
+  'Select a station first (click it in the heard list).',
+  'Seleziona prima una stazione (clic nell’elenco delle stazioni ascoltate).',
+  'Sélectionnez d’abord une station (clic dans la liste des stations entendues).',
+  'Zuerst eine Station wählen (in der Liste der gehörten Stationen anklicken).',
+  'Velg en stasjon først (klikk den i listen over hørte stasjoner).',
+  'Nejdřív vyberte stanici (klikněte na ni v seznamu slyšených stanic).'),
+ 'js8_rx_tx_settings':('JS8 RX/TX settings','Impostazioni RX/TX JS8','Réglages RX/TX JS8','JS8 RX/TX-Einstellungen','JS8 RX/TX-innstillinger','Nastavení RX/TX JS8'),
+ 'js8_speed':('Speed','Velocità','Vitesse','Geschwindigkeit','Hastighet','Rychlost'),
+ 'js8_depth_tooltip':(
+  'Fast: one pass. Normal: subtracts decoded signals and decodes again. Deep: also ordered-statistics decoding (more CPU).',
+  'Veloce: un passaggio. Normale: sottrae i segnali decodificati e decodifica di nuovo. Profonda: anche decodifica a statistiche ordinate (più CPU).',
+  'Rapide : une passe. Normal : soustrait les signaux décodés et décode à nouveau. Profond : aussi le décodage à statistiques ordonnées (plus de CPU).',
+  'Schnell: ein Durchlauf. Normal: zieht dekodierte Signale ab und dekodiert erneut. Tief: zusätzlich Ordered-Statistics-Dekodierung (mehr CPU).',
+  'Rask: ett gjennomløp. Normal: trekker fra dekodede signaler og dekoder på nytt. Dyp: også ordnet-statistikk-dekoding (mer CPU).',
+  'Rychlé: jeden průchod. Normální: odečte dekódované signály a dekóduje znovu. Hluboké: navíc dekódování uspořádanou statistikou (více CPU).'),
+ 'js8_tx_follows_rx':('TX offset follows RX offset','L’offset TX segue l’offset RX','Le décalage TX suit le décalage RX','TX-Ablage folgt der RX-Ablage','TX-forskyvning følger RX-forskyvning','Posun TX sleduje posun RX'),
+ 'js8_no_dictionary':(
+  'JS8 word tables missing: free text cannot be compressed or read.',
+  'Tabelle di parole JS8 mancanti: il testo libero non può essere compresso né letto.',
+  'Tables de mots JS8 absentes : le texte libre ne peut être ni compressé ni lu.',
+  'JS8-Worttabellen fehlen: Freitext kann weder komprimiert noch gelesen werden.',
+  'JS8-ordtabeller mangler: fritekst kan verken komprimeres eller leses.',
+  'Chybí slovní tabulky JS8: volný text nelze komprimovat ani číst.'),
+ 'js8_tx_cancelled':('Transmission cancelled.','Trasmissione annullata.','Émission annulée.','Aussendung abgebrochen.','Sending avbrutt.','Vysílání zrušeno.'),
+ 'js8_need_call':('Enter your callsign in the settings first.','Inserisci prima il tuo nominativo nelle impostazioni.','Saisissez d’abord votre indicatif dans les réglages.','Zuerst das eigene Rufzeichen in den Einstellungen eintragen.','Skriv inn kallesignalet ditt i innstillingene først.','Nejdřív zadejte svou značku v nastavení.'),
+ 'js8_tx_busy':(
+  'A transmission is already running or armed; press STOP to cancel it.',
+  'Una trasmissione è già in corso o armata; premi STOP per annullarla.',
+  'Une émission est déjà en cours ou armée ; appuyez sur STOP pour l’annuler.',
+  'Eine Aussendung läuft bereits oder ist vorgemerkt; mit STOP abbrechen.',
+  'En sending pågår allerede eller er klargjort; trykk STOP for å avbryte.',
+  'Vysílání už běží nebo je připraveno; zrušíte ho tlačítkem STOP.'),
+ 'js8_cannot_encode':('This text cannot be sent in JS8.','Questo testo non può essere inviato in JS8.','Ce texte ne peut pas être envoyé en JS8.','Dieser Text lässt sich in JS8 nicht senden.','Denne teksten kan ikke sendes i JS8.','Tento text nelze v JS8 odeslat.'),
+}.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'JS8 %1: %2 frame(s) in the last period':('JS8 %1: %2 frame(s) in the last period','JS8 %1: %2 frame nell’ultimo periodo','JS8 %1 : %2 trame(s) dans la dernière période','JS8 %1: %2 Frame(s) in der letzten Periode','JS8 %1: %2 ramme(r) i siste periode','JS8 %1: %2 rámců v poslední periodě'),
+ 'JS8 TX: %1 frame(s), %2 s: %3':('JS8 TX: %1 frame(s), %2 s: %3','JS8 TX: %1 frame, %2 s: %3','JS8 TX : %1 trame(s), %2 s : %3','JS8 TX: %1 Frame(s), %2 s: %3','JS8 TX: %1 ramme(r), %2 s: %3','JS8 TX: %1 rámců, %2 s: %3'),
+ 'JS8 TX: %1':('JS8 TX: %1','JS8 TX: %1','JS8 TX : %1','JS8 TX: %1','JS8 TX: %1','JS8 TX: %1'),
+ '%1 TX armed: UTC %2':('%1 TX armed: UTC %2','%1 TX armata: UTC %2','%1 TX armée : UTC %2','%1 TX vorgemerkt: UTC %2','%1 TX klargjort: UTC %2','%1 TX připraveno: UTC %2'),
+ 'Type a message and press Send.':('Type a message and press Send.','Scrivi un messaggio e premi Invia.','Saisissez un message et appuyez sur Envoyer.','Nachricht eingeben und Senden drücken.','Skriv en melding og trykk Send.','Napište zprávu a stiskněte Odeslat.'),
+}.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'js8_grid_column':('Grid','Locatore','Locator','Locator','Lokator','Lokátor'),
+}.items()})

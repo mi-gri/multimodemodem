@@ -38,6 +38,8 @@
 #include "modems/msk144/Msk144Decoder.h"
 #include "modems/q65/Q65Mode.h"
 #include "modems/q65/Q65Decoder.h"
+#include "modems/js8/Js8Decoder.h"
+#include "modems/js8/Js8Message.h"
 #include "settings/AppSettings.h"
 #include "logbook/AdifLogbook.h"
 #include "widgets/FaxImageWidget.h"
@@ -679,6 +681,23 @@ private slots:
     void clearQ65RxTable();
     void updateQ65SequencerFromDecode(const QString &message, int snrDb);
     Q65Mode::Submode currentQ65Submode() const;
+
+    // JS8 (Js8Ui.cpp)
+    void setupJs8DisplayPage();
+    void setupJs8Page();
+    void applyJs8Settings();
+    void handleJs8Decode(const Js8Decode &decode);
+    void js8Send(const QString &text, const QString &to);
+    void js8SendFromEditor();
+    void js8RefreshActivity();
+    void js8RefreshCalls();
+    void js8AppendRx(const QString &line, const QColor &colour = QColor());
+    void clearJs8Activity();
+    void startJs8RxShell();
+    void stopJs8Shell();
+    void js8SetOffset(int hz, bool rx, bool tx);
+    void updateJs8WaterfallMarkers();
+    Js8Mode::Submode currentJs8Submode() const;
 
     /**
      * @brief Arms/cancels the single UTC-period TX scheduler shared by MSK144
@@ -2125,6 +2144,54 @@ private:
     QLabel *m_lblQ65SequencerStatus = nullptr;
     Q65Decoder *m_q65Decoder = nullptr;
     QThread *m_q65Thread = nullptr;
+
+    // JS8
+    struct Js8Activity
+    {
+        double offsetHz = 0.0;
+        QDateTime utc;
+        int snrDb = -28;
+        QString text;      // rolling text at this offset
+        QString current;   // message since the last "last frame"
+        QString from;
+        bool complete = false;
+    };
+    struct Js8Heard
+    {
+        QString call;
+        QString grid;
+        int snrDb = -28;
+        QDateTime utc;
+        double offsetHz = 0.0;
+    };
+    QWidget *m_js8DisplayPage = nullptr;
+    QWidget *m_pageJs8Settings = nullptr;
+    QTableWidget *m_tableJs8Band = nullptr;
+    QTableWidget *m_tableJs8Calls = nullptr;
+    QPlainTextEdit *m_txtJs8Rx = nullptr;
+    QLineEdit *m_editJs8Tx = nullptr;
+    QLineEdit *m_editJs8To = nullptr;
+    QPushButton *m_btnJs8Send = nullptr;
+    QPushButton *m_btnJs8Cq = nullptr;
+    QPushButton *m_btnJs8Hb = nullptr;
+    QPushButton *m_btnJs8Snr = nullptr;
+    QPushButton *m_btnJs8Rx = nullptr;
+    QPushButton *m_btnJs8Stop = nullptr;
+    QPushButton *m_btnJs8ClearTo = nullptr;
+    QComboBox *m_cmbJs8Submode = nullptr;
+    QComboBox *m_cmbJs8Depth = nullptr;
+    QSpinBox *m_spinJs8RxFreq = nullptr;
+    QSpinBox *m_spinJs8TxFreq = nullptr;
+    QCheckBox *m_chkJs8TxFollowsRx = nullptr;
+    QLabel *m_lblJs8Status = nullptr;
+    QLabel *m_lblJs8TxStatus = nullptr;
+    QsoFormWidgets *m_js8QsoForm = nullptr;
+    Js8Decoder *m_js8Decoder = nullptr;
+    QThread *m_js8Thread = nullptr;
+    QVector<Js8Activity> m_js8Activity;
+    QMap<QString, Js8Heard> m_js8Heard;
+    QVector<Js8Message::Frame> m_js8PendingFrames;
+    QString m_js8PendingText;
 
     using Ft8SequencerState = FtQsoSequencer::State;
 

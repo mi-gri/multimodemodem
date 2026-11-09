@@ -168,6 +168,15 @@ FFTW3 (Matteo Frigo and Steven G. Johnson): external GPL-2.0-or-later library, c
 
 The native C++ spectral downconversion and complex Costas refinement were reimplemented with reference to the WSJT Development Group's WSJT-X 3.0.2 FT8 algorithms. Their pinned source inventory is in docs/provenance/ft-native-reference.json. FFTW3 remains the existing external numerical library. No WSJT-X decoder engine or Fortran runtime is linked by this change. Existing original WSJT/MSHV attributions and GPL obligations remain in effect.
 
+## JS8Call 2.2.0 (JS8)
+
+The JS8 mode uses material from JS8Call 2.2.0 by Jordan Sherer KN4CRD,
+GPL-3.0-or-later: the Varicode/JSC message layer, the JSC word tables and the
+JS8 frame unpacking (`third_party/js8call_gpl`), and C++ ports of its Fortran
+JS8 receiver, LDPC(174,87) code and transmitter (`modems/js8`).  JS8Call is
+based on WSJT-X (Joe Taylor K1JT and the WSJT development group).  CRC++ by
+Daniel Bahr is BSD 3-clause.  Details: `third_party/js8call_gpl/NOTICE.md`.
+
 ## zlib — compressed session logs
 
 Session diagnostics use the platform zlib library (zlib license) for standard gzip compression. Project and license: https://zlib.net/. No zlib source is embedded by this change.

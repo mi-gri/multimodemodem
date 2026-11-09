@@ -21,6 +21,6 @@ thread, with redaction, periodic flushes, loss markers and shutdown drain.
 
 CW native/neural receivers, CW/RTTY skimmers, Q65 and MSK144 are independent modem
 subsystems. Other audio/text/image modes retain their own workers and state.
-See [MSK144](msk144/README.md), [Q65](q65/README.md) and [skimmers](skimmers/README.md).
+See [MSK144](msk144/README.md), [Q65](q65/README.md), [JS8](js8/README.md) and [skimmers](skimmers/README.md).
 Legal attribution and pinned source inventories are linked from
 [third-party notices](../THIRD_PARTY_NOTICES.md).

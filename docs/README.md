@@ -14,5 +14,5 @@ program file or the data folders `MultiModeModem`, read `MultiModeModem`.
 
 The application includes twelve help topics in six languages, available from Help.
 The HTML sources are in [help/](help/). Technical subsystem notes remain under
-[CW/RTTY skimmers](skimmers/README.md), [MSK144](msk144/README.md) and [Q65](q65/README.md).
+[CW/RTTY skimmers](skimmers/README.md), [MSK144](msk144/README.md), [Q65](q65/README.md) and [JS8](js8/README.md).
 Licenses and upstream inventories are retained for attribution; they are not release instructions.

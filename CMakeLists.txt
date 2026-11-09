@@ -428,12 +428,47 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # -------------------------------------------------------------------------
+# JS8 (JS8Call 2.2 protocol): native C++ receiver, transmitter and the
+# Varicode/JSC message layer of JS8Call (third_party/js8call_gpl).
+# -------------------------------------------------------------------------
+add_library(m3_js8 STATIC
+    modems/js8/Js8Mode.h
+    modems/js8/Js8Ldpc.h
+    modems/js8/Js8Ldpc.cpp
+    modems/js8/Js8NativeEngine.h
+    modems/js8/Js8NativeEngine.cpp
+    modems/js8/Js8Message.h
+    modems/js8/Js8Message.cpp
+    modems/js8/Js8Decoder.h
+    modems/js8/Js8Decoder.cpp
+    modems/js8/tx/Js8Transmitter.h
+    modems/js8/tx/Js8Transmitter.cpp
+    third_party/js8call_gpl/Varicode.h
+    third_party/js8call_gpl/Varicode.cpp
+    third_party/js8call_gpl/Jsc.h
+    third_party/js8call_gpl/Jsc.cpp
+    third_party/js8call_gpl/DecodedFrame.h
+    third_party/js8call_gpl/DecodedFrame.cpp
+    third_party/js8call_gpl/Js8LdpcTables.h
+    third_party/js8call_gpl/js8_jsc.qrc
+)
+set_target_properties(m3_js8 PROPERTIES AUTORCC ON AUTOMOC ON)
+target_include_directories(m3_js8 PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/modems/js8")
+target_link_libraries(m3_js8 PUBLIC ${QT}::Core ${QT}::Gui m3_linear_resampler Threads::Threads "${M3_FFTW3_LIBRARY}")
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(m3_js8 PRIVATE -Wall -Wextra)
+    set_source_files_properties(third_party/js8call_gpl/Varicode.cpp third_party/js8call_gpl/Jsc.cpp
+        third_party/js8call_gpl/DecodedFrame.cpp PROPERTIES COMPILE_OPTIONS "-Wno-deprecated-declarations;-Wno-sign-compare;-Wno-unused-parameter;-Wno-unused-variable;-Wno-unused-but-set-variable;-Wno-implicit-fallthrough")
+endif()
+
+# -------------------------------------------------------------------------
 # Sources
 # -------------------------------------------------------------------------
 
 add_executable(MultiModeModem
     main.cpp
     FtCqWorkListUi.cpp
+    Js8Ui.cpp
     mainwindow.cpp
     FtAutomationLog.cpp
     updates/UpdateController.cpp updates/UpdateController.h
@@ -776,6 +811,7 @@ target_link_libraries(MultiModeModem PRIVATE
     m3_msk144
     m3_q65
     m3_weak_signal_codec
+    m3_js8
     m3_linear_resampler
     ${QT}::Widgets
     ${QT}::SerialPort
@@ -1226,6 +1262,14 @@ if(BUILD_TESTING)
     target_link_libraries(m3_q65_native_regression PRIVATE m3_q65 ${QT}::Core)
     add_test(NAME m3_q65_native_regression COMMAND m3_q65_native_regression)
     set_tests_properties(m3_q65_native_regression PROPERTIES TIMEOUT 240)
+
+    add_executable(m3_js8_regression
+        tests/Js8Regression.cpp
+    )
+    target_include_directories(m3_js8_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_js8_regression PRIVATE m3_js8 ${QT}::Core)
+    add_test(NAME m3_js8_regression COMMAND m3_js8_regression)
+    set_tests_properties(m3_js8_regression PROPERTIES TIMEOUT 300)
 
     add_executable(m3_msk144_native_regression
         tests/Msk144NativeRegression.cpp

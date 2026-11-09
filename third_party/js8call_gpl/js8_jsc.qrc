@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/js8">
+        <file>jsc_tables.txt</file>
+    </qresource>
+</RCC>
