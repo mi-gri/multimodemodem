@@ -62,7 +62,7 @@ QByteArray makeWav(quint16 format,
 }
 
 bool parseBytes(const QByteArray &bytes,
-                MadModemAudio::WavFileFormat &format,
+                M3Audio::WavFileFormat &format,
                 QString &error,
                 QByteArray *audioOut = nullptr)
 {
@@ -71,7 +71,7 @@ bool parseBytes(const QByteArray &bytes,
         error = QStringLiteral("cannot create temporary test WAV");
         return false;
     }
-    const bool ok = MadModemAudio::parseWavHeader(file, format, error);
+    const bool ok = M3Audio::parseWavHeader(file, format, error);
     if (ok && audioOut != nullptr) {
         *audioOut = file.read(format.dataSize);
     }
@@ -97,16 +97,16 @@ int main()
     QByteArray pcm;
     appendLe16(pcm, 0x8000U);
     appendLe16(pcm, 0x7fffU);
-    MadModemAudio::WavFileFormat format;
+    M3Audio::WavFileFormat format;
     QString error;
     QByteArray audio;
     ok &= expect(parseBytes(makeWav(1, 1, 48000, 16, 2, pcm), format, error, &audio),
                  "valid PCM WAV parses");
-    const QVector<float> samples = MadModemAudio::convertWavBytesToMono(audio, format, &error);
+    const QVector<float> samples = M3Audio::convertWavBytesToMono(audio, format, &error);
     ok &= expect(samples.size() == 2 && samples.front() <= -0.999f && samples.back() >= 0.999f,
                  "valid PCM frames convert safely");
 
-    MadModemAudio::WavFileFormat badFormat;
+    M3Audio::WavFileFormat badFormat;
     QString badError;
     ok &= expect(!parseBytes(makeWav(1, 2, 48000, 16, 2, pcm), badFormat, badError),
                  "undersized blockAlign is rejected");
@@ -127,7 +127,7 @@ int main()
     audio.clear();
     ok &= expect(parseBytes(makeWav(3, 1, 48000, 32, 4, floatAudio), format, error, &audio),
                  "float32 WAV container parses");
-    const QVector<float> invalidFloat = MadModemAudio::convertWavBytesToMono(audio, format, &error);
+    const QVector<float> invalidFloat = M3Audio::convertWavBytesToMono(audio, format, &error);
     ok &= expect(invalidFloat.isEmpty() && !error.isEmpty(),
                  "non-finite float sample is rejected");
 

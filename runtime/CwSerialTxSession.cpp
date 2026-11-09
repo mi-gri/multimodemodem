@@ -13,7 +13,7 @@
 #include <QProgressBar>
 #include <QSpinBox>
 namespace {
-QString uiText(const char* key, const char* fallback) { return MadModemI18n::translate(QString::fromUtf8(key),QString::fromUtf8(fallback)); }
+QString uiText(const char* key, const char* fallback) { return M3I18n::translate(QString::fromUtf8(key),QString::fromUtf8(fallback)); }
 
 }
 void MainWindow::configureCwTransmission()
@@ -45,10 +45,10 @@ void MainWindow::startCwSerialTransmission(const QString& text)
     if (port.isEmpty() || port.contains("://") || (port.contains(':') && !QRegularExpression("^COM[0-9]+:?$",QRegularExpression::CaseInsensitiveOption).match(port).hasMatch()))
         error=uiText("cw_key_port_required", "Choose a local serial CW KEY port. A CAT TCP address is not a KEY port.");
     const QString catPort=m_settings.hamlibRigPath.trimmed().isEmpty() ? m_settings.hamlibSerialPath : m_settings.hamlibRigPath;
-    const bool shared=(m_settings.hamlibCatEnabled || m_settings.hamlibPttEnabled) && m_settings.hamlibTcpAddress.trimmed().isEmpty() && MadModemSerial::sameEndpoint(port,catPort);
+    const bool shared=(m_settings.hamlibCatEnabled || m_settings.hamlibPttEnabled) && m_settings.hamlibTcpAddress.trimmed().isEmpty() && M3Serial::sameEndpoint(port,catPort);
     if (shared && (m_settings.hamlibHandshake!="none" || m_settings.hamlibForceDtr!="off" || m_settings.hamlibForceRts!="off"))
         error=uiText("cw_key_shared_config", "Sharing the CAT port for CW KEY requires CAT handshaking None and both DTR and RTS forced OFF in Audio/PTT/CAT settings. Alternatively choose the radio's separate KEY port.");
-    if (m_settings.rotatorEnabled && MadModemSerial::sameEndpoint(port,m_settings.rotatorPath))
+    if (m_settings.rotatorEnabled && M3Serial::sameEndpoint(port,m_settings.rotatorPath))
         error=uiText("cw_key_rotator_conflict", "The CW KEY port is assigned to the rotator. Choose a different serial port.");
     if (!error.isEmpty()) { appendLog(error);QMessageBox::warning(this,QStringLiteral("CW KEY"),error);return; }
     if (!m_cwSerialTx || m_cwSerialTx->isRunning()) return;
@@ -60,7 +60,7 @@ void MainWindow::startCwSerialTransmission(const QString& text)
     requestAudioInputStop();setReceiverRunning(false);pauseQsoSignalPeakForTransmit();
     m_progressTx->setValue(0);updateTxControlState();
     CwSerialConfig config;
-    config.port=MadModemSerial::endpoint(port);config.keyLine=m_settings.cwKeyLine;config.pttLine=m_settings.cwKeyPttLine;
+    config.port=M3Serial::endpoint(port);config.keyLine=m_settings.cwKeyLine;config.pttLine=m_settings.cwKeyPttLine;
     config.leadMs=m_settings.cwKeyLeadMs;config.tailMs=m_settings.cwKeyTailMs;
     const double wpm=m_spinCwTxWpm ? m_spinCwTxWpm->value() : m_settings.cwTxWpm;
     const auto generation=m_txRequestGeneration;

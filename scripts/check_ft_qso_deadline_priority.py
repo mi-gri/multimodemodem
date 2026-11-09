@@ -42,7 +42,7 @@ def main() -> None:
 
     require("bool qsoPriority = false;" in HDR,
             "candidate carries an explicit QSO-priority classification")
-    require("t_currentFtWorkClass == MadModemRuntime::WorkClass::FtGate" in finder,
+    require("t_currentFtWorkClass == M3Runtime::WorkClass::FtGate" in finder,
             "priority admission is restricted to the live gate")
     require("m_qsoDeadlineActive.load(std::memory_order_acquire)" in finder,
             "priority admission requires an active QSO")

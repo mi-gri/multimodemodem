@@ -82,7 +82,7 @@ void LogbookSettingsDialog::buildUi()
 
     m_lblWarning = new QLabel(this);
     m_lblWarning->setWordWrap(true);
-    MadModemUi::setSemanticRole(m_lblWarning, QStringLiteral("negative"));
+    M3Ui::setSemanticRole(m_lblWarning, QStringLiteral("negative"));
     outer->addWidget(m_lblWarning);
 
     m_buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
@@ -104,7 +104,7 @@ void LogbookSettingsDialog::refreshLabels()
 {
     setWindowTitle(L("Logbook file settings"));
     if (m_lblDescription != nullptr) {
-        m_lblDescription->setText(L("MadModem keeps the internal logbook as one ADIF file. Choose where that file is stored. The default path is beside the application executable."));
+        m_lblDescription->setText(L("MultiModeModem keeps the internal logbook as one ADIF file. Choose where that file is stored. The default path is beside the application executable."));
     }
     if (m_lblCurrentCaption != nullptr) {
         m_lblCurrentCaption->setText(L("Logbook file"));
@@ -167,7 +167,7 @@ void LogbookSettingsDialog::validatePath()
         const QFileInfo info(path);
         const QDir dir = info.absoluteDir();
         if (!dir.exists()) {
-            warning = L("The folder does not exist yet. MadModem will try to create it when saving the logbook.");
+            warning = L("The folder does not exist yet. MultiModeModem will try to create it when saving the logbook.");
         }
         if (info.fileName().trimmed().isEmpty()) {
             ok = false;

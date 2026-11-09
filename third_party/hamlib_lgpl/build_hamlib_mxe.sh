@@ -53,5 +53,5 @@ Use it for MadModem with:
   $MXE_BIN/${MXE_TARGET}-cmake -S "$PROJECT_ROOT" -B build-win64-static \
     -DCMAKE_BUILD_TYPE=Release -DHAMLIB_ROOT="$PREFIX" \
     -DPKG_CONFIG_EXECUTABLE="$MXE_BIN/${MXE_TARGET}-pkg-config" \
-    -DMADMODEM_REQUIRE_HAMLIB=ON
+    -DM3_REQUIRE_HAMLIB=ON
 MSG

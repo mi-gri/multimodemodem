@@ -5,7 +5,7 @@
 #include <cmath>
 #include <complex>
 #include <vector>
-namespace MadModemFt {
+namespace M3Ft {
 struct Ft8CoherentAlignment {int shift=0;double frequencyHz=0,score=0;};
 // FT8 baseband is sampled at 200 Hz (32 samples per symbol). Search the
 // synchronization tones only; data bits and expected messages are not inputs.

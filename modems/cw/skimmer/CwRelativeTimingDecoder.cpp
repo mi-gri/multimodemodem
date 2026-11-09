@@ -5,7 +5,7 @@
 #include <cmath>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 namespace {
 inline double clampd(double value, double low, double high) {
   return std::max(low, std::min(high, value));
@@ -1150,4 +1150,4 @@ CwRelativeTimingResult CwRelativeTimingDecoder::snapshot() const {
   return result;
 }
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

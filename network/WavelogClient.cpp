@@ -2,7 +2,7 @@
 #include "network/WavelogClient.h"
 
 #include "utils/ProductName.h"
-#include "MadModemVersion.h"
+#include "M3Version.h"
 
 #include <QHostAddress>
 #include <QJsonArray>
@@ -201,7 +201,7 @@ QNetworkReply *WavelogClient::postJson(const QUrl &url, const QByteArray &body)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("Accept", "application/json");
     request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("%1/%2").arg(ProductName::longName(), QStringLiteral(MADMODEM_VERSION_STRING)));
+                      QStringLiteral("%1/%2").arg(ProductName::longName(), QStringLiteral(M3_VERSION_STRING)));
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     request.setTransferTimeout(kTimeoutMs);
 #endif
@@ -246,7 +246,7 @@ void WavelogClient::fetchStations(const Config &config)
                                                  QString::fromLatin1(QUrl::toPercentEncoding(config.apiKey.trimmed()))));
     request.setRawHeader("Accept", "application/json");
     request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("%1/%2").arg(ProductName::longName(), QStringLiteral(MADMODEM_VERSION_STRING)));
+                      QStringLiteral("%1/%2").arg(ProductName::longName(), QStringLiteral(M3_VERSION_STRING)));
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     request.setTransferTimeout(kTimeoutMs);
 #endif

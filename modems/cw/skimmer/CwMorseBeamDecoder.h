@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 
 struct CwMorseTimingSnapshot {
   double ditMs = 60.0;
@@ -200,4 +200,4 @@ private:
   double m_continuityPrior = 0.0;
 };
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

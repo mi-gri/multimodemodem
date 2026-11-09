@@ -23,11 +23,11 @@ a = p.parse_args()
 b = a.build.resolve()
 s = Path(__file__).resolve().parents[1]
 flags = {}
-for line in (b / 'CMakeFiles/MadModem.dir/flags.make').read_text().splitlines():
+for line in (b / 'CMakeFiles/MultiModeModem.dir/flags.make').read_text().splitlines():
     if ' = ' in line:
         k, v = line.split(' = ', 1)
         flags[k] = shlex.split(v)
-link = shlex.split((b / 'CMakeFiles/MadModem.dir/link.txt').read_text())
+link = shlex.split((b / 'CMakeFiles/MultiModeModem.dir/link.txt').read_text())
 out = b / ('ft-replay-native' if a.native_only else ('ft-replay-baseline' if a.baseline else 'ft-replay-r30'))
 out.mkdir(exist_ok=True)
 def compile_file(source, target):
@@ -36,7 +36,7 @@ def compile_file(source, target):
                     '-c', str(source), '-o', str(target)], cwd=b, check=True)
 obj = out / 'main.o'
 compile_file(s / 'tests/FtReplayProbe.cpp', obj)
-link[link.index('CMakeFiles/MadModem.dir/main.cpp.o')] = str(obj)
+link[link.index('CMakeFiles/MultiModeModem.dir/main.cpp.o')] = str(obj)
 if a.baseline or a.native_only:
     code = (s / 'modems/ft8/Ft8RxDecoder.cpp').read_text()
     hook = '    appendReferenceRecovery(samples, slotStartUtc, out, stats, publish);'
@@ -46,7 +46,7 @@ if a.baseline or a.native_only:
     source.write_text(code.replace(hook, '    // R30 reference hook disabled for paired baseline.'))
     decoder = out / 'decoder.o'
     compile_file(source, decoder)
-    link[link.index('CMakeFiles/MadModem.dir/modems/ft8/Ft8RxDecoder.cpp.o')] = str(decoder)
+    link[link.index('CMakeFiles/MultiModeModem.dir/modems/ft8/Ft8RxDecoder.cpp.o')] = str(decoder)
 exe = out / 'probe'
 link[link.index('-o') + 1] = str(exe)
 subprocess.run(link, cwd=b, check=True)

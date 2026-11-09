@@ -100,14 +100,14 @@ int main(int argc, char** argv) {
       return 2;
     }
     const WavData wav = readPcm16Wav(argv[1]);
-    madmodem::cwskimmer::SelectedToneCwConfig config;
+    m3::cwskimmer::SelectedToneCwConfig config;
     config.toneHz = std::stod(argv[2]);
     config.bandwidthHz = 120.0;
     config.minSnrDb = 0.0;
     config.initialWpm = argc >= 4 ? std::stod(argv[3]) : 25.0;
     config.autoWpm = true;
     config.autoBandwidth = true;
-    madmodem::cwskimmer::SelectedToneCwTracker tracker(config);
+    m3::cwskimmer::SelectedToneCwTracker tracker(config);
     if (argc >= 5) {
       tracker.setInterferers({{std::stod(argv[4]), 1.0}});
     }

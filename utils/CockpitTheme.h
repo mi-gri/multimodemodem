@@ -7,7 +7,7 @@ class QApplication;
 class QMainWindow;
 class QWidget;
 
-namespace MadModemUi {
+namespace M3Ui {
 
 enum class ThemeColorRole {
     Accent,
@@ -35,4 +35,4 @@ void installCockpitMainWindowChrome(QMainWindow *window);
 void showMainWindowMaximized(QWidget *window);
 void polishCockpitWidgetTree(QWidget *root);
 
-} // namespace MadModemUi
+} // namespace M3Ui

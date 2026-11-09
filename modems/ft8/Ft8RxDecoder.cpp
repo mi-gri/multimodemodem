@@ -51,12 +51,12 @@
 #include <vector>
 
 #if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
-#define MADMODEM_FT8_HAVE_SSE2 1
+#define M3_FT8_HAVE_SSE2 1
 #include <emmintrin.h>
 #endif
 
 #if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__))
-#define MADMODEM_FT8_HAVE_AVX2_TARGET 1
+#define M3_FT8_HAVE_AVX2_TARGET 1
 #include <immintrin.h>
 #endif
 
@@ -153,19 +153,19 @@ constexpr int kFt4Scrambler[77] = {
 constexpr double kTwoPi = 6.283185307179586476925286766559;
 constexpr double kEps = 1.0e-18;
 
-thread_local MadModemRuntime::WorkClass t_currentFtWorkClass = MadModemRuntime::WorkClass::FtBoundary;
+thread_local M3Runtime::WorkClass t_currentFtWorkClass = M3Runtime::WorkClass::FtBoundary;
 
 class ScopedFtWorkClass
 {
 public:
-    explicit ScopedFtWorkClass(MadModemRuntime::WorkClass workClass)
+    explicit ScopedFtWorkClass(M3Runtime::WorkClass workClass)
         : m_previous(t_currentFtWorkClass)
     {
         t_currentFtWorkClass = workClass;
     }
     ~ScopedFtWorkClass() { t_currentFtWorkClass = m_previous; }
 private:
-    MadModemRuntime::WorkClass m_previous;
+    M3Runtime::WorkClass m_previous;
 };
 
 /*
@@ -261,7 +261,7 @@ struct Gf2Matrix83x174
 
 
 
-#if defined(MADMODEM_FT8_HAVE_AVX2_TARGET)
+#if defined(M3_FT8_HAVE_AVX2_TARGET)
 __attribute__((target("avx2,fma")))
 std::array<double, 8> ft8ToneEnergies8Avx2Fma(const double *xv,
                                              int sampleCount,
@@ -1012,16 +1012,16 @@ void makeFt4ReferenceWaveformRx(const std::array<int, 103> &tones,
 
 
 
-using OfflineWavFormat = MadModemAudio::WavFileFormat;
+using OfflineWavFormat = M3Audio::WavFileFormat;
 
 bool parseOfflineWavHeader(QFile &file, OfflineWavFormat &format, QString &error)
 {
-    return MadModemAudio::parseWavHeader(file, format, error);
+    return M3Audio::parseWavHeader(file, format, error);
 }
 
 QVector<float> convertOfflineWavToMono(const QByteArray &raw, const OfflineWavFormat &format)
 {
-    return MadModemAudio::convertWavBytesToMono(raw, format);
+    return M3Audio::convertWavBytesToMono(raw, format);
 }
 
 bool looksLikeUsefulFt8Message(const QString &message)
@@ -1062,7 +1062,7 @@ int wsjtxFt8ReportDb(double codewordSignalPower,
      *   xnoi = sum_i s8(mod(itone(i)+4,7), i)^2
      *   xsnr = 10*log10(xsig/xnoi - 1) - 27
      *
-     * MadModem symbolToneEnergy() returns a Goertzel POWER already, equivalent
+     * MultiModeModem symbolToneEnergy() returns a Goertzel POWER already, equivalent
      * to s8^2.  v3.16 accidentally squared that power again before calling
      * this function, which inflated displayed SNR values (+20 dB class reports)
      * without improving any decode.  The caller now passes sums of POWER, not
@@ -1162,7 +1162,7 @@ Ft8RxDecoder::Ft8RxDecoder(QObject *parent)
     // Create the persistent workers during application initialization rather
     // than on the first busy FT slot, avoiding a one-time RX-start stall.
     (void)FtDecodeWorkerPool::instance();
-    m_incrementalAnalysis = std::make_unique<MadModemFt::IncrementalAnalysis>(
+    m_incrementalAnalysis = std::make_unique<M3Ft::IncrementalAnalysis>(
         incrementalFt8Row, [this](const QVector<double> &samples,int start,double frequency) {
             return ft4SymbolToneEnergy(samples,start,frequency,576);
         });
@@ -2009,7 +2009,7 @@ void Ft8RxDecoder::resetCaptureTimeline(quint64 generation, const QString &reaso
     m_timestampJumps = 0;
     m_invalidSlotsSkipped = 0;
     m_lastTimelineDiagnosticUtcMs = 0;
-    MadModemRuntime::SystemResourceManager::instance().beginFtCapture(m_modeName);
+    M3Runtime::SystemResourceManager::instance().beginFtCapture(m_modeName);
     emitTimelineDiagnosticThrottled(QStringLiteral("FT capture generation %1: timeline reset (%2)")
                                       .arg(m_activeCaptureGeneration)
                                       .arg(reason));
@@ -2206,8 +2206,8 @@ void Ft8RxDecoder::processAudioBlock(const AudioBlock &block)
 
     if (!m_resourceSummaryEmitted) {
         m_resourceSummaryEmitted = true;
-        emit runtimeDiagnostic(MadModemRuntime::SystemResourceManager::instance().startupSummary());
-        emit runtimeDiagnostic(QStringLiteral("FT SIMD backend: %1").arg(MadModemCpu::summary()));
+        emit runtimeDiagnostic(M3Runtime::SystemResourceManager::instance().startupSummary());
+        emit runtimeDiagnostic(QStringLiteral("FT SIMD backend: %1").arg(M3Cpu::summary()));
     }
 
     ++m_audioBlocksReceived;
@@ -2289,7 +2289,7 @@ void Ft8RxDecoder::maybeRotateSlot()
 
 void Ft8RxDecoder::maybeStartEarlyDecodeSlot()
 {
-    // Kept for source compatibility with older MadModem branches.  v1.61 uses
+    // Kept for source compatibility with older MultiModeModem branches.  v1.61 uses
     // maybeStartStreamingDecodeSlot(), which can launch several guarded live
     // passes instead of a single late early pass.
     maybeStartStreamingDecodeSlot();
@@ -2308,7 +2308,7 @@ void Ft8RxDecoder::prepareIncrementalAnalysis()
     if (!m_incrementalEnabled || !m_incrementalAnalysis || !m_liveInputEnabled ||
         m_currentSlotId < 0 || m_skipCurrentSlotDecode || isPostTxIgnoredSlot() ||
         m_decodeJobActive.load(std::memory_order_acquire)) return;
-    MadModemFt::AnalysisConfig config;
+    M3Ft::AnalysisConfig config;
     config.epoch=m_incrementalEpoch;
     config.slotUtcMs=m_currentSlotStartUtc.toMSecsSinceEpoch();
     config.ft4=m_modeName==QStringLiteral("FT4");
@@ -2457,7 +2457,7 @@ void Ft8RxDecoder::deferFinalDecode(const QVector<double> &samples,
 void Ft8RxDecoder::startAsyncDecodeSlot(const QVector<double> &samples,
                                           const QDateTime &slotStartUtc,
                                           const QString &phaseLabel,
-                                          std::shared_ptr<const MadModemFt::PreparedAnalysis> prepared)
+                                          std::shared_ptr<const M3Ft::PreparedAnalysis> prepared)
 {
     bool expected = false;
     if (!m_decodeJobActive.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
@@ -2587,7 +2587,7 @@ void Ft8RxDecoder::startAsyncDecodeSlot(const QVector<double> &samples,
                         for (const Decode &decode : fresh) emit decodeReady(decode);
                         emit decodeBatchFinished(slotStartUtc.toMSecsSinceEpoch(), displayPhase);
                     };
-                MadModemFt::AnalysisReadScope analysisScope(prepared,samples);
+                M3Ft::AnalysisReadScope analysisScope(prepared,samples);
                 const QVector<Decode> decodes = decodeSlot(samples, slotStartUtc, &candidateCount, &stats,
                                                            progressPublisher);
 
@@ -3036,11 +3036,11 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
         if (stats != nullptr) stats->earlyStopReason = QStringLiteral("shutdown or capture-generation change requested");
         return {};
     }
-    const MadModemRuntime::WorkClass workClass = (stats != nullptr && stats->offline)
-        ? MadModemRuntime::WorkClass::FtOffline
+    const M3Runtime::WorkClass workClass = (stats != nullptr && stats->offline)
+        ? M3Runtime::WorkClass::FtOffline
         : ((stats != nullptr && stats->phase.startsWith(QStringLiteral("wsjtx-gate")))
-            ? MadModemRuntime::WorkClass::FtGate
-            : MadModemRuntime::WorkClass::FtBoundary);
+            ? M3Runtime::WorkClass::FtGate
+            : M3Runtime::WorkClass::FtBoundary);
     ScopedFtWorkClass scopedWorkClass(workClass);
 
     if (m_modeName == QStringLiteral("FT4")) {
@@ -3226,10 +3226,10 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
             }
         }
 
-        std::shared_ptr<const MadModemFt::FtNativeSpectrum> nativeSpectrum;
+        std::shared_ptr<const M3Ft::FtNativeSpectrum> nativeSpectrum;
         if (nativeRecoveryPass && (m_deepDecodeEnabled || m_dspPlusDecodeEnabled) && !m_gpuDecodeEnabled.load()) {
             try {
-                nativeSpectrum = std::make_shared<MadModemFt::FtNativeSpectrum>(slotSamples.constData(), int(slotSamples.size()));
+                nativeSpectrum = std::make_shared<M3Ft::FtNativeSpectrum>(slotSamples.constData(), int(slotSamples.size()));
             } catch (const std::exception &e) {
                 SessionDiagnostics::instance().record("ft.native.spectrum.error", {{"error", QString::fromUtf8(e.what())}});
                 // Existing output is already published. Skip this optional pass
@@ -3266,7 +3266,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
         // stealing keeps every permitted worker useful without creating threads
         // or statically pinning one expensive cluster to one worker.
         FtDecodeWorkerPool::instance().parallelFor(workerCount, workerCount, [this, nativeSpectrum, nativeStopUtcMs, &slotSamples, &slotStartUtc, &candidateSet, &rawPairs, &rawMutex, &diagMutex, &nextCandidate, &diagAttemptedCandidates, &diagLdpcTried, &diagBucketRescueDecodes, &noteRejectReason, &noteQuality, &noteOsdQuality, &osdGf2TriedInSet, &osdGf2TenthsMsInSet, &coherentFailed, failedForCoherent, osdGf2TryLimit, osdGf2BudgetTenthsMs, gateCandidateSet, qsoDeadlineSet](int, int) {
-            MadModemFt::FtNativeSpectrumScope spectrumScope(nativeSpectrum.get(), nativeStopUtcMs);
+            M3Ft::FtNativeSpectrumScope spectrumScope(nativeSpectrum.get(), nativeStopUtcMs);
             QVector<CandidateDecode> localPairs;
             localPairs.reserve(8);
             int localAttempted = 0;
@@ -3300,7 +3300,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
                         osdGf2TriedInSet.load(std::memory_order_relaxed) < osdGf2TryLimit &&
                         osdGf2TenthsMsInSet.load(std::memory_order_relaxed) < osdGf2BudgetTenthsMs;
                 const bool osdPermit = osdCandidateBudget &&
-                    MadModemRuntime::SystemResourceManager::instance().tryAcquireOsdPermit();
+                    M3Runtime::SystemResourceManager::instance().tryAcquireOsdPermit();
                 const bool decoded = decodeCandidate(slotSamples,
                                                      slotStartUtc,
                                                      candidate,
@@ -3311,7 +3311,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
                                                      !gateCandidateSet || qsoDeadlineSet,
                                                      osdPermit);
                 if (osdPermit) {
-                    MadModemRuntime::SystemResourceManager::instance().releaseOsdPermit();
+                    M3Runtime::SystemResourceManager::instance().releaseOsdPermit();
                 }
                 if (quality.osdGf2Tried > 0) {
                     osdGf2TriedInSet.fetch_add(quality.osdGf2Tried, std::memory_order_relaxed);
@@ -3972,7 +3972,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
             const auto decodeStart = Clock::now();
             const bool residualOsdBudget = (!liveAdaptiveResidual || elapsedLiveMs() < 500.0);
             const bool residualOsdPermit = residualOsdBudget &&
-                MadModemRuntime::SystemResourceManager::instance().tryAcquireOsdPermit();
+                M3Runtime::SystemResourceManager::instance().tryAcquireOsdPermit();
             const bool decoded = decodeCandidate(residual,
                                                  slotStartUtc,
                                                  candidate,
@@ -3983,7 +3983,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
                                                  allowHeavyMetricRecovery,
                                                  residualOsdPermit);
             if (residualOsdPermit) {
-                MadModemRuntime::SystemResourceManager::instance().releaseOsdPermit();
+                M3Runtime::SystemResourceManager::instance().releaseOsdPermit();
             }
             const auto decodeEnd = Clock::now();
             decodeMs += std::chrono::duration<double, std::milli>(decodeEnd - decodeStart).count();
@@ -4055,10 +4055,10 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
     const auto coherentTailStart = Clock::now();
     const Ft8Mode::Profile timingProfile = Ft8Mode::profileForMode(m_modeName);
     const qint64 replyDeadline = liveBoundaryDecode
-        ? MadModemFtTiming::replyArmDeadlineUtcMs(slotStartUtc.toMSecsSinceEpoch(),
+        ? M3FtTiming::replyArmDeadlineUtcMs(slotStartUtc.toMSecsSinceEpoch(),
                                                 timingProfile.slotMs, timingProfile.signalMs) : 0;
     const qint64 recoveryDeadline = liveBoundaryDecode
-        ? MadModemFtTiming::recoveryDeadlineUtcMs(slotStartUtc.toMSecsSinceEpoch(),
+        ? M3FtTiming::recoveryDeadlineUtcMs(slotStartUtc.toMSecsSinceEpoch(),
                                                 timingProfile.slotMs, timingProfile.signalMs) : 0;
     for (const Candidate &candidate : coherentRetries) {
         if (decodeCancellationRequested()) break;
@@ -4138,9 +4138,9 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
         int searched = 0;
         int residualPasses = 0;
         try {
-            MadModemFt::FtNativeSpectrum originalSpectrum(samples.constData(), int(samples.size()));
+            M3Ft::FtNativeSpectrum originalSpectrum(samples.constData(), int(samples.size()));
             auto measureModels = [&](int begin, int end) {
-                MadModemFt::FtNativeSpectrumScope originalScope(&originalSpectrum, nativeStop - 50);
+                M3Ft::FtNativeSpectrumScope originalScope(&originalSpectrum, nativeStop - 50);
                 for (int i = begin; i < end; ++i) {
                     if (decodeCancellationRequested() || QDateTime::currentMSecsSinceEpoch() >= nativeStop - 100) break;
                     CandidateDecode &pair = nativeModels[i];
@@ -4229,14 +4229,14 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
     }
 
     const double finalTotalMs = std::chrono::duration<double, std::milli>(Clock::now() - totalStart).count();
-    MadModemRuntime::SystemResourceManager::instance().observeFtJob(
+    M3Runtime::SystemResourceManager::instance().observeFtJob(
         workClass,
         finalTotalMs,
         stats != nullptr ? stats->currentCaptureQueueLatencyMs : 0.0,
         firstWorkerCount,
         totalCandidates);
-    const MadModemRuntime::RuntimeResourceSnapshot resourceSnapshot =
-        MadModemRuntime::SystemResourceManager::instance().snapshot();
+    const M3Runtime::RuntimeResourceSnapshot resourceSnapshot =
+        M3Runtime::SystemResourceManager::instance().snapshot();
 
     if (stats != nullptr) {
         stats->candidateCount = totalCandidates;
@@ -4299,7 +4299,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlot(const QVector<double> &sa
         stats->waterfallQueueRows = resourceSnapshot.waterfallQueueRows;
         stats->waterfallGpuBacked = resourceSnapshot.waterfallGpuBacked;
         stats->systemCpuLoadPercent = resourceSnapshot.systemCpuLoadPercent;
-        stats->simdBackend = MadModemCpu::ft8ToneEngineName();
+        stats->simdBackend = M3Cpu::ft8ToneEngineName();
         stats->resourceAdjustment = resourceSnapshot.lastAdjustment;
         stats->engineName = liveRealtimeDecode
             ? (liveAdaptiveDeepTriggered
@@ -4341,7 +4341,7 @@ QVector<Ft8RxDecoder::Candidate> Ft8RxDecoder::findCandidates(const QVector<doub
     const bool offlineAnalysis = m_offlineAnalysisActive.load();
     const bool liveAdaptive = !offlineAnalysis && (m_deepDecodeEnabled || m_dspPlusDecodeEnabled);
     const bool qsoPriorityActive = !offlineAnalysis &&
-                                   t_currentFtWorkClass == MadModemRuntime::WorkClass::FtGate &&
+                                   t_currentFtWorkClass == M3Runtime::WorkClass::FtGate &&
                                    m_qsoDeadlineActive.load(std::memory_order_acquire) &&
                                    !m_dxCall.trimmed().isEmpty();
     constexpr double kQsoFocusHalfSpanHz = 90.0;
@@ -4430,7 +4430,7 @@ QVector<Ft8RxDecoder::Candidate> Ft8RxDecoder::findCandidates(const QVector<doub
         return window;
     }();
 
-    auto *incremental=MadModemFt::currentAnalysis;
+    auto *incremental=M3Ft::currentAnalysis;
     if(incremental && !incremental->originalInput(samples))incremental=nullptr;
     auto buildCacheForStart = [&samples, maxEnergyBin, incremental](int startSample,
                                                                           CostasSpectrumCache &cache,
@@ -4682,10 +4682,10 @@ bool Ft8RxDecoder::decodeCandidate(const QVector<double> &samples,
     const auto traceStart=std::chrono::steady_clock::now();
     const auto recoveryStart = std::chrono::steady_clock::now();
     auto recoveryTimeAvailable = [&] {
-        const bool nativeOffline = MadModemFt::nativeFt8Spectrum && m_offlineAnalysisActive.load();
+        const bool nativeOffline = M3Ft::nativeFt8Spectrum && m_offlineAnalysisActive.load();
         return !decodeCancellationRequested() &&
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now()-recoveryStart).count() < (nativeOffline ? 96.0 : 24.0) &&
-            (MadModemFt::nativeFt8StopUtcMs==0 || QDateTime::currentMSecsSinceEpoch()<MadModemFt::nativeFt8StopUtcMs) &&
+            (M3Ft::nativeFt8StopUtcMs==0 || QDateTime::currentMSecsSinceEpoch()<M3Ft::nativeFt8StopUtcMs) &&
             (m_offlineAnalysisActive.load() || QDateTime::currentMSecsSinceEpoch() <
                 slotStartUtc.toMSecsSinceEpoch() + 15000 + 1100);
     };
@@ -4789,7 +4789,7 @@ bool Ft8RxDecoder::decodeCandidate(const QVector<double> &samples,
         return reject(DecodeRejectReason::Boundary);
     }
 
-    const bool nativeFront = MadModemFt::nativeFt8Spectrum != nullptr && allowMetricRecovery;
+    const bool nativeFront = M3Ft::nativeFt8Spectrum != nullptr && allowMetricRecovery;
     std::vector<std::complex<double>> nativeBaseband;
     int nativeBegin=0;
     double refinedSync = nativeFront ? 0.0 : costasSyncScore(startSample, baseHz, nullptr);
@@ -4821,7 +4821,7 @@ bool Ft8RxDecoder::decodeCandidate(const QVector<double> &samples,
 
     if (nativeFront) {
         std::vector<std::complex<double>> full;
-        MadModemFt::nativeFt8Spectrum->extract(baseHz,full);
+        M3Ft::nativeFt8Spectrum->extract(baseHz,full);
         constexpr int margin=10;
         const int initial=int(std::lround(double(startSample)/60.));
         nativeBaseband.resize(kSymbols*32+2*margin);
@@ -4829,7 +4829,7 @@ bool Ft8RxDecoder::decodeCandidate(const QVector<double> &samples,
             int index=initial-margin+k;
             nativeBaseband[k]=(index>=0&&index<int(full.size()))?full[index]:std::complex<double>{};
         }
-        const auto alignment=MadModemFt::alignFt8Coherent(nativeBaseband,margin,
+        const auto alignment=M3Ft::alignFt8Coherent(nativeBaseband,margin,
             qMax(-margin,-initial),qMin(margin,(int(samples.size())-kSymbols*kSamplesPerSymbol)/60-initial));
         nativeBegin=margin+alignment.shift;
         startSample=(initial+alignment.shift)*60;
@@ -4877,7 +4877,7 @@ bool Ft8RxDecoder::decodeCandidate(const QVector<double> &samples,
         std::array<double, 8> energies;
         if(nativeFront) {
             for(int tone=0;tone<8;++tone)
-                energies[tone]=std::norm(MadModemFt::coherentCorrelation32<8>(nativeBaseband,nativeBegin+sym*32,tone));
+                energies[tone]=std::norm(M3Ft::coherentCorrelation32<8>(nativeBaseband,nativeBegin+sym*32,tone));
         } else if(hasGpuEnergies)std::copy_n(gpuEnergies.data()+size_t(sym)*8,8,energies.begin());
         else energies=symbolToneEnergies8(samples, symStart, baseHz);
         double maxEnergy = 0.0;
@@ -4965,7 +4965,7 @@ bool Ft8RxDecoder::decodeCandidate(const QVector<double> &samples,
      * LDPC failures averaging only about 4--5 correct Costas symbols out of 21,
      * while valid decodes are about 18--19/21.  This is not a new invented
      * heuristic; it is the reference ft8b bail-out placed at the same point in
-     * the MadModem pipeline: after symbol extraction, before LDPC.
+     * the MultiModeModem pipeline: after symbol extraction, before LDPC.
      */
     // Deep Max uses the classical weak-signal recovery envelope that was
     // previously hidden behind the removed MIND switch. No neural score is
@@ -5226,7 +5226,7 @@ bool Ft8RxDecoder::decodeCandidate(const QVector<double> &samples,
     // and does not alter the ghost-candidate policy above.
     if (!metricDecoded && allowFt8bMetricRecovery &&
         recoveryTimeAvailable() &&
-        t_currentFtWorkClass != MadModemRuntime::WorkClass::FtGate) {
+        t_currentFtWorkClass != M3Runtime::WorkClass::FtGate) {
         if (qualityOut != nullptr) {
             ++qualityOut->coherentMetricAttempts;
         }
@@ -5245,13 +5245,13 @@ bool Ft8RxDecoder::decodeCandidate(const QVector<double> &samples,
                                    baseband)) {
             auto ft8CorrelationAt = [&baseband](int symbol, int tone, int shift) {
                 const int begin = kMargin + shift + symbol * kBasebandSamplesPerSymbol;
-                return MadModemFt::coherentCorrelation32<8>(baseband, begin, tone);
+                return M3Ft::coherentCorrelation32<8>(baseband, begin, tone);
             };
 
-            MadModemFt::Ft8CoherentAlignment alignment;
+            M3Ft::Ft8CoherentAlignment alignment;
             int coherentShift=0;
             if(nativeFront) {
-                alignment=MadModemFt::alignFt8Coherent(baseband,kMargin,
+                alignment=M3Ft::alignFt8Coherent(baseband,kMargin,
                     qMax(-kMargin,-startSample/kDecimation),
                     qMin(kMargin,(int(samples.size())-kSymbols*kSamplesPerSymbol-startSample-1)/kDecimation));
                 coherentShift=alignment.shift;
@@ -5543,7 +5543,7 @@ void Ft8RxDecoder::subtractDecodedSignal(QVector<double> &samples, const Candida
         cfilt[static_cast<size_t>(i)] = audio[startSample + i] * std::conj(cref[static_cast<size_t>(i)]);
     }
 
-    if(t_nativeResidualEnvelope) MadModemFt::raisedCosineEnvelope(cfilt,4000,true,first,last);
+    if(t_nativeResidualEnvelope) M3Ft::raisedCosineEnvelope(cfilt,4000,true,first,last);
     else smoothComplexEnvelopeZeroPhase(cfilt);
 
     for (int i = first; i < last; ++i) {
@@ -5976,15 +5976,15 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlotFt4(const QVector<double> 
 
     const auto totalEnd = Clock::now();
     const double finalTotalMs = std::chrono::duration<double, std::milli>(totalEnd - totalStart).count();
-    const MadModemRuntime::WorkClass workClass = t_currentFtWorkClass;
-    MadModemRuntime::SystemResourceManager::instance().observeFtJob(
+    const M3Runtime::WorkClass workClass = t_currentFtWorkClass;
+    M3Runtime::SystemResourceManager::instance().observeFtJob(
         workClass,
         finalTotalMs,
         stats != nullptr ? stats->currentCaptureQueueLatencyMs : 0.0,
         workerCount,
         candidates.size() + secondPassCandidates);
-    const MadModemRuntime::RuntimeResourceSnapshot resourceSnapshot =
-        MadModemRuntime::SystemResourceManager::instance().snapshot();
+    const M3Runtime::RuntimeResourceSnapshot resourceSnapshot =
+        M3Runtime::SystemResourceManager::instance().snapshot();
     if (candidateCount != nullptr) {
         *candidateCount = candidates.size() + secondPassCandidates;
     }
@@ -6030,7 +6030,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::decodeSlotFt4(const QVector<double> 
         stats->waterfallQueueRows = resourceSnapshot.waterfallQueueRows;
         stats->waterfallGpuBacked = resourceSnapshot.waterfallGpuBacked;
         stats->systemCpuLoadPercent = resourceSnapshot.systemCpuLoadPercent;
-        stats->simdBackend = MadModemCpu::ft8ToneEngineName();
+        stats->simdBackend = M3Cpu::ft8ToneEngineName();
         stats->resourceAdjustment = resourceSnapshot.lastAdjustment;
         stats->engineName = QStringLiteral("FT4 adaptive atomic live engine");
     }
@@ -6069,7 +6069,7 @@ QVector<Ft8RxDecoder::Candidate> Ft8RxDecoder::findFt4Candidates(const QVector<d
     const double high = qMin(static_cast<double>(m_searchHighHz), 3000.0 - 3.0 * kFt4ToneSpacingHz);
     const int freqCount = qMax(0, static_cast<int>(std::floor((high - low) / freqStep)) + 1);
 
-    auto *incremental=MadModemFt::currentAnalysis;
+    auto *incremental=M3Ft::currentAnalysis;
     if(incremental && !incremental->originalInput(samples))incremental=nullptr;
     auto syncScoreAt = [this, &samples, &blocks, incremental](double baseHz, int startSample, int &cacheHits) {
         double blockScores[4] = {0.0, 0.0, 0.0, 0.0};
@@ -6189,7 +6189,7 @@ QVector<Ft8RxDecoder::Candidate> Ft8RxDecoder::findFt4DeadlineCandidates(const Q
         ? qMax(0, static_cast<int>(std::floor((high - low) / freqStep)) + 1)
         : 0;
 
-    auto *incremental=MadModemFt::currentAnalysis;
+    auto *incremental=M3Ft::currentAnalysis;
     if(incremental && !incremental->originalInput(samples))incremental=nullptr;
     auto syncScoreAt = [this, &samples, &blocks, incremental](double baseHz, int startSample, int &cacheHits) {
         double blockScores[4] = {0.0, 0.0, 0.0, 0.0};
@@ -6530,7 +6530,7 @@ bool Ft8RxDecoder::decodeFt4Candidate(const QVector<double> &samples,
     // baseband (32 complex samples/symbol) and form coherent 1/2/4-symbol
     // metrics.  The early gate keeps the proven inexpensive metric only.
     if (!fecDecoded && (m_deepDecodeEnabled || m_dspPlusDecodeEnabled) && recoveryTimeAvailable() &&
-        t_currentFtWorkClass != MadModemRuntime::WorkClass::FtGate) {
+        t_currentFtWorkClass != M3Runtime::WorkClass::FtGate) {
         if (qualityOut != nullptr) {
             ++qualityOut->coherentMetricAttempts;
         }
@@ -6549,7 +6549,7 @@ bool Ft8RxDecoder::decodeFt4Candidate(const QVector<double> &samples,
                                    baseband)) {
             auto correlationAt = [&baseband](int symbol, int tone, int shift) {
                 const int begin = kMargin + shift + symbol * kSamplesPerBasebandSymbol;
-                return MadModemFt::coherentCorrelation32<4>(baseband, begin, tone);
+                return M3Ft::coherentCorrelation32<4>(baseband, begin, tone);
             };
 
             int coherentShift = 0;
@@ -6725,8 +6725,8 @@ bool Ft8RxDecoder::decodeFt4Candidate(const QVector<double> &samples,
     }
 
     if (!fecDecoded && m_dspPlusDecodeEnabled && bestHardSync >= 10 &&
-        t_currentFtWorkClass != MadModemRuntime::WorkClass::FtGate && recoveryTimeAvailable()) {
-        auto permit = MadModemRuntime::SystemResourceManager::instance().tryAcquireOsdPermit();
+        t_currentFtWorkClass != M3Runtime::WorkClass::FtGate && recoveryTimeAvailable()) {
+        auto permit = M3Runtime::SystemResourceManager::instance().tryAcquireOsdPermit();
         if (permit) {
             std::array<int,174> trial{};
             int order=-1, skips=0; bool rankFail=false;
@@ -6744,7 +6744,7 @@ bool Ft8RxDecoder::decodeFt4Candidate(const QVector<double> &samples,
                 qualityOut->osdGf2PivotSkips += skips;
                 qualityOut->osdGf2TotalMs += std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-begin).count();
             }
-            MadModemRuntime::SystemResourceManager::instance().releaseOsdPermit();
+            M3Runtime::SystemResourceManager::instance().releaseOsdPermit();
         } else if (qualityOut) ++qualityOut->osdGf2BudgetSkips;
     }
 
@@ -6977,9 +6977,9 @@ std::array<double, 4> Ft8RxDecoder::ft4SymbolToneEnergies4(const QVector<double>
 
     const double *xv = samples.constData() + startSample;
 
-#if defined(MADMODEM_FT8_HAVE_AVX2_TARGET)
+#if defined(M3_FT8_HAVE_AVX2_TARGET)
     static const bool useAvx2FmaToneEngine = []() {
-        const MadModemCpu::Features f = MadModemCpu::detect();
+        const M3Cpu::Features f = M3Cpu::detect();
         return f.avx2 && f.fma;
     }();
     if (useAvx2FmaToneEngine) {
@@ -7000,7 +7000,7 @@ std::array<double, 4> Ft8RxDecoder::ft4SymbolToneEnergies4(const QVector<double>
         coeff[tone] = 2.0 * std::cos(omega);
     }
 
-#if defined(MADMODEM_FT8_HAVE_SSE2)
+#if defined(M3_FT8_HAVE_SSE2)
     const __m128d c01 = _mm_set_pd(coeff[1], coeff[0]);
     const __m128d c23 = _mm_set_pd(coeff[3], coeff[2]);
     __m128d s1_01 = _mm_setzero_pd();
@@ -7070,7 +7070,7 @@ QString Ft8RxDecoder::unpackFt4Message77(const std::array<int, 174> &bits)
 }
 
 // Goertzel single-bin energy.  This is intentionally dependency-free so
-// MadModem does not inherit MSHV's FFTW build complexity for the first RX stage.
+// MultiModeModem does not inherit MSHV's FFTW build complexity for the first RX stage.
 double Ft8RxDecoder::symbolToneEnergy(const QVector<double> &samples,
                                       int startSample,
                                       double frequencyHz) const
@@ -7113,9 +7113,9 @@ std::array<double, 8> Ft8RxDecoder::symbolToneEnergies8(const QVector<double> &s
 
     const double *xv = samples.constData() + startSample;
 
-#if defined(MADMODEM_FT8_HAVE_AVX2_TARGET)
+#if defined(M3_FT8_HAVE_AVX2_TARGET)
     static const bool useAvx2FmaToneEngine = []() {
-        const MadModemCpu::Features f = MadModemCpu::detect();
+        const M3Cpu::Features f = M3Cpu::detect();
         return f.avx2 && f.fma;
     }();
     if (useAvx2FmaToneEngine) {
@@ -7129,7 +7129,7 @@ std::array<double, 8> Ft8RxDecoder::symbolToneEnergies8(const QVector<double> &s
     }
 #endif
 
-#if defined(MADMODEM_FT8_HAVE_SSE2)
+#if defined(M3_FT8_HAVE_SSE2)
     /*
      * v3.25: FT8 symbol demodulation is the hottest offline/live decode path.
      * The old code ran one full Goertzel pass for every tone, so each FT8
@@ -7257,7 +7257,7 @@ bool Ft8RxDecoder::ldpcDecode174_91(const std::array<double, 174> &llr,
         // Same normalized min-sum messages; two minima avoid the quadratic
         // neighbour scan without changing scale, clipping, ties or zero signs.
         for (int c = 0; c < M; ++c) {
-            MadModemFt::normalizedMinSumCheck(q[c], nrw_ft8_174_91[c], r[c]);
+            M3Ft::normalizedMinSumCheck(q[c], nrw_ft8_174_91[c], r[c]);
         }
 
         // Variable-node update and hard decisions.
@@ -7749,7 +7749,7 @@ void Ft8RxDecoder::appendReferenceRecovery(const QVector<double>&samples,const Q
     const auto profile=Ft8Mode::profileForMode(m_modeName);
     const bool gate=request.phase.startsWith(QStringLiteral("wsjtx-gate"));
     request.deadlineUtcMs=request.slotUtcMs+profile.slotMs+(gate?-50:1100);
-    request.workers=FtDecodeWorkerPool::instance().recommendedWorkerCount(request.offline?MadModemRuntime::WorkClass::FtOffline:MadModemRuntime::WorkClass::FtBoundary,4);
+    request.workers=FtDecodeWorkerPool::instance().recommendedWorkerCount(request.offline?M3Runtime::WorkClass::FtOffline:M3Runtime::WorkClass::FtBoundary,4);
     request.cancelled=[this]{return decodeCancellationRequested();};
     auto append=[&](const FtReferenceRecovery::Row&r) {
         if (decodeCancellationRequested())return;

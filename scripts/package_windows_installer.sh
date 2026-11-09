@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-version="$(tr -d '\r\n' < "$root/MADMODEM_VERSION.txt")"
-out="${MADMODEM_PACKAGE_OUT_DIR:-$root/dist/packages}"
+version="$(tr -d '\r\n' < "$root/M3_VERSION.txt")"
+out="${M3_PACKAGE_OUT_DIR:-$root/dist/packages}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 cat "$root/packaging/COPYRIGHT.txt" "$root/COPYING" > "$work/INSTALLER_LICENSE.txt"

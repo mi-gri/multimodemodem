@@ -1,5 +1,5 @@
 /* Built for baseline x86-64. Exit 0 only if both CPU and OS support every
-   instruction-set extension used by MADMODEM_AVX2_BUILD. */
+   instruction-set extension used by M3_AVX2_BUILD. */
 #include <stdint.h>
 
 static int supports_avx2(unsigned int ecx, unsigned int ebx7, uint64_t xcr0)
@@ -8,7 +8,7 @@ static int supports_avx2(unsigned int ecx, unsigned int ebx7, uint64_t xcr0)
                                   (1u << 27) | (1u << 28); /* FMA SSE4.2 XSAVE OSXSAVE AVX */
     return (ecx & required) == required && (ebx7 & (1u << 5)) && (xcr0 & 6u) == 6u;
 }
-#ifndef MADMODEM_CPU_PROBE_TEST
+#ifndef M3_CPU_PROBE_TEST
 #include <cpuid.h>
 int main(void)
 {

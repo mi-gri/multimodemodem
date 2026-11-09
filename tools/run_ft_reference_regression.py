@@ -19,11 +19,11 @@ a = p.parse_args()
 b = a.build.resolve()
 s = Path(__file__).resolve().parents[1]
 flags = {}
-for line in (b / 'CMakeFiles/MadModem.dir/flags.make').read_text().splitlines():
+for line in (b / 'CMakeFiles/MultiModeModem.dir/flags.make').read_text().splitlines():
     if ' = ' in line:
         key, value = line.split(' = ', 1)
         flags[key] = shlex.split(value)
-link = shlex.split((b / 'CMakeFiles/MadModem.dir/link.txt').read_text())
+link = shlex.split((b / 'CMakeFiles/MultiModeModem.dir/link.txt').read_text())
 out = b / ('ft-reference-sanitized' if a.sanitize else 'ft-reference-regression')
 out.mkdir(exist_ok=True)
 extra = ['-O1', '-g', '-ftrivial-auto-var-init=zero', '-fno-omit-frame-pointer', '-fsanitize=address,undefined'] if a.sanitize else ['-O2']
@@ -34,7 +34,7 @@ def compile_file(source, target):
                     *flags['CXX_FLAGS'], *extra, '-c', str(source), '-o', str(target)], cwd=b, check=True)
 main = out / 'main.o'
 compile_file(s / 'tests/FtReferenceRecoveryRegression.cpp', main)
-link[link.index('CMakeFiles/MadModem.dir/main.cpp.o')] = str(main)
+link[link.index('CMakeFiles/MultiModeModem.dir/main.cpp.o')] = str(main)
 if a.sanitize:
     objects = []
     for name in ['modems/ft8/FtReferenceRecovery.cpp', *['third_party/mshv_gpl/ft_reference/' + n for n in

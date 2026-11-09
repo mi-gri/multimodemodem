@@ -24,7 +24,7 @@ void writeHeader(QDataStream &stream, quint32 type)
     stream << kWsjtMagic
            << kWsjtSchema
            << type
-           << QByteArrayLiteral("MadModem");
+           << QByteArrayLiteral("MultiModeModem");
 }
 
 bool resolveAddress(const QString &serverAddress, QHostAddress *address, QString *error)
@@ -55,7 +55,7 @@ QString QsoUdpBroadcaster::buildAdifFile(const LogbookEntry &entry, const QStrin
         version = QCoreApplication::applicationVersion().trimmed();
     }
 
-    QString adif = QStringLiteral("<ADIF_VER:5>3.1.4 <PROGRAMID:8>MadModem ");
+    QString adif = QStringLiteral("<ADIF_VER:5>3.1.4 <PROGRAMID:8>MultiModeModem ");
     if (!version.isEmpty()) {
         const int utf8Bytes = version.toUtf8().size();
         adif += QStringLiteral("<PROGRAMVERSION:%1>%2 ").arg(utf8Bytes).arg(version);
@@ -107,7 +107,7 @@ QByteArray QsoUdpBroadcaster::buildQsoLoggedDatagram(const LogbookEntry &entry,
         : context.myCall.trimmed().toUpper();
 
     // WSJT-X/JTDX schema-3 QSO Logged (type 5). Empty values are legitimate
-    // protocol values when MadModem does not own that item (power/name/etc.).
+    // protocol values when MultiModeModem does not own that item (power/name/etc.).
     stream << off
            << entry.callsign.trimmed().toUpper().toUtf8()
            << entry.grid.trimmed().toUpper().toUtf8()

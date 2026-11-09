@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="${APP_NAME:-MadModem}"
-ROOT_DIR="${MADMODEM_ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-PACKAGE_DIR="${MADMODEM_PACKAGE_DIR:-$ROOT_DIR/MM}"
-PACKAGE_ZIP="${MADMODEM_PACKAGE_ZIP:-$ROOT_DIR/mm.zip}"
+APP_NAME="${APP_NAME:-MultiModeModem}"
+ROOT_DIR="${M3_ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+PACKAGE_DIR="${M3_PACKAGE_DIR:-$ROOT_DIR/MM}"
+PACKAGE_ZIP="${M3_PACKAGE_ZIP:-$ROOT_DIR/mm.zip}"
 
 rm -rf "$PACKAGE_DIR"
 mkdir -p "$PACKAGE_DIR"
@@ -20,8 +20,8 @@ else
 fi
 
 # Windows executables.  The normal release package may contain two CPU builds:
-#   MadModem.exe        = AVX2/FMA optimized executable for modern CPUs.
-#   MadModem-Legacy.exe = portable executable for older CPUs without AVX/AVX2.
+#   MultiModeModem.exe        = AVX2/FMA optimized executable for modern CPUs.
+#   MultiModeModem-Legacy.exe = portable executable for older CPUs without AVX/AVX2.
 if [[ -f "$ROOT_DIR/dist/windows/$APP_NAME.exe" ]]; then
     cp -f "$ROOT_DIR/dist/windows/$APP_NAME.exe" "$PACKAGE_DIR/$APP_NAME.exe"
     copied_exe=$((copied_exe + 1))
@@ -67,7 +67,7 @@ for f in \
     fi
 done
 
-# CW RX uses the single native MadModem clean-room implementation.
+# CW RX uses the single native MultiModeModem clean-room implementation.
 
 # Ship the localized Qt/HTML help source tree and generated per-language .qch files.
 # The runtime help browser looks for MM_en.qch, MM_it.qch, ... and falls back

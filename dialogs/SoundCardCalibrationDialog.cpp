@@ -1,5 +1,5 @@
 /**************************************************************************
- * MadModem sound-card calibration dialog.
+ * MultiModeModem sound-card calibration dialog.
  *
  * This implementation intentionally follows the calibration model documented
  * by QSSTV: before SSTV work, discipline the PC clock using NTP/timesyncd and
@@ -10,7 +10,7 @@
  *   Copyright (C) 2000-2019 Johan Maes, ON4QZ
  *   QSSTV is distributed under the GNU General Public License.
  *
- * This MadModem source-level adaptation keeps attribution and the original
+ * This MultiModeModem source-level adaptation keeps attribution and the original
  * QSSTV reference files under third_party/qsstv_gpl/.
  **************************************************************************/
 
@@ -315,7 +315,7 @@ void SoundCardCalibrationDialog::updateStandardButtonText()
 
 void SoundCardCalibrationDialog::buildUi()
 {
-    setWindowTitle(MadModemI18n::text(QStringLiteral("Soundcard calibration")));
+    setWindowTitle(M3I18n::text(QStringLiteral("Soundcard calibration")));
     // Compact tab-friendly layout: keep the QSSTV information readable, but avoid
     // fixed columns/buttons wider than the unified Settings window.
     resize(780, 500);

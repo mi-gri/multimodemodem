@@ -5,8 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="MultiModeModem"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
-BUILD_DIR="${MADMODEM_LINUX_BUILD_DIR:-$ROOT_DIR/build-linux-github}"
-INSTALL_DIR="${MADMODEM_LINUX_INSTALL_DIR:-$ROOT_DIR/dist/linux}"
+BUILD_DIR="${M3_LINUX_BUILD_DIR:-$ROOT_DIR/build-linux-github}"
+INSTALL_DIR="${M3_LINUX_INSTALL_DIR:-$ROOT_DIR/dist/linux}"
 HAMLIB_PREFIX="${HAMLIB_LINUX_PREFIX:-$ROOT_DIR/third_party/hamlib_lgpl/install-linux-x86_64}"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
@@ -35,9 +35,9 @@ rm -rf "$INSTALL_DIR"
 cmake -S "$ROOT_DIR" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
     -DHAMLIB_ROOT="$HAMLIB_PREFIX" \
-    -DMADMODEM_REQUIRE_HAMLIB=ON \
-    -DMADMODEM_REQUIRE_QT_LOCATION=ON \
-    -DMADMODEM_AUTOBUILD_HAMLIB=OFF \
+    -DM3_REQUIRE_HAMLIB=ON \
+    -DM3_REQUIRE_QT_LOCATION=ON \
+    -DM3_AUTOBUILD_HAMLIB=OFF \
     "$@"
 
 cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" --parallel "$JOBS"

@@ -1,4 +1,4 @@
-# Installation — MadModem 0.6.5
+# Installation — MultiModeModem 0.6.5
 
 Download the installer or portable package matching your system from
 [GitHub Releases](https://github.com/l-papadopol/MM/releases). Close MM before installation.
@@ -23,9 +23,9 @@ Managed installations use per-user directories:
 
 | System | Settings | Default logbook |
 | --- | --- | --- |
-| Windows | `%LOCALAPPDATA%/MadModem/settings.mad` | `%LOCALAPPDATA%/MadModem/logbook.adi` |
-| Linux | `~/.config/MadModem/settings.mad` | `~/.local/share/MadModem/logbook.adi` |
-| macOS | `~/Library/Preferences/MadModem/settings.mad` | `~/Library/Application Support/MadModem/logbook.adi` |
+| Windows | `%LOCALAPPDATA%/MultiModeModem/settings.mad` | `%LOCALAPPDATA%/MultiModeModem/logbook.adi` |
+| Linux | `~/.config/MultiModeModem/settings.mad` | `~/.local/share/MultiModeModem/logbook.adi` |
+| macOS | `~/Library/Preferences/MultiModeModem/settings.mad` | `~/Library/Application Support/MultiModeModem/logbook.adi` |
 
 Linux XDG overrides and explicitly chosen logbook paths are respected. Portable
 copies retain executable-adjacent data. Back up settings, ADIF files and recordings

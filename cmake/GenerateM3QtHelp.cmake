@@ -1,4 +1,4 @@
-# Generate MadModem Qt Help files in a build-safe, non-fatal way.
+# Generate MultiModeModem Qt Help files in a build-safe, non-fatal way.
 #
 # qhelpgenerator is optional: MM always ships embedded multilingual HTML help.
 # Some Qt/MXE qhelpgenerator builds can return a non-zero status even after

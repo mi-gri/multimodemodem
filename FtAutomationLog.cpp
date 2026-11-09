@@ -52,8 +52,8 @@ void MainWindow::traceFtAutomation(const QString &action, const QString &reason,
     if (m_ftAutomationTraceId.isEmpty() && originalTrace.isEmpty()) m_ftAutomationTraceId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     details.insert("trace_id", originalTrace.isEmpty() ? m_ftAutomationTraceId : originalTrace);
     details.insert("trace_schema",1);
-    details.insert("version",QStringLiteral(MADMODEM_VERSION_STRING));
-    details.insert("build",QString::fromLatin1(MadModemBuild::number()));
+    details.insert("version",QStringLiteral(M3_VERSION_STRING));
+    details.insert("build",QString::fromLatin1(M3Build::number()));
     details.insert("action", action);
     details.insert("reason", reason);
     details.insert("mode", ui && ui->cmbMode ? ui->cmbMode->currentText() : QString());

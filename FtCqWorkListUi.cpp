@@ -17,7 +17,7 @@
 namespace {
 constexpr int kFtDecodeRole=Qt::UserRole+430;
 constexpr int kFtPresentationOnlyRole=Qt::UserRole+429;
-QString uiText(const char *key,const char *fallback){return MadModemI18n::translate(QString::fromUtf8(key),QString::fromUtf8(fallback));}
+QString uiText(const char *key,const char *fallback){return M3I18n::translate(QString::fromUtf8(key),QString::fromUtf8(fallback));}
 }
 bool MainWindow::addFtDecodeToCqWorkList(QTableWidgetItem *selected, bool cqOnly)
 {

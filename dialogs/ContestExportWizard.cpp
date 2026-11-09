@@ -17,7 +17,7 @@
 #include <QScreen>
 
 namespace {
-QString L(const QString& text) { return MadModemI18n::text(text); }
+QString L(const QString& text) { return M3I18n::text(text); }
 QString validationText(const QString& error) {
     const QRegularExpression fieldError("(TX|RX) ([A-Z0-9_]+): missing or invalid recorded value$");
     const auto match=fieldError.match(error);

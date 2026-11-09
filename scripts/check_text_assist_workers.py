@@ -53,7 +53,7 @@ require('m_logbook.records()' not in body and 'm_logbook.containsCallsign' not i
 require('kLiveHighlightTailCharacters = 4096' in body,
         'live terminal snapshot lost its bounded tail')
 require('runtime/LogbookIndexWorker.cpp' in cmake and 'runtime/TextAssistWorker.cpp' in cmake,
-        'new workers are not part of the MadModem build')
+        'new workers are not part of the MultiModeModem build')
 require('m3_text_assist_workers_regression' in cmake and
         'tests/TextAssistWorkersRegression.cpp' in cmake,
         'text-assist worker C++ regression is not registered in CTest')

@@ -56,7 +56,7 @@
 #include <cmath>
 #include <utility>
 
-#ifdef MADMODEM_WITH_QT_LOCATION
+#ifdef M3_WITH_QT_LOCATION
 #include <QQmlContext>
 #include <QQmlError>
 #include <QQuickItem>
@@ -320,7 +320,8 @@ QStringList configuredOsmTileBaseUrls(bool useHttpFallback)
 {
     Q_UNUSED(useHttpFallback);
 
-    const QByteArray env = qgetenv("MADMODEM_OSM_TILE_BASE").trimmed();
+    QByteArray env = qgetenv("M3_OSM_TILE_BASE").trimmed();
+    if (env.isEmpty()) env = qgetenv("MADMODEM_OSM_TILE_BASE").trimmed();   // m3-compat: name before the rename
     QStringList bases;
     if (!env.isEmpty()) {
         /*
@@ -427,11 +428,11 @@ QsoMapWidget::QsoMapWidget(QWidget *parent)
     }
     m_tileNetwork = new QNetworkAccessManager(this);
     if (!QSslSocket::supportsSsl()) {
-        m_onlineMapFailureReason = MadModemI18n::text(QStringLiteral("Qt SSL/OpenSSL is unavailable; online OSM HTTPS tiles will use the offline map unless MADMODEM_OSM_TILE_BASE points to a local HTTP tile proxy/cache."));
+        m_onlineMapFailureReason = M3I18n::text(QStringLiteral("Qt SSL/OpenSSL is unavailable; online OSM HTTPS tiles will use the offline map unless M3_OSM_TILE_BASE points to a local HTTP tile proxy/cache."));
     }
     logOsmDiagnostics(QStringLiteral("startup"));
 
-#ifdef MADMODEM_WITH_QT_LOCATION
+#ifdef M3_WITH_QT_LOCATION
     if (QCoreApplication::instance() != nullptr) {
         connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit,
                 this, &QsoMapWidget::releaseQuickMapForShutdown,
@@ -442,7 +443,7 @@ QsoMapWidget::QsoMapWidget(QWidget *parent)
 
 QsoMapWidget::~QsoMapWidget()
 {
-#ifdef MADMODEM_WITH_QT_LOCATION
+#ifdef M3_WITH_QT_LOCATION
     releaseQuickMapForShutdown();
 #endif
 }
@@ -602,7 +603,7 @@ void QsoMapWidget::saveMap()
     const QString fileName = QFileDialog::getSaveFileName(this,
                                                           L(QStringLiteral("Save QSO map")),
                                                           QStringLiteral("qso-map.pdf"),
-                                                          MadModemI18n::text(QStringLiteral("PDF files (*.pdf);;PNG images (*.png);;JPEG images (*.jpg *.jpeg)")));
+                                                          M3I18n::text(QStringLiteral("PDF files (*.pdf);;PNG images (*.png);;JPEG images (*.jpg *.jpeg)")));
     if (fileName.isEmpty()) {
         return;
     }
@@ -668,7 +669,7 @@ void QsoMapWidget::printMap()
 
 void QsoMapWidget::loadDisplaySettings()
 {
-    QSettings settings(MadModemInstallation::settingsFilePath(), QSettings::IniFormat);
+    QSettings settings(M3Installation::settingsFilePath(), QSettings::IniFormat);
     const auto behavior=settings.value("QsoMap/displayBehavior").toString();
     m_displayBehavior=behavior=="heard_today"?DisplayBehavior::HeardToday:behavior=="worked_dxcc"?DisplayBehavior::WorkedDxcc:DisplayBehavior::LogbookQsos;
     m_mapFromDate=settings.value("QsoMap/fromDate",QDateTime::currentDateTimeUtc().date()).toDate();
@@ -692,7 +693,7 @@ void QsoMapWidget::loadDisplaySettings()
 
 void QsoMapWidget::saveDisplaySettings() const
 {
-    QSettings settings(MadModemInstallation::settingsFilePath(), QSettings::IniFormat);
+    QSettings settings(M3Installation::settingsFilePath(), QSettings::IniFormat);
     settings.setValue("QsoMap/fromDate",m_mapFromDate);
     settings.setValue("QsoMap/untilDate",m_mapUntilDate);
     settings.setValue(QStringLiteral("QsoMap/displayBehavior"), displayBehaviorName());
@@ -1053,8 +1054,8 @@ void QsoMapWidget::requestOsmTile(const TileSpec &tile) const
         self->m_osmTileRequestBlocked = true;
         self->m_onlineMapFailed = true;
         self->m_osmLastTileUrl = url.toString(QUrl::RemoveUserInfo);
-        self->m_osmLastNetworkError = MadModemI18n::text(QStringLiteral("Qt SSL/OpenSSL support is not available"));
-        self->m_onlineMapFailureReason = MadModemI18n::text(QStringLiteral("OSM HTTPS tiles require Qt SSL/OpenSSL on Windows. Rebuild MXE Qt with OpenSSL or set MADMODEM_OSM_TILE_BASE to a local HTTP tile proxy/cache."));
+        self->m_osmLastNetworkError = M3I18n::text(QStringLiteral("Qt SSL/OpenSSL support is not available"));
+        self->m_onlineMapFailureReason = M3I18n::text(QStringLiteral("OSM HTTPS tiles require Qt SSL/OpenSSL on Windows. Rebuild MXE Qt with OpenSSL or set M3_OSM_TILE_BASE to a local HTTP tile proxy/cache."));
         self->logOsmDiagnostics(QStringLiteral("ssl-unavailable"));
         self->update();
         return;
@@ -1089,33 +1090,33 @@ void QsoMapWidget::requestOsmTile(const TileSpec &tile) const
             messages << err.errorString();
         }
         self->m_osmLastSslError = messages.join(QStringLiteral("; "));
-        self->m_onlineMapFailureReason = MadModemI18n::text(QStringLiteral("OSM SSL verification failed: %1")).arg(self->m_osmLastSslError.left(120));
+        self->m_onlineMapFailureReason = M3I18n::text(QStringLiteral("OSM SSL verification failed: %1")).arg(self->m_osmLastSslError.left(120));
         self->logOsmDiagnostics(QStringLiteral("ssl-error"));
     });
     QObject::connect(reply, &QIODevice::readyRead, self, [reply, tilePayload]() {
         constexpr int kMaximumTileBytesLocal = 2 * 1024 * 1024;
-        if (reply->property("madmodemTileOversize").toBool()) {
+        if (reply->property("m3TileOversize").toBool()) {
             return;
         }
         const qint64 remaining = static_cast<qint64>(kMaximumTileBytesLocal) - tilePayload->size();
         if (remaining <= 0) {
-            reply->setProperty("madmodemTileOversize", true);
+            reply->setProperty("m3TileOversize", true);
             reply->abort();
             return;
         }
         const QByteArray chunk = reply->read(remaining + 1);
         tilePayload->append(chunk);
         if (tilePayload->size() > kMaximumTileBytesLocal) {
-            reply->setProperty("madmodemTileOversize", true);
+            reply->setProperty("m3TileOversize", true);
             reply->abort();
         }
     });
     QObject::connect(reply, &QNetworkReply::finished, self, [self, reply, key, scheme, tilePayload]() {
         constexpr int kMaximumTileBytesLocal = 2 * 1024 * 1024;
-        if (!reply->property("madmodemTileOversize").toBool()) {
+        if (!reply->property("m3TileOversize").toBool()) {
             tilePayload->append(reply->read(kMaximumTileBytesLocal - tilePayload->size() + 1));
             if (tilePayload->size() > kMaximumTileBytesLocal) {
-                reply->setProperty("madmodemTileOversize", true);
+                reply->setProperty("m3TileOversize", true);
             }
         }
         self->m_osmTilePending.remove(key);
@@ -1136,12 +1137,12 @@ void QsoMapWidget::requestOsmTile(const TileSpec &tile) const
             const QUrl redirectUrl = reply->url().resolved(redirectAttr.toUrl());
             self->m_osmLastRedirectTarget = redirectUrl.toString(QUrl::RemoveUserInfo);
             ++self->m_osmTileFailureCount;
-            self->m_onlineMapFailureReason = MadModemI18n::text(QStringLiteral("OSM tile endpoint redirected to %1; trying another configured source"))
+            self->m_onlineMapFailureReason = M3I18n::text(QStringLiteral("OSM tile endpoint redirected to %1; trying another configured source"))
                                                  .arg(redirectUrl.scheme().toUpper());
             providerShouldAdvance = true;
-        } else if (reply->property("madmodemTileOversize").toBool()) {
+        } else if (reply->property("m3TileOversize").toBool()) {
             ++self->m_osmTileFailureCount;
-            self->m_osmLastNetworkError = MadModemI18n::text(QStringLiteral("Tile response exceeded the 2 MiB safety limit"));
+            self->m_osmLastNetworkError = M3I18n::text(QStringLiteral("Tile response exceeded the 2 MiB safety limit"));
             self->m_onlineMapFailureReason = self->m_osmLastNetworkError;
             providerShouldAdvance = true;
         } else if (reply->error() == QNetworkReply::NoError) {
@@ -1157,8 +1158,8 @@ void QsoMapWidget::requestOsmTile(const TileSpec &tile) const
                 }
             } else {
                 ++self->m_osmTileFailureCount;
-                self->m_osmLastNetworkError = MadModemI18n::text(QStringLiteral("Tile image decode failed"));
-                self->m_onlineMapFailureReason = MadModemI18n::text(QStringLiteral("OSM tile image decode failed; trying another source"));
+                self->m_osmLastNetworkError = M3I18n::text(QStringLiteral("Tile image decode failed"));
+                self->m_onlineMapFailureReason = M3I18n::text(QStringLiteral("OSM tile image decode failed; trying another source"));
                 providerShouldAdvance = true;
             }
         } else {
@@ -1170,7 +1171,7 @@ void QsoMapWidget::requestOsmTile(const TileSpec &tile) const
                  reply->error() == QNetworkReply::ProtocolInvalidOperationError ||
                  reply->errorString().contains(QStringLiteral("SSL"), Qt::CaseInsensitive) ||
                  reply->errorString().contains(QStringLiteral("TLS"), Qt::CaseInsensitive))) {
-                self->m_onlineMapFailureReason = MadModemI18n::text(QStringLiteral("HTTPS/TLS tile request failed. Verify that the Windows build has Qt SSL/OpenSSL, or set MADMODEM_OSM_TILE_BASE to a local HTTP tile proxy/cache."));
+                self->m_onlineMapFailureReason = M3I18n::text(QStringLiteral("HTTPS/TLS tile request failed. Verify that the Windows build has Qt SSL/OpenSSL, or set M3_OSM_TILE_BASE to a local HTTP tile proxy/cache."));
                 providerShouldAdvance = true;
             } else if (reply->errorString().contains(QStringLiteral("SSL"), Qt::CaseInsensitive) ||
                        reply->errorString().contains(QStringLiteral("TLS"), Qt::CaseInsensitive) ||
@@ -1191,7 +1192,7 @@ void QsoMapWidget::requestOsmTile(const TileSpec &tile) const
             self->m_osmTileRequestBlocked = true;
             self->m_onlineMapFailed = true;
             if (self->m_onlineMapFailureReason.isEmpty()) {
-                self->m_onlineMapFailureReason = MadModemI18n::text(QStringLiteral("OSM tiles unavailable"));
+                self->m_onlineMapFailureReason = M3I18n::text(QStringLiteral("OSM tiles unavailable"));
             }
         }
         if (self->m_osmTileFailureCount > 0 || !self->m_osmLastRedirectTarget.isEmpty() || !self->m_osmLastNetworkError.isEmpty()) {
@@ -1206,11 +1207,11 @@ void QsoMapWidget::drawOsmTiles(QPainter *painter, const QRect &mapRect) const
 {
     painter->save();
     painter->setClipRect(mapRect);
-    painter->fillRect(mapRect, MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapBackdrop));
+    painter->fillRect(mapRect, M3Ui::themeColor(M3Ui::ThemeColorRole::MapBackdrop));
 
-    QColor attributionBackground = MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapBackdrop);
+    QColor attributionBackground = M3Ui::themeColor(M3Ui::ThemeColorRole::MapBackdrop);
     attributionBackground.setAlpha(220);
-    const QColor attributionText = MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapText);
+    const QColor attributionText = M3Ui::themeColor(M3Ui::ThemeColorRole::MapText);
 
     if (m_exportRendering) {
         // v4.13a: export/print should use the same cached OpenStreetMap tiles
@@ -1319,13 +1320,13 @@ void QsoMapWidget::drawOsmTiles(QPainter *painter, const QRect &mapRect) const
 void QsoMapWidget::drawMap(QPainter *painter, const QRect &targetRect) const
 {
     painter->save();
-    painter->fillRect(targetRect, MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapBackdrop));
+    painter->fillRect(targetRect, M3Ui::themeColor(M3Ui::ThemeColorRole::MapBackdrop));
 
     const QRect titleLine(targetRect.left() + 12,
                           targetRect.top() + 6,
                           qMax(10, targetRect.width() - 24),
                           24);
-    painter->setPen(QPen(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapText), 1));
+    painter->setPen(QPen(M3Ui::themeColor(M3Ui::ThemeColorRole::MapText), 1));
     painter->drawText(titleLine,
                       Qt::AlignLeft | Qt::AlignVCenter,
                       mapTitleText());
@@ -1338,7 +1339,7 @@ void QsoMapWidget::drawMap(QPainter *painter, const QRect &targetRect) const
         QFont smallFont = painter->font();
         smallFont.setPointSize(qMax(7, smallFont.pointSize() - 1));
         painter->setFont(smallFont);
-        painter->setPen(QPen(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapMutedText), 1));
+        painter->setPen(QPen(M3Ui::themeColor(M3Ui::ThemeColorRole::MapMutedText), 1));
         const QString elided = painter->fontMetrics().elidedText(reason, Qt::ElideRight, reasonLine.width());
         painter->drawText(reasonLine,
                           Qt::AlignLeft | Qt::AlignTop,
@@ -1352,7 +1353,7 @@ void QsoMapWidget::drawMap(QPainter *painter, const QRect &targetRect) const
     drawGrid(painter, mapRect);
     drawOverlays(painter, targetRect);
     painter->setClipping(false);
-    painter->setPen(QPen(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapBorder), 1));
+    painter->setPen(QPen(M3Ui::themeColor(M3Ui::ThemeColorRole::MapBorder), 1));
     painter->drawRect(mapRect.adjusted(-1, -1, 1, 1));
     painter->restore();
 }
@@ -1361,12 +1362,12 @@ void QsoMapWidget::drawLand(QPainter *painter, const QRect &mapRect) const
 {
     painter->save();
     painter->setClipRect(mapRect);
-    const QColor backdrop = MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapBackdrop);
+    const QColor backdrop = M3Ui::themeColor(M3Ui::ThemeColorRole::MapBackdrop);
     const QColor land = blendColours(backdrop,
-                                     MadModemUi::themeColor(MadModemUi::ThemeColorRole::Positive),
+                                     M3Ui::themeColor(M3Ui::ThemeColorRole::Positive),
                                      25);
     painter->setBrush(land);
-    painter->setPen(QPen(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapMutedText), 1));
+    painter->setPen(QPen(M3Ui::themeColor(M3Ui::ThemeColorRole::MapMutedText), 1));
     for (const QPolygonF &poly : worldLandPolygons()) {
         QPolygonF screenPoly;
         for (const QPointF &lonLat : poly) {
@@ -1381,7 +1382,7 @@ void QsoMapWidget::drawGrid(QPainter *painter, const QRect &mapRect) const
 {
     painter->save();
     painter->setClipRect(mapRect);
-    QColor gridColor = MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapMutedText);
+    QColor gridColor = M3Ui::themeColor(M3Ui::ThemeColorRole::MapMutedText);
     gridColor.setAlpha(150);
     painter->setPen(QPen(gridColor, 1, Qt::DashLine));
     for (int lon = -180; lon <= 180; lon += 30) {
@@ -1439,9 +1440,9 @@ void QsoMapWidget::drawMaidenheadGrid(QPainter *painter, const QRect &mapRect) c
             const bool isWorked = worked.contains(grid4);
             const int count = worked.value(grid4, 0);
             const int alpha = isWorked ? qMin(92, 42 + count * 10) : 34;
-            QColor cellColour = MadModemUi::themeColor(isWorked
-                ? MadModemUi::ThemeColorRole::Positive
-                : MadModemUi::ThemeColorRole::Negative);
+            QColor cellColour = M3Ui::themeColor(isWorked
+                ? M3Ui::ThemeColorRole::Positive
+                : M3Ui::ThemeColorRole::Negative);
             cellColour.setAlpha(alpha);
             QColor cellOutline = cellColour.darker(140);
             cellOutline.setAlpha(isWorked ? 130 : 110);
@@ -1454,7 +1455,7 @@ void QsoMapWidget::drawMaidenheadGrid(QPainter *painter, const QRect &mapRect) c
                 f.setBold(isWorked);
                 f.setPointSize(qMax(6, f.pointSize() - 2));
                 painter->setFont(f);
-                painter->setPen(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapText));
+                painter->setPen(M3Ui::themeColor(M3Ui::ThemeColorRole::MapText));
                 painter->drawText(cell.adjusted(2, 1, -2, -1),
                                   Qt::AlignCenter,
                                   grid4);
@@ -1649,7 +1650,7 @@ void QsoMapWidget::drawOverlays(QPainter *painter, const QRect &targetRect) cons
     painter->setRenderHint(QPainter::Antialiasing, true);
 
     if (haveHome && m_showPaths) {
-        QColor pathColour = MadModemUi::themeColor(MadModemUi::ThemeColorRole::RxSecondary);
+        QColor pathColour = M3Ui::themeColor(M3Ui::ThemeColorRole::RxSecondary);
         pathColour.setAlpha(150);
         painter->setPen(QPen(pathColour, 1.2));
         for (const MapPoint &p : points) {
@@ -1658,7 +1659,7 @@ void QsoMapWidget::drawOverlays(QPainter *painter, const QRect &targetRect) cons
     }
 
     if (haveHome) {
-        QColor labelBackground = MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapBackdrop);
+        QColor labelBackground = M3Ui::themeColor(M3Ui::ThemeColorRole::MapBackdrop);
         labelBackground.setAlpha(225);
         painter->setPen(Qt::NoPen);
         painter->setBrush(labelBackground);
@@ -1673,7 +1674,7 @@ void QsoMapWidget::drawOverlays(QPainter *painter, const QRect &targetRect) cons
         house.lineTo(homeScreen.x() - 9, homeScreen.y() + 13);
         house.lineTo(homeScreen.x() - 9, homeScreen.y() + 2);
         house.closeSubpath();
-        const QColor homeColour = MadModemUi::themeColor(MadModemUi::ThemeColorRole::Warning);
+        const QColor homeColour = M3Ui::themeColor(M3Ui::ThemeColorRole::Warning);
         painter->setBrush(homeColour);
         painter->setPen(QPen(homeColour.darker(190), 2.2));
         painter->drawPath(house);
@@ -1697,22 +1698,22 @@ void QsoMapWidget::drawOverlays(QPainter *painter, const QRect &targetRect) cons
         painter->setPen(Qt::NoPen);
         painter->setBrush(labelBackground);
         painter->drawRoundedRect(labelRect, 5, 5);
-        painter->setPen(QPen(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapBorder), 1));
+        painter->setPen(QPen(M3Ui::themeColor(M3Ui::ThemeColorRole::MapBorder), 1));
         painter->drawRoundedRect(labelRect, 5, 5);
-        painter->setPen(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapText));
+        painter->setPen(M3Ui::themeColor(M3Ui::ThemeColorRole::MapText));
         painter->drawText(labelRect.adjusted(8, 0, -8, 0), Qt::AlignVCenter | Qt::AlignLeft, homeLabel);
     }
 
     painter->setFont(QFont(painter->font().family(), 8, QFont::Bold));
     for (const MapPoint &p : points) {
-        QColor fill = MadModemUi::themeColor(MadModemUi::ThemeColorRole::Negative);
+        QColor fill = M3Ui::themeColor(M3Ui::ThemeColorRole::Negative);
         QColor outline = fill.darker(190);
         QString label = p.entry.callsign.left(12);
         if (m_displayBehavior == DisplayBehavior::HeardToday) {
-            fill = MadModemUi::themeColor(MadModemUi::ThemeColorRole::Warning);
+            fill = M3Ui::themeColor(M3Ui::ThemeColorRole::Warning);
             outline = fill.darker(190);
         } else if (m_displayBehavior == DisplayBehavior::WorkedDxcc) {
-            fill = MadModemUi::themeColor(MadModemUi::ThemeColorRole::Positive);
+            fill = M3Ui::themeColor(M3Ui::ThemeColorRole::Positive);
             outline = fill.darker(190);
             label = p.entry.country.trimmed();
             if (label.isEmpty()) {
@@ -1735,17 +1736,17 @@ void QsoMapWidget::drawOverlays(QPainter *painter, const QRect &targetRect) cons
                            p.screen.y() - labelBounds.height() - 5.0,
                            labelBounds.width() + 8.0,
                            labelBounds.height() + 4.0);
-        QColor markerBackground = MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapBackdrop);
+        QColor markerBackground = M3Ui::themeColor(M3Ui::ThemeColorRole::MapBackdrop);
         markerBackground.setAlpha(215);
         painter->setBrush(markerBackground);
-        painter->setPen(QPen(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapBorder), 0.8));
+        painter->setPen(QPen(M3Ui::themeColor(M3Ui::ThemeColorRole::MapBorder), 0.8));
         painter->drawRoundedRect(markerLabel, 3, 3);
-        painter->setPen(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapText));
+        painter->setPen(M3Ui::themeColor(M3Ui::ThemeColorRole::MapText));
         painter->drawText(markerLabel.adjusted(4, 0, -4, 0), Qt::AlignVCenter | Qt::AlignLeft, label);
     }
 
     painter->setClipping(false);
-    painter->setPen(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MapText));
+    painter->setPen(M3Ui::themeColor(M3Ui::ThemeColorRole::MapText));
     painter->drawText(targetRect.adjusted(12, -24, -12, -6),
                       Qt::AlignRight | Qt::AlignBottom,
                       painter->fontMetrics().elidedText(mapStatusText(),Qt::ElideRight,qMax(0,targetRect.width()-24)));
@@ -1949,34 +1950,34 @@ QString QsoMapWidget::mapStatusText() const
 QString QsoMapWidget::osmDiagnosticsText() const
 {
     QStringList lines;
-    lines << MadModemI18n::text(QStringLiteral("Qt SSL support: %1")).arg(QSslSocket::supportsSsl() ? L(QStringLiteral("YES")) : L(QStringLiteral("NO")));
+    lines << M3I18n::text(QStringLiteral("Qt SSL support: %1")).arg(QSslSocket::supportsSsl() ? L(QStringLiteral("YES")) : L(QStringLiteral("NO")));
 #if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
-    lines << MadModemI18n::text(QStringLiteral("OpenSSL build: %1")).arg(QSslSocket::sslLibraryBuildVersionString().isEmpty()
+    lines << M3I18n::text(QStringLiteral("OpenSSL build: %1")).arg(QSslSocket::sslLibraryBuildVersionString().isEmpty()
                                           ? L(QStringLiteral("unknown"))
                                           : QSslSocket::sslLibraryBuildVersionString());
-    lines << MadModemI18n::text(QStringLiteral("OpenSSL runtime: %1")).arg(QSslSocket::sslLibraryVersionString().isEmpty()
+    lines << M3I18n::text(QStringLiteral("OpenSSL runtime: %1")).arg(QSslSocket::sslLibraryVersionString().isEmpty()
                                             ? L(QStringLiteral("not loaded"))
                                             : QSslSocket::sslLibraryVersionString());
 #endif
-    lines << MadModemI18n::text(QStringLiteral("HTTP fallback: %1")).arg(m_osmUseHttpFallback ? L(QStringLiteral("ON")) : L(QStringLiteral("OFF")));
-    lines << MadModemI18n::text(QStringLiteral("Tile providers: %1")).arg(configuredOsmTileBaseUrls(m_osmUseHttpFallback).join(QStringLiteral(" | ")));
+    lines << M3I18n::text(QStringLiteral("HTTP fallback: %1")).arg(m_osmUseHttpFallback ? L(QStringLiteral("ON")) : L(QStringLiteral("OFF")));
+    lines << M3I18n::text(QStringLiteral("Tile providers: %1")).arg(configuredOsmTileBaseUrls(m_osmUseHttpFallback).join(QStringLiteral(" | ")));
     if (!m_osmLastTileUrl.isEmpty()) {
-        lines << MadModemI18n::text(QStringLiteral("Last tile: %1")).arg(m_osmLastTileUrl);
+        lines << M3I18n::text(QStringLiteral("Last tile: %1")).arg(m_osmLastTileUrl);
     }
     if (!m_osmLastHttpStatus.isEmpty()) {
-        lines << MadModemI18n::text(QStringLiteral("Last HTTP status: %1")).arg(m_osmLastHttpStatus);
+        lines << M3I18n::text(QStringLiteral("Last HTTP status: %1")).arg(m_osmLastHttpStatus);
     }
     if (!m_osmLastRedirectTarget.isEmpty()) {
-        lines << MadModemI18n::text(QStringLiteral("Last redirect: %1")).arg(m_osmLastRedirectTarget);
+        lines << M3I18n::text(QStringLiteral("Last redirect: %1")).arg(m_osmLastRedirectTarget);
     }
     if (!m_osmLastNetworkError.isEmpty()) {
-        lines << MadModemI18n::text(QStringLiteral("Last network error: %1")).arg(m_osmLastNetworkError);
+        lines << M3I18n::text(QStringLiteral("Last network error: %1")).arg(m_osmLastNetworkError);
     }
     if (!m_osmLastSslError.isEmpty()) {
-        lines << MadModemI18n::text(QStringLiteral("Last SSL error: %1")).arg(m_osmLastSslError);
+        lines << M3I18n::text(QStringLiteral("Last SSL error: %1")).arg(m_osmLastSslError);
     }
     if (!m_onlineMapFailureReason.isEmpty()) {
-        lines << MadModemI18n::text(QStringLiteral("Fallback reason: %1")).arg(m_onlineMapFailureReason);
+        lines << M3I18n::text(QStringLiteral("Fallback reason: %1")).arg(m_onlineMapFailureReason);
     }
     return lines.join(QStringLiteral("\n"));
 }
@@ -2030,7 +2031,7 @@ void QsoMapWidget::fallBackToStaticMap(const QString &reason)
     m_onlineMapFailureReason = reason.trimmed().isEmpty()
         ? L(QStringLiteral("Qt Location / OSM tiles unavailable"))
         : reason.trimmed();
-#ifdef MADMODEM_WITH_QT_LOCATION
+#ifdef M3_WITH_QT_LOCATION
     if (m_quickContainer != nullptr) {
         m_quickContainer->hide();
     }

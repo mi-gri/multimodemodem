@@ -18,7 +18,7 @@ def main():
     root = Path(__file__).resolve().parents[1]
     commands = json.loads((build / 'compile_commands.json').read_text())
     entry = next(x for x in commands if x['file'].endswith('/main.cpp'))
-    link = shlex.split((build / 'CMakeFiles/MadModem.dir/link.txt').read_text())
+    link = shlex.split((build / 'CMakeFiles/MultiModeModem.dir/link.txt').read_text())
     output = build / 'ft-response-probes'
     output.mkdir(exist_ok=True)
     probes = [('FtRuntimeLatencyProbe', ['cancel', 'async', ''])]
@@ -45,7 +45,7 @@ def main():
         command[command.index('-o') + 1] = str(obj)
         command[command.index('-c') + 1] = str(root / 'tests' / (name + '.cpp'))
         subprocess.run(command, cwd=build, check=True)
-        command = [str(obj) if x == 'CMakeFiles/MadModem.dir/main.cpp.o' else x for x in link]
+        command = [str(obj) if x == 'CMakeFiles/MultiModeModem.dir/main.cpp.o' else x for x in link]
         command[command.index('-o') + 1] = str(exe)
         subprocess.run(command, cwd=build, check=True)
         exe.chmod(0o755)

@@ -4,7 +4,7 @@
 #include <cmath>
 #include <complex>
 #include <vector>
-namespace MadModemFt {
+namespace M3Ft {
 template<int Tones>
 inline std::complex<double> coherentCorrelation32(
     const std::vector<std::complex<double>> &samples, int begin, int tone)

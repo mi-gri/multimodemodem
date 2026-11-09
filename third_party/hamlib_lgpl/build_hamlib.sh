@@ -150,6 +150,6 @@ Bundled Hamlib installed to:
 
 Use it for MadModem with:
   cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Release \
-    -DHAMLIB_ROOT="$PREFIX" -DMADMODEM_REQUIRE_HAMLIB=ON
+    -DHAMLIB_ROOT="$PREFIX" -DM3_REQUIRE_HAMLIB=ON
 
 MSG

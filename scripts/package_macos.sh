@@ -3,13 +3,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="MultiModeModem"
-ARCHS="${MADMODEM_OSX_ARCHITECTURES:-$(uname -m)}"
-BUILD_DIR="${MADMODEM_MACOS_BUILD_DIR:-$ROOT_DIR/build-macos-$ARCHS}"
-APP_PATH="${MADMODEM_APP_PATH:-$BUILD_DIR/$APP_NAME.app}"
+ARCHS="${M3_OSX_ARCHITECTURES:-$(uname -m)}"
+BUILD_DIR="${M3_MACOS_BUILD_DIR:-$ROOT_DIR/build-macos-$ARCHS}"
+APP_PATH="${M3_APP_PATH:-$BUILD_DIR/$APP_NAME.app}"
 APP_EXE="$APP_PATH/Contents/MacOS/$APP_NAME"
 FW_DIR="$APP_PATH/Contents/Frameworks"
-DIST_DIR="${MADMODEM_MACOS_DIST_DIR:-$ROOT_DIR/dist/macos}"
-VERSION="$(cat "$ROOT_DIR/MADMODEM_VERSION.txt" 2>/dev/null || echo dev)"
+DIST_DIR="${M3_MACOS_DIST_DIR:-$ROOT_DIR/dist/macos}"
+VERSION="$(cat "$ROOT_DIR/M3_VERSION.txt" 2>/dev/null || echo dev)"
 STAMP_ARCH="${ARCHS//;/+}"
 ZIP_PATH="$DIST_DIR/${APP_NAME}-${VERSION}-macOS-${STAMP_ARCH}-unsigned.zip"
 DMG_PATH="$DIST_DIR/${APP_NAME}-${VERSION}-macOS-${STAMP_ARCH}-unsigned.dmg"
@@ -297,7 +297,7 @@ $(find "$FW_DIR" -maxdepth 1 -name 'Qt*.framework' -print | sed 's#^.*/##' | sor
 TXT
 
 runtime_options=(--brew-prefix "$(brew --prefix)")
-if [[ "${MADMODEM_ADHOC_SIGN:-on}" == "on" ]]; then
+if [[ "${M3_ADHOC_SIGN:-on}" == "on" ]]; then
     runtime_options+=(--sign)
 fi
 python3 "$ROOT_DIR/scripts/fix_macos_runtime.py" "$APP_PATH" \

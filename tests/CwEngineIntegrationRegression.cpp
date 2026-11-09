@@ -12,7 +12,7 @@ static void require(bool ok,const char* message) {
 }
 
 static std::string directDecode(const std::vector<float>& audio, double tone) {
-    madmodem::cwskimmer::CwNeuralDecoder direct;
+    m3::cwskimmer::CwNeuralDecoder direct;
     direct.setToneHz(tone);
     std::string output;
     direct.setCallback([&](const std::string& s) { output+=s; });
@@ -64,7 +64,7 @@ int main(int argc,char** argv) {
     decoder.clearReceiver(0); decoder.clearReceiver(1);
     std::string searchExpected;
     for (std::size_t chunk:{std::size_t(32),std::size_t(997),std::size_t(4096)}) {
-      madmodem::cwskimmer::CwNeuralDecoder search;
+      m3::cwskimmer::CwNeuralDecoder search;
       search.setToneHz(1000);std::string output;
       search.setCallback([&](const std::string& s){output+=s;});
       for(std::size_t i=0;i<audio.size();i+=chunk)
@@ -82,7 +82,7 @@ int main(int argc,char** argv) {
     }
     require(text==searchExpected,"search RX A changed direct output");
     decoder.setSecondaryEnabled(true);textB.clear();
-    madmodem::cwskimmer::CwNeuralDecoder searchB;
+    m3::cwskimmer::CwNeuralDecoder searchB;
     searchB.setToneHz(1500);std::string searchExpectedB;
     searchB.setCallback([&](const std::string& s){searchExpectedB+=s;});
     searchB.process(audioB.data(),audioB.size(),48000);

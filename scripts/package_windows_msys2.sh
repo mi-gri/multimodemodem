@@ -3,10 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="MultiModeModem"
-VERSION="$(cat "$ROOT_DIR/MADMODEM_VERSION.txt" 2>/dev/null || echo dev)"
-OUT_DIR="${MADMODEM_PACKAGE_OUT_DIR:-$ROOT_DIR/dist/packages}"
-BUILD_LEGACY="${MADMODEM_WINDOWS_BUILD_LEGACY:-on}"
-BUILD_AVX2="${MADMODEM_WINDOWS_BUILD_AVX2:-on}"
+VERSION="$(cat "$ROOT_DIR/M3_VERSION.txt" 2>/dev/null || echo dev)"
+OUT_DIR="${M3_PACKAGE_OUT_DIR:-$ROOT_DIR/dist/packages}"
+BUILD_LEGACY="${M3_WINDOWS_BUILD_LEGACY:-on}"
+BUILD_AVX2="${M3_WINDOWS_BUILD_AVX2:-on}"
 
 # MSYS2 exports these for the selected shell. Default to the supported UCRT64
 # environment when the script is launched without the launcher variables.
@@ -136,16 +136,16 @@ create_windows_shortcut() {
     cat > "$launcher" <<'CMD'
 @echo off
 setlocal
-set "MADMODEM_ROOT=%~dp0"
-set "MADMODEM_BIN=%MADMODEM_ROOT%bin"
-if not exist "%MADMODEM_BIN%\MultiModeModem.exe" (
-  echo MultiModeModem.exe not found in "%MADMODEM_BIN%"
+set "M3_ROOT=%~dp0"
+set "M3_BIN=%M3_ROOT%bin"
+if not exist "%M3_BIN%\MultiModeModem.exe" (
+  echo MultiModeModem.exe not found in "%M3_BIN%"
   echo The Windows package must keep the executable and DLLs inside the bin folder.
   pause
   exit /b 1
 )
-cd /d "%MADMODEM_BIN%"
-start "MultiModeModem" "%MADMODEM_BIN%\MultiModeModem.exe" %*
+cd /d "%M3_BIN%"
+start "MultiModeModem" "%M3_BIN%\MultiModeModem.exe" %*
 endlocal
 CMD
 

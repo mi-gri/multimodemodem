@@ -49,7 +49,7 @@ bool condition(const QJsonObject& when, const LogbookEntry& e, bool* known) {
 QString recorded(const LogbookEntry& e, bool sent, const QString& id) {
     const QString family=e.mode.trimmed().toUpper()=="CW"?"CW":"RTTY";
     auto get=[&](const QString& key) { return e.adifFields.value(key).simplified().toUpper(); };
-    const QString own=get("APP_MADMODEM_"+family+(sent?"_TX_":"_RX_")+id);
+    const QString own=get("APP_M3_"+family+(sent?"_TX_":"_RX_")+id);
     if(!own.isEmpty()) return own;
     if(id=="RST") return (sent?e.rstSent:e.rstReceived).trimmed();
     if(id=="SERIAL") return get(sent?"STX":"SRX");

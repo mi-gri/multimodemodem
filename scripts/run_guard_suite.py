@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run consolidated MadModem static/release guard suites.
+"""Run consolidated MultiModeModem static/release guard suites.
 
 CTest intentionally registers a small number of stable suites.  The individual
 checks remain separate scripts so they can still be run directly while working
@@ -82,7 +82,7 @@ def main() -> int:
     checks = SUITES[args.suite]
     ran = 0
     skipped = 0
-    print(f"MadModem consolidated guard suite: {args.suite}")
+    print(f"MultiModeModem consolidated guard suite: {args.suite}")
 
     for kind, spec in checks:
         cmd = command_for(kind, spec, args.with_unix_checks)

@@ -1,9 +1,9 @@
-#ifndef MADMODEM_RUNTIMEI18N_H
-#define MADMODEM_RUNTIMEI18N_H
+#ifndef M3_RUNTIMEI18N_H
+#define M3_RUNTIMEI18N_H
 
 #include <QString>
 
-namespace MadModemI18n {
+namespace M3I18n {
 
 void setLanguageCode(const QString &languageCode);
 QString languageCode();
@@ -12,6 +12,6 @@ QString translateSource(const QString &prefix, const QString &source);
 QString text(const QString &source);
 QString placeholder(const QString &source);
 
-} // namespace MadModemI18n
+} // namespace M3I18n
 
-#endif // MADMODEM_RUNTIMEI18N_H
+#endif // M3_RUNTIMEI18N_H

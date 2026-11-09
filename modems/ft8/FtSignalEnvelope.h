@@ -5,7 +5,7 @@
 #include <complex>
 #include <vector>
 
-namespace MadModemFt {
+namespace M3Ft {
 // Centered cos^2 FIR, evaluated with sliding DC/cosine/sine sums. This is
 // convolution, not a forward/backward IIR approximation. The window has L+1
 // taps, zero endpoints and total mass L/2. Work is O(samples + L).

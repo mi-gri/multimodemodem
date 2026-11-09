@@ -309,7 +309,7 @@ std::vector<double> lowerEnvelopePolynomial(const std::vector<double> &dbLine,
     // become artificially hot when the receiver response bends sharply.
     stabilizeOneSidedEdgeAnchors(dbLine, begin, end, baseline);
 
-    // MadModem 0.5.79 deliberately keeps the complete selected spectrum in
+    // MultiModeModem 0.5.79 deliberately keeps the complete selected spectrum in
     // the colour-mapped history.  Older builds dynamically classified quiet
     // outer bins as an invalid passband and then forced those bins to exactly
     // zero after flattening.  A strong carrier could move that relative

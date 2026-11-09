@@ -147,7 +147,7 @@ void Msk144Transmitter::buildWaveform()
     if (m_unpackedMessage.isEmpty()) m_unpackedMessage = m_message;
 
     // The protocol generator supplies the exact 144/40 coded tone sequence.
-    // MadModem owns waveform synthesis so the selected audio centre is real:
+    // MultiModeModem owns waveform synthesis so the selected audio centre is real:
     // the two tones are always centre +/-500 Hz.  Synthesize the whole period
     // at the actual output rate instead of looping a sampled frame.  Looping a
     // frame reset the carrier phase whenever centre*72 ms was not an integer

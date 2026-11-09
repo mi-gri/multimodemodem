@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD_DIR="${1:-${MADMODEM_WATERFALL_TEST_BUILD_DIR:-/tmp/madmodem-waterfall-leveler-regression}}"
+BUILD_DIR="${1:-${M3_WATERFALL_TEST_BUILD_DIR:-/tmp/m3-waterfall-leveler-regression}}"
 CXX_BIN="${CXX:-g++}"
 mkdir -p "${BUILD_DIR}"
 

@@ -22,7 +22,7 @@
 class FtDecodeCoordinator;
 
 /**
- * @brief First MSHV-derived FT8 RX core for MadModem.
+ * @brief First MSHV-derived FT8 RX core for MultiModeModem.
  *
  * This decoder implements the complete live-slot plumbing and a compact native
  * FT8 decoder: 48/44.1 kHz audio is resampled to 12 kHz, accumulated in UTC
@@ -32,7 +32,7 @@ class FtDecodeCoordinator;
  *
  * The implementation intentionally keeps the class independent from the large
  * MSHV QObject decoder tree so it remains small enough to maintain inside
- * MadModem while still reusing MSHV protocol tables, CRC polynomial and message
+ * MultiModeModem while still reusing MSHV protocol tables, CRC polynomial and message
  * unpacking code under third_party/mshv_gpl/port.
  */
 class FtReferenceRecovery;
@@ -275,9 +275,9 @@ private:
     quint64 m_incrementalEpoch = 0;
     int m_incrementalSubmitted = 0;
     bool m_haveIncrementalConfig = false;
-    MadModemFt::AnalysisConfig m_incrementalConfig;
-    std::unique_ptr<MadModemFt::IncrementalAnalysis> m_incrementalAnalysis;
-    std::shared_ptr<const MadModemFt::PreparedAnalysis> m_pendingFinalAnalysis;
+    M3Ft::AnalysisConfig m_incrementalConfig;
+    std::unique_ptr<M3Ft::IncrementalAnalysis> m_incrementalAnalysis;
+    std::shared_ptr<const M3Ft::PreparedAnalysis> m_pendingFinalAnalysis;
     void resetIncrementalAnalysis();
     void prepareIncrementalAnalysis();
     struct Candidate
@@ -304,7 +304,7 @@ private:
     void maybeStartEarlyDecodeSlot();
     void maybeStartStreamingDecodeSlot();
     bool markDecodeEmitted(const Decode &decode, const QDateTime &slotStartUtc);
-    void startAsyncDecodeSlot(const QVector<double> &samples, const QDateTime &slotStartUtc, const QString &phaseLabel = QString(), std::shared_ptr<const MadModemFt::PreparedAnalysis> prepared = {});
+    void startAsyncDecodeSlot(const QVector<double> &samples, const QDateTime &slotStartUtc, const QString &phaseLabel = QString(), std::shared_ptr<const M3Ft::PreparedAnalysis> prepared = {});
     void maybeLaunchPendingFinalDecode();
     void applyPendingQsoContext();
     void recoverDriftingSignal(const QVector<double> &samples, const QDateTime &slotStartUtc,
@@ -538,7 +538,7 @@ private:
     // arbitrary decode jobs during the whole RX period; it starts decoding at
     // specific symbol-count gates (FT8 normal hsym=49, FT4 hsym=21) so the
     // sequencer gets decodes before the next TX period without creating a
-    // burst of overlapping work.  MadModem keeps the native decoder but uses
+    // burst of overlapping work.  MultiModeModem keeps the native decoder but uses
     // the same architectural policy here.
     int wsjtxDecodeGateSamples() const;
     QDateTime m_currentSlotStartUtc;

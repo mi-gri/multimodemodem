@@ -6,7 +6,7 @@
 #include <cstring>
 #include <limits>
 
-namespace MadModemAudio {
+namespace M3Audio {
 namespace {
 
 quint16 readLe16(const char *p)
@@ -233,4 +233,4 @@ QVector<float> convertWavBytesToMono(const QByteArray &bytes,
     return samples;
 }
 
-} // namespace MadModemAudio
+} // namespace M3Audio

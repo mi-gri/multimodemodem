@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source and WCAG contrast guard for all MadModem UI themes."""
+"""Source and WCAG contrast guard for all MultiModeModem UI themes."""
 
 from pathlib import Path
 import re
@@ -100,8 +100,8 @@ for role in ("Accent", "Positive", "Negative", "Warning", "MutedText",
              "RxPrimary", "RxSecondary", "MapBackdrop", "MapText", "MapBorder"):
     assert role in THEME_H and f"ThemeColorRole::{role}" in THEME, role
 
-assert "MadModemUi::applyUiTheme(app, bootTheme);" in MAIN
-assert "MadModemUi::installCockpitMainWindowChrome(&window);" in MAIN
+assert "M3Ui::applyUiTheme(app, bootTheme);" in MAIN
+assert "M3Ui::installCockpitMainWindowChrome(&window);" in MAIN
 assert "if (bootTheme != QStringLiteral(\"qt_default\"))" not in MAIN
 assert 'g_activeThemeKey != QStringLiteral("avionica")' in THEME
 assert 'QStringLiteral("3px")' not in THEME[THEME.index("QString genericThemeStyleSheet"):THEME.index("class CockpitTitleBar")]

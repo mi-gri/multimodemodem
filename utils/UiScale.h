@@ -1,5 +1,5 @@
-#ifndef MADMODEM_UISCALE_H
-#define MADMODEM_UISCALE_H
+#ifndef M3_UISCALE_H
+#define M3_UISCALE_H
 
 #include <QApplication>
 #include <QByteArray>
@@ -11,7 +11,7 @@
 #include <QWidget>
 #include <QtGlobal>
 
-namespace MadModemUi {
+namespace M3Ui {
 
 inline double scaleFactor()
 {
@@ -70,13 +70,13 @@ inline void applyLayoutScale(QLayout *layout)
 inline void markScaled(QWidget *w)
 {
     if (w != nullptr) {
-        w->setProperty("madmodemUiScaled", true);
+        w->setProperty("m3UiScaled", true);
     }
 }
 
 inline bool wasScaled(QWidget *w)
 {
-    return w != nullptr && w->property("madmodemUiScaled").toBool();
+    return w != nullptr && w->property("m3UiScaled").toBool();
 }
 
 inline void scaleWidgetTree(QWidget *root)
@@ -117,6 +117,6 @@ inline void scaleWidgetTree(QWidget *root)
     }
 }
 
-} // namespace MadModemUi
+} // namespace M3Ui
 
-#endif // MADMODEM_UISCALE_H
+#endif // M3_UISCALE_H

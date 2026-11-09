@@ -46,7 +46,7 @@ public:
     void reset();
 
     /**
-     * @brief Breaks only the live UART/frame continuity after MadModem's own TX.
+     * @brief Breaks only the live UART/frame continuity after MultiModeModem's own TX.
      *
      * Preserves noise/gate and polarity statistics so contest RX can resume
      * immediately instead of relearning the complete demodulator state.

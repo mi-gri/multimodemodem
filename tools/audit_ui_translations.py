@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit MadModem runtime UI dictionaries.
+"""Audit MultiModeModem runtime UI dictionaries.
 
 Checks canonical key parity/order, duplicate or empty entries, Qt placeholder
 preservation and removal of retired MIND/DDSP UI vocabulary.  English-identical

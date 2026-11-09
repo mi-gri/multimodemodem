@@ -24,7 +24,7 @@ public:
         ++m_generation; m_queue.clear(); m_queuedSeconds = 0; m_spots.clear();
     }
     void submit(const AudioBlock& block,
-                std::vector<madmodem::cwskimmer::CwSkimmerChannelState> carriers) {
+                std::vector<m3::cwskimmer::CwSkimmerChannelState> carriers) {
         if (block.sampleRate <= 0 || block.samples.isEmpty()) return;
         const double seconds = double(block.samples.size()) / block.sampleRate;
         {
@@ -48,7 +48,7 @@ public:
 private:
     struct Work {
         AudioBlock block;
-        std::vector<madmodem::cwskimmer::CwSkimmerChannelState> carriers;
+        std::vector<m3::cwskimmer::CwSkimmerChannelState> carriers;
         quint64 generation;
     };
     void run() {

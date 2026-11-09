@@ -52,7 +52,7 @@ int main(int argc,char** argv) {
         require(loaded.cwDecodeEngine==expected,"saved CW engine migration failed");
     }
     settings.setValue("CW/decodeEngine","native");settings.sync();
-    MadModemI18n::setLanguageCode("it");
+    M3I18n::setLanguageCode("it");
     {
         MainWindow window;window.resize(1280,900);window.show();settle();
         auto* mode=window.findChild<QComboBox*>("cmbMode");require(mode,"mode selector missing");

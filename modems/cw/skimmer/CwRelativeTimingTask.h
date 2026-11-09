@@ -9,7 +9,7 @@
 #include <memory>
 #include <thread>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 
 /**
  * Dedicated temporal task for one CW receiver.
@@ -81,4 +81,4 @@ private:
   std::thread m_worker;
 };
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

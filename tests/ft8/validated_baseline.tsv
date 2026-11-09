@@ -1,4 +1,4 @@
-# filename	sha256	expected_madmodem_decodes
+# filename	sha256	expected_m3_decodes
 websdr_test6.wav	0bae0c9f679c05169e4db65eab8b2a0da9b03b061a7b5930dc85142853c365a6	26
 test_21.wav	3185aa62f933c8e35e7557701a721ff2ed27197107a0a5b0ef640a211e9b1a77	25
 test_18.wav	f7490294eeed09e28ee392b9f8ed6907e02636f78b0df66af1d318abd6a876c3	16

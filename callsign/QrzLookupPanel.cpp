@@ -1,5 +1,5 @@
 #include "QrzLookupPanel.h"
-#include "../MadModemVersion.h"
+#include "../M3Version.h"
 #include "../settings/AppSettings.h"
 #include "../utils/RuntimeI18n.h"
 #include <QNetworkReply>
@@ -21,7 +21,7 @@ namespace {
 const QRegularExpression kRegexQrzCallsign(QStringLiteral("^(?:[A-Z0-9]{1,4}/)?[A-Z0-9]{1,3}[0-9][A-Z]{1,4}(?:/[A-Z0-9]{1,4})?$"));
 }
 namespace {
-QString uiText(const char* key, const char* fallback) { return MadModemI18n::translate(QString::fromUtf8(key), QString::fromUtf8(fallback)); }
+QString uiText(const char* key, const char* fallback) { return M3I18n::translate(QString::fromUtf8(key), QString::fromUtf8(fallback)); }
 }
 QrzResponse QrzResponse::parse(const QByteArray& xml) {
     QrzResponse result;
@@ -99,7 +99,7 @@ void QrzLookupPanel::request(const QList<QPair<QString,QString>>& query, std::fu
     const quint64 generation = m_generation;
     QNetworkRequest request(QUrl(QStringLiteral("https://xmldata.qrz.com/xml/current/")));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    request.setRawHeader("User-Agent", "MadModem/" MADMODEM_VERSION_STRING);
+    request.setRawHeader("User-Agent", "MultiModeModem/" M3_VERSION_STRING);
     // Credentials/session keys stay in the TLS POST body, never in URLs/logs.
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     QByteArray body;
@@ -125,7 +125,7 @@ void QrzLookupPanel::request(const QList<QPair<QString,QString>>& query, std::fu
 }
 void QrzLookupPanel::login(bool retry) {
     showStatus(uiText("qrz_connecting", "Connecting to QRZ…"));
-    const QList<QPair<QString,QString>> query{{"username",m_username},{"password",m_password},{"agent","MadModem-" MADMODEM_VERSION_STRING}};
+    const QList<QPair<QString,QString>> query{{"username",m_username},{"password",m_password},{"agent","MultiModeModem-" M3_VERSION_STRING}};
     request(query, [this, retry](const QrzResponse& result) {
         m_key = result.key;
         if (m_key.isEmpty() || !result.error.isEmpty()) { showStatus(result.error.isEmpty() ? uiText("qrz_login_failed", "QRZ login failed. Check your account details.") : result.error); return; }

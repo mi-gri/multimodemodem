@@ -10,7 +10,7 @@ static std::array<float,42> frame(double blank,double a) {
 }
 static void require(bool ok,const char* why) { if(!ok)throw std::runtime_error(why); }
 int main() {
-    using madmodem::cwskimmer::CwCtcPrefixDecoder;
+    using m3::cwskimmer::CwCtcPrefixDecoder;
     CwCtcPrefixDecoder decoder; std::vector<int> result;
     auto feed=[&](const auto& z) { auto v=decoder.consume(z);result.insert(result.end(),v.begin(),v.end()); };
     // Exhaustive binary three-frame CTC: P(A)=.739584, P(empty)=.140608,

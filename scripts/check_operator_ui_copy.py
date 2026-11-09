@@ -34,7 +34,7 @@ def main() -> int:
             "RTTY waterfall text does not have an operator toggle", errors)
 
     # Text assigned after the initial object-tree translation must be routed
-    # through uiText()/MadModemI18n. Pure meter/scale tokens are language-neutral.
+    # through uiText()/M3I18n. Pure meter/scale tokens are language-neutral.
     neutral_dynamic = {"WAV", "-inf dB"}
     dynamic_literal = re.compile(
         r"(?:setText|setToolTip|setStatusTip|setPlaceholderText|setWindowTitle)"

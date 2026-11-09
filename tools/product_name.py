@@ -12,4 +12,4 @@ _SHORT_RE = re.compile(r"(?<![/\\\w.])MM(?![/\\\w])")
 
 
 def brand(text: str) -> str:
-    return _SHORT_RE.sub(SHORT_NAME, text.replace("MadModem", LONG_NAME))
+    return _SHORT_RE.sub(SHORT_NAME, text.replace("MultiModeModem", LONG_NAME))

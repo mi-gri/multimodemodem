@@ -1,6 +1,6 @@
 #pragma once
 #include "AdifLogbook.h"
-#include "../MadModemVersion.h"
+#include "../M3Version.h"
 #include "../dxcc/CtyCountryFile.h"
 #include <QRegularExpression>
 #include <QSet>
@@ -9,7 +9,7 @@
 namespace CqWwRtty {
 inline QString zoneKey(const QString &value) { return QString::number(value.toInt()); }
 inline QString field(const LogbookEntry &e, bool sent, const QString &id) {
-    const QString internal = e.adifFields.value(QStringLiteral("APP_MADMODEM_RTTY_%1_%2").arg(sent ? "TX" : "RX", id)).trimmed().toUpper();
+    const QString internal = e.adifFields.value(QStringLiteral("APP_M3_RTTY_%1_%2").arg(sent ? "TX" : "RX", id)).trimmed().toUpper();
     if (!internal.isEmpty()) return internal;
     const QString standard = e.adifFields.value(id == "CQZONE" ? (sent ? "MY_CQ_ZONE" : "CQZ")
                                                             : (sent ? "MY_STATE" : "STATE")).trimmed().toUpper();
@@ -117,7 +117,7 @@ inline QByteArray cabrillo(QVector<LogbookEntry> records, const CabrilloOptions 
     auto clean = [](QString v) { return v.replace('\r',' ').replace('\n',' ').simplified(); };
     QString text = "START-OF-LOG: 3.0\nCONTEST: CQ-WW-RTTY\nCALLSIGN: " + own + "\nLOCATION: " + location +
         "\nCATEGORY-OPERATOR: " + o.operatorCategory + "\nCATEGORY-POWER: " + o.power + "\nCATEGORY-ASSISTED: " + o.assisted +
-        "\nCATEGORY-BAND: " + o.band + "\nCATEGORY-MODE: RTTY\nCATEGORY-STATION: FIXED\nCREATED-BY: MadModem " MADMODEM_VERSION_STRING "\nNAME: " + clean(o.name) + "\nEMAIL: " + clean(o.email) + "\n";
+        "\nCATEGORY-BAND: " + o.band + "\nCATEGORY-MODE: RTTY\nCATEGORY-STATION: FIXED\nCREATED-BY: MultiModeModem " M3_VERSION_STRING "\nNAME: " + clean(o.name) + "\nEMAIL: " + clean(o.email) + "\n";
     std::sort(records.begin(),records.end(),[](const LogbookEntry&a,const LogbookEntry&b){return a.utc<b.utc;});
     for (const auto &e : records) {
         if (e.adifFields.value("CONTEST_ID") != "CQ-WW-RTTY" || e.stationCallsign != own || e.utc.toUTC().date().year() != year)

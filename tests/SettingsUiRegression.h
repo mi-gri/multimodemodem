@@ -80,9 +80,9 @@ inline int runSettingsUiRegression(QApplication &app) {
         app.setFont(font);
         for (const QString &language : {QStringLiteral("en"), QStringLiteral("it"), QStringLiteral("de"),
                                        QStringLiteral("fr"), QStringLiteral("no"), QStringLiteral("cs")}) {
-            MadModemI18n::setLanguageCode(language);
+            M3I18n::setLanguageCode(language);
             AppSettingsDialog dialog(settings, QString(), QString(), {},
-                [](const QString &source) { return MadModemI18n::text(source); }, [](const QString &key, const QString &fallback) { return MadModemI18n::translate(key, fallback); },
+                [](const QString &source) { return M3I18n::text(source); }, [](const QString &key, const QString &fallback) { return M3I18n::translate(key, fallback); },
                 AppSettingsDialog::InitialPage::AudioPtt, &parent);
             dialog.show();
             app.processEvents();
@@ -101,7 +101,7 @@ inline int runSettingsUiRegression(QApplication &app) {
                             languageOk = false;
                         }
                     }
-                    const QString captureDir = qEnvironmentVariable("MADMODEM_UI_CAPTURE_DIR");
+                    const QString captureDir = qEnvironmentVariable("M3_UI_CAPTURE_DIR");
                     if (!captureDir.isEmpty()) {
                         QDir().mkpath(captureDir);
                         dialog.grab().save(QDir(captureDir).filePath(QStringLiteral("settings_%1_%2_%3_%4.png").arg(styleName).arg(pointSize).arg(language).arg(page)));

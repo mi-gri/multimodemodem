@@ -22,7 +22,7 @@ QString normalizeMessage(QString text)
 
     // Accept either bare FT message text or a WSJT-X formatted decode line.
     // WSJT-X decodedtext.cpp uses column 22 (+ optional seconds padding).  A
-    // regex fallback is safer for MadModem tests/log imports where spacing may
+    // regex fallback is safer for MultiModeModem tests/log imports where spacing may
     // not be byte-identical to WSJT-X display output.
     thread_local const QRegularExpression formattedLine(
         QStringLiteral("^\\s*\\d{4}(?:\\d{2})?\\s+[-+ ]?\\d+\\s+[-+]?\\d+(?:\\.\\d+)?\\s+\\d+\\s+[#@~&+ ]\\s+(.*)$"));

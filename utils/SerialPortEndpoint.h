@@ -2,7 +2,7 @@
 #include <QString>
 #include <QFileInfo>
 #include <QRegularExpression>
-namespace MadModemSerial {
+namespace M3Serial {
 // Compare the same local endpoint across COM/\\.\COM names and POSIX aliases.
 inline QString endpoint(QString value) {
     value = value.trimmed();

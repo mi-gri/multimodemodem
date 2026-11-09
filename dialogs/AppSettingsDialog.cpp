@@ -66,7 +66,7 @@
 #include <algorithm>
 #include <utility>
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
 #include <hamlib/rotator.h>
 #endif
 
@@ -132,7 +132,7 @@ void addRotatorPresetIfUnique(QList<RotatorModelPreset> *presets, QSet<int> *see
     seen->insert(id);
 }
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
 struct HamlibRotatorPresetBuildContext
 {
     QList<RotatorModelPreset> *presets = nullptr;
@@ -187,7 +187,7 @@ QList<RotatorModelPreset> buildRotatorPresets()
     QList<RotatorModelPreset> presets;
     QSet<int> seen;
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     rig_set_debug(SessionDiagnostics::instance().enabled()?RIG_DEBUG_CACHE:RIG_DEBUG_NONE);
     rot_load_all_backends();
     HamlibRotatorPresetBuildContext ctx;
@@ -295,7 +295,7 @@ void populateRotatorPortCombo(QComboBox *combo, const QString &current)
     if (combo->count() == 0) combo->addItem(QString());
     const int idx = combo->findText(current.trimmed(), Qt::MatchFixedString);
     combo->setCurrentIndex(idx >= 0 ? idx : 0);
-    combo->lineEdit()->setPlaceholderText(MadModemI18n::text(QStringLiteral("independent rotator port, e.g. /dev/ttyUSB1, /dev/cu.usbserial, COM5 or rotctld:localhost:4533")));
+    combo->lineEdit()->setPlaceholderText(M3I18n::text(QStringLiteral("independent rotator port, e.g. /dev/ttyUSB1, /dev/cu.usbserial, COM5 or rotctld:localhost:4533")));
 }
 
 QString rotatorBandObjectKey(QString band)
@@ -940,7 +940,7 @@ QWidget *AppSettingsDialog::makeUserQthMacrosPage()
         edit->setMinimumHeight(28);
         edit->setMinimumWidth(170);
         edit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        edit->setPlaceholderText(MadModemI18n::placeholder(placeholder));
+        edit->setPlaceholderText(M3I18n::placeholder(placeholder));
         return edit;
     };
 
@@ -1103,7 +1103,7 @@ QWidget *AppSettingsDialog::makeUserQthMacrosPage()
         QPlainTextEdit *textEdit = new QPlainTextEdit(macroGroup);
         textEdit->setMinimumHeight(62);
         textEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-        textEdit->setPlaceholderText(MadModemI18n::placeholder(QStringLiteral("Macro text with tokens, e.g. CQ CQ CQ de {MYCALL} {MYCALL} pse k")));
+        textEdit->setPlaceholderText(M3I18n::placeholder(QStringLiteral("Macro text with tokens, e.g. CQ CQ CQ de {MYCALL} {MYCALL} pse k")));
 
         labelEdit->setText(m_initialSettings.textMacroLabels.value(i, L(QStringLiteral("Macro %1")).arg(i + 1)));
         textEdit->setPlainText(m_initialSettings.textMacroTexts.value(i));
@@ -1637,7 +1637,7 @@ QWidget *AppSettingsDialog::makeAppearancePage()
                                                         ? QStringLiteral("avionica")
                                                         : m_initialSettings.uiTheme.trimmed().toLower());
     m_comboUiTheme->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
-    m_comboUiTheme->setToolTip(L(QStringLiteral("Select the global MadModem colour palette.")));
+    m_comboUiTheme->setToolTip(L(QStringLiteral("Select the global MultiModeModem colour palette.")));
 
     m_chkUiUseThemeFont = new QCheckBox(L(QStringLiteral("Use theme default font")), themeGroup);
     m_chkUiUseThemeFont->setChecked(m_initialSettings.uiUseThemeFont);
@@ -1700,7 +1700,7 @@ QWidget *AppSettingsDialog::makeAppearancePage()
     themeGrid->addWidget(m_spinUiFontSize, 3, 1);
     themeGrid->addWidget(reset, 4, 0, 1, 3);
 
-    QLabel *hint = new QLabel(L(QStringLiteral("Theme changes are applied after closing Settings with OK. Some window chrome details may require restarting MadModem.")), holder);
+    QLabel *hint = new QLabel(L(QStringLiteral("Theme changes are applied after closing Settings with OK. Some window chrome details may require restarting MultiModeModem.")), holder);
     hint->setWordWrap(true);
     hint->setStyleSheet(QStringLiteral("font-style: italic;"));
 
@@ -2407,7 +2407,7 @@ QWidget *AppSettingsDialog::makeRotatorPage()
     m_lblRotatorEndpointWarning = new QLabel(page);
     m_lblRotatorEndpointWarning->setWordWrap(true);
     m_lblRotatorEndpointWarning->setStyleSheet(QStringLiteral("QLabel { font-weight: 500; }"));
-    MadModemUi::setSemanticRole(m_lblRotatorEndpointWarning, QStringLiteral("negative"));
+    M3Ui::setSemanticRole(m_lblRotatorEndpointWarning, QStringLiteral("negative"));
     m_lblRotatorEndpointWarning->setVisible(false);
     outer->addWidget(m_lblRotatorEndpointWarning);
 

@@ -7,7 +7,7 @@
 /**
  * @brief Streaming resampler with an anti-alias FIR before linear interpolation.
  *
- * Text modes benefit from exact internal timing.  MadModem uses 8000 Hz for
+ * Text modes benefit from exact internal timing.  MultiModeModem uses 8000 Hz for
  * RTTY and BPSK31 because common baud/symbol rates map to convenient sample
  * counts while still preserving all information in the narrow audio passband.
  */

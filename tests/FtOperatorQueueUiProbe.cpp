@@ -28,10 +28,10 @@ int main(int argc,char **argv){
  QApplication app(argc,argv);app.setApplicationName("MultiModeModem");
  QSettings settings(AppSettings::settingsFilePath(),QSettings::IniFormat);settings.setValue("Updates/checkAtStartup",false);settings.sync();
  MainWindow w;
- require(w.windowTitle()==MadModemIdentity::windowTitle(),"startup title lost build identity");
+ require(w.windowTitle()==M3Identity::windowTitle(),"startup title lost build identity");
  for(const QString &lang:{QString("en"),QString("it"),QString("fr"),QString("de"),QString("no"),QString("cs")}){
   w.m_uiLanguageCode=lang;w.loadUiTranslationFile(lang);w.applyUiLanguage();
-  require(w.windowTitle()==MadModemIdentity::windowTitle(),"language change lost build identity");
+  require(w.windowTitle()==M3Identity::windowTitle(),"language change lost build identity");
  }
  QTemporaryDir audit;require(audit.isValid(),"audit temporary directory");
  // Ordinary runtime traces must work with complete session logging disabled.
@@ -140,7 +140,7 @@ int main(int argc,char **argv){
  QSet<QString> actions,reasons,modes;int events=0;
  for(const auto &line:readGzipLog(auditPath).split('\n')){
   const auto o=QJsonDocument::fromJson(line).object();if(o.value("event").toString()!="ft.automation")continue;
-  require(o.value("version").toString()==QStringLiteral(MADMODEM_VERSION_STRING)&&o.value("build").toString()==QString::fromLatin1(MadModemBuild::number()),"trace lost compiled identity");
+  require(o.value("version").toString()==QStringLiteral(M3_VERSION_STRING)&&o.value("build").toString()==QString::fromLatin1(M3Build::number()),"trace lost compiled identity");
   if(o.value("action").toString()=="tx.arm")require(!o.value("tx_plan_id").toString().isEmpty()&&o.value("tx_plan_id").toString()!="[redacted]","TX plan correlation must survive secret redaction");
   ++events;actions.insert(o.value("action").toString());reasons.insert(o.value("reason").toString());modes.insert(o.value("mode").toString());
   require(!o.value("trace_id").toString().isEmpty()&&o.contains("qso_id")&&o.contains("tx_slot_utc_ms")&&o.contains("state"),"correlation/context absent from structured automation event");

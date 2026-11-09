@@ -17,7 +17,7 @@ class FtDecodeWorkerPool final
 {
 public:
     static FtDecodeWorkerPool &instance() {
-        static FtDecodeWorkerPool pool(MadModemRuntime::SystemResourceManager::instance().poolCapacity());
+        static FtDecodeWorkerPool pool(M3Runtime::SystemResourceManager::instance().poolCapacity());
         return pool;
     }
     explicit FtDecodeWorkerPool(int capacity) : m_capacity(std::max(1, capacity)) {}
@@ -28,8 +28,8 @@ public:
     }
     FtDecodeWorkerPool(const FtDecodeWorkerPool &) = delete;
     FtDecodeWorkerPool &operator=(const FtDecodeWorkerPool &) = delete;
-    int recommendedWorkerCount(MadModemRuntime::WorkClass work, int items) const {
-        return MadModemRuntime::SystemResourceManager::instance().recommendedWorkers(work, items);
+    int recommendedWorkerCount(M3Runtime::WorkClass work, int items) const {
+        return M3Runtime::SystemResourceManager::instance().recommendedWorkers(work, items);
     }
     int workerCount() const {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -89,7 +89,7 @@ public:
     }
 private:
     void workerLoop(int index) {
-        MadModemRuntime::SystemResourceManager::instance().configureCurrentWorkerThread(index);
+        M3Runtime::SystemResourceManager::instance().configureCurrentWorkerThread(index);
         s_insidePool = true;
         for (;;) {
             std::function<void()> task;

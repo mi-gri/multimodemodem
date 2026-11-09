@@ -8,7 +8,7 @@
  *
  * This class is intentionally dependency-free and GPL-friendly: it follows the
  * classic tone-bank pattern used by programs such as fldigi for MFSK family
- * receivers, but it is a clean MadModem implementation.  It avoids per-sample
+ * receivers, but it is a clean MultiModeModem implementation.  It avoids per-sample
  * trig in the detector inner loop, precomputes the Hann window for the current
  * symbol length and evaluates all requested tones with stable double-precision
  * Goertzel recurrences.

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ASSET_DIR="${1:-$ROOT_DIR/release-assets}"
-VERSION="$(tr -d '\r\n' < "$ROOT_DIR/MADMODEM_VERSION.txt")"
+VERSION="$(tr -d '\r\n' < "$ROOT_DIR/M3_VERSION.txt")"
 
 if [[ ! -d "$ASSET_DIR" ]]; then
     echo "ERROR: release asset directory not found: $ASSET_DIR" >&2

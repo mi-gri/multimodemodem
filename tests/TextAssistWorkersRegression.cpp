@@ -24,8 +24,8 @@ int main(int argc, char **argv)
     AdifLogbook logbook(logPath);
     check(logbook.load(), "load empty logbook");
 
-    const QString sessionKey = QStringLiteral("APP_MADMODEM_RTTY_SESSION");
-    const QString ruleKey = QStringLiteral("APP_MADMODEM_RTTY_RULE");
+    const QString sessionKey = QStringLiteral("APP_M3_RTTY_SESSION");
+    const QString ruleKey = QStringLiteral("APP_M3_RTTY_RULE");
 
     LogbookEntry first;
     first.callsign = QStringLiteral("K1ABC");

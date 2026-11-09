@@ -3,7 +3,7 @@
 
 #include <QString>
 
-namespace MadModemCpu {
+namespace M3Cpu {
 
 struct Features
 {
@@ -18,6 +18,6 @@ Features detect();
 QString summary();
 QString ft8ToneEngineName();
 
-} // namespace MadModemCpu
+} // namespace M3Cpu
 
 #endif // CPUFEATURES_H

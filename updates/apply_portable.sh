@@ -1,5 +1,5 @@
 #!/bin/bash
-# Full portable-package update after MadModem exits. All arguments are data.
+# Full portable-package update after MultiModeModem exits. All arguments are data.
 set -euo pipefail
 pid="$1"; target="$2"; archive="$3"; expected="$4"; version="$5"; platform="$6"
 build="${7:-0}"
@@ -16,9 +16,9 @@ rollback() {
     fi
     if [[ $status != 0 ]]; then
         if [[ "$platform" == mac ]]; then
-            osascript -e 'display alert "MadModem update failed. The previous copy has been preserved."' || true
+            osascript -e 'display alert "MultiModeModem update failed. The previous copy has been preserved."' || true
         elif command -v zenity >/dev/null; then
-            zenity --error --text="MadModem update failed. The previous copy has been preserved. Log: $work/update.log" || true
+            zenity --error --text="MultiModeModem update failed. The previous copy has been preserved. Log: $work/update.log" || true
         fi
     fi
     exit "$status"
@@ -40,8 +40,8 @@ exec >"$work/update.log" 2>&1
 mkdir "$work/stage"
 if [[ "$platform" == mac ]]; then
     ditto -xk "$archive" "$work/stage"
-    source="$work/stage/MadModem.app"
-    executable=Contents/MacOS/MadModem
+    source="$work/stage/MultiModeModem.app"
+    executable=Contents/MacOS/MultiModeModem
 else
     case "$archive" in
         *.tar.gz) tar -xzf "$archive" -C "$work/stage" ;;
@@ -53,7 +53,7 @@ else
     roots=("$work/stage"/*)
     [[ ${#roots[@]} == 1 ]] || exit 6
     source="${roots[0]}"
-    executable=bin/MadModem
+    executable=bin/MultiModeModem
 fi
 [[ -x "$source/$executable" && -x "$target/$executable" ]] || exit 7
 # Release archives must never overwrite user state or change portable mode.
@@ -71,7 +71,7 @@ if [[ "$build" != 0 ]]; then probe_arg=--build-info; fi
 for ((i=0;i<60;i++)); do kill -0 "$check_pid" 2>/dev/null || break; sleep .25; done
 if kill -0 "$check_pid" 2>/dev/null; then kill -9 "$check_pid" || true; wait "$check_pid" || true; exit 9; fi
 wait "$check_pid"
-grep -Fx "MadModem $version" "$work/version.txt"
+grep -Fx "MultiModeModem $version" "$work/version.txt"
 if [[ "$build" != 0 ]]; then grep -Fx "Build $build" "$work/version.txt"; fi
 mutating=false
 # Keep the complete previous copy and log for recovery, outside the app folder.

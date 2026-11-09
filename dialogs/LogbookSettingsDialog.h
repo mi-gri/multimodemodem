@@ -14,7 +14,7 @@ class QPushButton;
 /**
  * @brief Small settings dialog for the internal ADIF logbook file path.
  *
- * MadModem stores its built-in logbook as a plain ADIF file.  The default path
+ * MultiModeModem stores its built-in logbook as a plain ADIF file.  The default path
  * remains beside the executable, but the user can choose a different file so
  * backups/sync folders are possible without changing export/import behavior.
  */

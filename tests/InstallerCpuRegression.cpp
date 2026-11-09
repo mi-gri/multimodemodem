@@ -1,4 +1,4 @@
-#define MADMODEM_CPU_PROBE_TEST
+#define M3_CPU_PROBE_TEST
 #include "../packaging/windows/cpu_probe.c"
 #include <cstdio>
 #include <initializer_list>

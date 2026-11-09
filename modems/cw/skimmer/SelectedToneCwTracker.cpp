@@ -16,7 +16,7 @@
 #include <utility>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 namespace {
 
 constexpr double kTwoPi = 6.283185307179586476925286766559;
@@ -1576,4 +1576,4 @@ std::string SelectedToneCwTracker::trackingState() const {
 const std::string& SelectedToneCwTracker::rollingText() const { return m_impl->rolling; }
 const std::string& SelectedToneCwTracker::partialText() const { return m_impl->partial; }
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

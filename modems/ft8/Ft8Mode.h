@@ -8,7 +8,7 @@
 #include <QVector>
 
 /**
- * @brief Metadata for the interoperable Franke-Taylor digital modes supported by MadModem.
+ * @brief Metadata for the interoperable Franke-Taylor digital modes supported by MultiModeModem.
  *
  * v1.12 intentionally focuses on real on-air modes FT8 and FT4.  FT4 is not an
  * FT8 timer tweak: it has a different 4-FSK symbol structure, four 4-symbol

@@ -1,6 +1,6 @@
 #pragma once
 #include "AdifLogbook.h"
-#include "../MadModemVersion.h"
+#include "../M3Version.h"
 #include <algorithm>
 #include <functional>
 #include <cmath>
@@ -43,7 +43,7 @@ inline QByteArray cabrillo(QVector<LogbookEntry> records,const Options&o,QString
     QSet<QString> modes;
     for(const auto& e:records) modes.insert(e.mode.trimmed().toUpper());
     const QString categoryMode=modes.size()==1?*modes.constBegin():QStringLiteral("MIXED");
-    QString out="START-OF-LOG: 3.0\nCREATED-BY: MadModem " MADMODEM_VERSION_STRING "\nCONTEST: "+contest+"\nCALLSIGN: "+own+
+    QString out="START-OF-LOG: 3.0\nCREATED-BY: MultiModeModem " M3_VERSION_STRING "\nCONTEST: "+contest+"\nCALLSIGN: "+own+
       "\nCATEGORY-OPERATOR: "+o.categoryOperator+"\nCATEGORY-BAND: "+o.categoryBand+"\nCATEGORY-POWER: "+o.categoryPower+
       "\nCATEGORY-ASSISTED: "+o.categoryAssisted+"\nCATEGORY-MODE: "+categoryMode+"\nCATEGORY-STATION: FIXED\nCATEGORY-TRANSMITTER: ONE\nNAME: "+clean(o.name)+"\nEMAIL: "+clean(o.email)+"\n";
     for(const auto&e:records){

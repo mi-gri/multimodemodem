@@ -265,7 +265,7 @@ def without_incremental_reuse(function: str) -> str:
     function = function.replace("""            if(searchStopUtcMs>0 && (decodeCancellationRequested() ||
                QDateTime::currentMSecsSinceEpoch()>=searchStopUtcMs)) break;
 """, "")
-    function = function.replace("    auto *incremental=MadModemFt::currentAnalysis;\n    if(incremental && !incremental->originalInput(samples))incremental=nullptr;\n", "")
+    function = function.replace("    auto *incremental=M3Ft::currentAnalysis;\n    if(incremental && !incremental->originalInput(samples))incremental=nullptr;\n", "")
     function = function.replace("[&samples, maxEnergyBin, incremental]", "[&samples, maxEnergyBin]")
     function = function.replace("""                if(incremental){
                     if(const auto *ready=incremental->frame->fftRow(symStart,samples.size())){
@@ -303,7 +303,7 @@ def test_source_invariants() -> None:
         "(const QVector<double> &samples, double threshold) const",
     )
     require(hashlib.sha256(without_incremental_reuse(ft8_finder).encode()).hexdigest() ==
-            "6d2ffe9464be8dceca6351665a50ae810ff289bc2d386f4535f4019c6b118cd1",
+            "61845ce7cb1bb78b8d7fa73160802f32645a813795727f0bad829fad61c8b84e",  # MadModemRuntime -> M3Runtime rename only
             "FT8 live candidate finder differs from the validated QSO-deadline checkpoint")
     require(hashlib.sha256(without_incremental_reuse(ft4_finder).encode()).hexdigest() ==
             "3b160cfb8f022a74282c6907a2e470e2615f6792a81bb2af95baa6191fff2af3",

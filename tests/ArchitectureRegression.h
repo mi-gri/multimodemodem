@@ -241,7 +241,7 @@ inline int runArchitectureRegression(QApplication &app)
     auto entry = [&](const QString &call, const QString &id) {
         LogbookEntry value; value.callsign = call; value.band = "20m"; value.mode = "FT8";
         value.utc = QDateTime::currentDateTimeUtc();
-        value.adifFields["APP_MADMODEM_QSO_ID"] = id;
+        value.adifFields["APP_M3_QSO_ID"] = id;
         return value;
     };
     const auto first = entry("K1ABC", "first");

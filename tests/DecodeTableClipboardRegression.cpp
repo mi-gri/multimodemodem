@@ -17,7 +17,7 @@ int main(int argc, char **argv)
         table.setItem(row, 1, new QTableWidgetItem(calls[row]));
         table.setItem(row, 2, new QTableWidgetItem(QString::fromUtf8("França")));
     }
-    MadModemUi::installDecodeTableCopy(&table);
+    M3Ui::installDecodeTableCopy(&table);
     table.show(); table.activateWindow(); table.setFocus();
     QTest::qWait(30);
     auto *selection = table.selectionModel();
@@ -32,8 +32,8 @@ int main(int argc, char **argv)
     require(QApplication::clipboard()->text().split('\n').size() == 4, "Ctrl+A Ctrl+C all rows");
     table.hideRow(1); table.hideColumn(2);
     table.horizontalHeader()->moveSection(1, 0);
-    require(MadModemUi::selectedDecodeRowsText(table).startsWith("CQ IZ6NNH JN63\t153845\n"), "hidden rows/columns and column display order");
-    require(MadModemUi::selectedDecodeRowsText(table).split('\n').size() == 3, "hidden row omitted");
+    require(M3Ui::selectedDecodeRowsText(table).startsWith("CQ IZ6NNH JN63\t153845\n"), "hidden rows/columns and column display order");
+    require(M3Ui::selectedDecodeRowsText(table).split('\n').size() == 3, "hidden row omitted");
     table.clearSelection(); QApplication::clipboard()->setText("preserve");
     QTest::keySequence(&table, QKeySequence(QKeySequence::Copy));
     require(QApplication::clipboard()->text() == "preserve", "empty selection preserves clipboard");

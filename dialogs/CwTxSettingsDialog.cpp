@@ -11,7 +11,7 @@
 #include <QMessageBox>
 #include <QSignalBlocker>
 namespace {
-QString uiText(const char* key, const char* fallback) { return MadModemI18n::translate(QString::fromUtf8(key), QString::fromUtf8(fallback)); }
+QString uiText(const char* key, const char* fallback) { return M3I18n::translate(QString::fromUtf8(key), QString::fromUtf8(fallback)); }
 QString selectedPort(QComboBox* box) {
     return box->currentIndex() >= 0 && box->currentText() == box->itemText(box->currentIndex())
         ? box->currentData().toString() : box->currentText().trimmed();

@@ -19,11 +19,11 @@ namespace
 
 QString L18n(const QString &source)
 {
-    return MadModemI18n::text(source);
+    return M3I18n::text(source);
 }
 QString P18n(const QString &source)
 {
-    return MadModemI18n::placeholder(source);
+    return M3I18n::placeholder(source);
 }
 constexpr int kDialogMinWidth = 860;
 constexpr int kDialogMinHeight = 560;
@@ -46,7 +46,7 @@ QLabel *makeTokenLabel(const QString &text, QWidget *parent)
     label->setMinimumWidth(kTokenMinWidth);
     label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    MadModemUi::setSemanticRole(label, QStringLiteral("muted"));
+    M3Ui::setSemanticRole(label, QStringLiteral("muted"));
     return label;
 }
 

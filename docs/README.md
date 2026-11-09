@@ -2,8 +2,8 @@
 
 MultiModeModem (m³) is a fork of [MadModem](https://github.com/l-papadopol/MM) by
 Lucian-Ioan Papadopol, IZ6NNH; see the [README](../README.md#origin-and-credits--herkunft)
-for origin and credits. The documents below are MadModem's; where they name the
-program file or the data folders `MadModem`, read `MultiModeModem`.
+for origin and credits. The documents below are MultiModeModem's; where they name the
+program file or the data folders `MultiModeModem`, read `MultiModeModem`.
 
 - [Installation and user data](INSTALLATION.md)
 - [Troubleshooting and automation logs](TROUBLESHOOTING.md)

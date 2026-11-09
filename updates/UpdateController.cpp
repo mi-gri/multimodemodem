@@ -1,7 +1,7 @@
 #include "utils/ProductName.h"
 #include "UpdateController.h"
-#include "../MadModemVersion.h"
-#include "MadModemBuildInfo.h"
+#include "../M3Version.h"
+#include "M3BuildInfo.h"
 #include "../settings/AppSettings.h"
 #include "../utils/InstallationPaths.h"
 #include "../utils/RuntimeI18n.h"
@@ -29,14 +29,15 @@
 #include <QVersionNumber>
 #include <memory>
 namespace {
-QString uiText(const char* key, const char* fallback) { return MadModemI18n::translate(QString::fromUtf8(key), QString::fromUtf8(fallback)); }
+QString uiText(const char* key, const char* fallback) { return M3I18n::translate(QString::fromUtf8(key), QString::fromUtf8(fallback)); }
 const QString repository = QStringLiteral("https://github.com/mi-gri/multimodemodem");
 struct ReleaseIdentity { QString version; quint64 build = 0; };
 ReleaseIdentity releaseIdentity(const QJsonObject &release) {
     if (release.value("draft").toBool()) return {};
     static const QRegularExpression versionTag(QStringLiteral("\\Av?([0-9]+\\.[0-9]+\\.[0-9]+)\\z"));
     static const QRegularExpression buildTag(QStringLiteral("\\Abuild-([0-9]+\\.[0-9]+\\.[0-9]+)-([1-9][0-9]*)\\z"));
-    static const QRegularExpression marker(QStringLiteral("<!-- MadModem build: ([1-9][0-9]*) -->"));
+    // Releases published before the rename carry the MultiModeModem marker.
+    static const QRegularExpression marker(QStringLiteral("<!-- (?:MultiModeModem|MadModem) build: ([1-9][0-9]*) -->"));   // m3-compat
     const QString tag = release.value("tag_name").toString();
     auto match = versionTag.match(tag);
     quint64 build = 0;
@@ -235,14 +236,14 @@ void UpdateController::fetchReleasePage(int page) {
         }
         const auto identity = releaseIdentity(m_newestRelease);
         m_releaseBuild = identity.build;
-        const quint64 localBuild = QStringLiteral(MADMODEM_BUILD_NUMBER).toULongLong();
-        m_version = newerPublishedVersion(m_newestRelease, QStringLiteral(MADMODEM_VERSION_STRING), localBuild);
+        const quint64 localBuild = QStringLiteral(M3_BUILD_NUMBER).toULongLong();
+        m_version = newerPublishedVersion(m_newestRelease, QStringLiteral(M3_VERSION_STRING), localBuild);
         if (m_version.isEmpty()) {
             m_busy = false;
             if (m_manual) {
                 const QString newest = identity.version.isEmpty() ? QStringLiteral("—") : versionLabel(identity.version, identity.build);
                 QMessageBox::information(m_window, ProductName::longName(), uiText("update_current_published", "No newer published release is available.\n\nInstalled: %1\nNewest published: %2")
-                    .arg(versionLabel(QStringLiteral(MADMODEM_VERSION_STRING), localBuild), newest));
+                    .arg(versionLabel(QStringLiteral(M3_VERSION_STRING), localBuild), newest));
             }
             return;
         }
@@ -251,7 +252,7 @@ void UpdateController::fetchReleasePage(int page) {
 }
 void UpdateController::fetch(const QUrl& url, qint64 maximum, std::function<void(QByteArray)> done) {
     QNetworkRequest request(url);
-    request.setRawHeader("User-Agent", "MultiModeModem/" MADMODEM_VERSION_STRING);
+    request.setRawHeader("User-Agent", "MultiModeModem/" M3_VERSION_STRING);
     request.setRawHeader("Accept", "application/vnd.github+json");
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     auto* reply = m_network.get(request);
@@ -273,7 +274,7 @@ void UpdateController::fetch(const QUrl& url, qint64 maximum, std::function<void
 }
 void UpdateController::offer(const QJsonObject& release) {
     if (!m_idle()) { m_busy = false; if (!m_manual) m_automaticCheck->start(30000); return; }
-    m_managed = MadModemInstallation::isManaged();
+    m_managed = M3Installation::isManaged();
     const QStringList names = assetNames(m_version, m_managed, m_releaseBuild);
     const QJsonObject asset = selectAsset(release, names);
     const QString name = asset.value("name").toString();
@@ -297,7 +298,7 @@ void UpdateController::offer(const QJsonObject& release) {
     const QUrl url(asset.value("browser_download_url").toString()), sumsUrl(sums.value("browser_download_url").toString());
     const qint64 size = static_cast<qint64>(asset.value("size").toDouble());
     if (!assetUrl(url) || !assetUrl(sumsUrl) || size <= 0 || size > qint64{2}*1024*1024*1024) { fail(uiText("update_invalid", "Invalid release information.")); return; }
-    QString message = uiText("update_offer", "MadModem %1 is available. Download the update?\n\nCurrent version: %2\nPackage: %3").arg(versionLabel(m_version, m_releaseBuild), versionLabel(QStringLiteral(MADMODEM_VERSION_STRING), QStringLiteral(MADMODEM_BUILD_NUMBER).toULongLong()), name);
+    QString message = uiText("update_offer", "MultiModeModem %1 is available. Download the update?\n\nCurrent version: %2\nPackage: %3").arg(versionLabel(m_version, m_releaseBuild), versionLabel(QStringLiteral(M3_VERSION_STRING), QStringLiteral(M3_BUILD_NUMBER).toULongLong()), name);
     if (release.value("prerelease").toBool()) message += "\n\n" + uiText("update_prerelease", "This is a pre-release.");
     message += "\n\n" + (m_managed ? uiText("update_installer_info", "After verification, you can close MM and start the installer. Settings and logbooks are preserved; the installer may request license acceptance or system permission.") : uiText("update_portable_info", "The portable copy will remain portable. After confirmation MM closes, a full backup is kept beside the program folder, the package is replaced and MM restarts."));
     if (QMessageBox::question(m_window, ProductName::longName(), message, QMessageBox::Yes|QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) { m_busy = false; return; }
@@ -325,7 +326,7 @@ void UpdateController::download(const QUrl& url, const QString& name, const QByt
     auto hash = std::make_shared<QCryptographicHash>(QCryptographicHash::Sha256);
     auto received = std::make_shared<qint64>(0);
     QNetworkRequest request(url);
-    request.setRawHeader("User-Agent", "MultiModeModem/" MADMODEM_VERSION_STRING);
+    request.setRawHeader("User-Agent", "MultiModeModem/" M3_VERSION_STRING);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     auto* reply = m_network.get(request);
     auto* timer = new QTimer(reply); timer->setSingleShot(true); timer->start(60000);
@@ -351,7 +352,7 @@ void UpdateController::download(const QUrl& url, const QString& name, const QByt
         if (m_cancelled) { m_busy = false; return; }
         if (!ok || !file->commit()) { fail(uiText("update_corrupt", "Download failed or checksum mismatch. No program files were changed.")); return; }
         if (!m_idle()) { m_busy = false; QMessageBox::information(m_window, ProductName::longName(), uiText("update_wait", "Update downloaded. Stop active operations before installing it from the download folder.") + "\n" + m_directory); return; }
-        if (QMessageBox::question(m_window, ProductName::longName(), uiText("update_install", "Download verified. Close MadModem and apply the update now?"), QMessageBox::Yes|QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) { m_busy = false; return; }
+        if (QMessageBox::question(m_window, ProductName::longName(), uiText("update_install", "Download verified. Close MultiModeModem and apply the update now?"), QMessageBox::Yes|QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) { m_busy = false; return; }
         if (!m_idle()) { m_busy = false; return; }
         if (launch(path, sha)) { m_window->close(); m_busy = false; }
         else fail(uiText("update_launch_failed", "Could not start the updater. The current installation is unchanged.") + "\n" + path);

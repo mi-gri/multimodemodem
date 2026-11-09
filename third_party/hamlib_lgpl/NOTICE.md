@@ -24,4 +24,4 @@ License summary:
 MadModem release builds link to the Hamlib library API by default. If Hamlib is not built
 or installed, the normal all-in-one build fails rather than silently compiling the
 safe development stub. The stub path remains available only for explicit developer
-builds with MADMODEM_REQUIRE_HAMLIB=OFF.
+builds with M3_REQUIRE_HAMLIB=OFF.

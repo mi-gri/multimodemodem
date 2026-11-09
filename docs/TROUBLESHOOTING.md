@@ -1,6 +1,6 @@
-# Troubleshooting — MadModem 0.6.5
+# Troubleshooting — MultiModeModem 0.6.5
 
-Include the complete window title or `MadModem --build-info`, operating system,
+Include the complete window title or `MultiModeModem --build-info`, operating system,
 mode, radio/audio configuration and the time of the problem in a report.
 
 ## Auto QSO traces

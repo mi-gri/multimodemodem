@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 env:
-  MADMODEM_BUILD_NUMBER: ${{ github.run_number }}
-  MADMODEM_BUILD_COMMIT: ${{ github.sha }}
+  M3_BUILD_NUMBER: ${{ github.run_number }}
+  M3_BUILD_COMMIT: ${{ github.sha }}
 
 concurrency:
   group: installers-${{ github.ref }}
@@ -48,13 +48,13 @@ jobs:
         run: |
           cmake -S . -B build-installer -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON -DHAMLIB_ROOT=/usr \
-            -DMADMODEM_REQUIRE_QT_LOCATION=ON \
-            -DMADMODEM_REQUIRE_HAMLIB=ON -DMADMODEM_AUTOBUILD_HAMLIB=OFF \
-            -DMADMODEM_AVX2_BUILD=OFF -DMADMODEM_NATIVE_OPTIMIZE=OFF -DBUILD_TESTING=OFF
+            -DM3_REQUIRE_QT_LOCATION=ON \
+            -DM3_REQUIRE_HAMLIB=ON -DM3_AUTOBUILD_HAMLIB=OFF \
+            -DM3_AVX2_BUILD=OFF -DM3_NATIVE_OPTIMIZE=OFF -DBUILD_TESTING=OFF
           cmake --build build-installer --parallel 2
       - name: Create portable archives
         env:
-          MADMODEM_LINUX_PLATFORM: Ubuntu24.04
+          M3_LINUX_PLATFORM: Ubuntu24.04
         run: |
           cmake --install build-installer --prefix "$PWD/dist/linux"
           bash scripts/package_linux_github.sh
@@ -101,13 +101,13 @@ jobs:
         run: |
           cmake -S . -B build-installer -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON -DHAMLIB_ROOT=/usr \
-            -DMADMODEM_REQUIRE_QT_LOCATION=ON \
-            -DMADMODEM_REQUIRE_HAMLIB=ON -DMADMODEM_AUTOBUILD_HAMLIB=OFF \
-            -DMADMODEM_AVX2_BUILD=OFF -DMADMODEM_NATIVE_OPTIMIZE=OFF -DBUILD_TESTING=OFF
+            -DM3_REQUIRE_QT_LOCATION=ON \
+            -DM3_REQUIRE_HAMLIB=ON -DM3_AUTOBUILD_HAMLIB=OFF \
+            -DM3_AVX2_BUILD=OFF -DM3_NATIVE_OPTIMIZE=OFF -DBUILD_TESTING=OFF
           cmake --build build-installer --parallel 2
       - name: Create portable archives
         env:
-          MADMODEM_LINUX_PLATFORM: Fedora43
+          M3_LINUX_PLATFORM: Fedora43
         run: |
           cmake --install build-installer --prefix "$PWD/dist/linux"
           bash scripts/package_linux_github.sh
@@ -228,7 +228,7 @@ jobs:
             arch: arm64
     runs-on: ${{ matrix.runner }}
     env:
-      MADMODEM_OSX_ARCHITECTURES: ${{ matrix.arch }}
+      M3_OSX_ARCHITECTURES: ${{ matrix.arch }}
       MACOSX_DEPLOYMENT_TARGET: '15.0'
       JOBS: '2'
     steps:
@@ -238,7 +238,7 @@ jobs:
       - name: Build application
         run: |
           bash scripts/ci_release_version_guard.sh
-          bash scripts/build_macos.sh -DMADMODEM_NATIVE_OPTIMIZE=OFF -DBUILD_TESTING=OFF
+          bash scripts/build_macos.sh -DM3_NATIVE_OPTIMIZE=OFF -DBUILD_TESTING=OFF
       - name: Bundle runtime and create portable archives
         timeout-minutes: 15
         run: bash scripts/package_macos.sh

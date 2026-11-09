@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <limits>
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
 #include <hamlib/rotator.h>
 
 #endif
@@ -316,7 +316,7 @@ void CatRotatorController::connectRotator()
         return;
     }
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     closeBackend();
     rot_model_t model = static_cast<rot_model_t>(m_config.hamlibModel > 0 ? m_config.hamlibModel : 1);
     ROT *rot = rot_init(model);
@@ -359,7 +359,7 @@ void CatRotatorController::connectRotator()
     pollNow();
 #else
     m_connected = false;
-    setStatus(QStringLiteral("CatRotator cannot connect: MadModem was built without Hamlib rotator support."));
+    setStatus(QStringLiteral("CatRotator cannot connect: MultiModeModem was built without Hamlib rotator support."));
     emit connectionChanged(false);
 #endif
 }
@@ -375,7 +375,7 @@ void CatRotatorController::closeBackend()
     cancelCalibration();
     setMotionActive(false);
     m_pollTimer.stop();
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     if (m_rot != nullptr) {
         ROT *rot = static_cast<ROT *>(m_rot);
         rot_close(rot);
@@ -394,7 +394,7 @@ void CatRotatorController::pollNow()
     if (!m_connected) {
         return;
     }
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     if (m_rot == nullptr) {
         return;
     }
@@ -449,7 +449,7 @@ void CatRotatorController::setAzEl(double azimuthDeg, double elevationDeg, const
 
 void CatRotatorController::stop()
 {
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     if (m_connected && m_rot != nullptr) {
         const int rc = rot_stop(static_cast<ROT *>(m_rot));
         if (rc != RIG_OK) {
@@ -712,7 +712,7 @@ void CatRotatorController::moveBackend(double azimuthDeg, double elevationDeg, c
     m_targetAz = azimuthDeg;
     m_targetEl = elevationDeg;
     emit targetChanged(m_targetAz, m_targetEl, reason);
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     if (m_rot != nullptr) {
         ROT *rot = static_cast<ROT *>(m_rot);
         // Mechanical coordinates may be signed/overlapping; Hamlib uses the

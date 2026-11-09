@@ -6,7 +6,7 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 
-namespace MadModemInstallation {
+namespace M3Installation {
 inline bool isManaged(const QString &executableDir = QCoreApplication::applicationDirPath())
 {
     return QFileInfo::exists(QDir(executableDir).filePath(QStringLiteral("managed-install.flag")));
@@ -44,9 +44,9 @@ inline QString userFile(const QString &executableDir, const QString &userDir, co
     return target;
 }
 // MultiModeModem (m³) runs under its own application name, so Qt's user
-// folders moved from …/MadModem to …/MultiModeModem. Copy the settings and the
-// default logbook from the MadModem folders once; never overwrite, never
-// delete, so MadModem itself keeps working. Diagnostics are not copied.
+// folders moved from …/MultiModeModem to …/MultiModeModem. Copy the settings and the
+// default logbook from the MultiModeModem folders once; never overwrite, never
+// delete, so MultiModeModem itself keeps working. Diagnostics are not copied.
 // Settings files hold account secrets; keep them readable by the owner only.
 inline void restrictToOwner(const QString &file)
 {
@@ -120,7 +120,7 @@ inline QString settingsFileFor(const QString &executableDir, const QString &conf
 
 inline void adoptUpstreamUserData()
 {
-    // Settings next to the program take precedence over MadModem's folder.
+    // Settings next to the program take precedence over MultiModeModem's folder.
     if (!qEnvironmentVariableIsSet("M3_CONFIG_DIR"))
         userFile(QCoreApplication::applicationDirPath(), configDirectory(), QStringLiteral("settings.mad"));
     const struct { QStandardPaths::StandardLocation location; const char *file; } items[] = {

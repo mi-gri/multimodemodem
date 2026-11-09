@@ -21,7 +21,7 @@ public:
         if(middle>=last){QMutexLocker lock(&mutex);if(epoch==generation && !result.ready){
             if(result.blocks && block.firstSampleUtcNs>lastEnd+5000000LL)result.gap=true;
             result.ready=true;}return;}
-        const auto power=MadModemAudio::radioTelescopeWelchBandPower(block.samples,block.sampleRate,low,high);
+        const auto power=M3Audio::radioTelescopeWelchBandPower(block.samples,block.sampleRate,low,high);
         QMutexLocker lock(&mutex);if(epoch==generation){
             const auto duration=block.samples.size()*1000000000LL/block.sampleRate;
             if(!result.blocks && block.firstSampleUtcNs>first+duration)result.gap=true;

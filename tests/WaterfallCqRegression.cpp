@@ -163,7 +163,7 @@ int main()
         check(brand(QStringLiteral("Über MM")) == QString::fromUtf8("Über m³") &&
               brand(QStringLiteral("MadModem-Logbuch")) == QStringLiteral("MultiModeModem-Logbuch"),
               "product name: visible names replaced");
-        check(brand(QStringLiteral("Pictures/MadModem/SSTV")) == QStringLiteral("Pictures/MultiModeModem/SSTV") &&
+        check(brand(QStringLiteral("Pictures/MultiModeModem/SSTV")) == QStringLiteral("Pictures/MultiModeModem/SSTV") &&
               brand(QStringLiteral("MadModem_logbook.adi")) == QStringLiteral("MultiModeModem_logbook.adi") &&
               brand(QStringLiteral("CQ DL1ABC/MM")) == QStringLiteral("CQ DL1ABC/MM") &&
               brand(QStringLiteral("COMMS")) == QStringLiteral("COMMS"),

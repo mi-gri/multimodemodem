@@ -6,7 +6,7 @@ import os
 import subprocess
 import tempfile
 ROOT=Path(__file__).resolve().parents[1]
-version=(ROOT/'MADMODEM_VERSION.txt').read_text().strip()
+version=(ROOT/'M3_VERSION.txt').read_text().strip()
 with tempfile.TemporaryDirectory(prefix='mm-publish-check-') as tmp:
     t=Path(tmp);assets=t/'assets';assets.mkdir();bin=t/'bin';bin.mkdir()
     files=[]
@@ -49,8 +49,8 @@ p.write_text(json.dumps(d));print(result);sys.exit(status)
             d=json.loads(state.read_text());d['body']='Custom operator note\n'+d['body'];state.write_text(json.dumps(d))
         subprocess.run(['bash',str(ROOT/'scripts/publish_github_release.sh'),str(assets)],env=env,check=True,capture_output=True,text=True)
     d=json.loads(state.read_text())
-    assert 'Custom operator note' in d['body'] and d['body'].count('MadModem build:')==1
-    assert '<!-- MadModem build: 115 -->' in d['body']
+    assert 'Custom operator note' in d['body'] and d['body'].count('MultiModeModem build:')==1
+    assert '<!-- MultiModeModem build: 115 -->' in d['body']
     edits=[x for x in d['calls'] if x[:2]==['release','edit']]
     assert len(edits)==2 and all('--prerelease=true' in x and '--latest=false' in x for x in edits)
     creates=[x for x in d['calls'] if x[:2]==['release','create']]

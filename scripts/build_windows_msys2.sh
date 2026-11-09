@@ -5,8 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="MultiModeModem"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
-BUILD_LEGACY="${MADMODEM_WINDOWS_BUILD_LEGACY:-on}"
-BUILD_AVX2="${MADMODEM_WINDOWS_BUILD_AVX2:-on}"
+BUILD_LEGACY="${M3_WINDOWS_BUILD_LEGACY:-on}"
+BUILD_AVX2="${M3_WINDOWS_BUILD_AVX2:-on}"
 
 # MSYS2 exports these for the selected shell. Default to the supported UCRT64
 # environment when the script is launched without the launcher variables.
@@ -80,10 +80,10 @@ build_variant() {
         -DCMAKE_PREFIX_PATH="$MINGW_PREFIX" \
         -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON \
         -DHAMLIB_ROOT="$HAMLIB_PREFIX" \
-        -DMADMODEM_REQUIRE_HAMLIB=ON \
-        -DMADMODEM_AUTOBUILD_HAMLIB=OFF \
-        -DMADMODEM_AVX2_BUILD="$avx2" \
-        -DBUILD_TESTING="${MADMODEM_BUILD_TESTING:-OFF}"
+        -DM3_REQUIRE_HAMLIB=ON \
+        -DM3_AUTOBUILD_HAMLIB=OFF \
+        -DM3_AVX2_BUILD="$avx2" \
+        -DBUILD_TESTING="${M3_BUILD_TESTING:-OFF}"
 
     cmake --build "$build_dir" --config "$BUILD_TYPE" --parallel "$JOBS"
 

@@ -6,8 +6,8 @@
 // select_compiler_config.hpp as boost/config/compiler/clang.hpp, but that file
 // was not present in the subset. For the Boost.CRC code used here, Clang can be
 // treated as GCC-compatible, which is exactly what this wrapper does.
-#ifndef MADMODEM_MSHV_BOOST_CONFIG_COMPILER_CLANG_HPP
-#define MADMODEM_MSHV_BOOST_CONFIG_COMPILER_CLANG_HPP
+#ifndef M3_MSHV_BOOST_CONFIG_COMPILER_CLANG_HPP
+#define M3_MSHV_BOOST_CONFIG_COMPILER_CLANG_HPP
 
 #include "../../gcc.hpp"
 
@@ -15,4 +15,4 @@
 #  define BOOST_COMPILER "Clang compiler"
 #endif
 
-#endif // MADMODEM_MSHV_BOOST_CONFIG_COMPILER_CLANG_HPP
+#endif // M3_MSHV_BOOST_CONFIG_COMPILER_CLANG_HPP

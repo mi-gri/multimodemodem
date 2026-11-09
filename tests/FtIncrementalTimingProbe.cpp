@@ -75,7 +75,7 @@ int main(int argc,char **argv){
    }
    if(phase=="wsjtx-gate")samples.resize(mode=="FT8"?162000:73200);
    const auto decodeSlotUtc=QDateTime::fromMSecsSinceEpoch(QDateTime::currentMSecsSinceEpoch()/period*period,Qt::UTC);
-   MadModemFt::AnalysisConfig config;config.epoch=1;config.ft4=mode=="FT4";config.slotUtcMs=decodeSlotUtc.toMSecsSinceEpoch();config.markerHz=1033;config.lowHz=rx.m_searchLowHz;config.highHz=rx.m_searchHighHz;
+   M3Ft::AnalysisConfig config;config.epoch=1;config.ft4=mode=="FT4";config.slotUtcMs=decodeSlotUtc.toMSecsSinceEpoch();config.markerHz=1033;config.lowHz=rx.m_searchLowHz;config.highHz=rx.m_searchHighHz;
    rx.m_incrementalAnalysis->submit(config,0,samples);
    const int expected=(samples.size()-(config.ft4?576:1920)-1)/(config.ft4?576:480)+1;
    QElapsedTimer waiting;waiting.start();while(waiting.elapsed()<5000){auto p=rx.m_incrementalAnalysis->snapshot(samples,config.slotUtcMs);if(p&&int(p->rows.size())==expected)break;QThread::msleep(1);}

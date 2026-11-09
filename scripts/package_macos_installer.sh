@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-version="$(tr -d '\r\n' < "$root/MADMODEM_VERSION.txt")"
-arch="${MADMODEM_OSX_ARCHITECTURES:-$(uname -m)}"
-app="${MADMODEM_APP_PATH:-$root/build-macos-$arch/MultiModeModem.app}"
-out="${MADMODEM_MACOS_DIST_DIR:-$root/dist/macos}"
+version="$(tr -d '\r\n' < "$root/M3_VERSION.txt")"
+arch="${M3_OSX_ARCHITECTURES:-$(uname -m)}"
+app="${M3_APP_PATH:-$root/build-macos-$arch/MultiModeModem.app}"
+out="${M3_MACOS_DIST_DIR:-$root/dist/macos}"
 [[ "$(uname -s)" == Darwin ]]
 [[ "$arch" == arm64 || "$arch" == x86_64 ]]
 test -x "$app/Contents/MacOS/MultiModeModem"

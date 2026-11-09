@@ -1,6 +1,6 @@
 #include "HelpDialog.h"
 #include "../utils/RuntimeI18n.h"
-#include "../MadModemVersion.h"
+#include "../M3Version.h"
 #include "../settings/AppSettings.h"
 
 #include <QApplication>
@@ -23,7 +23,7 @@
 #include <QVBoxLayout>
 #include <QWhatsThis>
 
-#ifdef MADMODEM_WITH_QT_HELP
+#ifdef M3_WITH_QT_HELP
 #include <QHelpContentWidget>
 #include <QHelpEngine>
 #include <QHelpIndexWidget>
@@ -32,7 +32,7 @@
 
 namespace {
 
-constexpr const char *kHelpNamespacePrefix = "org.madmodem.mm.0578";
+constexpr const char *kHelpNamespacePrefix = "org.m3.mm.0578";
 
 struct FallbackTopic
 {
@@ -58,7 +58,7 @@ const FallbackTopic kFallbackTopics[] = {
 class HelpBrowser final : public QTextBrowser
 {
 public:
-#ifdef MADMODEM_WITH_QT_HELP
+#ifdef M3_WITH_QT_HELP
     explicit HelpBrowser(QHelpEngine *engine, QWidget *parent = nullptr)
         : QTextBrowser(parent)
         , m_engine(engine)
@@ -78,7 +78,7 @@ public:
 protected:
     QVariant loadResource(int type, const QUrl &name) override
     {
-#ifdef MADMODEM_WITH_QT_HELP
+#ifdef M3_WITH_QT_HELP
         if (m_engine != nullptr && name.scheme() == QLatin1String("qthelp")) {
             const QByteArray data = m_engine->fileData(name);
             if (!data.isEmpty()) {
@@ -90,7 +90,7 @@ protected:
     }
 
 private:
-#ifdef MADMODEM_WITH_QT_HELP
+#ifdef M3_WITH_QT_HELP
     QHelpEngine *m_engine = nullptr;
 #endif
 };
@@ -122,7 +122,7 @@ HelpDialog::~HelpDialog() = default;
 
 void HelpDialog::setupUiShell()
 {
-    setWindowTitle(MadModemI18n::text(QStringLiteral("MM Help")));
+    setWindowTitle(M3I18n::text(QStringLiteral("MM Help")));
     resize(1080, 720);
     setMinimumSize(820, 520);
 
@@ -133,19 +133,19 @@ void HelpDialog::setupUiShell()
     QHBoxLayout *toolbar = new QHBoxLayout();
     toolbar->setSpacing(6);
 
-    m_homeButton = new QPushButton(MadModemI18n::text(QStringLiteral("Home")), this);
-    m_backButton = new QPushButton(MadModemI18n::text(QStringLiteral("Back")), this);
-    m_forwardButton = new QPushButton(MadModemI18n::text(QStringLiteral("Forward")), this);
+    m_homeButton = new QPushButton(M3I18n::text(QStringLiteral("Home")), this);
+    m_backButton = new QPushButton(M3I18n::text(QStringLiteral("Back")), this);
+    m_forwardButton = new QPushButton(M3I18n::text(QStringLiteral("Forward")), this);
     m_searchEdit = new QLineEdit(this);
-    m_searchEdit->setPlaceholderText(MadModemI18n::text(QStringLiteral("Filter contents / index...")));
-    m_whatsThisButton = new QPushButton(MadModemI18n::text(QStringLiteral("What's This?")), this);
-    QPushButton *closeButton = new QPushButton(MadModemI18n::text(QStringLiteral("Close")), this);
+    m_searchEdit->setPlaceholderText(M3I18n::text(QStringLiteral("Filter contents / index...")));
+    m_whatsThisButton = new QPushButton(M3I18n::text(QStringLiteral("What's This?")), this);
+    QPushButton *closeButton = new QPushButton(M3I18n::text(QStringLiteral("Close")), this);
 
     toolbar->addWidget(m_homeButton);
     toolbar->addWidget(m_backButton);
     toolbar->addWidget(m_forwardButton);
     toolbar->addSpacing(10);
-    toolbar->addWidget(new QLabel(MadModemI18n::text(QStringLiteral("Search:")), this));
+    toolbar->addWidget(new QLabel(M3I18n::text(QStringLiteral("Search:")), this));
     toolbar->addWidget(m_searchEdit, 1);
     toolbar->addWidget(m_whatsThisButton);
     toolbar->addWidget(closeButton);
@@ -163,7 +163,7 @@ void HelpDialog::setupUiShell()
 
 bool HelpDialog::setupQtHelpBackend(const QUrl &startUrl)
 {
-#ifndef MADMODEM_WITH_QT_HELP
+#ifndef M3_WITH_QT_HELP
     Q_UNUSED(startUrl);
     return false;
 #else
@@ -189,6 +189,12 @@ bool HelpDialog::setupQtHelpBackend(const QUrl &startUrl)
     }
 
     const QString ns = helpNamespaceForLanguage(qchLang);
+    // Drop help of earlier versions (also the namespace used before the
+    // rename) so contents and index do not show pages twice.
+    for (const QString &old : m_helpEngine->registeredDocumentations()) {
+        if (old != ns && (old.startsWith(QStringLiteral("org.m3.mm.")) || old.startsWith(QStringLiteral("org.madmodem.mm."))))   // m3-compat
+            m_helpEngine->unregisterDocumentation(old);
+    }
     const QStringList registered = m_helpEngine->registeredDocumentations();
     if (!registered.contains(ns)) {
         const bool ok = m_helpEngine->registerDocumentation(qchPath);
@@ -204,10 +210,10 @@ bool HelpDialog::setupQtHelpBackend(const QUrl &startUrl)
     m_contentWidget = m_helpEngine->contentWidget();
     m_indexWidget = m_helpEngine->indexWidget();
     if (m_contentWidget != nullptr) {
-        m_leftTabs->addTab(m_contentWidget, MadModemI18n::text(QStringLiteral("Contents")));
+        m_leftTabs->addTab(m_contentWidget, M3I18n::text(QStringLiteral("Contents")));
     }
     if (m_indexWidget != nullptr) {
-        m_leftTabs->addTab(m_indexWidget, MadModemI18n::text(QStringLiteral("Index")));
+        m_leftTabs->addTab(m_indexWidget, M3I18n::text(QStringLiteral("Index")));
     }
 
     m_viewer = new HelpBrowser(m_helpEngine, m_splitter);
@@ -263,11 +269,11 @@ void HelpDialog::setupFallbackBackend(const QUrl &startUrl)
     m_effectiveHelpLanguage = htmlLang;
 
     m_fallbackTree = new QTreeWidget(m_splitter);
-    m_fallbackTree->setHeaderLabel(MadModemI18n::text(QStringLiteral("Contents")));
+    m_fallbackTree->setHeaderLabel(M3I18n::text(QStringLiteral("Contents")));
     m_fallbackTree->setRootIsDecorated(false);
     m_fallbackTree->setUniformRowHeights(true);
 
-#ifdef MADMODEM_WITH_QT_HELP
+#ifdef M3_WITH_QT_HELP
     m_viewer = new HelpBrowser(nullptr, m_splitter);
 #else
     m_viewer = new HelpBrowser(m_splitter);
@@ -317,7 +323,7 @@ void HelpDialog::openUrl(const QUrl &url)
         return;
     }
 
-#ifdef MADMODEM_WITH_QT_HELP
+#ifdef M3_WITH_QT_HELP
     if (m_helpEngine != nullptr && url.scheme() == QLatin1String("qthelp")) {
         m_viewer->setSource(url);
         return;
@@ -388,7 +394,7 @@ QString HelpDialog::locateHelpFile(const QString &fileName) const
         QDir(appDir).filePath(QStringLiteral("docs/help/") + fileName),
         QDir(appDir).filePath(fileName),
         QDir(appDir).filePath(QStringLiteral("../share/MultiModeModem/help/") + fileName),
-        QDir(appDir).filePath(QStringLiteral("../share/MadModem/help/") + fileName),
+        QDir(appDir).filePath(QStringLiteral("../share/MultiModeModem/help/") + fileName),
         QDir(QDir::currentPath()).filePath(QStringLiteral("docs/help/") + fileName),
         QDir(QDir::currentPath()).filePath(QStringLiteral("help/") + fileName),
         QDir(QDir::currentPath()).filePath(fileName)

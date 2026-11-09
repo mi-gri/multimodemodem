@@ -38,7 +38,7 @@ class QShowEvent;
 /**
  * @brief Unified application settings window.
  *
- * This dialog embeds the existing settings editors as tab pages so MadModem
+ * This dialog embeds the existing settings editors as tab pages so MultiModeModem
  * exposes one WSJT-X-like Settings entry instead of many separate menu items.
  * The old editor classes remain reusable, but their local OK/Cancel buttons are
  * hidden and the outer dialog performs one final commit.

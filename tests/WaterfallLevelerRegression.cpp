@@ -105,7 +105,7 @@ int main()
 
     // A whole-receiver AGC step must disappear in the very next row.  This is
     // the key behaviour inherited from WSJT-X flat4 and intentionally replaces
-    // MadModem's former slow temporal floor slew.
+    // MultiModeModem's former slow temporal floor slew.
     WaterfallLeveler stepLeveler;
     std::vector<double> before = noiseLine(kBins, -89.0);
     for (std::size_t i = 0; i < before.size(); ++i)

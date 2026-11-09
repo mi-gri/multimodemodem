@@ -20,7 +20,7 @@
 #include <vector>
 static void check(bool v,const char *why){if(!v){std::cerr<<why<<'\n';std::exit(1);}}
 static QVector<QJsonObject> read(const QString &p){QVector<QJsonObject> rows;for(const auto &line:readGzipLog(p).split('\n')){if(line.isEmpty())continue;QJsonParseError err;auto d=QJsonDocument::fromJson(line,&err);check(err.error==QJsonParseError::NoError,"valid JSONL");rows.append(d.object());}return rows;}
-int main(int argc,char **argv){QCoreApplication app(argc,argv);app.setApplicationName("MadModemDiagnosticsRegression");
+int main(int argc,char **argv){QCoreApplication app(argc,argv);app.setApplicationName("M3DiagnosticsRegression");
  if(argc==3&&QString(argv[1])=="--fatal"){
 #ifdef Q_OS_UNIX
   const rlimit noCore{0,0};setrlimit(RLIMIT_CORE,&noCore);
@@ -42,7 +42,7 @@ int main(int argc,char **argv){QCoreApplication app(argc,argv);app.setApplicatio
  check(count==3000&&log.lost()==0,"all concurrent records retained");check(rows.last()["event"]=="session.end"&&rows.last()["complete"].toBool(),"shutdown drains and writes complete footer");
  const auto plain=readGzipLog(first);check(!plain.contains("SECRET_"),"recursive redaction after decompression");
  check(QFileInfo(first).size()*2<plain.size(),"gzip materially reduces representative JSONL size");
- const auto exportPath=qEnvironmentVariable("MADMODEM_DIAGNOSTICS_TEST_EXPORT");if(!exportPath.isEmpty())check(QFile::copy(first,exportPath),"export compressed test fixture");
+ const auto exportPath=qEnvironmentVariable("M3_DIAGNOSTICS_TEST_EXPORT");if(!exportPath.isEmpty())check(QFile::copy(first,exportPath),"export compressed test fixture");
  check(log.start(folder),"restart");const auto second=log.path();check(first!=second,"unique path preserves earlier file");log.stop();check(read(first).size()==rows.size(),"no overwrite");
  QFile blocker(dir.path()+"/blocker");check(blocker.open(QIODevice::WriteOnly),"create blocker");blocker.write("x");blocker.close();check(!log.start(blocker.fileName()+"/sub"),"bad folder reports failure");check(!log.error().isEmpty(),"visible error");check(log.start(folder),"recover after error");log.stop();
  SessionDiagnostics pressure(64);check(pressure.start(folder),"pressure start");for(int i=0;i<100;++i)pressure.record("pressure",{{"payload",QString(500,'x')}});pressure.stop();auto losses=read(pressure.path());bool marker=false;for(const auto &r:losses)if(r["event"]=="diagnostic.loss")marker=true;check(marker&&pressure.lost()>0&&!losses.last()["complete"].toBool(),"overflow explicitly marked incomplete");

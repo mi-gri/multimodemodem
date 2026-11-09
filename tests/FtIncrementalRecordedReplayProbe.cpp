@@ -13,15 +13,15 @@
 #include <iostream>
 int main(int argc,char **argv){
  QCoreApplication app(argc,argv);
- if(qEnvironmentVariableIsSet("PROBE_WORKERS")){auto &r=MadModemRuntime::SystemResourceManager::instance();r.m_poolCapacity=qEnvironmentVariableIntValue("PROBE_WORKERS");r.m_maxLiveWorkers=r.m_poolCapacity;}
+ if(qEnvironmentVariableIsSet("PROBE_WORKERS")){auto &r=M3Runtime::SystemResourceManager::instance();r.m_poolCapacity=qEnvironmentVariableIntValue("PROBE_WORKERS");r.m_maxLiveWorkers=r.m_poolCapacity;}
  for(int i=1;i<argc;++i){
   QFile f(argv[i]);if(!f.open(QIODevice::ReadOnly))return 2;
   const auto bytes=f.readAll();QVector<double> samples(bytes.size()/sizeof(double));std::memcpy(samples.data(),bytes.constData(),bytes.size());
   Ft8RxDecoder rx;const int period=samples.size()<100000?7500:15000;rx.setModeName(period==7500?"FT4":"FT8");
   Ft8RxDecoder::PerfStats s;s.phase="boundary";
   auto slot=QDateTime::currentDateTimeUtc().addMSecs(-period-qEnvironmentVariableIntValue("PROBE_LATE_MS"));
-  MadModemFt::AnalysisConfig c;c.epoch=1;c.slotUtcMs=slot.toMSecsSinceEpoch();c.ft4=period==7500;c.lowHz=rx.m_searchLowHz;c.highHz=rx.m_searchHighHz;c.markerHz=rx.m_rxMarkerHz;
-  std::shared_ptr<const MadModemFt::PreparedAnalysis> prepared;
+  M3Ft::AnalysisConfig c;c.epoch=1;c.slotUtcMs=slot.toMSecsSinceEpoch();c.ft4=period==7500;c.lowHz=rx.m_searchLowHz;c.highHz=rx.m_searchHighHz;c.markerHz=rx.m_rxMarkerHz;
+  std::shared_ptr<const M3Ft::PreparedAnalysis> prepared;
   if(!qEnvironmentVariableIsSet("PROBE_NO_CACHE")){
    for(int offset=0;offset<samples.size();offset+=1200)rx.m_incrementalAnalysis->submit(c,offset,samples.mid(offset,qMin(1200,samples.size()-offset)));
    const int expected=(samples.size()-(c.ft4?576:1920)-1)/(c.ft4?576:480)+1;
@@ -29,7 +29,7 @@ int main(int argc,char **argv){
    if(!prepared||int(prepared->rows.size())!=expected)return 5;
   }
   slot=QDateTime::currentDateTimeUtc().addMSecs(-period-qEnvironmentVariableIntValue("PROBE_LATE_MS"));
-  MadModemFt::AnalysisReadScope scope(prepared,samples);
+  M3Ft::AnalysisReadScope scope(prepared,samples);
   QElapsedTimer clock;clock.start();double first=-1;
   QSet<QString> published;
   const auto rows=rx.decodeSlot(samples,slot,nullptr,&s,[&](const QVector<Ft8RxDecoder::Decode>& batch){if(first<0&&!batch.isEmpty())first=clock.nsecsElapsed()/1e6;for(const auto &d:batch)published.insert(d.message);});

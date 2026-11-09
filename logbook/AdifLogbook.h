@@ -13,7 +13,7 @@
 /**
  * @brief One QSO log entry stored in ADIF form.
  *
- * MadModem exposes the common fields directly, but keeps every ADIF tag found
+ * MultiModeModem exposes the common fields directly, but keeps every ADIF tag found
  * in the original record.  This is important for real logbooks produced by
  * WSJT-X, MSHV, Logger32, N1MM, DXKeeper, Log4OM, etc.: unsupported fields must
  * not be destroyed just because MM does not show them in a primary column.
@@ -65,7 +65,7 @@ struct LogbookSearchCriteria
  * @brief ADIF-backed logbook store.
  *
  * Load/save is conservative and ADIF-preserving: the common columns are parsed
- * for UI/filtering, while all tags are kept for round-trip export.  MadModem no
+ * for UI/filtering, while all tags are kept for round-trip export.  MultiModeModem no
  * longer rewrites a user-provided 60+ MB ADIF file on shutdown just to normalize
  * the small subset of fields it understands.
  */

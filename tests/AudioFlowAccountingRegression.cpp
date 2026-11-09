@@ -13,7 +13,7 @@ int main(int argc,char **argv){QCoreApplication app(argc,argv);
  RadioPowerWindow window;const qint64 base=1792519200000000000LL;const qint64 duration=1024LL*1000000000LL/48000;
  window.begin(base,base+10*duration,300,3000);double sum=0;
  for(int n=0;n<=10;++n){b.firstSampleUtcNs=base+n*1024LL*1000000000LL/48000;for(int i=0;i<1024;++i)b.samples[i]=.01*std::sin((n*1024+i)*.71)+.02*std::sin((n*1024+i)*.13);
-  if(n<10)sum+=MadModemAudio::radioTelescopeWelchBandPower(b.samples,48000,300,3000);window.process(b);}
+  if(n<10)sum+=M3Audio::radioTelescopeWelchBandPower(b.samples,48000,300,3000);window.process(b);}
  auto power=window.snapshot();check(power.ready&&!power.gap&&power.blocks==10&&power.sum==sum,"timestamped power window parity without GUI events");
  for(int n=11;n<30;++n){b.firstSampleUtcNs=base+n*duration;window.process(b);}window.markGap();
  power=window.snapshot();check(power.ready&&!power.gap&&power.blocks==10&&power.sum==sum,"finished window changed after later audio or gap");

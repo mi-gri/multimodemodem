@@ -7,7 +7,7 @@
 /**
  * @brief Shared WSJT-X-style parser for decoded FT4/FT8 message text.
  *
- * This is the only FT text parser used by MadModem UI, double-click handling,
+ * This is the only FT text parser used by MultiModeModem UI, double-click handling,
  * QSO map/logbook extraction and FtQsoSequencer.  It mirrors the practical
  * structure of WSJT-X 3.0.1 Decoder/decodedtext.*: normalize the formatted
  * decode line, split into message words using a tokens_re-compatible grammar,

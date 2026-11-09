@@ -7,7 +7,7 @@
 #include <atomic>
 #include <mutex>
 
-namespace MadModemRuntime {
+namespace M3Runtime {
 
 enum class WorkClass
 {
@@ -111,6 +111,6 @@ private:
     quint64 m_cpuPrevIdle = 0;
 };
 
-} // namespace MadModemRuntime
+} // namespace M3Runtime
 
 #endif // SYSTEMRESOURCEMANAGER_H

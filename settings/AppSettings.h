@@ -8,7 +8,7 @@
 #include <QStringList>
 
 /**
- * @brief Stores persistent MadModem user settings.
+ * @brief Stores persistent MultiModeModem user settings.
  *
  * Purpose:
  * - Keep audio input/output device selections.
@@ -65,7 +65,7 @@ public:
     bool logbookVisibleFieldsConfigured = false;
     QStringList logbookVisibleFields;
     int waterfallColorScalePercent = 80;
-    QString waterfallPalette = "madmodem";
+    QString waterfallPalette = "m3";
     // Global UI appearance. Theme names are stable keys, not translated labels:
     // avionica, qt_default, hacker_green, classic_dark, high_contrast.
     QString uiTheme = "avionica";
@@ -303,7 +303,7 @@ public:
 
     // CatRotator integration. The original CatRotator WSJT-X/AirScout
     // tracking inputs are intentionally not exposed here; the rotator follows only
-    // MadModem-selected QSO targets or manual commands.
+    // MultiModeModem-selected QSO targets or manual commands.
     // Rotator hardware communication is intentionally separate from radio CAT/PTT.
     struct RotatorBandSettings
     {

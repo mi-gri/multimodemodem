@@ -7,7 +7,7 @@
 #include <memory>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 
 /**
  * Full-passband carrier discovery only. It never emits Morse characters.
@@ -41,4 +41,4 @@ private:
   std::unique_ptr<Impl> m_impl;
 };
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

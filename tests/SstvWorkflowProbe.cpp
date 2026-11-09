@@ -36,7 +36,7 @@ int main(int argc,char **argv){QApplication app(argc,argv);app.setApplicationNam
  w.m_chkSstvAutoVis->setChecked(false);check(!w.m_settings.sstvAutoVis,"VIS setting not applied");
  w.m_chkSstvAutoVis->setChecked(true);check(w.m_settings.sstvAutoVis,"VIS setting not reenabled");
  for(const QString &lang:{QString("en"),QString("it"),QString("fr"),QString("de"),QString("no"),QString("cs")}){
-  MadModemI18n::setLanguageCode(lang);SstvImageEditorDialog translated;translated.show();translated.resize(800,600);app.processEvents();app.processEvents();
+  M3I18n::setLanguageCode(lang);SstvImageEditorDialog translated;translated.show();translated.resize(800,600);app.processEvents();app.processEvents();
   check(translated.width()==800 && translated.height()==600,"localized editor exceeds 800x600");
   auto *tools=translated.findChild<QTabWidget*>("sstvEditorTools");check(tools,"tools tabs missing");
   for(int tab=0;tab<tools->count();++tab)check(tools->tabBar()->rect().contains(tools->tabBar()->tabRect(tab)),"localized tab clipped");

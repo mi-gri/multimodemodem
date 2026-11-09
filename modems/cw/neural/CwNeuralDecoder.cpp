@@ -6,7 +6,7 @@
 #include <cmath>
 #include <utility>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 namespace {
 constexpr double pi = 3.14159265358979323846;
 

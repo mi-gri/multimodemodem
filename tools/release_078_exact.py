@@ -1,4 +1,4 @@
-"""Curated translations added for the MadModem 0.5.78 UI consolidation."""
+"""Curated translations added for the MultiModeModem 0.5.78 UI consolidation."""
 
 # Stable runtime key -> language -> translated value.
 KEYS = {
@@ -192,7 +192,7 @@ KEYS = {
     "q65_status_idle": {"it": "Q65: inattivo", "fr": "Q65 : inactif", "de": "Q65: inaktiv", "no": "Q65: inaktiv", "cs": "Q65: nečinný"},
     "decode_depth": {"it": "Decodifica", "fr": "Décodage", "de": "Dekodierung", "no": "Dekoding", "cs": "Dekódování"},
     "cw_tracked_ab": {"it": "Tracciato A: %1 WPM · B: %2 WPM", "fr": "Suivi A : %1 MPM · B : %2 MPM", "de": "Verfolgt A: %1 WPM · B: %2 WPM", "no": "Sporet A: %1 WPM · B: %2 WPM", "cs": "Sledováno A: %1 WPM · B: %2 WPM"},
-    "action.exit.safe": {"it": "Chiudi MadModem in modo sicuro.", "fr": "Fermer MadModem en toute sécurité.", "de": "MadModem sicher beenden.", "no": "Lukk MadModem på en sikker måte.", "cs": "Bezpečně ukončit MadModem."},
+    "action.exit.safe": {"it": "Chiudi MultiModeModem in modo sicuro.", "fr": "Fermer MultiModeModem en toute sécurité.", "de": "MultiModeModem sicher beenden.", "no": "Lukk MultiModeModem på en sikker måte.", "cs": "Bezpečně ukončit MultiModeModem."},
     "scheduler_wefax_group": {"it": "MeteoFax / RX WEFAX HF", "fr": "MeteoFax / RX WEFAX HF", "de": "MeteoFax / HF-WEFAX RX", "no": "MeteoFax / HF WEFAX RX", "cs": "MeteoFax / HF WEFAX RX"},
     "seq_completed": {"it": "QSO completato / invia 73 se necessario", "fr": "QSO terminé / envoyer 73 si nécessaire", "de": "QSO abgeschlossen / bei Bedarf 73 senden", "no": "QSO fullført / send 73 ved behov", "cs": "QSO dokončeno / podle potřeby odeslat 73"},
     "seq_send_rr73": {"it": "ricevuto rapporto R; selezionato RR73", "fr": "rapport R reçu ; RR73 sélectionné", "de": "R-Bericht empfangen; RR73 gewählt", "no": "R-rapport mottatt; RR73 valgt", "cs": "přijat R-report; zvoleno RR73"},

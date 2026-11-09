@@ -1,6 +1,6 @@
-# Architecture — MadModem 0.6.5
+# Architecture — MultiModeModem 0.6.5
 
-MadModem is a C++17 Qt Widgets application. Audio capture and bounded decoder
+MultiModeModem is a C++17 Qt Widgets application. Audio capture and bounded decoder
 queues run independently of GUI rendering. CAT/PTT, waveform preparation and
 logbook persistence use workers; the GUI owns FT session decisions and UI state.
 

@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 
 CwRelativeTimingTask::CwRelativeTimingTask(CwRelativeTimingConfig config, bool dedicatedThread)
     : m_latest(CwRelativeTimingDecoder(config).snapshot()) {
@@ -185,4 +185,4 @@ void CwRelativeTimingTask::stop() {
   m_worker.join();
 }
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

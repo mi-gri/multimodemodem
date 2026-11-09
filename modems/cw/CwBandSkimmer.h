@@ -13,7 +13,7 @@ public:
     void reset();
     void setChannelLimit(int limit);
     void process(const QVector<float>& audio, int sampleRate,
-                 const std::vector<madmodem::cwskimmer::CwSkimmerChannelState>& carriers);
+                 const std::vector<m3::cwskimmer::CwSkimmerChannelState>& carriers);
     QVector<SkimmerSpot> spots() const;
 private:
     struct Lane;

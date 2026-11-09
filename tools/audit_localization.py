@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility entry point for the MadModem localization audit."""
+"""Compatibility entry point for the MultiModeModem localization audit."""
 from audit_ui_translations import main
 
 if __name__ == "__main__":

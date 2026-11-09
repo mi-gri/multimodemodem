@@ -16,7 +16,7 @@ class QTcpSocket;
  * @brief Optional Hamlib CAT/PTT controller.
  *
  * The class is compiled as a safe stub when Hamlib headers/libraries are not
- * available.  When MadModem is built with MADMODEM_WITH_HAMLIB it owns one
+ * available.  When MultiModeModem is built with M3_WITH_HAMLIB it owns one
  * Hamlib RIG handle, polls the transceiver frequency, and can key CAT PTT for
  * transmit.  Serial RTS/DTR is a separate, explicitly selected PTT method;
  * this controller never changes PTT route automatically after a failure.
@@ -111,7 +111,7 @@ private:
     bool prepareDigitalTxAudioRoute();
     bool forceUsbMode(bool required);
     bool forceDataUsbMode(bool required);
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     void capturePreTxMode();
     void restorePreTxMode();
 #endif
@@ -168,11 +168,11 @@ private:
     double m_ftSplitRxFrequencyHz = 0.0;
     double m_ftSplitTxFrequencyHz = 0.0;
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     struct RigDeleter;
     void *m_rig = nullptr;
     bool m_havePreTxMode = false;
-    bool m_txModeChangedByMadModem = false;
+    bool m_txModeChangedByM3 = false;
     qint64 m_preTxMode = 0;
     qint64 m_preTxPassband = 0;
     qint64 m_preTxModeVfo = 0;

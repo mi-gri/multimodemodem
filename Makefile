@@ -1,13 +1,13 @@
 # -----------------------------------------------------------------------------
-# MadModem convenience Makefile
+# MultiModeModem convenience Makefile
 #
 # v1.08 all-in-one policy: Hamlib is compiled from the bundled source before
-# MadModem is configured.  The default build links real Hamlib CAT/PTT support;
+# MultiModeModem is configured.  The default build links real Hamlib CAT/PTT support;
 # no silent Hamlib stub is used unless you explicitly pass
-# -DMADMODEM_REQUIRE_HAMLIB=OFF yourself.
+# -DM3_REQUIRE_HAMLIB=OFF yourself.
 # -----------------------------------------------------------------------------
 
-APP        := MadModem
+APP        := MultiModeModem
 BUILD_TYPE ?= Release
 JOBS       ?= $(shell nproc 2>/dev/null || echo 4)
 
@@ -28,7 +28,7 @@ hamlib-linux:
 
 linux: hamlib-linux
 	cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
-		-DHAMLIB_ROOT="$(HAMLIB_LINUX_ROOT)" -DMADMODEM_REQUIRE_HAMLIB=ON
+		-DHAMLIB_ROOT="$(HAMLIB_LINUX_ROOT)" -DM3_REQUIRE_HAMLIB=ON
 	cmake --build build-linux -j$(JOBS)
 
 windows: win64-static
@@ -53,7 +53,7 @@ win64-static: hamlib-windows
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DHAMLIB_ROOT="$(HAMLIB_WIN_ROOT)" \
 		-DPKG_CONFIG_EXECUTABLE="$(MXE_ROOT)/usr/bin/$(MXE_TARGET)-pkg-config" \
-		-DMADMODEM_REQUIRE_HAMLIB=ON
+		-DM3_REQUIRE_HAMLIB=ON
 	cmake --build build-win64-static -j$(JOBS)
 
 run: linux
@@ -72,15 +72,15 @@ distclean:
 		third_party/hamlib_lgpl/install-win64-static
 
 help:
-	@echo "MadModem build targets:"
+	@echo "MultiModeModem build targets:"
 	@echo "  make linux          Build bundled Hamlib + native Linux binary"
 	@echo "  make win64-static   Build bundled Hamlib + Windows static EXE using MXE"
 	@echo "  make windows        Alias of win64-static"
 	@echo "  make macos          Build native macOS .app bundle on a Mac/Homebrew host"
 	@echo "  make package-macos  Build and package unsigned macOS ZIP/DMG"
 	@echo "  make run            Build and run Linux binary"
-	@echo "  make clean          Clean MadModem build trees"
-	@echo "  make distclean      Remove MadModem and Hamlib build/install trees"
+	@echo "  make clean          Clean MultiModeModem build trees"
+	@echo "  make distclean      Remove MultiModeModem and Hamlib build/install trees"
 	@echo ""
 	@echo "Quick all-in-one Linux + Windows build: ./build_all.sh (or: bash build_all.sh if your extractor stripped executable bits)"
 	@echo "macOS CI build: GitHub Actions -> Build macOS unsigned"

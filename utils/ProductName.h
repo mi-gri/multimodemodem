@@ -5,12 +5,11 @@
 // Product name of this fork. MultiModeModem (m³) is based on MadModem by
 // Lucian-Ioan Papadopol, IZ6NNH (https://github.com/l-papadopol/MM).
 //
-// The program file, the application name (and with it the settings and data
-// folders, see MadModemInstallation::adoptUpstreamUserData) and the proposed
-// file names are MultiModeModem. Source identifiers, the CMake target and the
-// WSJT-X UDP id keep the upstream name so upstream changes still merge. The
-// translation dictionaries keep "MadModem"/"MM" as well; the name is replaced
-// when a text is shown (brand()).
+// Program file, application name, settings and data folders, source
+// identifiers (M3*), the CMake target and the WSJT-X UDP id all use the fork's
+// name; "MadModem" remains only in references to the original program and
+// where old data is read (see M3Installation::adoptUpstreamUserData).
+// brand() still maps "MadModem"/"MM" in texts that come from elsewhere.
 namespace ProductName {
 
 inline QString longName() { return QStringLiteral("MultiModeModem"); }
@@ -19,7 +18,7 @@ inline QString upstreamName() { return QStringLiteral("MadModem"); }
 
 // Replaces the upstream product name in a visible text: "MadModem" becomes
 // "MultiModeModem" everywhere, also in the folder and file names the texts
-// propose ("Pictures/MadModem/SSTV"). The abbreviation "MM" becomes "m³",
+// propose ("Pictures/MultiModeModem/SSTV"). The abbreviation "MM" becomes "m³",
 // except as a word part or the maritime mobile suffix "/MM".
 inline QString brand(QString text)
 {

@@ -27,7 +27,7 @@ public:
         const quint64 request = ++m_sequence;
         Operation operation = [this, entry, recentFtDuplicate](AdifLogbook &store, QString &error) {
             ensureIndexes(store);
-            const auto id = entry.adifFields.value(QStringLiteral("APP_MADMODEM_QSO_ID"));
+            const auto id = entry.adifFields.value(QStringLiteral("APP_M3_QSO_ID"));
             if (!id.isEmpty() && m_recordIds.contains(id)) return 0;
             if (recentFtDuplicate) {
                 const auto dates = m_ftDates.value(ftKey(entry));
@@ -117,7 +117,7 @@ private:
             entry.band.trimmed().toUpper() + QLatin1Char('|') + entry.mode.trimmed().toUpper();
     }
     void indexEntry(const LogbookEntry &entry) {
-        const auto id = entry.adifFields.value(QStringLiteral("APP_MADMODEM_QSO_ID"));
+        const auto id = entry.adifFields.value(QStringLiteral("APP_M3_QSO_ID"));
         if (!id.isEmpty()) m_recordIds.insert(id);
         m_ftDates[ftKey(entry)].append(entry.utc);
     }

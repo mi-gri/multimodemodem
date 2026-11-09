@@ -83,7 +83,7 @@ void CwDecoder::resetSkimmer()
     m_haveDiagnosticB = false;
     // Native full-passband carrier discovery. It never decodes Morse and
     // therefore cannot inject unrelated characters into the RX terminals.
-    madmodem::cwskimmer::CwSkimmerConfig cfg;
+    m3::cwskimmer::CwSkimmerConfig cfg;
     cfg.minimumFrequencyHz = 100.0;
     cfg.maximumFrequencyHz = 3500.0;
     cfg.associationRadiusHz = 18.0;
@@ -91,11 +91,11 @@ void CwDecoder::resetSkimmer()
     cfg.thresholdMultiplier = 8.0f;
     cfg.minEventSnrDb = 7.0f;
 
-    m_skimmer = std::make_unique<madmodem::cwskimmer::CwSkimmerEngine>(cfg);
+    m_skimmer = std::make_unique<m3::cwskimmer::CwSkimmerEngine>(cfg);
     // Display snapshots are batched below, never posted once per FFT peak.
 
     auto makeSelectedTracker = [this](int rank, double toneHz) {
-        madmodem::cwskimmer::SelectedToneCwConfig selectedCfg;
+        m3::cwskimmer::SelectedToneCwConfig selectedCfg;
         selectedCfg.toneHz = toneHz;
         selectedCfg.bandwidthHz = m_bandwidthHz;
         selectedCfg.minSnrDb = 3.0;
@@ -106,8 +106,8 @@ void CwDecoder::resetSkimmer()
         selectedCfg.afcRangeHz = m_afcRangeHz;
         selectedCfg.maxRollingText = 160;
         selectedCfg.decoderChannelNumber = rank;
-        auto tracker = std::make_unique<madmodem::cwskimmer::SelectedToneCwTracker>(selectedCfg);
-        tracker->setCallback([this, rank](const madmodem::cwskimmer::SelectedToneCwEvent &event) {
+        auto tracker = std::make_unique<m3::cwskimmer::SelectedToneCwTracker>(selectedCfg);
+        tracker->setCallback([this, rank](const m3::cwskimmer::SelectedToneCwEvent &event) {
             if (m_decodeEngine == QStringLiteral("native"))
                 acceptDecodedText(rank, event.committedText);
             if (event.wpm > 0.1 && std::isfinite(event.wpm)) {
@@ -123,7 +123,7 @@ void CwDecoder::resetSkimmer()
             emitSkimmerStatus(false);
         });
         tracker->setDiagnosticCallback([this, rank](
-            const madmodem::cwskimmer::SelectedToneCwDiagnosticSample &sample) {
+            const m3::cwskimmer::SelectedToneCwDiagnosticSample &sample) {
             CwDiagnosticPoint point;
             point.timestampSec = sample.timestampSec;
             point.acquisitionEnvelope = static_cast<float>(sample.acquisitionEnvelope);
@@ -173,7 +173,7 @@ void CwDecoder::resetSkimmer()
             emit liveLogLine(rank, QString::fromStdString(line));
         });
         tracker->setSpectrumCallback([this, rank](
-            const madmodem::cwskimmer::SelectedToneCwSpectrumFrame &frame) {
+            const m3::cwskimmer::SelectedToneCwSpectrumFrame &frame) {
             QVector<float> offsets;
             QVector<float> inputPsd;
             QVector<float> filteredPsd;
@@ -201,8 +201,8 @@ void CwDecoder::resetSkimmer()
 
     m_toneTrackerA = makeSelectedTracker(0, m_toneHz);
     m_toneTrackerB = makeSelectedTracker(1, m_secondaryToneHz);
-    m_neuralA = std::make_unique<madmodem::cwskimmer::CwNeuralDecoder>();
-    m_neuralB = std::make_unique<madmodem::cwskimmer::CwNeuralDecoder>();
+    m_neuralA = std::make_unique<m3::cwskimmer::CwNeuralDecoder>();
+    m_neuralB = std::make_unique<m3::cwskimmer::CwNeuralDecoder>();
     m_neuralA->setToneHz(m_toneHz);
     m_neuralB->setToneHz(m_secondaryToneHz);
     m_neuralA->setCallback([this](const std::string& text) { acceptDecodedText(0, text); });
@@ -303,7 +303,7 @@ void CwDecoder::updateTrackerInterferers()
 
     auto buildList = [&](double targetHz, double otherMarkerHz,
                          bool includeOtherMarker) {
-        std::vector<madmodem::cwskimmer::SelectedToneCwInterferer> result;
+        std::vector<m3::cwskimmer::SelectedToneCwInterferer> result;
         result.reserve(5U);
 
         auto addOrMerge = [&](double toneHz, double confidence) {
@@ -322,7 +322,7 @@ void CwDecoder::updateTrackerInterferers()
                     return;
                 }
             }
-            madmodem::cwskimmer::SelectedToneCwInterferer item;
+            m3::cwskimmer::SelectedToneCwInterferer item;
             item.toneHz = toneHz;
             item.confidence = qBound(0.0, confidence, 1.0);
             result.push_back(item);
@@ -421,7 +421,7 @@ void CwDecoder::resetBandSkimmer()
     m_bandSkimmer.reset();
     m_bandPublishSamples = 0;
     const auto discoveryConfig = m_skimmer->config();
-    m_skimmer = std::make_unique<madmodem::cwskimmer::CwSkimmerEngine>(discoveryConfig);
+    m_skimmer = std::make_unique<m3::cwskimmer::CwSkimmerEngine>(discoveryConfig);
     emit bandSkimmerChanged({});
 }
 

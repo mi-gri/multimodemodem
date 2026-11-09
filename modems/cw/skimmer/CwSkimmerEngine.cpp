@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 namespace {
 
 constexpr double kTwoPi = 6.283185307179586476925286766559;
@@ -307,4 +307,4 @@ std::vector<CwSkimmerChannelState> CwSkimmerEngine::priorityChannels(std::size_t
 }
 std::vector<uint32_t> CwSkimmerEngine::lastMagnitudes() const { return m_impl->magnitudes; }
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

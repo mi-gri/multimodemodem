@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 
 enum class CwRelativeTimingState {
   Search,
@@ -169,4 +169,4 @@ private:
   std::optional<CwLogicRun> m_deferredSpace;
 };
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

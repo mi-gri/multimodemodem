@@ -1,6 +1,6 @@
 // -*- Mode: C++ -*-
-#ifndef MADMODEM_DECODIUM_NTP_CLIENT_HPP__
-#define MADMODEM_DECODIUM_NTP_CLIENT_HPP__
+#ifndef M3_DECODIUM_NTP_CLIENT_HPP__
+#define M3_DECODIUM_NTP_CLIENT_HPP__
 
 #include <QObject>
 #include <QUdpSocket>
@@ -117,4 +117,4 @@ private:
     double m_maxRttMs = 1000.0;
 };
 
-#endif // MADMODEM_DECODIUM_NTP_CLIENT_HPP__
+#endif // M3_DECODIUM_NTP_CLIENT_HPP__

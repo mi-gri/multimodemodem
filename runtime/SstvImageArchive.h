@@ -1,5 +1,5 @@
-#ifndef MADMODEM_SSTV_IMAGE_ARCHIVE_H
-#define MADMODEM_SSTV_IMAGE_ARCHIVE_H
+#ifndef M3_SSTV_IMAGE_ARCHIVE_H
+#define M3_SSTV_IMAGE_ARCHIVE_H
 
 #include <QObject>
 #include <QDateTime>

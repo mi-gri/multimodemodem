@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <QtHelpProject version="1.0">
-    <namespace>org.madmodem.mm.065.cs</namespace>
+    <namespace>org.m3.mm.065.cs</namespace>
     <virtualFolder>doc</virtualFolder>
     <filterSection>
         <filterAttribute>MM</filterAttribute>

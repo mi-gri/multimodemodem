@@ -5,7 +5,7 @@
 #include <optional>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 
 struct CwCarrierObservation {
   double timestampSec = 0.0;
@@ -172,4 +172,4 @@ private:
   double m_runQsbProbabilitySum = 0.0;
 };
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

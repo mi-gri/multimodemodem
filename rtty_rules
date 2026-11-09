@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "updated_utc": "2026-08-15",
-  "description": "MadModem RTTY Contest Engine rules. File esterno ricaricabile: exchange, macro, seriali, condizioni, dupes, periodi, moltiplicatori e scoring sono dati; le regole dei singoli contest non sono hard-coded nel binario.",
+  "description": "MultiModeModem RTTY Contest Engine rules. File esterno ricaricabile: exchange, macro, seriali, condizioni, dupes, periodi, moltiplicatori e scoring sono dati; le regole dei singoli contest non sono hard-coded nel binario.",
   "profiles": [
     {
       "id": "sartg_new_year",

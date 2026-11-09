@@ -6,16 +6,16 @@ using namespace cwtest;
 
 std::string decode(const std::vector<float>& samples, double frequencyHz,
                    double hintWpm, std::vector<std::string>* logs = nullptr,
-                   const std::vector<madmodem::cwskimmer::SelectedToneCwInterferer>& interferers = {},
+                   const std::vector<m3::cwskimmer::SelectedToneCwInterferer>& interferers = {},
                    double* finalWpm = nullptr) {
-  madmodem::cwskimmer::SelectedToneCwConfig config;
+  m3::cwskimmer::SelectedToneCwConfig config;
   config.toneHz = frequencyHz;
   config.bandwidthHz = 120.0;
   config.minSnrDb = 0.0;
   config.initialWpm = hintWpm;
   config.autoWpm = true;
   config.autoBandwidth = true;
-  madmodem::cwskimmer::SelectedToneCwTracker tracker(config);
+  m3::cwskimmer::SelectedToneCwTracker tracker(config);
   tracker.setInterferers(interferers);
   std::string output;
   tracker.setCallback([&](const auto& event) { output += event.committedText; });
@@ -58,7 +58,7 @@ void testShortPreludeKeepsFirstElement() {
 }
 
 void testTimingTaskResetDiscardsOldText() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   for (bool keepPrior : {false, true}) {
     CwRelativeTimingTask task;
     double time = 0.0;
@@ -105,7 +105,7 @@ void testTimingTaskResetDiscardsOldText() {
 }
 
 void testRelativeTimingDirect() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwRelativeTimingConfig cfg;
   cfg.initialWpm = 15.0;
   CwRelativeTimingDecoder decoder(cfg);
@@ -144,7 +144,7 @@ void testRelativeTimingDirect() {
 }
 
 void testSameLaneAbruptOperatorSpeedChange() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwRelativeTimingConfig cfg;
   cfg.initialWpm = 20.0;
   cfg.autoWpm = true;
@@ -202,7 +202,7 @@ void testSameLaneAbruptOperatorSpeedChange() {
 }
 
 void testProvisionalEpochRebasesBeforePublishing() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwRelativeTimingConfig cfg;
   cfg.initialWpm = 25.0;
   cfg.autoWpm = true;
@@ -271,7 +271,7 @@ void testProvisionalEpochRebasesBeforePublishing() {
 }
 
 void testMalformedEstablishedClockRebasesAcrossMicroMark() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwRelativeTimingConfig cfg;
   cfg.initialWpm = 50.0;
   CwRelativeTimingDecoder decoder(cfg);
@@ -324,7 +324,7 @@ void testMalformedEstablishedClockRebasesAcrossMicroMark() {
 }
 
 void testAdaptiveBeamReplaysWrongInitialClock() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwMorseBeamDecoder beam;
   CwMorseTimingSnapshot timing;
   timing.ditMs = 80.0;       // deliberately wrong 15 WPM hint
@@ -377,7 +377,7 @@ void testAdaptiveBeamReplaysWrongInitialClock() {
 
 
 void testStretchedElementSpacesDoNotSplitCallsign() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwMorseBeamDecoder beam;
   CwMorseTimingSnapshot timing;
   timing.ditMs = 48.0;       // 25 WPM machine sender
@@ -432,7 +432,7 @@ void testStretchedElementSpacesDoNotSplitCallsign() {
 }
 
 void testBayesianPosteriorMetadata() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwMorseBeamDecoder beam;
   CwMorseTimingSnapshot timing;
   timing.ditMs = 40.0;
@@ -477,7 +477,7 @@ void testBayesianPosteriorMetadata() {
 }
 
 void testLocalTxResumeRetainsCwTiming() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   SignalOptions signal;
   signal.frequencyHz = 1412.0;
   signal.wpm = 30.0;
@@ -575,7 +575,7 @@ void appendBroadNarrowbandNoise(std::vector<float>& samples,
 }
 
 void testTimingRejectsMicroRunStorm() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwRelativeTimingConfig cfg;
   cfg.initialWpm = 20.0;
   CwRelativeTimingDecoder decoder(cfg);
@@ -638,7 +638,7 @@ void testTimingRejectsMicroRunStorm() {
 }
 
 void testWpmCeilingAndDuplicateToneUpdate() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   SelectedToneCwConfig cfg;
   cfg.toneHz = 1000.0;
   cfg.initialWpm = 70.0;  // stale setting from the failing live run
@@ -661,7 +661,7 @@ void testWpmCeilingAndDuplicateToneUpdate() {
 }
 
 void testDiscriminatorResetUsesLiveTimestamp() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwCarrierDiscriminatorConfig cfg;
   cfg.minSnrDb = 0.0;
   cfg.minimumStableMs = 4;
@@ -698,7 +698,7 @@ void testDiscriminatorResetUsesLiveTimestamp() {
 }
 
 void testSegmentalFixedLagIsCausalAndBounded() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwCarrierDiscriminatorConfig cfg;
   cfg.minSnrDb = 0.0;
   cfg.minimumFixedLagMs = 36;
@@ -765,7 +765,7 @@ void testSegmentalFixedLagIsCausalAndBounded() {
 }
 
 void testFirstSampleRateDoesNotRestartAgain() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   SelectedToneCwConfig cfg;
   cfg.toneHz = 1000.0;
   SelectedToneCwTracker tracker(cfg);
@@ -785,7 +785,7 @@ void testFirstSampleRateDoesNotRestartAgain() {
 }
 
 void testCommittedPatternSnapshot() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwRelativeTimingDecoder decoder;
   double time = 0.0;
   CwRelativeTimingResult committed;
@@ -1003,7 +1003,7 @@ int main() {
     adjacent.frequencyHz = 1388.0;
     adjacent.interfererOffsetHz = 70.0;
     adjacent.interfererAmplitude = 0.55;
-    std::vector<madmodem::cwskimmer::SelectedToneCwInterferer> neighbours = {
+    std::vector<m3::cwskimmer::SelectedToneCwInterferer> neighbours = {
         {adjacent.frequencyHz + adjacent.interfererOffsetHz, 1.0}};
     const std::string adjacentText = "CQ CQ DE IZ6NNH";
     std::vector<std::string> adjacentLogs;

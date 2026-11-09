@@ -27,38 +27,38 @@ def check(root: Path, env: dict[str, str]) -> list[str]:
         if values != [wanted]:
             errors.append(f"{name}: expected {wanted!r}, found {values!r}")
 
-    version = read("MADMODEM_VERSION.txt").strip()
-    revision = read("MADMODEM_SOURCE_REVISION.txt").strip()
-    print("MadModem CI version guard")
-    print(f"  MADMODEM_VERSION.txt : {version}")
+    version = read("M3_VERSION.txt").strip()
+    revision = read("M3_SOURCE_REVISION.txt").strip()
+    print("MultiModeModem CI version guard")
+    print(f"  M3_VERSION.txt : {version}")
     print(f"  SOURCE_REVISION      : {revision}")
     for key, default in (("GITHUB_REF_TYPE", "manual"),
                          ("GITHUB_REF_NAME", "manual"), ("GITHUB_SHA", "manual")):
         print(f"  {key:<20} : {env.get(key, default)}")
 
     if not re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", version):
-        errors.append("MADMODEM_VERSION.txt: expected one MAJOR.MINOR.PATCH version")
+        errors.append("M3_VERSION.txt: expected one MAJOR.MINOR.PATCH version")
         return errors
     numbers = version.split(".")
     if not revision.startswith(version + "-") or "\n" in revision:
-        errors.append(f"MADMODEM_SOURCE_REVISION.txt: revision does not belong to {version}")
+        errors.append(f"M3_SOURCE_REVISION.txt: revision does not belong to {version}")
     if env.get("GITHUB_REF_TYPE") == "tag":
         tag = env.get("GITHUB_REF_NAME", "")
         if tag.removeprefix("v") != version:
             errors.append(f"Git tag {tag!r} does not match {version}; use a matching version tag and commit")
 
-    header = read("MadModemVersion.h")
-    for macro, wanted in (("STRING", version), ("DISPLAY", f"MadModem {version}"),
+    header = read("M3Version.h")
+    for macro, wanted in (("STRING", version), ("DISPLAY", f"MultiModeModem {version}"),
                           ("PRERELEASE", "")):
-        require(f"MadModemVersion.h / MADMODEM_VERSION_{macro}",
-                rf'^\s*#define\s+MADMODEM_VERSION_{macro}\s+"([^"\r\n]*)"\s*$', wanted, header)
+        require(f"M3Version.h / M3_VERSION_{macro}",
+                rf'^\s*#define\s+M3_VERSION_{macro}\s+"([^"\r\n]*)"\s*$', wanted, header)
     for macro, wanted in zip(("MAJOR", "MINOR", "PATCH"), numbers):
-        require(f"MadModemVersion.h / MADMODEM_VERSION_{macro}",
-                rf"^\s*#define\s+MADMODEM_VERSION_{macro}\s+(\d+)\s*$", wanted, header)
+        require(f"M3Version.h / M3_VERSION_{macro}",
+                rf"^\s*#define\s+M3_VERSION_{macro}\s+(\d+)\s*$", wanted, header)
 
     cmake = read("CMakeLists.txt")
     require("CMakeLists.txt / project VERSION",
-            r"project\s*\(\s*MadModem\s+VERSION\s+(\S+)", version, cmake)
+            r"project\s*\(\s*MultiModeModem\s+VERSION\s+(\S+)", version, cmake)
     resource = read("multimodemodem.rc")
     for field in ("FILEVERSION", "PRODUCTVERSION"):
         require(f"multimodemodem.rc / {field}", rf"^\s*{field}\s+([0-9,]+)\s*$",
@@ -70,13 +70,13 @@ def check(root: Path, env: dict[str, str]) -> list[str]:
     try:
         ui = ET.fromstring(read("mainwindow.ui"))
         title = ui.find("./widget/property[@name='windowTitle']/string")
-        if title is None or title.text != f"MadModem {version}":
-            errors.append(f"mainwindow.ui: windowTitle must be MadModem {version}")
+        if title is None or title.text != f"MultiModeModem {version}":
+            errors.append(f"mainwindow.ui: windowTitle must be MultiModeModem {version}")
     except ET.ParseError as exc:
         errors.append(f"mainwindow.ui: {exc}")
 
     for lang in LANGS:
-        namespace = f"org.madmodem.mm.{version.replace('.', '')}.{lang}"
+        namespace = f"org.m3.mm.{version.replace('.', '')}.{lang}"
         qhp = f"docs/help/MM_{lang}.qhp"
         qhcp = f"docs/help/MM_{lang}.qhcp"
         for name in (qhp, qhcp):

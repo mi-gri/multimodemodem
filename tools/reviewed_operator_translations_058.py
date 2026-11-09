@@ -1,4 +1,4 @@
-"""Reviewed sentence-level translations for MadModem 0.5.8 operator UI.
+"""Reviewed sentence-level translations for MultiModeModem 0.5.8 operator UI.
 
 These values deliberately use complete sentences.  Radio/protocol terms such as
 CAT, PTT, RX, TX, QSO, FT4/FT8, ADIF and Maidenhead remain unchanged.
@@ -527,18 +527,18 @@ KEYS: dict[str, dict[str, str]] = {
         "cs": "Dlaždice OSM nejsou dostupné",
     },
     "text.qt_ssl_openssl_is_unavailable_online_osm_https_tiles_will_use_the_offline_map_unless_madmo": {
-        "it": "Qt SSL/OpenSSL non è disponibile: le tile OSM HTTPS online useranno la mappa offline, salvo un proxy/cache HTTP locale configurato con MADMODEM_OSM_TILE_BASE.",
-        "fr": "Qt SSL/OpenSSL est indisponible : les tuiles OSM HTTPS en ligne utiliseront la carte hors ligne, sauf si MADMODEM_OSM_TILE_BASE indique un proxy/cache HTTP local.",
-        "de": "Qt SSL/OpenSSL ist nicht verfügbar: Online-OSM-Kacheln über HTTPS verwenden die Offlinekarte, sofern MADMODEM_OSM_TILE_BASE nicht auf einen lokalen HTTP-Proxy/Cache zeigt.",
-        "no": "Qt SSL/OpenSSL er utilgjengelig: OSM-fliser over HTTPS bruker frakoblet kart, med mindre MADMODEM_OSM_TILE_BASE peker på en lokal HTTP-proxy/-cache.",
-        "cs": "Qt SSL/OpenSSL není dostupné: online dlaždice OSM přes HTTPS použijí offline mapu, pokud MADMODEM_OSM_TILE_BASE neodkazuje na místní HTTP proxy/cache.",
+        "it": "Qt SSL/OpenSSL non è disponibile: le tile OSM HTTPS online useranno la mappa offline, salvo un proxy/cache HTTP locale configurato con M3_OSM_TILE_BASE.",
+        "fr": "Qt SSL/OpenSSL est indisponible : les tuiles OSM HTTPS en ligne utiliseront la carte hors ligne, sauf si M3_OSM_TILE_BASE indique un proxy/cache HTTP local.",
+        "de": "Qt SSL/OpenSSL ist nicht verfügbar: Online-OSM-Kacheln über HTTPS verwenden die Offlinekarte, sofern M3_OSM_TILE_BASE nicht auf einen lokalen HTTP-Proxy/Cache zeigt.",
+        "no": "Qt SSL/OpenSSL er utilgjengelig: OSM-fliser over HTTPS bruker frakoblet kart, med mindre M3_OSM_TILE_BASE peker på en lokal HTTP-proxy/-cache.",
+        "cs": "Qt SSL/OpenSSL není dostupné: online dlaždice OSM přes HTTPS použijí offline mapu, pokud M3_OSM_TILE_BASE neodkazuje na místní HTTP proxy/cache.",
     },
     "text.osm_https_tiles_require_qt_ssl_openssl_on_windows_rebuild_mxe_qt_with_openssl_or_set_madmo": {
-        "it": "Le tile OSM HTTPS richiedono Qt SSL/OpenSSL su Windows. Ricompila Qt MXE con OpenSSL oppure imposta MADMODEM_OSM_TILE_BASE su un proxy/cache HTTP locale.",
-        "fr": "Les tuiles OSM HTTPS exigent Qt SSL/OpenSSL sous Windows. Recompilez Qt MXE avec OpenSSL ou définissez MADMODEM_OSM_TILE_BASE sur un proxy/cache HTTP local.",
-        "de": "OSM-Kacheln über HTTPS benötigen unter Windows Qt SSL/OpenSSL. Qt MXE mit OpenSSL neu bauen oder MADMODEM_OSM_TILE_BASE auf einen lokalen HTTP-Proxy/Cache setzen.",
-        "no": "OSM-fliser over HTTPS krever Qt SSL/OpenSSL i Windows. Bygg Qt MXE med OpenSSL eller sett MADMODEM_OSM_TILE_BASE til en lokal HTTP-proxy/-cache.",
-        "cs": "Dlaždice OSM přes HTTPS vyžadují ve Windows Qt SSL/OpenSSL. Znovu sestavte Qt MXE s OpenSSL nebo nastavte MADMODEM_OSM_TILE_BASE na místní HTTP proxy/cache.",
+        "it": "Le tile OSM HTTPS richiedono Qt SSL/OpenSSL su Windows. Ricompila Qt MXE con OpenSSL oppure imposta M3_OSM_TILE_BASE su un proxy/cache HTTP locale.",
+        "fr": "Les tuiles OSM HTTPS exigent Qt SSL/OpenSSL sous Windows. Recompilez Qt MXE avec OpenSSL ou définissez M3_OSM_TILE_BASE sur un proxy/cache HTTP local.",
+        "de": "OSM-Kacheln über HTTPS benötigen unter Windows Qt SSL/OpenSSL. Qt MXE mit OpenSSL neu bauen oder M3_OSM_TILE_BASE auf einen lokalen HTTP-Proxy/Cache setzen.",
+        "no": "OSM-fliser over HTTPS krever Qt SSL/OpenSSL i Windows. Bygg Qt MXE med OpenSSL eller sett M3_OSM_TILE_BASE til en lokal HTTP-proxy/-cache.",
+        "cs": "Dlaždice OSM přes HTTPS vyžadují ve Windows Qt SSL/OpenSSL. Znovu sestavte Qt MXE s OpenSSL nebo nastavte M3_OSM_TILE_BASE na místní HTTP proxy/cache.",
     },
     "text.osm_tile_endpoint_redirected_to_1_trying_another_configured_source": {
         "it": "L’endpoint OSM ha reindirizzato verso %1; provo un’altra sorgente configurata",
@@ -560,11 +560,11 @@ KEYS: dict[str, dict[str, str]] = {
         "cs": "Obraz dlaždice OSM se nepodařilo dekódovat; zkouší se jiný zdroj",
     },
     "text.https_tls_tile_request_failed_verify_that_the_windows_build_has_qt_ssl_openssl_or_set_madm": {
-        "it": "Richiesta HTTPS/TLS della tile non riuscita. Verifica che la build Windows includa Qt SSL/OpenSSL oppure imposta MADMODEM_OSM_TILE_BASE su un proxy/cache HTTP locale.",
-        "fr": "Échec de la requête HTTPS/TLS de la tuile. Vérifiez que la version Windows inclut Qt SSL/OpenSSL ou définissez MADMODEM_OSM_TILE_BASE sur un proxy/cache HTTP local.",
-        "de": "HTTPS/TLS-Anfrage der Kachel fehlgeschlagen. Prüfen, ob der Windows-Build Qt SSL/OpenSSL enthält, oder MADMODEM_OSM_TILE_BASE auf einen lokalen HTTP-Proxy/Cache setzen.",
-        "no": "HTTPS/TLS-forespørselen for flisen mislyktes. Kontroller at Windows-bygget har Qt SSL/OpenSSL, eller sett MADMODEM_OSM_TILE_BASE til en lokal HTTP-proxy/-cache.",
-        "cs": "Požadavek HTTPS/TLS na dlaždici selhal. Ověřte, že sestavení pro Windows obsahuje Qt SSL/OpenSSL, nebo nastavte MADMODEM_OSM_TILE_BASE na místní HTTP proxy/cache.",
+        "it": "Richiesta HTTPS/TLS della tile non riuscita. Verifica che la build Windows includa Qt SSL/OpenSSL oppure imposta M3_OSM_TILE_BASE su un proxy/cache HTTP locale.",
+        "fr": "Échec de la requête HTTPS/TLS de la tuile. Vérifiez que la version Windows inclut Qt SSL/OpenSSL ou définissez M3_OSM_TILE_BASE sur un proxy/cache HTTP local.",
+        "de": "HTTPS/TLS-Anfrage der Kachel fehlgeschlagen. Prüfen, ob der Windows-Build Qt SSL/OpenSSL enthält, oder M3_OSM_TILE_BASE auf einen lokalen HTTP-Proxy/Cache setzen.",
+        "no": "HTTPS/TLS-forespørselen for flisen mislyktes. Kontroller at Windows-bygget har Qt SSL/OpenSSL, eller sett M3_OSM_TILE_BASE til en lokal HTTP-proxy/-cache.",
+        "cs": "Požadavek HTTPS/TLS na dlaždici selhal. Ověřte, že sestavení pro Windows obsahuje Qt SSL/OpenSSL, nebo nastavte M3_OSM_TILE_BASE na místní HTTP proxy/cache.",
     },
     "text.select_the_hamlib_rotator_model_the_first_number_is_the_model_id_passed_to_rot_init": {
         "it": "Seleziona il modello Hamlib del rotore. Il primo numero è l’ID passato a rot_init().",
@@ -657,19 +657,19 @@ KEYS: dict[str, dict[str, str]] = {
         "no": "Ikke-FT-moduser bruker manuell frekvens. Planleggeren ber bare CAT om QSY og starter aldri TX.",
         "cs": "Režimy mimo FT používají ruční frekvenci. Plánovač pouze požádá CAT o QSY a nikdy nespustí TX.",
     },
-    "text.madmodem_keeps_the_internal_logbook_as_one_adif_file_choose_where_that_file_is_stored_the_": {
-        "it": "MadModem conserva il registro interno in un unico file ADIF. Scegli dove salvarlo; il percorso predefinito è accanto all’eseguibile.",
-        "fr": "MadModem conserve le journal interne dans un seul fichier ADIF. Choisissez son emplacement ; le chemin par défaut est près de l’exécutable.",
-        "de": "MadModem speichert das interne Logbuch in einer ADIF-Datei. Speicherort wählen; standardmäßig liegt sie neben der Anwendung.",
-        "no": "MadModem lagrer den interne loggen i én ADIF-fil. Velg plassering; standarden er ved siden av programfilen.",
-        "cs": "MadModem ukládá interní deník do jediného souboru ADIF. Vyberte umístění; výchozí cesta je vedle aplikace.",
+    "text.m3_keeps_the_internal_logbook_as_one_adif_file_choose_where_that_file_is_stored_the_": {
+        "it": "MultiModeModem conserva il registro interno in un unico file ADIF. Scegli dove salvarlo; il percorso predefinito è accanto all’eseguibile.",
+        "fr": "MultiModeModem conserve le journal interne dans un seul fichier ADIF. Choisissez son emplacement ; le chemin par défaut est près de l’exécutable.",
+        "de": "MultiModeModem speichert das interne Logbuch in einer ADIF-Datei. Speicherort wählen; standardmäßig liegt sie neben der Anwendung.",
+        "no": "MultiModeModem lagrer den interne loggen i én ADIF-fil. Velg plassering; standarden er ved siden av programfilen.",
+        "cs": "MultiModeModem ukládá interní deník do jediného souboru ADIF. Vyberte umístění; výchozí cesta je vedle aplikace.",
     },
-    "text.the_folder_does_not_exist_yet_madmodem_will_try_to_create_it_when_saving_the_logbook": {
-        "it": "La cartella non esiste; MadModem proverà a crearla al salvataggio del registro.",
-        "fr": "Le dossier n’existe pas ; MadModem tentera de le créer lors de l’enregistrement du journal.",
-        "de": "Der Ordner existiert noch nicht; MadModem versucht ihn beim Speichern des Logbuchs anzulegen.",
-        "no": "Mappen finnes ikke; MadModem prøver å opprette den når loggen lagres.",
-        "cs": "Složka neexistuje; MadModem se ji pokusí vytvořit při ukládání deníku.",
+    "text.the_folder_does_not_exist_yet_m3_will_try_to_create_it_when_saving_the_logbook": {
+        "it": "La cartella non esiste; MultiModeModem proverà a crearla al salvataggio del registro.",
+        "fr": "Le dossier n’existe pas ; MultiModeModem tentera de le créer lors de l’enregistrement du journal.",
+        "de": "Der Ordner existiert noch nicht; MultiModeModem versucht ihn beim Speichern des Logbuchs anzulegen.",
+        "no": "Mappen finnes ikke; MultiModeModem prøver å opprette den når loggen lagres.",
+        "cs": "Složka neexistuje; MultiModeModem se ji pokusí vytvořit při ukládání deníku.",
     },
     "text.cat_test_reads_only_the_rig_frequency_it_never_keys_ptt_dtr_rts_and_handshake_are_used_onl": {
         "it": "Il test CAT legge solo la frequenza della radio e non attiva il PTT. DTR, RTS e handshake sono usati solo se selezionati qui.",
@@ -790,11 +790,11 @@ KEYS.update({
         "cs": "Vybere paletu waterfallu; výchozí paleta zvýrazňuje slabé signály.",
     },
     "tx_blocked_unknown_reason": {
-        "it": "MadModem ha bloccato TX/PTT per sicurezza senza ricevere un motivo dettagliato.",
-        "fr": "MadModem a bloqué TX/PTT par sécurité sans recevoir de motif détaillé.",
-        "de": "MadModem hat TX/PTT aus Sicherheitsgründen blockiert, aber keinen genauen Grund erhalten.",
-        "no": "MadModem blokkerte TX/PTT av sikkerhetshensyn uten å få en detaljert årsak.",
-        "cs": "MadModem z bezpečnostních důvodů zablokoval TX/PTT, ale neobdržel podrobný důvod.",
+        "it": "MultiModeModem ha bloccato TX/PTT per sicurezza senza ricevere un motivo dettagliato.",
+        "fr": "MultiModeModem a bloqué TX/PTT par sécurité sans recevoir de motif détaillé.",
+        "de": "MultiModeModem hat TX/PTT aus Sicherheitsgründen blockiert, aber keinen genauen Grund erhalten.",
+        "no": "MultiModeModem blokkerte TX/PTT av sikkerhetshensyn uten å få en detaljert årsak.",
+        "cs": "MultiModeModem z bezpečnostních důvodů zablokoval TX/PTT, ale neobdržel podrobný důvod.",
     },
     "tx_blocked_message": {
         "it": "%1 non può trasmettere: un controllo di sicurezza o configurazione non è riuscito.",

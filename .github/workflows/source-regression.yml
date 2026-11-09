@@ -47,11 +47,11 @@ jobs:
           cmake -S . -B build-ci -G "Unix Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=${{ matrix.qt == 5 && 'ON' || 'OFF' }} \
-            -DMADMODEM_REQUIRE_QT_LOCATION=${{ matrix.qt == 5 && 'ON' || 'OFF' }} \
-            -DMADMODEM_REQUIRE_HAMLIB=ON \
-            -DMADMODEM_AUTOBUILD_HAMLIB=OFF \
-            -DMADMODEM_NATIVE_OPTIMIZE=OFF \
-            -DMADMODEM_ENABLE_LTO=OFF \
+            -DM3_REQUIRE_QT_LOCATION=${{ matrix.qt == 5 && 'ON' || 'OFF' }} \
+            -DM3_REQUIRE_HAMLIB=ON \
+            -DM3_AUTOBUILD_HAMLIB=OFF \
+            -DM3_NATIVE_OPTIMIZE=OFF \
+            -DM3_ENABLE_LTO=OFF \
             -DBUILD_TESTING=ON
 
       - name: Build

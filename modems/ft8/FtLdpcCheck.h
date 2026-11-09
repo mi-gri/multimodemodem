@@ -2,7 +2,7 @@
 #pragma once
 #include <algorithm>
 #include <cmath>
-namespace MadModemFt {
+namespace M3Ft {
 // Exactly the normalized min-sum check used by the receiver, evaluated in
 // linear rather than quadratic work per row. Ties and zero signs are retained.
 inline void normalizedMinSumCheck(const double *input,int degree,double *output)

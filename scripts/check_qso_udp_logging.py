@@ -40,7 +40,7 @@ checks = [
     ("AdifLogbook::entryToAdif(entry)" in broadcaster and "<EOH>" in broadcaster,
      "Logged ADIF payload must be a complete ADIF file"),
     ("network/QsoUdpBroadcaster.cpp" in cmake and "network/QsoUdpBroadcaster.h" in cmake,
-     "UDP broadcaster must be compiled into MadModem"),
+     "UDP broadcaster must be compiled into MultiModeModem"),
 ]
 for ok, message in checks:
     if not ok:

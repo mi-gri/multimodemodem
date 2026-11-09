@@ -49,7 +49,7 @@ bool looksLikeBadGeneratedValue(const QString &value, const QString &normalized,
 
 } // namespace
 
-namespace MadModemI18n {
+namespace M3I18n {
 
 QString translateSourceUnbranded(const QString &prefix, const QString &source);
 
@@ -145,4 +145,4 @@ QString placeholder(const QString &source)
     return translateSource(QStringLiteral("placeholder"), source);
 }
 
-} // namespace MadModemI18n
+} // namespace M3I18n

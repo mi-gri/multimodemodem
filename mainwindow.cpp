@@ -14,8 +14,8 @@
 #include "audio/AudioDeviceCache.h"
 #include "runtime/SstvImageArchive.h"
 #include "audio/RadioBandPower.h"
-#include "MadModemBuildInfo.h"
-#include "MadModemVersion.h"
+#include "M3BuildInfo.h"
+#include "M3Version.h"
 #include "ui_mainwindow.h"
 
 #include "dialogs/HelpDialog.h"
@@ -323,10 +323,10 @@ int waterfallPeriodMs(const QString &modeName)
 // of the preceding RX slot. Automatic plans require
 // the full waveform plus the final guard to fit; an explicit operator action
 // may instead resume at the sample position of the current UTC period.
-constexpr int kFtPttPrearmLeadMs = MadModemFtTiming::pttPrearmLeadMs;
-constexpr int kFtLateStartPreparationMs = MadModemFtTiming::lateStartPreparationMs;
-constexpr int kFtGeneratedSignalAllowanceMs = MadModemFtTiming::generatedSignalAllowanceMs;
-constexpr int kFtSlotEndGuardMs = MadModemFtTiming::slotEndGuardMs;
+constexpr int kFtPttPrearmLeadMs = M3FtTiming::pttPrearmLeadMs;
+constexpr int kFtLateStartPreparationMs = M3FtTiming::lateStartPreparationMs;
+constexpr int kFtGeneratedSignalAllowanceMs = M3FtTiming::generatedSignalAllowanceMs;
+constexpr int kFtSlotEndGuardMs = M3FtTiming::slotEndGuardMs;
 constexpr int kFtMinimumLatePartialToneMs = 600;
 
 // Forward declaration: contest-dupe highlighting is implemented before the
@@ -336,7 +336,7 @@ QString rttyContestPeriodId(const RttyContestProfile &profile, const QDateTime &
 
 int latestFtFullFrameArmMs(const Ft8Mode::Profile &profile)
 {
-    return MadModemFtTiming::latestFullFrameArmMs(profile.slotMs, profile.signalMs);
+    return M3FtTiming::latestFullFrameArmMs(profile.slotMs, profile.signalMs);
 }
 
 int latestFtManualPartialStartMs(const Ft8Mode::Profile &profile)
@@ -619,12 +619,12 @@ QString ft8StatusColour(const QString &state)
 {
     const QString lower = state.toLower();
     if (lower.contains(QStringLiteral("not")) || lower.contains(QStringLiteral("slow")) || lower.contains(QStringLiteral("warning")) || lower.contains(QStringLiteral("unknown"))) {
-        return MadModemUi::themeColor(MadModemUi::ThemeColorRole::Negative).name();
+        return M3Ui::themeColor(M3Ui::ThemeColorRole::Negative).name();
     }
     if (lower.contains(QStringLiteral("synced")) || lower.contains(QStringLiteral("locked")) || lower.contains(QStringLiteral("ok")) || lower.contains(QStringLiteral("none"))) {
-        return MadModemUi::themeColor(MadModemUi::ThemeColorRole::Positive).name();
+        return M3Ui::themeColor(M3Ui::ThemeColorRole::Positive).name();
     }
-    return MadModemUi::themeColor(MadModemUi::ThemeColorRole::MutedText).name();
+    return M3Ui::themeColor(M3Ui::ThemeColorRole::MutedText).name();
 }
 
 QString htmlEscaped(const QString &text)
@@ -710,7 +710,7 @@ QString friendlyAudioName(const QString &backendName)
 /**
  * @brief Minimal parsed WAV stream metadata.
  */
-using WavStreamFormat = MadModemAudio::WavFileFormat;
+using WavStreamFormat = M3Audio::WavFileFormat;
 
 /**
  * @brief User-facing WEFAX station/preset entry.
@@ -1570,7 +1570,7 @@ MainWindow::MainWindow(QWidget *parent)
     refreshQsoMaps();
     setupLanguageMenu();
     applyUiLanguage();
-    MadModemUi::polishCockpitWidgetTree(this);
+    M3Ui::polishCockpitWidgetTree(this);
 
     m_pttTestTimer.setSingleShot(true);
     m_terminalHighlightTimer.setSingleShot(true);
@@ -1673,7 +1673,7 @@ MainWindow::MainWindow(QWidget *parent)
         last=state;
     });diagnosticHealthTimer->start(1000);
     appendLog("MM started.");
-    appendLog(QStringLiteral("%1 %2 | %3 | source %4 | commit %5").arg(ProductName::longName(), QStringLiteral(MADMODEM_VERSION_STRING), MadModemIdentity::buildLabel(), QStringLiteral(MADMODEM_SOURCE_REVISION), QStringLiteral(MADMODEM_BUILD_COMMIT)));
+    appendLog(QStringLiteral("%1 %2 | %3 | source %4 | commit %5").arg(ProductName::longName(), QStringLiteral(M3_VERSION_STRING), M3Identity::buildLabel(), QStringLiteral(M3_SOURCE_REVISION), QStringLiteral(M3_BUILD_COMMIT)));
     appendLog("Settings file: " + AppSettings::settingsFilePath());
     appendLog("Receiver is ready. Use Status → ▶ RX to start live decoding, or analyze a WAV test file from the mode panel.");
     updateMainStateButton();
@@ -1696,8 +1696,8 @@ void MainWindow::spotFt8ToPskReporter(const Ft8RxDecoder::Decode &decode, const 
     if (!CtyCountryFile::instance().lookupCallsign(station).valid) return;
     if (m_pskReporter == nullptr) m_pskReporter = new PskReporter(this);
     m_pskReporter->setLocalStation({myCall, myGrid, m_settings.antennaForBand(bandFromFrequencyHz(double(frequencyHz))),
-        QStringLiteral("%1 %2 build %3").arg(ProductName::longName(), QStringLiteral(MADMODEM_VERSION_STRING),
-                                             QString::fromLatin1(MadModemBuild::number()))});
+        QStringLiteral("%1 %2 build %3").arg(ProductName::longName(), QStringLiteral(M3_VERSION_STRING),
+                                             QString::fromLatin1(M3Build::number()))});
     PskReport::Spot spot;
     spot.call = station;
     spot.grid = grid.trimmed().toUpper();
@@ -2059,7 +2059,7 @@ void MainWindow::shutdownRuntime(const char *reason)
 
 void MainWindow::setupUiState()
 {
-    setWindowTitle(MadModemIdentity::windowTitle());
+    setWindowTitle(M3Identity::windowTitle());
 
     if (ui->menubar != nullptr) {
         // Keep menus as in-process Qt widgets. Native/global menu behaviour can
@@ -2171,9 +2171,9 @@ void MainWindow::setupUiState()
     ui->progressAudioLevel->setValue(0);
 
     ui->lblAudioLevelDb->setText("-inf dB");
-    ui->lblEstimatedFrequency->setText(MadModemI18n::text(QStringLiteral("Freq: -- Hz")));
-    ui->lblDecoderState->setText(MadModemI18n::text(QStringLiteral("Decoder: idle")));
-    ui->lblAppStatus->setText(MadModemI18n::text(QStringLiteral("Idle")));
+    ui->lblEstimatedFrequency->setText(M3I18n::text(QStringLiteral("Freq: -- Hz")));
+    ui->lblDecoderState->setText(M3I18n::text(QStringLiteral("Decoder: idle")));
+    ui->lblAppStatus->setText(M3I18n::text(QStringLiteral("Idle")));
 
     setupBandSchedulerTab();
 
@@ -2188,8 +2188,8 @@ void MainWindow::setupUiState()
     }
 
     setReceiverRunning(false);
-    appendLog(QStringLiteral("CPU acceleration: %1").arg(MadModemCpu::summary()));
-    appendLog(MadModemRuntime::SystemResourceManager::instance().startupSummary());
+    appendLog(QStringLiteral("CPU acceleration: %1").arg(M3Cpu::summary()));
+    appendLog(M3Runtime::SystemResourceManager::instance().startupSummary());
 }
 
 void MainWindow::setupCustomWidgets()
@@ -2379,7 +2379,7 @@ void MainWindow::setupCustomWidgets()
     m_lblSstvTxPreview->setMaximumHeight(145);
     m_lblSstvTxPreview->setFrameShape(QFrame::StyledPanel);
     m_lblSstvTxPreview->setAlignment(Qt::AlignCenter);
-    m_lblSstvTxPreview->setText(MadModemI18n::text(QStringLiteral("SSTV preview")));
+    m_lblSstvTxPreview->setText(M3I18n::text(QStringLiteral("SSTV preview")));
 
     m_progressTx = new QProgressBar(m_grpTxImage);
     m_progressTx->setRange(0, 100);
@@ -2396,10 +2396,10 @@ void MainWindow::setupCustomWidgets()
     m_editSstvTxName = new QLineEdit(m_grpTxImage);
     m_editSstvTxQth = new QLineEdit(m_grpTxImage);
     m_editSstvTxReport = new QLineEdit(m_grpTxImage);
-    m_editSstvTxCall->setPlaceholderText(MadModemI18n::placeholder(QStringLiteral("Callsign")));
-    m_editSstvTxName->setPlaceholderText(MadModemI18n::placeholder(QStringLiteral("Name")));
-    m_editSstvTxQth->setPlaceholderText(MadModemI18n::placeholder(QStringLiteral("QTH")));
-    m_editSstvTxReport->setPlaceholderText(MadModemI18n::placeholder(QStringLiteral("Report / note")));
+    m_editSstvTxCall->setPlaceholderText(M3I18n::placeholder(QStringLiteral("Callsign")));
+    m_editSstvTxName->setPlaceholderText(M3I18n::placeholder(QStringLiteral("Name")));
+    m_editSstvTxQth->setPlaceholderText(M3I18n::placeholder(QStringLiteral("QTH")));
+    m_editSstvTxReport->setPlaceholderText(M3I18n::placeholder(QStringLiteral("Report / note")));
 
     Q_UNUSED(txImageCaption);
     Q_UNUSED(txModeCaption);
@@ -2629,10 +2629,10 @@ void MainWindow::setupCustomWidgets()
     }
 
     m_settings.waterfallColorScalePercent = 80;
-    m_settings.waterfallPalette = QStringLiteral("madmodem");
+    m_settings.waterfallPalette = QStringLiteral("m3");
     if (m_waterfallWidget != nullptr) {
         m_waterfallWidget->setColorScalePercent(80);
-        m_waterfallWidget->setPaletteName(QStringLiteral("madmodem"));
+        m_waterfallWidget->setPaletteName(QStringLiteral("m3"));
     }
 
     if (ui->statusTabLayout != nullptr) {
@@ -2854,7 +2854,7 @@ QWidget *MainWindow::createTextTerminalPage(const QString &title,
     *rxTerminal = new QPlainTextEdit(page);
     (*rxTerminal)->setReadOnly(true);
     (*rxTerminal)->setMaximumBlockCount(2500);
-    (*rxTerminal)->setPlaceholderText(MadModemI18n::placeholder(QStringLiteral("Received and transmitted text appears here.")));
+    (*rxTerminal)->setPlaceholderText(M3I18n::placeholder(QStringLiteral("Received and transmitted text appears here.")));
     (*rxTerminal)->setLineWrapMode(QPlainTextEdit::WidgetWidth);
     (*rxTerminal)->setMinimumHeight(190);
     installRxTextContextMenu(*rxTerminal);
@@ -2884,13 +2884,13 @@ QWidget *MainWindow::createTextTerminalPage(const QString &title,
     *txInput = new QPlainTextEdit(page);
     (*txInput)->setMinimumHeight(50);
     (*txInput)->setMaximumHeight(68);
-    (*txInput)->setPlaceholderText(MadModemI18n::placeholder(QStringLiteral("Type text to transmit, then press ➤.")));
+    (*txInput)->setPlaceholderText(M3I18n::placeholder(QStringLiteral("Type text to transmit, then press ➤.")));
     (*txInput)->setLineWrapMode(QPlainTextEdit::WidgetWidth);
 
     *sendButton = new QPushButton(QString::fromUtf8("➤"), page);
     (*sendButton)->setMinimumWidth(52);
     (*sendButton)->setMinimumHeight(50);
-    (*sendButton)->setToolTip(MadModemI18n::text(QStringLiteral("Transmit the text typed in the input box.")));
+    (*sendButton)->setToolTip(M3I18n::text(QStringLiteral("Transmit the text typed in the input box.")));
 
     inputLayout->addWidget(*txInput, 1);
     inputLayout->addWidget(*sendButton);
@@ -2958,7 +2958,7 @@ QWidget *MainWindow::createCwTerminalPage()
         QLabel *title = new QLabel(panel);
         title->setObjectName(primary ? QStringLiteral("cwRxATitle") : QStringLiteral("cwRxBTitle"));
         title->setStyleSheet(QStringLiteral("font-weight: 700;"));
-        MadModemUi::setSemanticRole(title,
+        M3Ui::setSemanticRole(title,
                                     primary ? QStringLiteral("rxPrimary")
                                             : QStringLiteral("rxSecondary"));
         QPushButton *clearButton = new QPushButton(panel);
@@ -3068,7 +3068,7 @@ void MainWindow::placeQsoFormInModePanel(QVBoxLayout *layout, QsoFormWidgets *fo
 
 QWidget *MainWindow::createQsoFormPanel(QWidget *parent, const QString &modeLabel, QsoFormWidgets **qsoForm)
 {
-    QGroupBox *box = new QGroupBox(MadModemI18n::text(QStringLiteral("QSO Info")), parent);
+    QGroupBox *box = new QGroupBox(M3I18n::text(QStringLiteral("QSO Info")), parent);
     // v1.55: do not force a too-small maximum height here.  The v1.53 cap made
     // translated labels and the macro row paint over the QSO fields on Linux
     // and Windows.  Let the grid compute its own natural height and keep the
@@ -3101,15 +3101,15 @@ QWidget *MainWindow::createQsoFormPanel(QWidget *parent, const QString &modeLabe
     form->addButton->setMaximumWidth(QWIDGETSIZE_MAX);
     form->addButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
-    form->callsign->setPlaceholderText(MadModemI18n::placeholder(QStringLiteral("Call")));
+    form->callsign->setPlaceholderText(M3I18n::placeholder(QStringLiteral("Call")));
     form->rstSent->setPlaceholderText("599");
     form->rstReceived->setPlaceholderText("599");
     form->band->setPlaceholderText("20m");
     form->mode->setPlaceholderText(modeLabel);
-    form->grid->setPlaceholderText(MadModemI18n::placeholder(QStringLiteral("JN61")));
+    form->grid->setPlaceholderText(M3I18n::placeholder(QStringLiteral("JN61")));
     form->utc->setReadOnly(true);
-    form->utc->setToolTip(MadModemI18n::text(QStringLiteral("UTC is written automatically when the QSO is added to the ADIF logbook.")));
-    form->addButton->setToolTip(MadModemI18n::text(QStringLiteral("Add this QSO to logbook. The UTC time is taken at save time.")));
+    form->utc->setToolTip(M3I18n::text(QStringLiteral("UTC is written automatically when the QSO is added to the ADIF logbook.")));
+    form->addButton->setToolTip(M3I18n::text(QStringLiteral("Add this QSO to logbook. The UTC time is taken at save time.")));
 
     form->rstSent->setMaxLength(8);
     form->rstReceived->setMaxLength(8);
@@ -3473,7 +3473,7 @@ bool MainWindow::addQsoToLogFromForm(QsoFormWidgets *form)
     entry.grid = form->grid != nullptr ? form->grid->text().trimmed().toUpper() : QString();
     entry.utc = QDateTime::currentDateTimeUtc();
     entry.utcEnd = entry.utc;
-    entry.adifFields.insert(QStringLiteral("APP_MADMODEM_QSO_ID"), QUuid::createUuid().toString(QUuid::WithoutBraces));
+    entry.adifFields.insert(QStringLiteral("APP_M3_QSO_ID"), QUuid::createUuid().toString(QUuid::WithoutBraces));
     entry.stationCallsign = stationCallsign();
     entry.operatorCall = stationCallsign();
     if (m_lastRigFrequencyHz > 0.0) entry.freq = QString::number(m_lastRigFrequencyHz / 1.0e6, 'f', 6);
@@ -4205,15 +4205,15 @@ void MainWindow::applyTextAssistResult(quint64 requestId, const QStringList &wor
         if (kind == QStringLiteral("call")) {
             const QString call = AdifLogbook::normalizeCallsign(annotation.value(QStringLiteral("value")).toString());
             const bool worked = workedSet.contains(call);
-            const QColor color = MadModemUi::themeColor(worked ? MadModemUi::ThemeColorRole::Negative
-                                                               : MadModemUi::ThemeColorRole::Positive);
+            const QColor color = M3Ui::themeColor(worked ? M3Ui::ThemeColorRole::Negative
+                                                               : M3Ui::ThemeColorRole::Positive);
             fmt.setForeground(color);
             fmt.setFontUnderline(true);
             fmt.setUnderlineColor(color);
             fmt.setUnderlineStyle(QTextCharFormat::SingleUnderline);
             if (worked && m_settings.logbookStrikeWorkedCalls) fmt.setFontStrikeOut(true);
         } else if (kind == QStringLiteral("locator")) {
-            const QColor color = MadModemUi::themeColor(MadModemUi::ThemeColorRole::RxSecondary);
+            const QColor color = M3Ui::themeColor(M3Ui::ThemeColorRole::RxSecondary);
             fmt.setForeground(color);
             fmt.setFontUnderline(true);
             fmt.setUnderlineColor(color);
@@ -5122,18 +5122,18 @@ QString MainWindow::contestSettingsRoot() const
 
 QString MainWindow::contestAdifRuleKey() const
 {
-    return contestContextIsCw() ? QStringLiteral("APP_MADMODEM_CW_RULE") : QStringLiteral("APP_MADMODEM_RTTY_RULE");
+    return contestContextIsCw() ? QStringLiteral("APP_M3_CW_RULE") : QStringLiteral("APP_M3_RTTY_RULE");
 }
 
 QString MainWindow::contestAdifSessionKey() const
 {
-    return contestContextIsCw() ? QStringLiteral("APP_MADMODEM_CW_SESSION") : QStringLiteral("APP_MADMODEM_RTTY_SESSION");
+    return contestContextIsCw() ? QStringLiteral("APP_M3_CW_SESSION") : QStringLiteral("APP_M3_RTTY_SESSION");
 }
 
 QString MainWindow::contestFieldAdifKey(const QString &direction, const QString &fieldId) const
 {
     const QString family = contestContextIsCw() ? QStringLiteral("CW") : QStringLiteral("RTTY");
-    return QStringLiteral("APP_MADMODEM_%1_%2_%3")
+    return QStringLiteral("APP_M3_%1_%2_%3")
         .arg(family, direction.trimmed().toUpper(), fieldId.trimmed().toUpper());
 }
 
@@ -5634,7 +5634,7 @@ bool MainWindow::rttyContestConditionMatches(const QJsonObject &condition,
             if (key == QStringLiteral("field_own_regex")) {
                 // The rule file owns the meaning of this station setting. C++ only
                 // provides a generic predicate so future contest rule changes can
-                // be reloaded without rebuilding MadModem.
+                // be reloaded without rebuilding MultiModeModem.
                 QSettings settings(AppSettings::settingsFilePath(), QSettings::IniFormat);
                 fieldValue = settings.value(contestSettingsRoot() + QStringLiteral("/station/%1/%2")
                                                  .arg(profile->id, fieldId))
@@ -6613,7 +6613,7 @@ void MainWindow::setupMfskPage()
     m_spinMfskCenterHz->setSuffix(" Hz");
 
     m_chkMfskAfc = new QCheckBox("AFC", settingsGroup);
-    m_chkMfskAfc->setToolTip(MadModemI18n::text(QStringLiteral("Enable slow AFC for the MFSK tone-bank receiver.")));
+    m_chkMfskAfc->setToolTip(M3I18n::text(QStringLiteral("Enable slow AFC for the MFSK tone-bank receiver.")));
     m_spinMfskAfcRangeHz = new QSpinBox(settingsGroup);
     m_spinMfskAfcRangeHz->setRange(5, 200);
     m_spinMfskAfcRangeHz->setSingleStep(5);
@@ -6716,8 +6716,8 @@ void MainWindow::setupCwPage()
     m_lblCwTrackedWpmB->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_lblCwTrackedWpmA->setStyleSheet(QStringLiteral("font-weight:600;"));
     m_lblCwTrackedWpmB->setStyleSheet(QStringLiteral("font-weight:600;"));
-    MadModemUi::setSemanticRole(m_lblCwTrackedWpmA, QStringLiteral("rxPrimary"));
-    MadModemUi::setSemanticRole(m_lblCwTrackedWpmB, QStringLiteral("rxSecondary"));
+    M3Ui::setSemanticRole(m_lblCwTrackedWpmA, QStringLiteral("rxPrimary"));
+    M3Ui::setSemanticRole(m_lblCwTrackedWpmB, QStringLiteral("rxSecondary"));
     m_lblCwDualRx = new QLabel(uiText("cw_dual_rx_status", "RX A: left click · RX B: right click · TX: left+right click on waterfall"), settingsGroup);
     m_lblCwDualRx->setWordWrap(true);
     m_lblCwDualRx->setStyleSheet(QStringLiteral("font-weight: 500;"));
@@ -6746,8 +6746,8 @@ void MainWindow::setupCwPage()
     QLabel *txLabel = new QLabel(uiText("cw_tx_tone", "TX tone"), settingsGroup);
     rxALabel->setStyleSheet(QStringLiteral("font-weight:600;"));
     rxBLabel->setStyleSheet(QStringLiteral("font-weight:600;"));
-    MadModemUi::setSemanticRole(rxALabel, QStringLiteral("rxPrimary"));
-    MadModemUi::setSemanticRole(rxBLabel, QStringLiteral("rxSecondary"));
+    M3Ui::setSemanticRole(rxALabel, QStringLiteral("rxPrimary"));
+    M3Ui::setSemanticRole(rxBLabel, QStringLiteral("rxSecondary"));
     txLabel->setStyleSheet(QStringLiteral("font-weight:600;"));
 
     grid->addWidget(new QLabel(uiText("cw_rx_a_tone", "RX A tone"), settingsGroup), 1, 0);
@@ -7501,7 +7501,7 @@ bool MainWindow::continueRadioTelescopePeakRefinement()
                            QString::number(rec.evaluations),
                            rec.status));
         if (m_lblRadioTelescopeStatus != nullptr) {
-            m_lblRadioTelescopeStatus->setText(MadModemI18n::text(QStringLiteral("Auto-peak complete: az %1° el %2° (%3 dBFS)"))
+            m_lblRadioTelescopeStatus->setText(M3I18n::text(QStringLiteral("Auto-peak complete: az %1° el %2° (%3 dBFS)"))
                                                    .arg(QString::number(rec.bestAzimuthDeg, 'f', 1),
                                                         QString::number(useElevation ? rec.bestElevationDeg : 0.0, 'f', 1),
                                                         QString::number(rec.bestMetricDb, 'f', 1)));
@@ -7538,7 +7538,7 @@ bool MainWindow::continueRadioTelescopePeakRefinement()
                        QString::number(m_radioTelescopePeakRefineStepsRemaining),
                        rec.status));
     if (m_lblRadioTelescopeStatus != nullptr) {
-        m_lblRadioTelescopeStatus->setText(MadModemI18n::text(QStringLiteral("Auto-peak probe: az %1° el %2°"))
+        m_lblRadioTelescopeStatus->setText(M3I18n::text(QStringLiteral("Auto-peak probe: az %1° el %2°"))
                                                .arg(QString::number(refineTile.azimuthDeg, 'f', 1),
                                                     QString::number(refineTile.elevationDeg, 'f', 1)));
     }
@@ -7582,7 +7582,7 @@ void MainWindow::pointRadioTelescopeMaxNoise()
     m_radioTelescopeTargetElevationDeg = tile.elevationDeg;
     m_catRotatorController->setAzEl(tile.azimuthDeg, tile.elevationDeg, QStringLiteral("radio telescope strongest tile fallback"));
     if (m_lblRadioTelescopeStatus != nullptr) {
-        m_lblRadioTelescopeStatus->setText(MadModemI18n::text(QStringLiteral("Pointing strongest tile: az %1° el %2° (%3 dBFS)"))
+        m_lblRadioTelescopeStatus->setText(M3I18n::text(QStringLiteral("Pointing strongest tile: az %1° el %2° (%3 dBFS)"))
                                                .arg(QString::number(tile.azimuthDeg, 'f', 1),
                                                     QString::number(tile.elevationDeg, 'f', 1),
                                                     QString::number(tile.noiseDb, 'f', 1)));
@@ -7988,7 +7988,7 @@ void MainWindow::startRadioTelescopeScan()
     m_radioTelescopeTargetElevationDeg = 0.0;
     if (m_lblRadioTelescopeProgress != nullptr) {
         m_lblRadioTelescopeProgress->setText(
-            MadModemI18n::text(QStringLiteral("0/%1 tiles")).arg(m_radioTelescopeTiles.size()));
+            M3I18n::text(QStringLiteral("0/%1 tiles")).arg(m_radioTelescopeTiles.size()));
     }
 
     if (rotatorOnline) {
@@ -8004,7 +8004,7 @@ void MainWindow::startRadioTelescopeScan()
                                         m_radioTelescopeTargetElevationDeg,
                                         QStringLiteral("radio telescope park before scan"));
         if (m_lblRadioTelescopeStatus != nullptr) {
-            m_lblRadioTelescopeStatus->setText(MadModemI18n::text(QStringLiteral("Moving to park/start position az %1° el %2° before scan"))
+            m_lblRadioTelescopeStatus->setText(M3I18n::text(QStringLiteral("Moving to park/start position az %1° el %2° before scan"))
                                                    .arg(QString::number(m_radioTelescopeTargetAzimuthDeg, 'f', 1),
                                                         QString::number(m_radioTelescopeTargetElevationDeg, 'f', 1)));
         }
@@ -8040,7 +8040,7 @@ void MainWindow::stopRadioTelescopeScan(bool automatic)
     }
     if (m_lblRadioTelescopeProgress != nullptr && automatic) {
         m_lblRadioTelescopeProgress->setText(
-            MadModemI18n::text(QStringLiteral("%1/%1 tiles")).arg(m_radioTelescopeTiles.size()));
+            M3I18n::text(QStringLiteral("%1/%1 tiles")).arg(m_radioTelescopeTiles.size()));
     }
     updateRadioTelescopeHeatmapWidget();
 
@@ -8062,7 +8062,7 @@ void MainWindow::stopRadioTelescopeScan(bool automatic)
                       .arg(QString::number(m_radioTelescopeReturnAzimuthDeg, 'f', 1),
                            QString::number(m_radioTelescopeReturnElevationDeg, 'f', 1)));
         if (m_lblRadioTelescopeStatus != nullptr) {
-            m_lblRadioTelescopeStatus->setText(MadModemI18n::text(QStringLiteral("Returning to pre-scan position az %1° el %2°"))
+            m_lblRadioTelescopeStatus->setText(M3I18n::text(QStringLiteral("Returning to pre-scan position az %1° el %2°"))
                                                    .arg(QString::number(m_radioTelescopeReturnAzimuthDeg, 'f', 1),
                                                         QString::number(m_radioTelescopeReturnElevationDeg, 'f', 1)));
         }
@@ -8133,7 +8133,7 @@ void MainWindow::advanceRadioTelescopeScan()
         m_radioTelescopeAccumulatedPower = 0.0;
         m_radioTelescopeAccumulatedBlocks = 0;
         if (m_lblRadioTelescopeStatus != nullptr) {
-            m_lblRadioTelescopeStatus->setText(MadModemI18n::text(QStringLiteral("Sampling tile az %1° el %2°"))
+            m_lblRadioTelescopeStatus->setText(M3I18n::text(QStringLiteral("Sampling tile az %1° el %2°"))
                                                    .arg(QString::number(m_radioTelescopeTargetAzimuthDeg, 'f', 0))
                                                    .arg(QString::number(m_radioTelescopeTargetElevationDeg, 'f', 0)));
         }
@@ -8167,7 +8167,7 @@ void MainWindow::advanceRadioTelescopeScan()
         updateRadioTelescopeHeatmapWidget();
         ++m_radioTelescopeCurrentTileIndex;
         if (m_lblRadioTelescopeProgress != nullptr) {
-            m_lblRadioTelescopeProgress->setText(MadModemI18n::text(QStringLiteral("%1/%2 tiles"))
+            m_lblRadioTelescopeProgress->setText(M3I18n::text(QStringLiteral("%1/%2 tiles"))
                                                      .arg(qMax(0, m_radioTelescopeCurrentTileIndex))
                                                      .arg(m_radioTelescopeTiles.size()));
         }
@@ -8196,7 +8196,7 @@ void MainWindow::advanceRadioTelescopeScan()
             m_radioTelescopePhaseDeadlineMs = nowMs + etaMs + settleMs;
             m_radioTelescopeScanPhase = RadioTelescopeScanPhase::WaitingForRotator;
             if (m_lblRadioTelescopeStatus != nullptr) {
-                m_lblRadioTelescopeStatus->setText(MadModemI18n::text(QStringLiteral("Moving rotator to az %1° el %2°"))
+                m_lblRadioTelescopeStatus->setText(M3I18n::text(QStringLiteral("Moving rotator to az %1° el %2°"))
                                                        .arg(QString::number(m_radioTelescopeTargetAzimuthDeg, 'f', 0))
                                                        .arg(QString::number(m_radioTelescopeTargetElevationDeg, 'f', 0)));
             }
@@ -8204,7 +8204,7 @@ void MainWindow::advanceRadioTelescopeScan()
             m_radioTelescopeScanPhase = RadioTelescopeScanPhase::Settling;
             m_radioTelescopePhaseDeadlineMs = nowMs + settleMs;
             if (m_lblRadioTelescopeStatus != nullptr) {
-                m_lblRadioTelescopeStatus->setText(MadModemI18n::text(QStringLiteral("Bench test: settling before sample at az %1° el %2°"))
+                m_lblRadioTelescopeStatus->setText(M3I18n::text(QStringLiteral("Bench test: settling before sample at az %1° el %2°"))
                                                        .arg(QString::number(m_radioTelescopeTargetAzimuthDeg, 'f', 0))
                                                        .arg(QString::number(m_radioTelescopeTargetElevationDeg, 'f', 0)));
             }
@@ -8240,7 +8240,7 @@ void MainWindow::advanceRadioTelescopeScan()
             m_radioTelescopeScanPhase = RadioTelescopeScanPhase::Settling;
             m_radioTelescopePhaseDeadlineMs = nowMs + settleMs;
             if (m_lblRadioTelescopeStatus != nullptr) {
-                m_lblRadioTelescopeStatus->setText(MadModemI18n::text(QStringLiteral("Rotator ready, settling %1 ms before sample"))
+                m_lblRadioTelescopeStatus->setText(M3I18n::text(QStringLiteral("Rotator ready, settling %1 ms before sample"))
                                                        .arg(settleMs));
             }
         }
@@ -8264,7 +8264,7 @@ double MainWindow::measureRadioTelescopeBandPower(const AudioBlock &block) const
 
     const int lowHz = qMin(m_spinRadioTelescopeLowHz->value(), m_spinRadioTelescopeHighHz->value());
     const int highHz = qMax(m_spinRadioTelescopeLowHz->value(), m_spinRadioTelescopeHighHz->value());
-    return MadModemAudio::radioTelescopeWelchBandPower(block.samples, qMax(1, block.sampleRate), lowHz, highHz);
+    return M3Audio::radioTelescopeWelchBandPower(block.samples, qMax(1, block.sampleRate), lowHz, highHz);
 }
 
 void MainWindow::setupMsk144Page()
@@ -8346,7 +8346,7 @@ void MainWindow::setupMsk144Page()
     m_lblMsk144Status = new QLabel(uiText("msk144_status_idle", "MSK144: idle"), rxGroup);
     m_lblMsk144Status->setWordWrap(true);
     m_lblMsk144Status->setStyleSheet(QStringLiteral("font-weight: 500;"));
-    MadModemUi::setSemanticRole(m_lblMsk144Status, QStringLiteral("rxSecondary"));
+    M3Ui::setSemanticRole(m_lblMsk144Status, QStringLiteral("rxSecondary"));
     m_lblMsk144PeriodStatus = new QLabel(rxGroup);
     m_lblMsk144PeriodStatus->setWordWrap(true);
 
@@ -8519,7 +8519,7 @@ void MainWindow::setupMsk144Page()
         connect(m_msk144Decoder, &Msk144Decoder::periodReady, this, [this](int buffered, int period) {
             if (m_lblMsk144PeriodStatus != nullptr) {
                 m_lblMsk144PeriodStatus->setText(
-                    MadModemI18n::text(QStringLiteral("Last MSK144 period: %1/%2 s buffered"))
+                    M3I18n::text(QStringLiteral("Last MSK144 period: %1/%2 s buffered"))
                         .arg(buffered).arg(period));
             }
         }, Qt::QueuedConnection);
@@ -8622,7 +8622,7 @@ void MainWindow::setupQ65Page()
     m_lblQ65Status = new QLabel(uiText("q65_status_idle", "Q65: idle"), rxGroup);
     m_lblQ65Status->setWordWrap(true);
     m_lblQ65Status->setStyleSheet(QStringLiteral("font-weight: 500;"));
-    MadModemUi::setSemanticRole(m_lblQ65Status, QStringLiteral("rxSecondary"));
+    M3Ui::setSemanticRole(m_lblQ65Status, QStringLiteral("rxSecondary"));
     m_lblQ65AverageStatus = new QLabel(QStringLiteral("AVG: 0 | 0"), rxGroup);
     m_lblQ65AverageStatus->setWordWrap(true);
 
@@ -8795,14 +8795,14 @@ void MainWindow::setupQ65Page()
         connect(m_q65Decoder, &Q65Decoder::periodReady, this, [this](int buffered, int period) {
             if (m_lblQ65AverageStatus != nullptr) {
                 m_lblQ65AverageStatus->setText(
-                    MadModemI18n::text(QStringLiteral("Last Q65 period: %1/%2 s buffered"))
+                    M3I18n::text(QStringLiteral("Last Q65 period: %1/%2 s buffered"))
                         .arg(buffered).arg(period));
             }
         }, Qt::QueuedConnection);
         connect(m_q65Decoder, &Q65Decoder::averageStatusChanged, this, [this](int usable, int all) {
             if (m_lblQ65AverageStatus != nullptr) {
                 m_lblQ65AverageStatus->setText(
-                    MadModemI18n::text(QStringLiteral("AVG: %1 | %2")).arg(usable).arg(all));
+                    M3I18n::text(QStringLiteral("AVG: %1 | %2")).arg(usable).arg(all));
             }
         }, Qt::QueuedConnection);
         m_q65Thread->start();
@@ -8969,7 +8969,7 @@ void MainWindow::setupFt8Page()
         << uiText("country", "Country"));
     m_tableFt8Rx->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_tableFt8Rx->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    MadModemUi::installDecodeTableCopy(m_tableFt8Rx);
+    M3Ui::installDecodeTableCopy(m_tableFt8Rx);
     m_tableFt8Rx->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_tableFt8Rx->verticalHeader()->setVisible(false);
     m_tableFt8Rx->horizontalHeader()->setStretchLastSection(true);
@@ -9103,13 +9103,13 @@ void MainWindow::setupFt8Page()
     m_lblFt8SessionQueue = new QLabel(controlGroup);
     m_lblFt8SessionQueue->setAlignment(Qt::AlignCenter);
     m_lblFt8SessionQueue->setStyleSheet(QStringLiteral("QLabel { font-weight: 600; }"));
-    MadModemUi::setSemanticRole(m_lblFt8SessionQueue, QStringLiteral("muted"));
+    M3Ui::setSemanticRole(m_lblFt8SessionQueue, QStringLiteral("muted"));
     m_lblFt8SessionQueue->setToolTip(uiText("ft8_session_stats_tooltip",
-        "Counts completed FT4/FT8 QSOs since MadModem was started and shows callers waiting in the passive FIFO."));
+        "Counts completed FT4/FT8 QSOs since MultiModeModem was started and shows callers waiting in the passive FIFO."));
     m_chkFt8FullAutoQso = new QCheckBox(uiText("ft8_auto_qso", "Auto QSO"), controlGroup);
     m_chkFt8FullAutoQso->setToolTip(uiText("ft8_auto_qso_tooltip", "WSJT-Z-style gated automation. Decoded CQs are buffered and prioritized by new country, new grid square, new band, new mode, distance and SNR before answering."));
     m_chkFt8FullAutoQso->setStyleSheet(QStringLiteral("QCheckBox { font-weight: 500; }"));
-    MadModemUi::setSemanticRole(m_chkFt8FullAutoQso, QStringLiteral("accent"));
+    M3Ui::setSemanticRole(m_chkFt8FullAutoQso, QStringLiteral("accent"));
     m_chkFt8HoldTxFreq = new QCheckBox(uiText("hold_tx_frequency", "Hold TX frequency"), controlGroup);
     m_chkFt8HoldTxFreq->setToolTip(uiText("hold_tx_frequency_tooltip", "Legacy shortcut: force the red TX marker to stay fixed. The TX strategy selector in the FT settings page is the primary control."));
     m_cmbFt8TxStrategy = new QComboBox(controlGroup);
@@ -9508,15 +9508,15 @@ void MainWindow::setupHelpTooltips()
     ui->btnFaxBrowseOutputFolder->setVisible(false);
     ui->editFaxOutputFolder->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
-    ui->lblFaxLinePreset->setText(MadModemI18n::text(QStringLiteral("Station")));
-    ui->lblFaxImageLines->setText(MadModemI18n::text(QStringLiteral("Max lines")));
-    ui->lblFaxEndTimeout->setText(MadModemI18n::text(QStringLiteral("Stop wait")));
+    ui->lblFaxLinePreset->setText(M3I18n::text(QStringLiteral("Station")));
+    ui->lblFaxImageLines->setText(M3I18n::text(QStringLiteral("Max lines")));
+    ui->lblFaxEndTimeout->setText(M3I18n::text(QStringLiteral("Stop wait")));
     ui->chkFaxAutoStartPhasing->setText(uiText("wefax_apt_start", "APT start"));
     ui->chkFaxAutoToneTracking->setText(uiText("wefax_auto_tones", "Auto tones"));
     ui->chkFaxInputBandpass->setText(uiText("wefax_bandpass", "Band-pass"));
-    ui->chkFaxEndOfSignal->setText(MadModemI18n::text(QStringLiteral("Detect stop/end")));
-    ui->chkFaxAutoSave->setText(MadModemI18n::text(QStringLiteral("Auto save")));
-    ui->lblFaxZoomStatus->setText(MadModemI18n::text(QStringLiteral("Zoom: fit")));
+    ui->chkFaxEndOfSignal->setText(M3I18n::text(QStringLiteral("Detect stop/end")));
+    ui->chkFaxAutoSave->setText(M3I18n::text(QStringLiteral("Auto save")));
+    ui->lblFaxZoomStatus->setText(M3I18n::text(QStringLiteral("Zoom: fit")));
     ui->lblFaxHint->setVisible(false);
     ui->cmbSstvMode->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     ui->lblSstvHint->setVisible(false);
@@ -10175,11 +10175,11 @@ void MainWindow::setupProcessingConnections()
             this, [this](int rank, const QString &text) {
                 if (rank <= 0) {
                     appendCwDecoderText(QStringLiteral("A"), text,
-                                        MadModemUi::themeColor(MadModemUi::ThemeColorRole::RxPrimary),
+                                        M3Ui::themeColor(M3Ui::ThemeColorRole::RxPrimary),
                                         &m_cwPrimaryLineOpen);
                 } else if (rank == 1) {
                     appendCwDecoderText(QStringLiteral("B"), text,
-                                        MadModemUi::themeColor(MadModemUi::ThemeColorRole::RxSecondary),
+                                        M3Ui::themeColor(M3Ui::ThemeColorRole::RxSecondary),
                                         &m_cwSecondaryLineOpen);
                 }
             },
@@ -10387,7 +10387,7 @@ void MainWindow::saveUiLanguageSetting() const
 
 void MainWindow::loadUiTranslationFile(const QString &languageCode)
 {
-    MadModemI18n::setLanguageCode(languageCode);
+    M3I18n::setLanguageCode(languageCode);
     m_uiTranslations.clear();
 
     const QString resourcePath = QStringLiteral(":/translations/ui_%1.ini").arg(languageCode);
@@ -10722,7 +10722,7 @@ void MainWindow::applyUiLanguage()
     // previous translated caption as if it were the source text, so menu and tab
     // labels appeared to change only after restarting the application.
     applyUiLanguageToObjectTree(this);
-    setWindowTitle(MadModemIdentity::windowTitle());
+    setWindowTitle(M3Identity::windowTitle());
 
     if (ui->menuFile != nullptr) ui->menuFile->setTitle(uiText("menu.file", "File"));
     if (ui->menuSettings != nullptr) ui->menuSettings->setTitle(uiText("menu.settings", "Settings"));
@@ -10732,7 +10732,7 @@ void MainWindow::applyUiLanguage()
 
     if (ui->actionExit != nullptr) {
         ui->actionExit->setText(uiText("action.exit", "Exit"));
-        ui->actionExit->setToolTip(uiText("action.exit.safe", "Safely close MadModem."));
+        ui->actionExit->setToolTip(uiText("action.exit.safe", "Safely close MultiModeModem."));
         ui->actionExit->setStatusTip(ui->actionExit->toolTip());
         ui->actionExit->setShortcut(QKeySequence(QStringLiteral("Ctrl+Q")));
     }
@@ -10743,7 +10743,7 @@ void MainWindow::applyUiLanguage()
         m_actionAppSettings->setStatusTip(m_actionAppSettings->toolTip());
     }
     if (ui->actionOpenWeatherFaxWav != nullptr) ui->actionOpenWeatherFaxWav->setText(uiText("action.openWefaxWav", "Analyze WEFAX WAV..."));
-    if (ui->actionAboutMadModem != nullptr) ui->actionAboutMadModem->setText(uiText("action.about", "About MM"));
+    if (ui->actionAboutM3 != nullptr) ui->actionAboutM3->setText(uiText("action.about", "About MM"));
     if (m_actionHelpContents != nullptr) {
         const QString helpTip = uiText("help.contents.tooltip", "Open the built-in MM help browser.");
         m_actionHelpContents->setText(uiText("action.helpContents", "Help contents..."));
@@ -10801,7 +10801,7 @@ void MainWindow::applyUiLanguage()
     if (m_cmbWaterfallPalette != nullptr) {
         const QSignalBlocker blocker(m_cmbWaterfallPalette);
         if (m_cmbWaterfallPalette->count() >= 6) {
-            m_cmbWaterfallPalette->setItemText(0, uiText("waterfall_palette_madmodem", "MadModem / WSJT-X default"));
+            m_cmbWaterfallPalette->setItemText(0, uiText("waterfall_palette_m3", "MultiModeModem / WSJT-X default"));
             m_cmbWaterfallPalette->setItemText(1, uiText("waterfall_palette_wsjtx", "WSJT-X default"));
             m_cmbWaterfallPalette->setItemText(2, uiText("waterfall_palette_mshv", "MSHV contrast"));
             m_cmbWaterfallPalette->setItemText(3, uiText("waterfall_palette_fldigi", "fldigi colours"));
@@ -10865,7 +10865,7 @@ void MainWindow::applyUiLanguage()
     }
     if (m_lblFt8SessionQueue != nullptr) {
         m_lblFt8SessionQueue->setToolTip(uiText("ft8_session_stats_tooltip",
-            "Counts completed FT4/FT8 QSOs since MadModem was started and shows callers waiting in the passive FIFO."));
+            "Counts completed FT4/FT8 QSOs since MultiModeModem was started and shows callers waiting in the passive FIFO."));
         updateFt8SessionQueueUi();
     }
 
@@ -10908,16 +10908,16 @@ void MainWindow::setupUiConnections()
     m_actionStartRxRecording->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+R")));
     m_actionHelpContents = new QAction("Help contents...", this);
     m_actionHelpContents->setShortcut(QKeySequence(QKeySequence::HelpContents));
-    m_actionHelpContents->setStatusTip(MadModemI18n::text(QStringLiteral("Open MM inline help.")));
-    m_actionHelpContents->setToolTip(MadModemI18n::text(QStringLiteral("Open MM inline help.")));
+    m_actionHelpContents->setStatusTip(M3I18n::text(QStringLiteral("Open MM inline help.")));
+    m_actionHelpContents->setToolTip(M3I18n::text(QStringLiteral("Open MM inline help.")));
     m_actionWhatsThisMode = new QAction("What's This?", this);
     m_actionWhatsThisMode->setShortcut(QKeySequence(QStringLiteral("Shift+F1")));
-    m_actionWhatsThisMode->setStatusTip(MadModemI18n::text(QStringLiteral("Click a control to read its context help.")));
-    m_actionWhatsThisMode->setToolTip(MadModemI18n::text(QStringLiteral("Click a control to read its context help.")));
-    if (ui->menuHelp != nullptr && ui->actionAboutMadModem != nullptr) {
-        ui->menuHelp->insertAction(ui->actionAboutMadModem, m_actionHelpContents);
-        ui->menuHelp->insertAction(ui->actionAboutMadModem, m_actionWhatsThisMode);
-        ui->menuHelp->insertSeparator(ui->actionAboutMadModem);
+    m_actionWhatsThisMode->setStatusTip(M3I18n::text(QStringLiteral("Click a control to read its context help.")));
+    m_actionWhatsThisMode->setToolTip(M3I18n::text(QStringLiteral("Click a control to read its context help.")));
+    if (ui->menuHelp != nullptr && ui->actionAboutM3 != nullptr) {
+        ui->menuHelp->insertAction(ui->actionAboutM3, m_actionHelpContents);
+        ui->menuHelp->insertAction(ui->actionAboutM3, m_actionWhatsThisMode);
+        ui->menuHelp->insertSeparator(ui->actionAboutM3);
     }
     if (ui->menuFile != nullptr) {
         ui->menuFile->insertAction(ui->actionExit, m_actionSstvEditor);
@@ -10972,8 +10972,8 @@ void MainWindow::setupUiConnections()
     connect(ui->actionOpenWeatherFaxWav, &QAction::triggered,
             this, &MainWindow::openWeatherFaxWavFile);
 
-    connect(ui->actionAboutMadModem, &QAction::triggered,
-            this, &MainWindow::showAboutMadModem);
+    connect(ui->actionAboutM3, &QAction::triggered,
+            this, &MainWindow::showAboutM3);
 
     if (m_actionHelpContents != nullptr) {
         connect(m_actionHelpContents, &QAction::triggered,
@@ -11003,7 +11003,7 @@ void MainWindow::setupUiConnections()
         connect(m_cmbWaterfallPalette, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
             QString palette = m_cmbWaterfallPalette->itemData(index).toString().trimmed().toLower();
             if (palette != QStringLiteral("raptor") && palette != QStringLiteral("grayscale")) {
-                palette = QStringLiteral("madmodem");
+                palette = QStringLiteral("m3");
             }
             m_settings.waterfallPalette = palette;
             if (m_waterfallWidget != nullptr) {
@@ -12106,9 +12106,9 @@ void MainWindow::applyUiAppearanceSettings()
         }
         font.setPointSize(qBound(8, m_settings.uiFontPointSize, 24));
     }
-    MadModemUi::applyUiTheme(*app, theme);
+    M3Ui::applyUiTheme(*app, theme);
     app->setFont(font);
-    MadModemUi::polishCockpitWidgetTree(this);
+    M3Ui::polishCockpitWidgetTree(this);
     for (QPlainTextEdit *terminal : {m_txtRttyRx, m_txtBpsk31Rx, m_txtMfskRx,
                                      m_txtCwRx, m_txtCwRxB}) {
         if (terminal != nullptr && !terminal->toPlainText().isEmpty()) {
@@ -12342,7 +12342,7 @@ void MainWindow::updateRigControlStatusUi()
         m_lblRigFrequency->setText(text);
         m_lblRigFrequency->setVisible(catEnabled || pttEnabled || connected);
         m_lblRigFrequency->setToolTip(uiText("rig_rx_filter_hint",
-            "RX mode and receiver filter width. ~ marks a Hamlib value that may be nominal. MadModem transmits RTTY and CW as audio; native FSK/CW keying is a separate radio function."));
+            "RX mode and receiver filter width. ~ marks a Hamlib value that may be nominal. MultiModeModem transmits RTTY and CW as audio; native FSK/CW keying is a separate radio function."));
     }
 
     if (m_lblRigPttStatus != nullptr) {
@@ -12355,7 +12355,7 @@ void MainWindow::updateRigControlStatusUi()
         }
         m_lblRigPttStatus->setText(pttText);
         m_lblRigPttStatus->setStyleSheet(QStringLiteral("font-weight: 500;"));
-        MadModemUi::setSemanticRole(m_lblRigPttStatus,
+        M3Ui::setSemanticRole(m_lblRigPttStatus,
                                     m_lastRigPttOn ? QStringLiteral("negative")
                                                    : QStringLiteral("positive"));
     }
@@ -12450,12 +12450,12 @@ void MainWindow::updateRigReadout()
         m_lblRigReadoutPower->setText(uiText("rig_readout_power", "PWR %1 W").arg(power));
         m_lblRigReadoutSwr->setText(uiText("rig_readout_swr", "SWR %1").arg(swr));
         // Red while transmitting, grey for the last reading after TX.
-        MadModemUi::setSemanticRole(m_lblRigReadoutPower,
+        M3Ui::setSemanticRole(m_lblRigReadoutPower,
                                     m_rigTxMeterActive ? QStringLiteral("negative") : QStringLiteral("muted"));
         QString swrRole = m_rigTxMeterActive ? QStringLiteral("positive") : QStringLiteral("muted");
         if (m_rigTxSwr >= 3.0) swrRole = QStringLiteral("negative");
         else if (m_rigTxSwr >= 2.0) swrRole = QStringLiteral("warning");
-        MadModemUi::setSemanticRole(m_lblRigReadoutSwr, swrRole);
+        M3Ui::setSemanticRole(m_lblRigReadoutSwr, swrRole);
     }
     if (m_lblRigReadoutAlc != nullptr) {
         // Hamlib reports ALC on a 0..1 scale; shown in percent of full scale.
@@ -12464,7 +12464,7 @@ void MainWindow::updateRigReadout()
         m_lblRigReadoutAlc->setText(uiText("rig_readout_alc", "ALC %1 %").arg(alc));
         QString alcRole = m_rigTxMeterActive ? QStringLiteral("positive") : QStringLiteral("muted");
         if (m_rigTxAlc >= 0.5) alcRole = QStringLiteral("warning");
-        MadModemUi::setSemanticRole(m_lblRigReadoutAlc, alcRole);
+        M3Ui::setSemanticRole(m_lblRigReadoutAlc, alcRole);
     }
 }
 
@@ -12598,7 +12598,7 @@ void MainWindow::showTxBlockedWarning(const QString &modeLabel,
 {
     const QString cleanMode = modeLabel.trimmed().isEmpty() ? QStringLiteral("TX/PTT") : modeLabel.trimmed();
     const QString cleanReason = reason.trimmed().isEmpty()
-        ? uiText("tx_blocked_unknown_reason", "MadModem blocked TX/PTT for safety, but no detailed reason was returned.")
+        ? uiText("tx_blocked_unknown_reason", "MultiModeModem blocked TX/PTT for safety, but no detailed reason was returned.")
         : reason.trimmed();
 
     QMessageBox box(this);
@@ -12727,12 +12727,12 @@ void MainWindow::updateFtBandFrequencyUi()
         }
         m_lblFt8BandStatus->setText(text);
         m_lblFt8BandStatus->setStyleSheet(QStringLiteral("font-weight: 500;"));
-        MadModemUi::setSemanticRole(m_lblFt8BandStatus,
+        M3Ui::setSemanticRole(m_lblFt8BandStatus,
                                     onSlot || !haveCat ? QStringLiteral("positive")
                                                       : QStringLiteral("negative"));
     }
     m_cmbFt8Band->setStyleSheet(haveCat && !onSlot ? QStringLiteral("font-weight: 500;") : QString());
-    MadModemUi::setSemanticRole(m_cmbFt8Band,
+    M3Ui::setSemanticRole(m_cmbFt8Band,
                                 haveCat && !onSlot ? QStringLiteral("negative") : QString());
 }
 
@@ -13572,7 +13572,7 @@ bool MainWindow::prepareForOfflineAnalysis(const QString &label)
         QMessageBox::information(
             this,
             label,
-            MadModemI18n::text(QStringLiteral("Stop TX before analyzing a WAV test file."))
+            M3I18n::text(QStringLiteral("Stop TX before analyzing a WAV test file."))
             );
         return false;
     }
@@ -13607,8 +13607,8 @@ void MainWindow::requestModeChange(const QString &modeName)
         appendLog("Mode change blocked: WAV analysis is active.");
         QMessageBox::information(
             this,
-            MadModemI18n::text(QStringLiteral("Change mode")),
-            MadModemI18n::text(QStringLiteral("Wait for WAV analysis to finish before changing modem mode."))
+            M3I18n::text(QStringLiteral("Change mode")),
+            M3I18n::text(QStringLiteral("Wait for WAV analysis to finish before changing modem mode."))
             );
         return;
     }
@@ -14386,7 +14386,7 @@ void MainWindow::applyMsk144Settings()
     invokeRxDecoder(m_msk144Decoder, &Msk144Decoder::setMyCall, stationCallsign());
     invokeRxDecoder(m_msk144Decoder, &Msk144Decoder::setDxCall, m_editMsk144DxCall != nullptr ? m_editMsk144DxCall->text() : QString());
     if (m_lblMsk144Status != nullptr) {
-        m_lblMsk144Status->setText(MadModemI18n::text(QStringLiteral("MSK144 RX: %1 s, %2, RX %3 Hz, F Tol ±%4 Hz; TX %5 Hz"))
+        m_lblMsk144Status->setText(M3I18n::text(QStringLiteral("MSK144 RX: %1 s, %2, RX %3 Hz, F Tol ±%4 Hz; TX %5 Hz"))
                                        .arg(period)
                                        .arg(depth <= 1 ? QStringLiteral("Fast") : (depth == 2 ? QStringLiteral("Normal") : QStringLiteral("Deep")))
                                        .arg(rxHz)
@@ -14554,7 +14554,7 @@ void MainWindow::updateMsk144SequencerFromDecode(const QString &message, int snr
         m_tableMsk144TxMessages->selectRow(row);
         QTableWidgetItem *item = m_tableMsk144TxMessages->item(row, 1);
         const QString selected = item != nullptr ? item->text().trimmed() : QString();
-        m_lblMsk144SequencerStatus->setText(MadModemI18n::text(QStringLiteral("Sequencer: %1 | Tx%2 %3 | SNR %4 dB"))
+        m_lblMsk144SequencerStatus->setText(M3I18n::text(QStringLiteral("Sequencer: %1 | Tx%2 %3 | SNR %4 dB"))
                                                 .arg(reason)
                                                 .arg(row + 1)
                                                 .arg(selected)
@@ -14569,7 +14569,7 @@ void MainWindow::handleMsk144Ping(double frequencyHz, int snrDb, double tSeconds
     // accumulate transient MSK dB labels: they flicker, hide real traces, and are
     // not operator-selectable markers.  Decoded messages remain in the RX table.
     if (m_lblMsk144PeriodStatus != nullptr) {
-        m_lblMsk144PeriodStatus->setText(MadModemI18n::text(QStringLiteral("MSK144 ping near %1 Hz: %2 dB at T=%3 s"))
+        m_lblMsk144PeriodStatus->setText(M3I18n::text(QStringLiteral("MSK144 ping near %1 Hz: %2 dB at T=%3 s"))
                                              .arg(qRound(frequencyHz))
                                              .arg(snrDb)
                                              .arg(tSeconds, 0, 'f', 1));
@@ -14650,7 +14650,7 @@ void MainWindow::applyQ65Settings()
                               Qt::QueuedConnection);
 
     if (m_lblQ65Status != nullptr) {
-        m_lblQ65Status->setText(MadModemI18n::text(QStringLiteral("%1 RX: %2 s, %3, RX %4 Hz, DF ±%5 Hz; TX %6 Hz"))
+        m_lblQ65Status->setText(M3I18n::text(QStringLiteral("%1 RX: %2 s, %3, RX %4 Hz, DF ±%5 Hz; TX %6 Hz"))
                                     .arg(Q65Mode::modeName(submode))
                                     .arg(period)
                                     .arg(depth <= 1 ? QStringLiteral("Fast") : (depth == 2 ? QStringLiteral("Normal") : QStringLiteral("Deep")))
@@ -14801,7 +14801,7 @@ void MainWindow::scheduleNativeWeakSignalPeriodTx()
     const QString boundary = QDateTime::fromMSecsSinceEpoch(
                                  m_nativeWeakSignalTxBoundaryUtcMs, Qt::UTC)
                                  .time().toString(QStringLiteral("HH:mm:ss.zzz"));
-    const QString armed = MadModemI18n::text(
+    const QString armed = M3I18n::text(
         QStringLiteral("%1 TX armed: UTC %2, period %3"))
         .arg(label, boundary)
         .arg(txFirst ? 1 : 2);
@@ -14827,7 +14827,7 @@ void MainWindow::cancelNativeWeakSignalPeriodTx(const QString &reason)
     m_nativeWeakSignalTxBoundaryUtcMs = 0;
     m_nativeWeakSignalPreparedModulator.reset();
     if (wasPending) {
-        appendLog(MadModemI18n::text(QStringLiteral("%1 TX schedule cancelled."))
+        appendLog(M3I18n::text(QStringLiteral("%1 TX schedule cancelled."))
                       .arg(mode.isEmpty() ? QStringLiteral("Weak-signal") : mode));
     }
     updateTxControlState();
@@ -14859,7 +14859,7 @@ void MainWindow::handleNativeWeakSignalPeriodTxDue()
     // end guard for CAT/PTT and audio-stream startup latency.
     constexpr qint64 kMaximumBoundaryLatenessMs = 100;
     if (-remainingMs > kMaximumBoundaryLatenessMs || !m_nativeWeakSignalPreparedModulator) {
-        appendLog(MadModemI18n::text(
+        appendLog(M3I18n::text(
             QStringLiteral("Weak-signal TX boundary missed by %1 ms; complete frame deferred."))
                       .arg(-remainingMs));
         m_nativeWeakSignalTxPending = false;
@@ -14948,7 +14948,7 @@ void MainWindow::updateQ65SequencerFromDecode(const QString &message, int snrDb)
         m_tableQ65TxMessages->selectRow(row);
         QTableWidgetItem *item = m_tableQ65TxMessages->item(row, 1);
         const QString selected = item != nullptr ? item->text().trimmed() : QString();
-        m_lblQ65SequencerStatus->setText(MadModemI18n::text(QStringLiteral("Sequencer: %1 | Tx%2 %3 | SNR %4 dB"))
+        m_lblQ65SequencerStatus->setText(M3I18n::text(QStringLiteral("Sequencer: %1 | Tx%2 %3 | SNR %4 dB"))
                                              .arg(reason)
                                              .arg(row + 1)
                                              .arg(selected)
@@ -15184,9 +15184,9 @@ void MainWindow::loadRttyTxTextFile()
 {
     const QString fileName = QFileDialog::getOpenFileName(
         this,
-        MadModemI18n::text(QStringLiteral("Load RTTY TX text")),
+        M3I18n::text(QStringLiteral("Load RTTY TX text")),
         QDir::homePath(),
-        MadModemI18n::text(QStringLiteral("Text files (*.txt *.log);;All files (*)"))
+        M3I18n::text(QStringLiteral("Text files (*.txt *.log);;All files (*)"))
         );
 
     if (fileName.isEmpty()) {
@@ -15196,8 +15196,8 @@ void MainWindow::loadRttyTxTextFile()
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::warning(this,
-                             MadModemI18n::text(QStringLiteral("Load RTTY text failed")),
-                             MadModemI18n::text(QStringLiteral("Unable to open the selected text file.")));
+                             M3I18n::text(QStringLiteral("Load RTTY text failed")),
+                             M3I18n::text(QStringLiteral("Unable to open the selected text file.")));
         appendLog("RTTY text load failed: " + file.errorString());
         return;
     }
@@ -15352,9 +15352,9 @@ void MainWindow::loadBpsk31TxTextFile()
 {
     const QString fileName = QFileDialog::getOpenFileName(
         this,
-        MadModemI18n::text(QStringLiteral("Load PSK TX text")),
+        M3I18n::text(QStringLiteral("Load PSK TX text")),
         QDir::homePath(),
-        MadModemI18n::text(QStringLiteral("Text files (*.txt *.log);;All files (*)"))
+        M3I18n::text(QStringLiteral("Text files (*.txt *.log);;All files (*)"))
         );
 
     if (fileName.isEmpty()) {
@@ -15364,8 +15364,8 @@ void MainWindow::loadBpsk31TxTextFile()
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::warning(this,
-                             MadModemI18n::text(QStringLiteral("Load PSK text failed")),
-                             MadModemI18n::text(QStringLiteral("Unable to open the selected text file.")));
+                             M3I18n::text(QStringLiteral("Load PSK text failed")),
+                             M3I18n::text(QStringLiteral("Unable to open the selected text file.")));
         appendLog("PSK text load failed: " + file.errorString());
         return;
     }
@@ -15459,9 +15459,9 @@ void MainWindow::loadMfskTxTextFile()
 {
     const QString fileName = QFileDialog::getOpenFileName(
         this,
-        MadModemI18n::text(QStringLiteral("Load MFSK TX text")),
+        M3I18n::text(QStringLiteral("Load MFSK TX text")),
         QDir::homePath(),
-        MadModemI18n::text(QStringLiteral("Text files (*.txt *.log);;All files (*)"))
+        M3I18n::text(QStringLiteral("Text files (*.txt *.log);;All files (*)"))
         );
 
     if (fileName.isEmpty()) {
@@ -15471,8 +15471,8 @@ void MainWindow::loadMfskTxTextFile()
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::warning(this,
-                             MadModemI18n::text(QStringLiteral("Load MFSK text failed")),
-                             MadModemI18n::text(QStringLiteral("Unable to open the selected text file.")));
+                             M3I18n::text(QStringLiteral("Load MFSK text failed")),
+                             M3I18n::text(QStringLiteral("Unable to open the selected text file.")));
         appendLog("MFSK text load failed: " + file.errorString());
         return;
     }
@@ -15628,9 +15628,9 @@ void MainWindow::loadCwTxTextFile()
 {
     const QString fileName = QFileDialog::getOpenFileName(
         this,
-        MadModemI18n::text(QStringLiteral("Load CW TX text")),
+        M3I18n::text(QStringLiteral("Load CW TX text")),
         QDir::homePath(),
-        MadModemI18n::text(QStringLiteral("Text files (*.txt *.log);;All files (*)"))
+        M3I18n::text(QStringLiteral("Text files (*.txt *.log);;All files (*)"))
         );
 
     if (fileName.isEmpty()) {
@@ -15640,8 +15640,8 @@ void MainWindow::loadCwTxTextFile()
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::warning(this,
-                             MadModemI18n::text(QStringLiteral("Load CW text failed")),
-                             MadModemI18n::text(QStringLiteral("Unable to open the selected text file.")));
+                             M3I18n::text(QStringLiteral("Load CW text failed")),
+                             M3I18n::text(QStringLiteral("Unable to open the selected text file.")));
         appendLog("CW text load failed: " + file.errorString());
         return;
     }
@@ -15905,9 +15905,9 @@ void MainWindow::loadHellTxTextFile()
 {
     const QString fileName = QFileDialog::getOpenFileName(
         this,
-        MadModemI18n::text(QStringLiteral("Load Hellschreiber TX text")),
+        M3I18n::text(QStringLiteral("Load Hellschreiber TX text")),
         QDir::homePath(),
-        MadModemI18n::text(QStringLiteral("Text files (*.txt *.log);;All files (*)"))
+        M3I18n::text(QStringLiteral("Text files (*.txt *.log);;All files (*)"))
         );
 
     if (fileName.isEmpty()) {
@@ -15917,8 +15917,8 @@ void MainWindow::loadHellTxTextFile()
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::warning(this,
-                             MadModemI18n::text(QStringLiteral("Load Hellschreiber text failed")),
-                             MadModemI18n::text(QStringLiteral("Unable to open the selected text file.")));
+                             M3I18n::text(QStringLiteral("Load Hellschreiber text failed")),
+                             M3I18n::text(QStringLiteral("Unable to open the selected text file.")));
         appendLog("Hellschreiber text load failed: " + file.errorString());
         return;
     }
@@ -16453,7 +16453,7 @@ void MainWindow::updateFt8SlotStatus()
                                               QString::number(remainExactSec, 'f', 1)));
         m_lblFt8WindowStatus->setToolTip(window + QStringLiteral(" · ") + timingDetail);
         m_lblFt8WindowStatus->setStyleSheet(QStringLiteral("font-weight: 500; font-size: 9pt;"));
-        MadModemUi::setSemanticRole(m_lblFt8WindowStatus,
+        M3Ui::setSemanticRole(m_lblFt8WindowStatus,
                                     txWindow ? QStringLiteral("negative")
                                              : QStringLiteral("positive"));
     }
@@ -16508,7 +16508,7 @@ void MainWindow::handleFtSlotUpdated(const QString &modeLabel,
                                               QString::number(remainExactSec, 'f', 1)));
         m_lblFt8WindowStatus->setToolTip(window + QStringLiteral(" · ") + timingDetail);
         m_lblFt8WindowStatus->setStyleSheet(QStringLiteral("font-weight: 500; font-size: 9pt;"));
-        MadModemUi::setSemanticRole(m_lblFt8WindowStatus,
+        M3Ui::setSemanticRole(m_lblFt8WindowStatus,
                                     txWindow ? QStringLiteral("negative")
                                              : QStringLiteral("positive"));
     }
@@ -17179,9 +17179,9 @@ void MainWindow::updateFt8DecodePerformanceUi()
     const QString latencyText = m_haveFt8PerfStats
         ? QStringLiteral("%1 ms").arg(m_lastFt8PerfStats.totalMs, 0, 'f', 0)
         : QStringLiteral("--");
-    const QString accentColour = MadModemUi::themeColor(MadModemUi::ThemeColorRole::Accent).name();
+    const QString accentColour = M3Ui::themeColor(M3Ui::ThemeColorRole::Accent).name();
     const QString latencyColour = (m_haveFt8PerfStats && m_lastFt8PerfStats.totalMs > 3000.0)
-        ? MadModemUi::themeColor(MadModemUi::ThemeColorRole::Negative).name()
+        ? M3Ui::themeColor(M3Ui::ThemeColorRole::Negative).name()
         : accentColour;
 
     double liveAvgMs = 0.0;
@@ -18159,7 +18159,7 @@ void MainWindow::startFt8CqRepeat()
     const QString cq = selectFt8TxRow(0);
     if (!isFt8CqMessage(cq)) {
         QMessageBox::information(this,
-                                 MadModemI18n::text(QStringLiteral("FT8 CQ repeat")),
+                                 M3I18n::text(QStringLiteral("FT8 CQ repeat")),
                                  uiText("ft8_cq_message_missing", "Generate/select a CQ message before starting CQ repeat."));
         return;
     }
@@ -18933,7 +18933,7 @@ void MainWindow::autoLogFt8QsoFor(const FtQsoSession &session, const QString &re
     entry.callsign = AdifLogbook::normalizeCallsign(session.dxCall);
     entry.stationCallsign = stationCallsign();
     entry.operatorCall = stationCallsign();
-    entry.adifFields.insert(QStringLiteral("APP_MADMODEM_QSO_ID"), QUuid::createUuid().toString(QUuid::WithoutBraces));
+    entry.adifFields.insert(QStringLiteral("APP_M3_QSO_ID"), QUuid::createUuid().toString(QUuid::WithoutBraces));
     entry.adifFields.insert(QStringLiteral("MY_GRIDSQUARE"), stationLocator());
     entry.rstSent = session.reportSent.isEmpty() ? QStringLiteral("-10") : cleanFt8Report(session.reportSent);
     entry.rstReceived = session.reportReceived.isEmpty() ? QStringLiteral("-10") : cleanFt8Report(session.reportReceived);
@@ -18989,7 +18989,7 @@ void MainWindow::finishAutoLogFt8Qso(const LogbookEntry &entry, const QString &r
     m_logbookStore->append(entry, [this, entry, key, automationTrace](int count, const QString &error) {
         traceFtAutomation("qso.log",count < 0 ? "save_failed" : (count > 0 ? "saved" : "duplicate_skipped"),
             {{"trace_id",automationTrace},{"logged_call",entry.callsign},{"logged_qso_id",entry.callsign+QLatin1Char('|')+QString::number(entry.utc.toMSecsSinceEpoch())},
-             {"adif_id",entry.adifFields.value(QStringLiteral("APP_MADMODEM_QSO_ID"))},{"error",error}});
+             {"adif_id",entry.adifFields.value(QStringLiteral("APP_M3_QSO_ID"))},{"error",error}});
         if (count < 0) {
             appendLog(QStringLiteral("FT auto-log failed; QSO retained for retry: ") + error);
             return;
@@ -19689,7 +19689,7 @@ void MainWindow::styleFt8DecodeRow(int row, QVariantList *missingQueries, QSet<Q
         break;
     case Novelty::NewCall:
         newBackground = mmColourFromSetting(m_settings.ftHighlightNewCallBackground, QColor(0xa0, 0xa0, 0x30));
-        tip = MadModemI18n::text(QStringLiteral("Needed station: %1 is not in the ADIF logbook yet. You can call it after the current QSO/73, even if this line is not CQ.")).arg(station);
+        tip = M3I18n::text(QStringLiteral("Needed station: %1 is not in the ADIF logbook yet. You can call it after the current QSO/73, even if this line is not CQ.")).arg(station);
         break;
     case Novelty::NewCallBand:
         newBackground = mmColourFromSetting(m_settings.ftHighlightNewCallBandBackground, QColor(0xe0, 0xe0, 0x70));
@@ -19813,7 +19813,7 @@ void MainWindow::appendFt8LocalTxRow(const QString &message, int frequencyHz, co
             sep->setFlags(sep->flags() & ~Qt::ItemIsEditable & ~Qt::ItemIsSelectable);
             sep->setData(kFtSlotSeparatorRole, true);
             sep->setBackground(QBrush(m_tableFt8Rx->palette().color(QPalette::AlternateBase)));
-            sep->setForeground(QBrush(MadModemUi::themeColor(MadModemUi::ThemeColorRole::MutedText)));
+            sep->setForeground(QBrush(M3Ui::themeColor(M3Ui::ThemeColorRole::MutedText)));
             QFont f = m_tableFt8Rx->font();
             f.setBold(true);
             sep->setFont(f);
@@ -20176,7 +20176,7 @@ void MainWindow::handleFt8DecodeBatchFinished(qint64 slotStartUtcMs, const QStri
         m_ft8DeferredDecodeLogs.clear();
     }
     const double uiBatchMs = static_cast<double>(uiBatchTimer.nsecsElapsed()) / 1000000.0;
-    MadModemRuntime::SystemResourceManager::instance().observeGuiFrame(uiBatchMs);
+    M3Runtime::SystemResourceManager::instance().observeGuiFrame(uiBatchMs);
     if (uiBatchMs > 25.0) {
         appendLog(QStringLiteral("FT UI batch: %1 row(s) presented in %2 ms")
                       .arg(displayBatch.size())
@@ -21501,7 +21501,7 @@ void MainWindow::updateTextTxHighlight(double progress, int characterPosition)
 
     if (wanted > 0) {
         QTextEdit::ExtraSelection sentSelection;
-        sentSelection.format.setForeground(MadModemUi::themeColor(MadModemUi::ThemeColorRole::Positive));
+        sentSelection.format.setForeground(M3Ui::themeColor(M3Ui::ThemeColorRole::Positive));
         QTextCursor sentCursor(m_activeTextTxEditor->document());
         if (selectDocumentRange(sentCursor, 0, wanted)) {
             sentSelection.cursor = sentCursor;
@@ -21511,7 +21511,7 @@ void MainWindow::updateTextTxHighlight(double progress, int characterPosition)
 
     if (wanted < safeLength) {
         QTextEdit::ExtraSelection currentSelection;
-        const QColor currentColor = MadModemUi::themeColor(MadModemUi::ThemeColorRole::Accent);
+        const QColor currentColor = M3Ui::themeColor(M3Ui::ThemeColorRole::Accent);
         currentSelection.format.setForeground(currentColor);
         currentSelection.format.setFontUnderline(true);
         currentSelection.format.setUnderlineColor(currentColor);
@@ -22080,7 +22080,7 @@ bool MainWindow::analyzeWeatherFaxWavFile(const QString &fileName)
     WavStreamFormat wav;
     QString errorMessage;
 
-    if (!MadModemAudio::parseWavHeader(file, wav, errorMessage)) {
+    if (!M3Audio::parseWavHeader(file, wav, errorMessage)) {
         appendLog("WAV parse failed: " + errorMessage);
         m_offlineAnalysisActive = false;
         setReceiverRunning(false);
@@ -22123,7 +22123,7 @@ bool MainWindow::analyzeWeatherFaxWavFile(const QString &fileName)
     if (ui->lblAudioLevelDb != nullptr) ui->lblAudioLevelDb->setText(QStringLiteral("WAV"));
     if (m_lblVuMeterDb != nullptr) m_lblVuMeterDb->setText(QStringLiteral("WAV"));
     ui->lblEstimatedFrequency->setText(uiText("frequency_idle", "Freq: -- Hz"));
-    ui->lblAppStatus->setText(MadModemI18n::text(QStringLiteral("WAV analysis")));
+    ui->lblAppStatus->setText(M3I18n::text(QStringLiteral("WAV analysis")));
 
     appendLog("Analyzing WEFAX WAV: " + fileName);
     appendLog(QString("WAV format: %1 Hz, %2 channel(s), %3-bit, %4 byte(s).")
@@ -22173,7 +22173,7 @@ bool MainWindow::analyzeWeatherFaxWavFile(const QString &fileName)
         }
 
         errorMessage.clear();
-        const QVector<float> samples = MadModemAudio::convertWavBytesToMono(raw, wav, &errorMessage);
+        const QVector<float> samples = M3Audio::convertWavBytesToMono(raw, wav, &errorMessage);
 
         if (!errorMessage.isEmpty()) {
             appendLog("WAV conversion failed: " + errorMessage);
@@ -22274,7 +22274,7 @@ bool MainWindow::analyzeSstvWavFile(const QString &fileName)
     WavStreamFormat wav;
     QString errorMessage;
 
-    if (!MadModemAudio::parseWavHeader(file, wav, errorMessage)) {
+    if (!M3Audio::parseWavHeader(file, wav, errorMessage)) {
         appendLog("SSTV WAV parse failed: " + errorMessage);
         m_offlineAnalysisActive = false;
         setReceiverRunning(false);
@@ -22305,7 +22305,7 @@ bool MainWindow::analyzeSstvWavFile(const QString &fileName)
     if (ui->lblAudioLevelDb != nullptr) ui->lblAudioLevelDb->setText(QStringLiteral("WAV"));
     if (m_lblVuMeterDb != nullptr) m_lblVuMeterDb->setText(QStringLiteral("WAV"));
     ui->lblEstimatedFrequency->setText(uiText("frequency_idle", "Freq: -- Hz"));
-    ui->lblAppStatus->setText(MadModemI18n::text(QStringLiteral("SSTV WAV analysis")));
+    ui->lblAppStatus->setText(M3I18n::text(QStringLiteral("SSTV WAV analysis")));
 
     appendLog("Analyzing SSTV WAV: " + fileName);
     appendLog(QString("WAV format: %1 Hz, %2 channel(s), %3-bit, %4 byte(s).")
@@ -22358,7 +22358,7 @@ bool MainWindow::analyzeSstvWavFile(const QString &fileName)
         }
 
         errorMessage.clear();
-        const QVector<float> samples = MadModemAudio::convertWavBytesToMono(raw, wav, &errorMessage);
+        const QVector<float> samples = M3Audio::convertWavBytesToMono(raw, wav, &errorMessage);
 
         if (!errorMessage.isEmpty()) {
             appendLog("SSTV WAV conversion failed: " + errorMessage);
@@ -22474,9 +22474,9 @@ void MainWindow::saveSstvImage()
 
     QString fileName = QFileDialog::getSaveFileName(
         this,
-        MadModemI18n::text(QStringLiteral("Save SSTV image")),
+        M3I18n::text(QStringLiteral("Save SSTV image")),
         QDir::home().filePath("SSTV.png"),
-        MadModemI18n::text(QStringLiteral("PNG image (*.png)"))
+        M3I18n::text(QStringLiteral("PNG image (*.png)"))
         );
 
     if (fileName.isEmpty()) {
@@ -22489,8 +22489,8 @@ void MainWindow::saveSstvImage()
 
     if (!image.save(fileName, "PNG")) {
         QMessageBox::warning(this,
-                             MadModemI18n::text(QStringLiteral("Save PNG failed")),
-                             MadModemI18n::text(QStringLiteral("Unable to save the SSTV image.")));
+                             M3I18n::text(QStringLiteral("Save PNG failed")),
+                             M3I18n::text(QStringLiteral("Unable to save the SSTV image.")));
         return;
     }
 
@@ -22559,9 +22559,9 @@ void MainWindow::saveWeatherFaxImage()
 
     QString fileName = QFileDialog::getSaveFileName(
         this,
-        MadModemI18n::text(QStringLiteral("Save MeteoFax image")),
+        M3I18n::text(QStringLiteral("Save MeteoFax image")),
         defaultName,
-        MadModemI18n::text(QStringLiteral("PNG image (*.png)"))
+        M3I18n::text(QStringLiteral("PNG image (*.png)"))
         );
 
     if (fileName.isEmpty()) {
@@ -22574,8 +22574,8 @@ void MainWindow::saveWeatherFaxImage()
 
     if (!saveWeatherFaxImageToFile(image, fileName)) {
         QMessageBox::warning(this,
-                             MadModemI18n::text(QStringLiteral("Save PNG failed")),
-                             MadModemI18n::text(QStringLiteral("Unable to save the MeteoFax image.")));
+                             M3I18n::text(QStringLiteral("Save PNG failed")),
+                             M3I18n::text(QStringLiteral("Unable to save the MeteoFax image.")));
     }
 }
 
@@ -23694,7 +23694,7 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
         if(!SessionDiagnostics::instance().start(m_settings.sessionDiagnosticsFolder))appendLog(SessionDiagnostics::instance().error());
     } else if(!m_settings.sessionDiagnosticsEnabled)SessionDiagnostics::instance().stop();
     SessionDiagnostics::instance().settings(m_settings);
-    SessionDiagnostics::instance().record("resources",{{"cpu",MadModemCpu::summary()},{"policy",MadModemRuntime::SystemResourceManager::instance().startupSummary()}});
+    SessionDiagnostics::instance().record("resources",{{"cpu",M3Cpu::summary()},{"policy",M3Runtime::SystemResourceManager::instance().startupSummary()}});
     if (m_qrzLookupPanel) m_qrzLookupPanel->setAccountCredentials(m_settings.qrzUsername, m_settings.qrzPassword);
     m_settings.schedulerQsyPlanJson = BandSchedulerDialog::serializeEntries(dialog.schedulerEntries());
     savePersistentSettings();
@@ -23995,7 +23995,7 @@ void MainWindow::showOnlineHelp()
     dialog.exec();
 }
 
-void MainWindow::showAboutMadModem()
+void MainWindow::showAboutM3()
 {
     QDialog dialog(this);
     dialog.setWindowTitle(uiText("action.about", "About MM"));
@@ -24019,7 +24019,7 @@ void MainWindow::showAboutMadModem()
         "Amateur radio digital modem and station hub.<br>"
         "Based on MadModem %3.")
         .arg(ProductName::longName(), ProductName::shortName(),
-             QStringLiteral(MADMODEM_VERSION_STRING)), &dialog);
+             QStringLiteral(M3_VERSION_STRING)), &dialog);
     title->setTextFormat(Qt::RichText);
     title->setWordWrap(true);
     header->addWidget(title, 1);
@@ -24882,8 +24882,8 @@ void MainWindow::handleWeatherFaxImageCompleted(const QImage &image, const QStri
 
     if (!saveWeatherFaxImageToFile(image, fileName)) {
         QMessageBox::warning(this,
-                             MadModemI18n::text(QStringLiteral("Auto-save PNG failed")),
-                             MadModemI18n::text(QStringLiteral("Unable to auto-save the completed MeteoFax image.")));
+                             M3I18n::text(QStringLiteral("Auto-save PNG failed")),
+                             M3I18n::text(QStringLiteral("Unable to auto-save the completed MeteoFax image.")));
         return;
     }
 
@@ -24944,7 +24944,7 @@ void MainWindow::browseWeatherFaxOutputFolder()
 
     const QString folder = QFileDialog::getExistingDirectory(
         this,
-        MadModemI18n::text(QStringLiteral("Select MeteoFax output folder")),
+        M3I18n::text(QStringLiteral("Select MeteoFax output folder")),
         currentFolder
         );
 
@@ -25200,7 +25200,7 @@ void MainWindow::updateTxPreview()
         const int rx = (m_spinMsk144RxFreq != nullptr) ? m_spinMsk144RxFreq->value() : 1500;
         const int tx = (m_spinMsk144TxFreq != nullptr) ? m_spinMsk144TxFreq->value() : 1500;
         m_lblTxMode->setText(
-            MadModemI18n::text(QStringLiteral("MSK144: RX %1 Hz, TX %2 Hz, %3 s"))
+            M3I18n::text(QStringLiteral("MSK144: RX %1 Hz, TX %2 Hz, %3 s"))
                 .arg(rx).arg(tx).arg(period));
         m_txPreparedImage = QImage();
     } else if (Q65Mode::isFamilyMode(modeName)) {
@@ -25208,7 +25208,7 @@ void MainWindow::updateTxPreview()
         const int rx = (m_spinQ65RxFreq != nullptr) ? m_spinQ65RxFreq->value() : 1500;
         const int tx = (m_spinQ65TxFreq != nullptr) ? m_spinQ65TxFreq->value() : 1500;
         m_lblTxMode->setText(
-            MadModemI18n::text(QStringLiteral("%1: RX %2 Hz, TX %3 Hz, %4 s"))
+            M3I18n::text(QStringLiteral("%1: RX %2 Hz, TX %3 Hz, %4 s"))
                 .arg(Q65Mode::modeName(currentQ65Submode())).arg(rx).arg(tx).arg(period));
         m_txPreparedImage = QImage();
     } else if (Ft8Mode::isFamilyMode(modeName)) {
@@ -25236,7 +25236,7 @@ void MainWindow::updateTxPreview()
         }
         m_txPreparedImage = QImage();
     } else {
-        m_lblTxMode->setText(MadModemI18n::text(QStringLiteral("TX mode unavailable")));
+        m_lblTxMode->setText(M3I18n::text(QStringLiteral("TX mode unavailable")));
         m_txPreparedImage = QImage();
     }
 
@@ -25283,7 +25283,7 @@ void MainWindow::updateTxPreview()
         m_lblTxImageName->setText(msg.isEmpty() ? QString("%1: no TX message selected").arg(profile.shortLabel)
                                                  : QString("%1 selected: %2").arg(profile.shortLabel, msg.left(48)));
     } else if (m_txSourceImage.isNull() || m_txImageOwnerMode != modeName) {
-        m_lblTxImageName->setText(MadModemI18n::text(QStringLiteral("No TX image loaded")));
+        m_lblTxImageName->setText(M3I18n::text(QStringLiteral("No TX image loaded")));
         if (!m_rxRunning && !m_txRunning && m_faxImageWidget != nullptr) {
             m_faxImageWidget->clearTransmitProgress();
         }
@@ -25662,9 +25662,9 @@ void MainWindow::loadTxImage()
 
     const QString fileName = QFileDialog::getOpenFileName(
         this,
-        MadModemI18n::text(QStringLiteral("Load image for TX")),
+        M3I18n::text(QStringLiteral("Load image for TX")),
         QDir::homePath(),
-        MadModemI18n::text(QStringLiteral("Images (*.png *.jpg *.jpeg *.bmp);;All files (*)"))
+        M3I18n::text(QStringLiteral("Images (*.png *.jpg *.jpeg *.bmp);;All files (*)"))
         );
 
     if (fileName.isEmpty()) {
@@ -25678,8 +25678,8 @@ void MainWindow::loadTxImage()
 
     if (image.isNull()) {
         QMessageBox::warning(this,
-                             MadModemI18n::text(QStringLiteral("Load TX image failed")),
-                             MadModemI18n::text(QStringLiteral("Unable to load the selected image file.")));
+                             M3I18n::text(QStringLiteral("Load TX image failed")),
+                             M3I18n::text(QStringLiteral("Unable to load the selected image file.")));
         appendLog("TX image load failed: " + reader.errorString());
         return;
     }
@@ -25748,8 +25748,8 @@ void MainWindow::startImageTx()
     if (liveRxRunning && !textMode) {
         appendLog("TX blocked: stop RX before image/video transmission.");
         QMessageBox::information(this,
-                                 MadModemI18n::text(QStringLiteral("TX blocked")),
-                                 MadModemI18n::text(QStringLiteral("Stop RX before starting WEFAX/SSTV image TX. Text modes can pause and resume RX automatically.")));
+                                 M3I18n::text(QStringLiteral("TX blocked")),
+                                 M3I18n::text(QStringLiteral("Stop RX before starting WEFAX/SSTV image TX. Text modes can pause and resume RX automatically.")));
         return;
     }
 
@@ -25759,36 +25759,36 @@ void MainWindow::startImageTx()
 
     if (!textMode && m_txSourceImage.isNull()) {
         QMessageBox::information(this,
-                                 MadModemI18n::text(QStringLiteral("Image TX")),
-                                 MadModemI18n::text(QStringLiteral("Load an image before starting TX.")));
+                                 M3I18n::text(QStringLiteral("Image TX")),
+                                 M3I18n::text(QStringLiteral("Load an image before starting TX.")));
         return;
     }
 
     if (rttyMode && (m_rttyTxOverrideText.isNull() ? (m_txtRttyTx == nullptr || m_txtRttyTx->toPlainText().trimmed().isEmpty()) : m_rttyTxOverrideText.trimmed().isEmpty())) {
         QMessageBox::information(this,
                                  QStringLiteral("RTTY TX"),
-                                 MadModemI18n::text(QStringLiteral("Enter or load text before starting RTTY TX.")));
+                                 M3I18n::text(QStringLiteral("Enter or load text before starting RTTY TX.")));
         return;
     }
 
     if (bpskMode && (m_txtBpsk31Tx == nullptr || m_txtBpsk31Tx->toPlainText().trimmed().isEmpty())) {
         QMessageBox::information(this,
                                  QStringLiteral("PSK TX"),
-                                 MadModemI18n::text(QStringLiteral("Enter or load text before starting PSK TX.")));
+                                 M3I18n::text(QStringLiteral("Enter or load text before starting PSK TX.")));
         return;
     }
 
     if (mfskMode && (m_txtMfskTx == nullptr || m_txtMfskTx->toPlainText().trimmed().isEmpty())) {
         QMessageBox::information(this,
                                  QStringLiteral("MFSK TX"),
-                                 MadModemI18n::text(QStringLiteral("Enter or load text before starting MFSK TX.")));
+                                 M3I18n::text(QStringLiteral("Enter or load text before starting MFSK TX.")));
         return;
     }
 
     if (cwMode && (m_txtCwTx == nullptr || m_txtCwTx->toPlainText().trimmed().isEmpty())) {
         QMessageBox::information(this,
                                  QStringLiteral("CW TX"),
-                                 MadModemI18n::text(QStringLiteral("Enter or load text before starting CW TX.")));
+                                 M3I18n::text(QStringLiteral("Enter or load text before starting CW TX.")));
         return;
     }
 
@@ -25800,7 +25800,7 @@ void MainWindow::startImageTx()
     if (hellMode && (m_txtHellTx == nullptr || m_txtHellTx->toPlainText().trimmed().isEmpty())) {
         QMessageBox::information(this,
                                  QStringLiteral("Hellschreiber TX"),
-                                 MadModemI18n::text(QStringLiteral("Enter or load text before starting Hellschreiber TX.")));
+                                 M3I18n::text(QStringLiteral("Enter or load text before starting Hellschreiber TX.")));
         return;
     }
 
@@ -25816,7 +25816,7 @@ void MainWindow::startImageTx()
         refreshMsk144StandardMessages();
         if (m_tableMsk144TxMessages == nullptr || m_tableMsk144TxMessages->rowCount() == 0) {
             QMessageBox::information(this, QStringLiteral("MSK144 TX"),
-                                     MadModemI18n::text(QStringLiteral("Generate or select an MSK144 message before starting TX.")));
+                                     M3I18n::text(QStringLiteral("Generate or select an MSK144 message before starting TX.")));
             return;
         }
     }
@@ -25824,7 +25824,7 @@ void MainWindow::startImageTx()
         refreshQ65StandardMessages();
         if (m_tableQ65TxMessages == nullptr || m_tableQ65TxMessages->rowCount() == 0) {
             QMessageBox::information(this, QStringLiteral("Q65 TX"),
-                                     MadModemI18n::text(QStringLiteral("Generate or select a Q65 message before starting TX.")));
+                                     M3I18n::text(QStringLiteral("Generate or select a Q65 message before starting TX.")));
             return;
         }
     }
@@ -25894,7 +25894,7 @@ void MainWindow::startImageTx()
     if (nativeBoundaryStart) {
         modulator = std::move(*nativeWaveform);
         if (!modulator) {
-            appendLog(MadModemI18n::text(
+            appendLog(M3I18n::text(
                 QStringLiteral("Unable to create a transmitter for the active mode.")));
         }
     } else {
@@ -25904,7 +25904,7 @@ void MainWindow::startImageTx()
     if (!modulator) {
         QMessageBox::warning(this,
                              QStringLiteral("TX"),
-                             MadModemI18n::text(QStringLiteral("Unable to create a transmitter for the active mode.")));
+                             M3I18n::text(QStringLiteral("Unable to create a transmitter for the active mode.")));
         const bool restartRx = m_returnToRxAfterTx;
         m_returnToRxAfterTx = false;
         m_currentTxIsTextMode = false;
@@ -26028,7 +26028,7 @@ qint64 MainWindow::pendingFt8AudioStartDeadlineUtcMs() const
     const auto profile = Ft8Mode::profileForMode(ui->cmbMode->currentText());
     const int latest = (m_pendingFt8TxPlan.latePartial || m_pendingFt8TxPlan.operatorRequested)
         ? latestFtManualPartialStartMs(profile)
-        : MadModemFtTiming::latestFullFrameStartMs(profile.slotMs, profile.signalMs);
+        : M3FtTiming::latestFullFrameStartMs(profile.slotMs, profile.signalMs);
     return m_pendingFt8TxPlan.slotBoundaryUtcMs + latest;
 }
 

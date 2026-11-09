@@ -7,8 +7,8 @@ import re
 def stamp(notes: str, build: int, commit: str) -> str:
     if not 0 < build <= 2147483647 or not re.fullmatch(r'(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})', commit):
         raise ValueError('Invalid distribution identity')
-    notes = re.sub(r'^<!-- MadModem (?:build|commit): [^\r\n]* -->[ \t]*\r?\n?', '', notes, flags=re.M)
-    return notes.rstrip() + f'\n\n<!-- MadModem build: {build} -->\n<!-- MadModem commit: {commit.lower()} -->\n'
+    notes = re.sub(r'^<!-- (?:MultiModeModem|MadModem) (?:build|commit): [^\r\n]* -->[ \t]*\r?\n?', '', notes, flags=re.M)  # m3-compat
+    return notes.rstrip() + f'\n\n<!-- MultiModeModem build: {build} -->\n<!-- MultiModeModem commit: {commit.lower()} -->\n'
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)

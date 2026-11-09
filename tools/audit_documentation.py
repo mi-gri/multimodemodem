@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate MadModem release metadata and multilingual help sources."""
+"""Validate MultiModeModem release metadata and multilingual help sources."""
 from __future__ import annotations
 
 from html.parser import HTMLParser
@@ -14,7 +14,7 @@ from product_name import brand
 ROOT = Path(__file__).resolve().parents[1]
 HELP = ROOT / "docs" / "help"
 LANGS = ["en", "it", "fr", "de", "no", "cs"]
-VERSION = (ROOT / "MADMODEM_VERSION.txt").read_text(encoding="utf-8").strip()
+VERSION = (ROOT / "M3_VERSION.txt").read_text(encoding="utf-8").strip()
 
 
 class HtmlCheck(HTMLParser):
@@ -23,7 +23,7 @@ class HtmlCheck(HTMLParser):
 
 def main() -> int:
     errors: list[str] = []
-    expected_namespace = f"org.madmodem.mm.{VERSION.replace('.', '')}"
+    expected_namespace = f"org.m3.mm.{VERSION.replace('.', '')}"
 
     current_docs = [
         ROOT / "README.md",
@@ -77,7 +77,7 @@ def main() -> int:
                 errors.append(f"{page.relative_to(ROOT)}: malformed or duplicate html element")
             if not text.rstrip().endswith("</body></html>"):
                 errors.append(f"{page.relative_to(ROOT)}: content exists outside the body/html close")
-            if f"MadModem {VERSION}" not in text:
+            if f"MultiModeModem {VERSION}" not in text:
                 errors.append(f"{page.relative_to(ROOT)}: missing current footer version")
             for href in re.findall(r"href=['\"]([^'\"]+)['\"]", text):
                 if href.startswith(("http:", "https:", "#")):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static validator for MadModem's external contest rules files.
+"""Static validator for MultiModeModem's external contest rules files.
 
 With no argument it validates rtty_rules for backward compatibility. Pass cw_rules
 to validate the CW database with exactly the same generic-engine schema.

@@ -149,7 +149,7 @@ struct Ft8FullAutoCqCandidate
 };
 
 /**
- * @brief Main application window for MadModem.
+ * @brief Main application window for MultiModeModem.
  *
  * Purpose:
  * - Own the main UI.
@@ -959,7 +959,7 @@ private slots:
     /**
      * @brief Shows application information.
      */
-    void showAboutMadModem();
+    void showAboutM3();
     void restoreLastSession();
     void spotFt8ToPskReporter(const Ft8RxDecoder::Decode &decode, const QString &call, const QString &grid,
                               const QString &mode);

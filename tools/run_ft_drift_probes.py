@@ -33,8 +33,8 @@ def main():
     command[command.index('-o') + 1] = str(obj)
     command[command.index('-c') + 1] = str(source / 'tests/FtDriftRxProbe.cpp')
     subprocess.run(command, cwd=build, check=True)
-    link = shlex.split((build / 'CMakeFiles/MadModem.dir/link.txt').read_text())
-    link = [str(obj) if x == 'CMakeFiles/MadModem.dir/main.cpp.o' else x for x in link]
+    link = shlex.split((build / 'CMakeFiles/MultiModeModem.dir/link.txt').read_text())
+    link = [str(obj) if x == 'CMakeFiles/MultiModeModem.dir/main.cpp.o' else x for x in link]
     link[link.index('-o') + 1] = str(exe)
     subprocess.run(link, cwd=build, check=True)
     exe.chmod(0o755)

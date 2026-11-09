@@ -80,8 +80,8 @@ require("m_maxLiveWorkers = qMax(1, logical - m_reservedLogicalProcessors)" in r
 
 require('if (m_config.txAudioRoute != QStringLiteral("default"))' in rig,
         "default CAT TX route does not query/restore rig mode")
-require("m_txModeChangedByMadModem" in rig,
-        "rig mode is restored only when MadModem actually changed it")
+require("m_txModeChangedByM3" in rig,
+        "rig mode is restored only when MultiModeModem actually changed it")
 
 clock_setup_start = main.index("void MainWindow::setupFt8Page")
 clock_setup_end = main.index("void MainWindow::setupProcessingConnections", clock_setup_start)

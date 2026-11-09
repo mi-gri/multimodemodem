@@ -165,7 +165,7 @@ public slots:
     void setColorScalePercent(int percent);
 
     /**
-     * @brief Selects the intensity palette: madmodem/wsjtx, mshv, fldigi, raptor, or grayscale.
+     * @brief Selects the intensity palette: m3/wsjtx, mshv, fldigi, raptor, or grayscale.
      */
     void setPaletteName(const QString &name);
 
@@ -249,7 +249,7 @@ private:
     QImage m_image;
     QVector<QRgb> m_colorTable;
     int m_colorScalePercent = 100;
-    QString m_paletteName = QStringLiteral("madmodem");
+    QString m_paletteName = QStringLiteral("m3");
     ScrollDirection m_scrollDirection = ScrollDirection::Down;
 
     double m_minHz = 100.0;

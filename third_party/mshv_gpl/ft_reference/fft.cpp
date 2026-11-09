@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <cstring>
 namespace MshvReference {
-namespace {auto &planner=MadModemDsp::fftwPlannerMutex;struct Plan {
+namespace {auto &planner=M3Dsp::fftwPlannerMutex;struct Plan {
  int n; int kind; fftw_plan plan=nullptr; double *real=nullptr; fftw_complex *data=nullptr;
  Plan(int count,int type,int sign):n(count),kind(type){
   data=fftw_alloc_complex(n);real=fftw_alloc_real(n+2);if(!data||!real){fftw_free(data);fftw_free(real);throw std::bad_alloc();}

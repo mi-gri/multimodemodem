@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate the reviewed, operator-facing MadModem help pages.
+"""Regenerate the reviewed, operator-facing MultiModeModem help pages.
 
 The navigation is kept from each language project.  Page bodies are complete
 translations: never build prose by replacing individual English words.
@@ -14,7 +14,7 @@ from product_name import brand
 
 ROOT = Path(__file__).resolve().parents[1]
 HELP = ROOT / "docs" / "help"
-VERSION = (ROOT / "MADMODEM_VERSION.txt").read_text(encoding="utf-8").strip()
+VERSION = (ROOT / "M3_VERSION.txt").read_text(encoding="utf-8").strip()
 
 LANGUAGE_NAMES = {
     "en": "English",
@@ -104,7 +104,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                          'measured motion rate. Automatic peak search stays inside the configured AZ/EL span and '
                          'pauses during TX.</p>\n'
                          '<h2>Signal peak tracking</h2><p>When QSO tracking is active, a band row with <strong>Auto '
-                         'peak</strong> enabled can refine the geometric bearing from a real received signal. MadModem '
+                         'peak</strong> enabled can refine the geometric bearing from a real received signal. MultiModeModem '
                          'uses discrete, rate-limited probes rather than continuous conical motion: at most 5 '
                          'measurements on an azimuth-only rotor or 7 on Alt-Az, with at least 90 seconds between '
                          'cycles. Pattern search is the recommended low-wear default; Golden section is available only '
@@ -127,7 +127,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                              'selected records.</p>\n'
                              '<p><strong>UDP QSO logging:</strong> in Settings → Logbook, enable <em>Send logged QSOs '
                              'to UDP server</em> and set the destination address and port (default 127.0.0.1:2237). '
-                             'After a QSO is successfully appended to the local ADIF log, MadModem sends a '
+                             'After a QSO is successfully appended to the local ADIF log, MultiModeModem sends a '
                              'WSJT-X/JTDX-compatible Logged ADIF UDP message. UDP failure never cancels the local log '
                              'entry.</p>\n'
                              '<p>The QSO map can show the online or offline background, Maidenhead grid, station '
@@ -188,7 +188,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                                  '<h2>Safety</h2><p>The mode does not transmit, but it can move a large antenna system '
                                  'automatically. Never start a scan until azimuth/elevation limits, cable wrap, '
                                  'obstructions and an accessible stop method have been verified. When no rotator is '
-                                 'connected, MadModem must report the condition instead of pretending that a physical '
+                                 'connected, MultiModeModem must report the condition instead of pretending that a physical '
                                  'scan occurred.</p>'),
         'ft8_ft4.html': ('FT4 / FT8',
                          '<h1>FT4 / FT8</h1>\n'
@@ -260,7 +260,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'instead of sending catch-up bursts. Test wiring and timing on the actual radio before contest '
                     'use.</p>'),
         'index.html': ('MM Help',
-                       '<h1>MadModem help</h1><p>MadModem combines digital modes, audio/CAT/PTT, FT4/FT8, rotator '
+                       '<h1>MultiModeModem help</h1><p>MultiModeModem combines digital modes, audio/CAT/PTT, FT4/FT8, rotator '
                        'control, Radio Telescope, scheduler, logbook and QSO mapping in one Qt '
                        "interface.</p><ul><li><a href='quickstart.html'>Quick start</a></li><li><a "
                        "href='audio_cat_ptt.html'>Audio, CAT and PTT</a></li><li><a href='waterfall.html'>Waterfall "
@@ -357,7 +357,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                          'AZ/EL impostata e si sospende durante il TX.</p>\n'
                          "<h2>Inseguimento del massimo del segnale</h2><p>Quando è attivo l'inseguimento QSO, una riga "
                          'di banda con <strong>Auto peak</strong> abilitato può rifinire il puntamento geometrico '
-                         'usando il segnale realmente ricevuto. MadModem usa sonde discrete e limitate nel tempo, non '
+                         'usando il segnale realmente ricevuto. MultiModeModem usa sonde discrete e limitate nel tempo, non '
                          'una scansione conica continua: al massimo 5 misure con rotore solo azimutale o 7 con Alt-Az, '
                          'con almeno 90 secondi fra due cicli. Pattern search è il default consigliato a bassa usura; '
                          'Golden section è disponibile solo per sistemi azimutali e Nelder-Mead solo per Alt-Az. Sono '
@@ -382,7 +382,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                              '<p><strong>Invio QSO via UDP:</strong> in Impostazioni → Registro QSO abilita <em>Invia '
                              'i QSO registrati al server UDP</em> e imposta indirizzo e porta di destinazione '
                              '(predefiniti 127.0.0.1:2237). Dopo che un QSO è stato aggiunto con successo al registro '
-                             'ADIF locale, MadModem invia un messaggio UDP Logged ADIF compatibile con WSJT-X/JTDX. Un '
+                             'ADIF locale, MultiModeModem invia un messaggio UDP Logged ADIF compatibile con WSJT-X/JTDX. Un '
                              'errore UDP non annulla mai il QSO salvato localmente.</p>\n'
                              '<p>La mappa QSO può mostrare sfondo online o locale, griglia Maidenhead, stazioni e '
                              'percorsi dal tuo QTH. Un unico pulsante Livelli sceglie gli elementi visibili. Il '
@@ -448,7 +448,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                                  '<h2>Sicurezza</h2><p>Il modo non trasmette, ma può muovere automaticamente un '
                                  'sistema d’antenna di grandi dimensioni. Non avviare la scansione prima di avere '
                                  'verificato limiti di azimut/elevazione, avvolgimento dei cavi, ostacoli e un metodo '
-                                 'di arresto accessibile. Senza rotore collegato MadModem deve segnalare la '
+                                 'di arresto accessibile. Senza rotore collegato MultiModeModem deve segnalare la '
                                  'condizione, non simulare una scansione fisica.</p>'),
         'ft8_ft4.html': ('FT4 / FT8',
                          '<h1>FT4 / FT8</h1>\n'
@@ -522,7 +522,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'produrre raffiche di recupero. Verifica cablaggio e tempi sulla radio effettiva prima dell’uso in '
                     'contest.</p>'),
         'index.html': ('Guida MM',
-                       '<h1>Guida MadModem</h1><p>MadModem riunisce modi digitali, audio/CAT/PTT, FT4/FT8, controllo '
+                       '<h1>Guida MultiModeModem</h1><p>MultiModeModem riunisce modi digitali, audio/CAT/PTT, FT4/FT8, controllo '
                        'rotore, Radio Telescope, pianificatore, registro QSO e mappa in un’unica interfaccia '
                        "Qt.</p><ul><li><a href='quickstart.html'>Avvio rapido</a></li><li><a "
                        "href='audio_cat_ptt.html'>Audio, CAT e PTT</a></li><li><a href='waterfall.html'>Waterfall e "
@@ -618,7 +618,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                          "s'interrompt pendant la TX.</p>\n"
                          '<h2>Suivi du maximum du signal</h2><p>Lorsque le suivi QSO est actif, une ligne de bande '
                          'avec <strong>Auto peak</strong> activé peut affiner le pointage géométrique à partir du '
-                         'signal réellement reçu. MadModem utilise des sondes discrètes et limitées, et non un '
+                         'signal réellement reçu. MultiModeModem utilise des sondes discrètes et limitées, et non un '
                          'balayage conique continu : au maximum 5 mesures avec un rotor azimutal seul ou 7 en Alt-Az, '
                          'avec au moins 90 secondes entre deux cycles. Pattern search est le choix recommandé à faible '
                          'usure ; Golden section est réservé aux systèmes azimutaux et Nelder-Mead aux systèmes '
@@ -641,7 +641,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                              'résultats ou seulement les lignes choisies.</p>\n'
                              '<p><strong>Envoi des QSO par UDP :</strong> dans Réglages → Journal, activez l’envoi '
                              'vers le serveur UDP et indiquez l’adresse et le port de destination (127.0.0.1:2237 par '
-                             'défaut). Après l’ajout réussi du QSO au journal ADIF local, MadModem envoie un message '
+                             'défaut). Après l’ajout réussi du QSO au journal ADIF local, MultiModeModem envoie un message '
                              'UDP ADIF journalisé compatible WSJT-X/JTDX. Un échec UDP n’annule jamais l’entrée '
                              'locale.</p>\n'
                              '<p>La carte QSO peut afficher un fond en ligne ou local, la grille Maidenhead, les '
@@ -708,7 +708,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                                  '<h2>Sécurité</h2><p>Le mode n’émet pas, mais il peut déplacer automatiquement une '
                                  'grande antenne. Ne démarrez jamais un balayage avant d’avoir vérifié les limites '
                                  'azimut/élévation, l’enroulement des câbles, les obstacles et un moyen d’arrêt '
-                                 'accessible. Sans rotateur connecté, MadModem doit signaler l’état au lieu de simuler '
+                                 'accessible. Sans rotateur connecté, MultiModeModem doit signaler l’état au lieu de simuler '
                                  'un balayage physique.</p>'),
         'ft8_ft4.html': ('FT4 / FT8',
                          '<h1>FT4 / FT8</h1>\n'
@@ -782,7 +782,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'arrête le message au lieu de produire une rafale de rattrapage. Vérifiez câblage et temporisation '
                     'sur la radio avant un contest.</p>'),
         'index.html': ('Aide MM',
-                       '<h1>Aide MadModem</h1><p>MadModem réunit les modes numériques, audio/CAT/PTT, FT4/FT8, la '
+                       '<h1>Aide MultiModeModem</h1><p>MultiModeModem réunit les modes numériques, audio/CAT/PTT, FT4/FT8, la '
                        'commande du rotateur, le radiotélescope, le planificateur, le journal et la carte QSO dans une '
                        "seule interface Qt.</p><ul><li><a href='quickstart.html'>Démarrage rapide</a></li><li><a "
                        "href='audio_cat_ptt.html'>Audio, CAT et PTT</a></li><li><a href='waterfall.html'>Waterfall et "
@@ -878,7 +878,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                          'eingestellten AZ/EL-Bereich und pausiert bei TX.</p>\n'
                          '<h2>Signalmaximum-Nachführung</h2><p>Bei aktiver QSO-Nachführung kann eine Bandzeile mit '
                          'aktiviertem <strong>Auto peak</strong> die geometrische Peilung anhand des tatsächlich '
-                         'empfangenen Signals verfeinern. MadModem verwendet diskrete, begrenzte Messpunkte statt '
+                         'empfangenen Signals verfeinern. MultiModeModem verwendet diskrete, begrenzte Messpunkte statt '
                          'kontinuierlicher konischer Bewegung: höchstens 5 Messungen bei reinem Azimutrotor oder 7 bei '
                          'Alt-Az, mit mindestens 90 Sekunden zwischen den Zyklen. Pattern Search ist die empfohlene '
                          'verschleißarme Voreinstellung; Golden Section steht nur für Azimutsysteme und Nelder-Mead '
@@ -903,7 +903,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                              '<p><strong>QSO-Übertragung per UDP:</strong> unter Einstellungen → Logbuch das Senden an '
                              'den UDP-Server aktivieren und Zieladresse sowie Port einstellen (Standard '
                              '127.0.0.1:2237). Nach dem erfolgreichen Eintrag eines QSO in das lokale ADIF-Logbuch '
-                             'sendet MadModem eine WSJT-X/JTDX-kompatible Logged-ADIF-UDP-Nachricht. Ein UDP-Fehler '
+                             'sendet MultiModeModem eine WSJT-X/JTDX-kompatible Logged-ADIF-UDP-Nachricht. Ein UDP-Fehler '
                              'verwirft den lokalen Logbucheintrag nicht.</p>\n'
                              '<p>Die QSO-Karte zeigt wahlweise Online- oder Offline-Hintergrund, Maidenhead-Gitter, '
                              'Stationen und Wege vom eigenen QTH. Eine einzige Schaltfläche Ebenen wählt die '
@@ -968,7 +968,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                                  '<h2>Sicherheit</h2><p>Der Modus sendet nicht, kann aber eine große Antennenanlage '
                                  'automatisch bewegen. Ein Scan darf erst nach Prüfung von Azimut-/Elevationsgrenzen, '
                                  'Kabelaufwicklung, Hindernissen und einer erreichbaren Stoppmöglichkeit gestartet '
-                                 'werden. Ohne angeschlossenen Rotor muss MadModem diesen Zustand melden und darf '
+                                 'werden. Ohne angeschlossenen Rotor muss MultiModeModem diesen Zustand melden und darf '
                                  'keinen realen Scan vortäuschen.</p>'),
         'ft8_ft4.html': ('FT4 / FT8',
                          '<h1>FT4 / FT8</h1>\n'
@@ -1042,7 +1042,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'die Nachricht statt Aufholbursts zu senden. Verkabelung und Zeitverhalten vor Contestbetrieb am '
                     'tatsächlichen Funkgerät prüfen.</p>'),
         'index.html': ('MM-Hilfe',
-                       '<h1>MadModem-Hilfe</h1><p>MadModem vereint Digitalmodi, Audio/CAT/PTT, FT4/FT8, '
+                       '<h1>MultiModeModem-Hilfe</h1><p>MultiModeModem vereint Digitalmodi, Audio/CAT/PTT, FT4/FT8, '
                        'Rotorsteuerung, Radioteleskop, Planer, Logbuch und QSO-Karte in einer '
                        "Qt-Oberfläche.</p><ul><li><a href='quickstart.html'>Schnellstart</a></li><li><a "
                        "href='audio_cat_ptt.html'>Audio, CAT und PTT</a></li><li><a href='waterfall.html'>Wasserfall "
@@ -1131,7 +1131,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                          'TX.</p>\n'
                          '<h2>Sporing av signalmaksimum</h2><p>Når QSO-sporing er aktiv, kan en båndrad med '
                          '<strong>Auto peak</strong> aktivert finjustere geometrisk peiling fra det faktisk mottatte '
-                         'signalet. MadModem bruker diskrete og hastighetsbegrensede målepunkter, ikke kontinuerlig '
+                         'signalet. MultiModeModem bruker diskrete og hastighetsbegrensede målepunkter, ikke kontinuerlig '
                          'konisk bevegelse: maksimalt 5 målinger med ren asimutrotor eller 7 med Alt-Az, og minst 90 '
                          'sekunder mellom syklusene. Pattern search er anbefalt standard med lav slitasje; Golden '
                          'section er bare tilgjengelig for asimutsystemer og Nelder-Mead bare for Alt-Az. Gyldig '
@@ -1153,7 +1153,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                              'bare valgte poster.</p>\n'
                              '<p><strong>QSO-logging via UDP:</strong> under Innstillinger → Loggbok aktiver sending '
                              'til UDP-server og angi måladresse og port (standard 127.0.0.1:2237). Etter at et QSO er '
-                             'lagt til i den lokale ADIF-loggen, sender MadModem en WSJT-X/JTDX-kompatibel Logged ADIF '
+                             'lagt til i den lokale ADIF-loggen, sender MultiModeModem en WSJT-X/JTDX-kompatibel Logged ADIF '
                              'UDP-melding. En UDP-feil fjerner aldri den lokale loggposten.</p>\n'
                              '<p>QSO-kartet kan vise nett- eller lokal bakgrunn, Maidenhead-rutenett, stasjoner og '
                              'linjer fra eget QTH. Én Lag-knapp velger synlige elementer. En valgt lokator kan også '
@@ -1212,7 +1212,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                                  '<h2>Sikkerhet</h2><p>Modusen sender ikke, men kan flytte et stort antennesystem '
                                  'automatisk. Start aldri en skanning før asimut-/elevasjonsgrenser, kabelvridning, '
                                  'hindringer og en tilgjengelig stoppmetode er kontrollert. Uten tilkoblet rotor skal '
-                                 'MadModem melde tilstanden i stedet for å late som en fysisk skanning er utført.</p>'),
+                                 'MultiModeModem melde tilstanden i stedet for å late som en fysisk skanning er utført.</p>'),
         'ft8_ft4.html': ('FT4 / FT8',
                          '<h1>FT4 / FT8</h1>\n'
                          '<p>Velg et bånd for å stille radioen via CAT til standard FT-frekvens. Grønt viser RX og '
@@ -1277,7 +1277,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'for bare å prøve OFF. For store forsinkelser stopper meldingen fremfor å sende '
                     'innhentingsutbrudd. Kontroller kabling og tider på den faktiske radioen før konkurransebruk.</p>'),
         'index.html': ('MM-hjelp',
-                       '<h1>MadModem-hjelp</h1><p>MadModem samler digitale moduser, lyd/CAT/PTT, FT4/FT8, '
+                       '<h1>MultiModeModem-hjelp</h1><p>MultiModeModem samler digitale moduser, lyd/CAT/PTT, FT4/FT8, '
                        'rotorstyring, radioteleskop, planlegger, loggbok og QSO-kart i ett '
                        "Qt-grensesnitt.</p><ul><li><a href='quickstart.html'>Hurtigstart</a></li><li><a "
                        "href='audio_cat_ptt.html'>Lyd, CAT og PTT</a></li><li><a href='waterfall.html'>Waterfall og "
@@ -1365,7 +1365,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                          'pozastaví.</p>\n'
                          '<h2>Sledování maxima signálu</h2><p>Při aktivním sledování QSO může řádek pásma se zapnutým '
                          '<strong>Auto peak</strong> zpřesnit geometrický směr podle skutečně přijímaného signálu. '
-                         'MadModem používá diskrétní a časově omezené sondy, nikoli nepřetržitý kuželový pohyb: '
+                         'MultiModeModem používá diskrétní a časově omezené sondy, nikoli nepřetržitý kuželový pohyb: '
                          'nejvýše 5 měření pro pouze azimutální rotátor nebo 7 pro Alt-Az, s odstupem alespoň 90 '
                          'sekund mezi cykly. Pattern search je doporučená výchozí volba s nízkým opotřebením; Golden '
                          'section je pouze pro azimutální systémy a Nelder-Mead pouze pro Alt-Az. Je vyžadována platná '
@@ -1386,7 +1386,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                              'pouze vybrané záznamy.</p>\n'
                              '<p><strong>Odesílání QSO přes UDP:</strong> v Nastavení → Deník povolte odesílání na UDP '
                              'server a nastavte cílovou adresu a port (výchozí 127.0.0.1:2237). Po úspěšném přidání '
-                             'QSO do místního deníku ADIF odešle MadModem UDP zprávu Logged ADIF kompatibilní s '
+                             'QSO do místního deníku ADIF odešle MultiModeModem UDP zprávu Logged ADIF kompatibilní s '
                              'WSJT-X/JTDX. Chyba UDP nikdy nezruší místně uložený záznam.</p>\n'
                              '<p>Mapa QSO může zobrazit online nebo místní podklad, mřížku Maidenhead, stanice a trasy '
                              'z vašeho QTH. Jediné tlačítko Vrstvy volí viditelné prvky. Vybraný lokátor lze použít i '
@@ -1445,7 +1445,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                                  '<h2>Bezpečnost</h2><p>Režim nevysílá, ale může automaticky pohybovat velkým anténním '
                                  'systémem. Sken nikdy nespouštějte před kontrolou limitů azimutu/elevace, kroucení '
                                  'kabelů, překážek a dostupného způsobu zastavení. Bez připojeného rotátoru musí '
-                                 'MadModem stav oznámit, nikoli předstírat fyzické skenování.</p>'),
+                                 'MultiModeModem stav oznámit, nikoli předstírat fyzické skenování.</p>'),
         'ft8_ft4.html': ('FT4 / FT8',
                          '<h1>FT4 / FT8</h1>\n'
                          '<p>Výběrem pásma naladíte rádio přes CAT na standardní frekvenci FT. Zelená značí RX a '
@@ -1508,7 +1508,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'připojte rozhraní znovu a stiskněte Stop pro opakování pouze OFF. Nadměrné zpoždění zastaví '
                     'zprávu místo doháněcích dávek. Před soutěží ověřte zapojení a časování na skutečném rádiu.</p>'),
         'index.html': ('Nápověda MM',
-                       '<h1>Nápověda MadModem</h1><p>MadModem spojuje digitální režimy, audio/CAT/PTT, FT4/FT8, '
+                       '<h1>Nápověda MultiModeModem</h1><p>MultiModeModem spojuje digitální režimy, audio/CAT/PTT, FT4/FT8, '
                        'ovládání rotátoru, radioteleskop, plánovač, deník a mapu QSO v jediném rozhraní '
                        "Qt.</p><ul><li><a href='quickstart.html'>Rychlý start</a></li><li><a "
                        "href='audio_cat_ptt.html'>Audio, CAT a PTT</a></li><li><a href='waterfall.html'>Waterfall a "

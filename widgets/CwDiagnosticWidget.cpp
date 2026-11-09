@@ -669,7 +669,7 @@ public:
         tools->setSpacing(3);
         m_title = new QLabel(this);
         m_title->setStyleSheet(QStringLiteral("font-weight:700;"));
-        MadModemUi::setSemanticRole(m_title,
+        M3Ui::setSemanticRole(m_title,
                                     primary ? QStringLiteral("rxPrimary")
                                             : QStringLiteral("rxSecondary"));
         tools->addWidget(m_title);

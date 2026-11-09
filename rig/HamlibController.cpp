@@ -11,13 +11,13 @@
 
 #include <cstdint>
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
 #include <hamlib/rig.h>
 #include <cstring>
 #endif
 
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
 namespace {
 int diagnosticHamlibMessage(rig_debug_level_e level,rig_ptr_t,const char *format,va_list args) {
     if(!SessionDiagnostics::instance().enabled())return 0;
@@ -93,7 +93,7 @@ QByteArray portPathForHamlib(QString path)
     return path.toLocal8Bit();
 }
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
 bool setHamlibConfIfPresent(RIG *rig, const char *name, const QByteArray &value, QString *error = nullptr)
 {
     if (rig == nullptr || name == nullptr) {
@@ -147,7 +147,7 @@ void HamlibController::initializeDiagnosticTrace() {updateHamlibDiagnostics();}
 
 bool HamlibController::isCompiledWithHamlib()
 {
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     return true;
 #else
     return false;
@@ -176,7 +176,7 @@ bool routeRequestsUsbMode(const HamlibController::Config &cfg)
     return cfg.txAudioRoute == QStringLiteral("usb");
 }
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
 constexpr pbwidth_t kDigitalWidePassbandHz = 3000;
 
 // WSJT-X does not model the radio as "exactly two physical VFOs".  It asks
@@ -346,7 +346,7 @@ void HamlibController::configure(const Config &config)
     if (!isCompiledWithHamlib()) {
         disconnectRig();
         setStatus(QStringLiteral("Hamlib support not compiled in"));
-        emitError(QStringLiteral("Hamlib support is not compiled in this MadModem build."));
+        emitError(QStringLiteral("Hamlib support is not compiled in this MultiModeModem build."));
         return;
     }
 
@@ -387,7 +387,7 @@ bool HamlibController::isConnected() const
     if (isHamRadioDeluxeModel(m_config.rigModel)) {
         return m_hrdSocket != nullptr && m_hrdSocket->state() == QTcpSocket::ConnectedState;
     }
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     return m_rig != nullptr;
 #else
     return false;
@@ -397,7 +397,7 @@ bool HamlibController::isConnected() const
 bool HamlibController::suspendSerialPortForCw(const QString& port)
 {
     if (m_cwPortSuspended) return false;
-    if (!MadModemSerial::sameEndpoint(port,m_config.rigPath)) {
+    if (!M3Serial::sameEndpoint(port,m_config.rigPath)) {
         emitError(QStringLiteral("CW KEY CAT handoff port mismatch.")); return false;
     }
     m_cwReconnect = isConnected();
@@ -422,7 +422,7 @@ bool HamlibController::connectRig()
     if (isHamRadioDeluxeModel(m_config.rigModel)) {
         return connectHrd();
     }
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     setStatus(QStringLiteral("Hamlib support not compiled in"));
     return false;
 #else
@@ -533,11 +533,11 @@ bool HamlibController::connectRig()
      * Keep serial CAT opening deliberately conservative.  v1.56-v1.64 tried
      * to make read-only CAT tests extra safe by forcing optional Hamlib
      * configuration tokens such as ptt_type=None, dtr_state=OFF,
-     * rts_state=OFF and client=MadModem before rig_open().  Real Hamlib
+     * rts_state=OFF and client=MultiModeModem before rig_open().  Real Hamlib
      * builds/backends are not consistent here: some Kenwood/Icom/Yaesu
      * models either do not expose those tokens or reject them in a way that
      * makes the following rig_open() fail, even though the same radio works
-     * correctly with WSJT-X and with older MadModem releases.
+     * correctly with WSJT-X and with older MultiModeModem releases.
      *
      * Therefore CAT open follows the WSJT-X/v1.40-style path: set only the
      * required user-selected path, serial speed and a best-effort ptt_type=None
@@ -588,7 +588,7 @@ bool HamlibController::disconnectRig()
         emitError(QStringLiteral("CAT disconnect: FT split restore was not attempted because PTT OFF was not confirmed; inspect the radio manually."));
     }
     disconnectHrd();
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     if (m_rig != nullptr) {
         RIG *rig = static_cast<RIG *>(m_rig);
         rig_close(rig);
@@ -614,7 +614,7 @@ bool HamlibController::disconnectRig()
         m_lastPtt = true;
     }
     txMeteringChanged();
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     m_havePreTxMode = false;
     m_preTxMode = 0;
     m_preTxPassband = 0;
@@ -658,7 +658,7 @@ void HamlibController::pollNow()
         return;
     }
 
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     return;
 #else
     if (m_rig == nullptr && !connectRig()) {
@@ -674,7 +674,7 @@ void HamlibController::pollNow()
     // Hamlib's Kenwood backend can otherwise keep STATE(current_vfo) cached
     // as VFO A after open; on rigs such as the TS-890S, manual changes on
     // the front panel while operating on VFO B would then look like a stale
-    // frequency in MadModem.  If the backend cannot report the active VFO we
+    // frequency in MultiModeModem.  If the backend cannot report the active VFO we
     // fall back to RIG_VFO_CURR, preserving the old behaviour.
     vfo_t activeVfo = RIG_VFO_CURR;
     const int vfoRet = rig_get_vfo(rig, &activeVfo);
@@ -795,7 +795,7 @@ void HamlibController::txMeteringChanged()
 // error; it must never interfere with PTT.
 void HamlibController::pollTxMeters()
 {
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     if (!m_txMetering || m_rig == nullptr) return;
     RIG *rig = static_cast<RIG *>(m_rig);
     double watts = -1.0;
@@ -856,7 +856,7 @@ bool HamlibController::setFrequencyHz(double frequencyHz)
         return pollHrd();
     }
 
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     emitError(QStringLiteral("Hamlib frequency set requested, but Hamlib support is not compiled in."));
     return false;
 #else
@@ -957,7 +957,7 @@ bool HamlibController::beginFtSplitTx(const QString &operation, int rfShiftHz)
         return true;
     }
 
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     Q_UNUSED(rfShiftHz);
     emitError(QStringLiteral("FT split TX requested, but Hamlib support is not compiled in."));
     return false;
@@ -1043,7 +1043,7 @@ bool HamlibController::beginFtSplitTx(const QString &operation, int rfShiftHz)
 
         // If we captured the TX-side frequency, restore it while split is
         // still enabled so the operator's dormant/active TX VFO is not left at
-        // MadModem's 500-Hz compensated frequency.
+        // MultiModeModem's 500-Hz compensated frequency.
         if (previousTxFrequency > 0.0) {
             const int selectRet = rig_set_split_vfo(rig, RIG_VFO_CURR, RIG_SPLIT_ON, restoreTxVfo);
             if (selectRet == RIG_OK) {
@@ -1065,7 +1065,7 @@ bool HamlibController::beginFtSplitTx(const QString &operation, int rfShiftHz)
     }
 
     // Capture the selected TX-side frequency *after* Hamlib has established
-    // the logical split selector but *before* MadModem changes it.  This also
+    // the logical split selector but *before* MultiModeModem changes it.  This also
     // preserves a dormant TX VFO when split was originally OFF, so leaving FT
     // operation cannot surprise the operator with a modified secondary VFO.
     ret = rig_get_split_freq(rig, RIG_VFO_CURR, &previousTxFrequency);
@@ -1139,7 +1139,7 @@ bool HamlibController::endFtSplitTx()
         return true;
     }
 
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     m_ftSplitTxActive = false;
     m_ftSplitTxOperation.clear();
     m_ftSplitRxFrequencyHz = 0.0;
@@ -1230,7 +1230,7 @@ bool HamlibController::setPtt(bool enabled)
     if (isHamRadioDeluxeModel(m_config.rigModel)) {
         return setHrdPtt(enabled);
     }
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     emitError(QStringLiteral("Hamlib PTT requested, but Hamlib support is not compiled in."));
     return false;
 #else
@@ -1252,7 +1252,7 @@ bool HamlibController::setPtt(bool enabled)
     }
 
     if (enabled) {
-        m_txModeChangedByMadModem = false;
+        m_txModeChangedByM3 = false;
         // "None / keep current mode" means exactly that: do not query or
         // rewrite the radio mode at every PTT edge.  The CAT handle remains
         // open and only the PTT state changes.
@@ -1292,7 +1292,7 @@ bool HamlibController::setPtt(bool enabled)
 
 bool HamlibController::setWsjtLikeCatPtt(bool enabled)
 {
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     Q_UNUSED(enabled);
     return false;
 #else
@@ -1327,7 +1327,7 @@ bool HamlibController::setWsjtLikeCatPtt(bool enabled)
 
 bool HamlibController::setHamlibPttMode(bool enabled, int onMode, const QString &label, bool reportErrors)
 {
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     Q_UNUSED(enabled);
     Q_UNUSED(onMode);
     Q_UNUSED(label);
@@ -1368,7 +1368,7 @@ bool HamlibController::setHamlibPttMode(bool enabled, int onMode, const QString 
 #endif
 }
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
 void HamlibController::capturePreTxMode()
 {
     if (m_havePreTxMode) {
@@ -1391,7 +1391,7 @@ void HamlibController::capturePreTxMode()
     if (splitTx) {
         // Query the active split TX mode through Hamlib's public split API.
         // beginFtSplitTx() has already established the TX selector with
-        // rig_set_split_vfo(); MadModem never edits Hamlib private state.
+        // rig_set_split_vfo(); MultiModeModem never edits Hamlib private state.
         ret = rig_get_split_mode(rig, RIG_VFO_CURR, &mode, &width);
     } else {
         ret = rig_get_mode(rig, RIG_VFO_CURR, &mode, &width);
@@ -1419,10 +1419,10 @@ void HamlibController::restorePreTxMode()
     m_preTxModeVfo = 0;
     m_preTxModeWasSplit = false;
 
-    if (!m_txModeChangedByMadModem) {
+    if (!m_txModeChangedByM3) {
         return;
     }
-    m_txModeChangedByMadModem = false;
+    m_txModeChangedByM3 = false;
 
     if (mode == RIG_MODE_NONE) {
         return;
@@ -1453,7 +1453,7 @@ void HamlibController::restorePreTxMode()
 
 bool HamlibController::prepareDigitalTxAudioRoute()
 {
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     return true;
 #else
     if (m_config.txAudioRoute == "default") {
@@ -1474,7 +1474,7 @@ bool HamlibController::prepareDigitalTxAudioRoute()
 
 bool HamlibController::forceUsbMode(bool required)
 {
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     Q_UNUSED(required);
     return true;
 #else
@@ -1490,7 +1490,7 @@ bool HamlibController::forceUsbMode(bool required)
     const bool splitTx = m_ftSplitTxActive &&
                          m_ftSplitTxOperation == QStringLiteral("rig") &&
                          m_ftSplitTxVfo != 0;
-    // When MadModem is about to change the real split TX mode, restoration is
+    // When MultiModeModem is about to change the real split TX mode, restoration is
     // part of the same transaction.  Do not modify a remote TX-side mode if
     // Hamlib could not first snapshot it.  This check is intentionally limited
     // to opt-in Rig Split; the long-standing None/Fake-It PTT path is unchanged.
@@ -1506,7 +1506,7 @@ bool HamlibController::forceUsbMode(bool required)
         ret = rig_set_mode(rig, RIG_VFO_CURR, RIG_MODE_USB, kDigitalWidePassbandHz);
     }
     if (ret == RIG_OK) {
-        m_txModeChangedByMadModem = true;
+        m_txModeChangedByM3 = true;
         return true;
     }
 
@@ -1519,7 +1519,7 @@ bool HamlibController::forceUsbMode(bool required)
 
 bool HamlibController::forceDataUsbMode(bool required)
 {
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     Q_UNUSED(required);
     return true;
 #else
@@ -1536,7 +1536,7 @@ bool HamlibController::forceDataUsbMode(bool required)
                          m_ftSplitTxOperation == QStringLiteral("rig") &&
                          m_ftSplitTxVfo != 0;
     // Same transaction rule as USB above: a real split TX mode must be
-    // restorable before MadModem is allowed to change it.
+    // restorable before MultiModeModem is allowed to change it.
     if (splitTx && !m_havePreTxMode) {
         emitError(QStringLiteral("FT Split Operation/Rig could not snapshot the split TX mode/passband before changing the transmit audio route; TX aborted."));
         return false;
@@ -1564,7 +1564,7 @@ bool HamlibController::forceDataUsbMode(bool required)
             ret = rig_set_mode(rig, RIG_VFO_CURR, mode, kDigitalWidePassbandHz);
         }
         if (ret == RIG_OK) {
-            m_txModeChangedByMadModem = true;
+            m_txModeChangedByM3 = true;
             return true;
         }
         lastError = QString::fromLocal8Bit(rigerror(ret));
@@ -1580,7 +1580,7 @@ bool HamlibController::forceDataUsbMode(bool required)
 bool HamlibController::sendRawCatCommand(const QByteArray &command)
 {
     SessionDiagnostics::instance().record("cat.sendRawCatCommand",{{"hex",QString::fromLatin1(command.toHex())}});
-#ifndef MADMODEM_WITH_HAMLIB
+#ifndef M3_WITH_HAMLIB
     Q_UNUSED(command);
     return false;
 #else

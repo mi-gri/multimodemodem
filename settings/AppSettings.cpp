@@ -5,6 +5,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QStandardPaths>
 #include <QFile>
 #include <QHash>
 #include <QRegularExpression>
@@ -173,7 +174,7 @@ void normalizeRotatorBandSettings(AppSettings::RotatorProfileSettings &profile)
 
 QString AppSettings::settingsFilePath()
 {
-    return MadModemInstallation::settingsFilePath();
+    return M3Installation::settingsFilePath();
 }
 
 // -----------------------------------------------------------------------------
@@ -185,6 +186,15 @@ void AppSettings::load()
     QSettings settings(settingsFilePath(), QSettings::IniFormat);
     sessionDiagnosticsEnabled = settings.value("Diagnostics/sessionEnabled", false).toBool();
     sessionDiagnosticsFolder = settings.value("Diagnostics/folder").toString();
+    // The former default folder of MultiModeModem (…/MultiModeModem/diagnostics) becomes
+    // the program's own default again; old recordings stay where they are.
+    {
+        QDir legacyDefault(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
+        legacyDefault.cdUp();
+        if (!sessionDiagnosticsFolder.isEmpty() &&
+            QDir(sessionDiagnosticsFolder).absolutePath() == legacyDefault.filePath(QStringLiteral("MadModem/diagnostics")))   // m3-compat
+            sessionDiagnosticsFolder.clear();
+    }
 
     audioInputName = settings.value("Audio/inputDevice", audioInputName).toString();
     audioOutputName = settings.value("Audio/outputDevice", audioOutputName).toString();
@@ -217,7 +227,7 @@ void AppSettings::load()
     Q_UNUSED(settings.value("Display/waterfallColorScalePercent"));
     Q_UNUSED(settings.value("Display/waterfallPalette"));
     waterfallColorScalePercent = 80;
-    waterfallPalette = "madmodem";
+    waterfallPalette = "m3";
     uiTheme = settings.value("Display/uiTheme", uiTheme).toString().trimmed().toLower();
     if (uiTheme != "avionica" && uiTheme != "qt_default" && uiTheme != "hacker_green" &&
         uiTheme != "classic_dark" && uiTheme != "high_contrast") {

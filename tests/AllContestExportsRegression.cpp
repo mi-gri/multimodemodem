@@ -72,19 +72,19 @@ int main(int argc,char** argv) {
                 const auto periods=definition.value("periods").toArray();
                 if(!periods.isEmpty()) e.utc=QDateTime::fromString(periods.first().toObject().value("start_utc").toString(),Qt::ISODate);
                 e.adifFields["CONTEST_ID"]=profile.id;
-                e.adifFields["APP_MADMODEM_"+mode+"_RULE"]=key;
-                e.adifFields["APP_MADMODEM_"+mode+"_SESSION"]="first";
+                e.adifFields["APP_M3_"+mode+"_RULE"]=key;
+                e.adifFields["APP_M3_"+mode+"_SESSION"]="first";
                 for(auto it=values.begin();it!=values.end();++it) {
-                    e.adifFields["APP_MADMODEM_"+mode+"_TX_"+it.key()]=it.value().first;
-                    e.adifFields["APP_MADMODEM_"+mode+"_RX_"+it.key()]=it.value().second;
+                    e.adifFields["APP_M3_"+mode+"_TX_"+it.key()]=it.value().first;
+                    e.adifFields["APP_M3_"+mode+"_RX_"+it.key()]=it.value().second;
                 }
                 if(key=="arrl_rookie_roundup_rtty") {
-                    e.adifFields["APP_MADMODEM_RTTY_TX_YEAR"]="20";e.adifFields["APP_MADMODEM_RTTY_RX_YEAR"]="21";
+                    e.adifFields["APP_M3_RTTY_TX_YEAR"]="20";e.adifFields["APP_M3_RTTY_RX_YEAR"]="21";
                 }
                 QString error;
                 const auto tx=automaticExchange(e,profile,true,&error),rx=automaticExchange(e,profile,false,&error);
                 check(tx==expected[key].first && rx==expected[key].second && error.isEmpty(),"exact internal exchanges: "+key+" ["+tx+" / "+rx+"]");
-                auto restarted=e; restarted.utc=e.utc.addSecs(60); restarted.adifFields["APP_MADMODEM_"+mode+"_SESSION"]="restarted";
+                auto restarted=e; restarted.utc=e.utc.addSecs(60); restarted.adifFields["APP_M3_"+mode+"_SESSION"]="restarted";
                 const auto bytes=cabrillo({restarted,e},profiles,{},true,&error);
                 check(!bytes.isEmpty() && bytes.count("QSO:")==2,"Cabrillo across sessions: "+key+" "+error);
                 auto raw=e; raw.adifFields.clear(); raw.adifFields["CONTEST_ID"]=profile.id;

@@ -23,8 +23,8 @@ def run(*args, **kwargs):
 
 def distribution_release(build_dir: Path, fallback: str, expected: str = '') -> str:
     """Use the compiled build identity for native same-version upgrades."""
-    header = build_dir / 'generated/MadModemBuildInfo.h'
-    match = re.search(r'^#define MADMODEM_BUILD_NUMBER "([0-9]+)"$', header.read_text(), re.M) if header.exists() else None
+    header = build_dir / 'generated/M3BuildInfo.h'
+    match = re.search(r'^#define M3_BUILD_NUMBER "([0-9]+)"$', header.read_text(), re.M) if header.exists() else None
     number = int(match[1]) if match else 0
     if number > 2147483647:
         raise SystemExit('Invalid compiled distribution identity')
@@ -38,11 +38,11 @@ def main():
     parser.add_argument('--format', choices=['deb', 'rpm'], required=True)
     parser.add_argument('--output', type=Path, default=ROOT / 'dist/packages')
     args = parser.parse_args()
-    version = (ROOT / 'MADMODEM_VERSION.txt').read_text().strip()
-    revision = re.search(r'-r(\d+)-', (ROOT / 'MADMODEM_SOURCE_REVISION.txt').read_text())
+    version = (ROOT / 'M3_VERSION.txt').read_text().strip()
+    revision = re.search(r'-r(\d+)-', (ROOT / 'M3_SOURCE_REVISION.txt').read_text())
     if not re.fullmatch(r'\d+\.\d+\.\d+', version) or not revision:
         raise SystemExit('Native installer requires a numeric release and source revision.')
-    release = distribution_release(args.build_dir.resolve(), revision.group(1), os.environ.get("MADMODEM_BUILD_NUMBER", ""))
+    release = distribution_release(args.build_dir.resolve(), revision.group(1), os.environ.get("M3_BUILD_NUMBER", ""))
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='multimodemodem-package-') as tmp:

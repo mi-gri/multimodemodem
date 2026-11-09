@@ -66,7 +66,7 @@ void receive(const std::string& text, double offset = 0.0, bool adjacent = false
 }
 
 void filterAndManualClock() {
-  using namespace madmodem::cwskimmer;
+  using namespace m3::cwskimmer;
   CwRelativeTimingConfig timingConfig;
   timingConfig.initialWpm = 20.0;
   timingConfig.autoWpm = false;

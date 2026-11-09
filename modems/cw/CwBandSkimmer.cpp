@@ -5,7 +5,7 @@
 #include <cmath>
 #include <set>
 
-using namespace madmodem::cwskimmer;
+using namespace m3::cwskimmer;
 
 struct CwBandSkimmer::Lane {
     SkimmerSpot spot;

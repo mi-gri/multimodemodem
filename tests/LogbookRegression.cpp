@@ -42,6 +42,9 @@ int main(int argc, char **argv) {
     {QFile f(path); f.open(QIODevice::WriteOnly); f.write(QByteArray(full).replace("DL1AAA", "DL1AAB"));}
     entry.callsign = "OK1ABC";
     check(!first.append(entry, &error) && error.contains("externally"), "rewritten file still rejected");
+    const auto legacyFields = AdifLogbook::parseAdif("<CALL:6>IZ6NNH <APP_MADMODEM_QSO_ID:3>abc <EOR>");   // m3-compat
+    check(legacyFields.size() == 1 && legacyFields[0].adifFields.value("APP_M3_QSO_ID") == "abc" &&
+          !legacyFields[0].adifFields.contains("APP_MADMODEM_QSO_ID"), "fields written before the rename are read as APP_M3_*");   // m3-compat
     const auto malformed = AdifLogbook::parseAdif("<CALL:2147483647>X");
     check(malformed.isEmpty(), "oversized field rejected without overflow");
     return ok ? 0 : 1;

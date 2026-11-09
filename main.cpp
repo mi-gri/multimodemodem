@@ -4,9 +4,9 @@
 #include "runtime/SessionDiagnosticsUiTap.h"
 #include "runtime/SessionDiagnostics.h"
 // -----------------------------------------------------------------------------
-// MadModem
-#include "MadModemVersion.h"
-#include "MadModemBuildInfo.h"
+// MultiModeModem
+#include "M3Version.h"
+#include "M3BuildInfo.h"
 // Cross-platform amateur radio audio modem
 // -----------------------------------------------------------------------------
 
@@ -136,16 +136,16 @@ int main(int argc, char *argv[])
             } else {
                 continue;
             }
-            if (!MadModemInstallation::isValidConfigArgument(value)) {
+            if (!M3Installation::isValidConfigArgument(value)) {
                 std::fprintf(stderr, "--config needs a name (letters, digits, . _ -) or a path to a .mad file\n");
                 return 2;
             }
-            MadModemInstallation::activeConfig() = value;
+            M3Installation::activeConfig() = value;
         }
     }
-    MadModemInstallation::adoptUpstreamUserData();
-    QCoreApplication::setApplicationVersion(QStringLiteral(MADMODEM_VERSION_STRING));
-    app.setApplicationDisplayName(MadModemIdentity::windowTitle());
+    M3Installation::adoptUpstreamUserData();
+    QCoreApplication::setApplicationVersion(QStringLiteral(M3_VERSION_STRING));
+    app.setApplicationDisplayName(M3Identity::windowTitle());
     app.setWindowIcon(QIcon(":/icons/multimodemodem.png"));
 
     // Windows GUI executables can make QCommandLineParser::showVersion open
@@ -157,15 +157,15 @@ int main(int argc, char *argv[])
         (startupArguments.at(1) == QStringLiteral("--version") ||
          startupArguments.at(1) == QStringLiteral("-v"))) {
         // Release builds print exactly one line (the installer tests compare it).
-        std::fprintf(stdout, "MultiModeModem %s (based on MadModem)\n", MADMODEM_VERSION_STRING);
-        if (MadModemIdentity::isLocalBuild())
-            std::fprintf(stdout, "%s\n", qPrintable(MadModemIdentity::buildLabel()));
+        std::fprintf(stdout, "MultiModeModem %s (based on MadModem)\n", M3_VERSION_STRING);
+        if (M3Identity::isLocalBuild())
+            std::fprintf(stdout, "%s\n", qPrintable(M3Identity::buildLabel()));
         std::fflush(stdout);
         return 0;
     }
 
     if (startupArguments.size() == 2 && startupArguments.at(1) == QStringLiteral("--build-info")) {
-        std::fprintf(stdout, "MultiModeModem %s (based on MadModem)\nBuild %s\nCommit %s\n", MADMODEM_VERSION_STRING, qPrintable(MadModemIdentity::buildLabel()), MADMODEM_BUILD_COMMIT);
+        std::fprintf(stdout, "MultiModeModem %s (based on MadModem)\nBuild %s\nCommit %s\n", M3_VERSION_STRING, qPrintable(M3Identity::buildLabel()), M3_BUILD_COMMIT);
         std::fflush(stdout);
         return 0;
     }
@@ -328,19 +328,19 @@ int main(int argc, char *argv[])
     struct DiagnosticShutdown { ~DiagnosticShutdown(){SessionDiagnostics::instance().stop();SessionDiagnostics::restoreQtCapture();} } diagnosticShutdown;
     if(bootSettings.sessionDiagnosticsEnabled) {
         auto &log=SessionDiagnostics::instance();log.start(bootSettings.sessionDiagnosticsFolder);log.settings(bootSettings);
-        log.record("build",{{"source",QStringLiteral(MADMODEM_SOURCE_REVISION)},{"build",QString::fromLatin1(MadModemBuild::number())},{"label",MadModemIdentity::buildLabel()},{"commit",QStringLiteral(MADMODEM_BUILD_COMMIT)}});
+        log.record("build",{{"source",QStringLiteral(M3_SOURCE_REVISION)},{"build",QString::fromLatin1(M3Build::number())},{"label",M3Identity::buildLabel()},{"commit",QStringLiteral(M3_BUILD_COMMIT)}});
     }
 
     HamlibController::initializeDiagnosticTrace();
     const QString bootTheme = bootSettings.uiTheme.trimmed().toLower();
-    MadModemUi::applyUiTheme(app, bootTheme);
+    M3Ui::applyUiTheme(app, bootTheme);
 
     MainWindow window;
     // Use one stable window/chrome ownership path for every theme. The active
     // palette decides whether the rim is Avionica metal, a classic single line
     // or a high-contrast outline, so live theme changes cannot leave behind a
     // native/custom hybrid title bar.
-    MadModemUi::installCockpitMainWindowChrome(&window);
+    M3Ui::installCockpitMainWindowChrome(&window);
     // A normal maximized window keeps native popup stacking on Windows.
     // Never reassert fullscreen/activation from delayed startup callbacks.
     // The window comes back as it was closed (MainWindow::saveLastSession);
@@ -351,7 +351,7 @@ int main(int argc, char *argv[])
         const bool maximized = session.value(QStringLiteral("Session/windowMaximized"), true).toBool();
         if (!geometry.isEmpty()) window.restoreGeometry(geometry);
         if (maximized || geometry.isEmpty()) {
-            MadModemUi::showMainWindowMaximized(&window);
+            M3Ui::showMainWindowMaximized(&window);
         } else {
             window.setWindowState(window.windowState() & ~(Qt::WindowFullScreen | Qt::WindowMaximized | Qt::WindowMinimized));
             window.show();

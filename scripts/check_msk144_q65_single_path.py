@@ -34,9 +34,9 @@ checks = {
     "Q65 native engine is mandatory": (
         "modems/q65/Q65NativeEngine.cpp" in cmake
         and "modems/weak_signal/WeakSignalCodecLock.cpp" in cmake
-        and "MADMODEM_ENABLE_Q65" not in cmake
+        and "M3_ENABLE_Q65" not in cmake
         and "decoderq65.cpp" not in cmake
-        and "MADMODEM_FFTW3_LIBRARY" not in re.search(r"target_link_libraries\(m3_q65\b(.*?)\)", cmake, re.S).group(1)
+        and "M3_FFTW3_LIBRARY" not in re.search(r"target_link_libraries\(m3_q65\b(.*?)\)", cmake, re.S).group(1)
     ),
     "Q65 wrapper owns only the native engine": (
         "engine.decode(job.samples,job.periodId,job.config)" in q65_decoder
@@ -44,7 +44,7 @@ checks = {
         and "m_jobs.size()<2" in q65_decoder
         and "DecoderQ65" not in q65_decoder
         and "ensureMshv" not in q65_decoder
-        and "#ifdef MADMODEM_Q65" not in q65_decoder
+        and "#ifdef M3_Q65" not in q65_decoder
         and "Q65 RX unavailable" not in main
     ),
     "Q65 RX performs complete protocol validation": (

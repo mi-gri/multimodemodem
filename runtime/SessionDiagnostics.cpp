@@ -1,5 +1,5 @@
-#include "MadModemVersion.h"
-#include "MadModemBuildInfo.h"
+#include "M3Version.h"
+#include "M3BuildInfo.h"
 #include "../utils/BuildNumber.h"
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "SessionDiagnostics.h"
@@ -143,8 +143,8 @@ void SessionDiagnostics::run() {
     if(opened)opened=write(line({{"event","session.start"},{"seq","1"},{"schema",1},{"compression","gzip"},
         {"utc",QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},{"steady_ns",QString::number(AudioBlock::steadyNowNs())},
         {"pid",double(QCoreApplication::applicationPid())},{"application",QCoreApplication::applicationName()},
-        {"version",QStringLiteral(MADMODEM_VERSION_STRING)},{"source_revision",QStringLiteral(MADMODEM_SOURCE_REVISION)},
-        {"build",QString::fromLatin1(MadModemBuild::number())},{"commit",QStringLiteral(MADMODEM_BUILD_COMMIT)},
+        {"version",QStringLiteral(M3_VERSION_STRING)},{"source_revision",QStringLiteral(M3_SOURCE_REVISION)},
+        {"build",QString::fromLatin1(M3Build::number())},{"commit",QStringLiteral(M3_BUILD_COMMIT)},
         {"os",QSysInfo::prettyProductName()},{"architecture",QSysInfo::currentCpuArchitecture()},{"qt",QString::fromLatin1(qVersion())},
         {"logical_processors",QThread::idealThreadCount()},{"queue_limit_bytes",double(m_limit)}}))&&file.flush();
     {std::lock_guard<std::mutex> l(m_mutex);if(!opened)m_error="Cannot create diagnostic log: "+filePath+" ("+file.errorString()+")";else m_sequence=1;m_ready=true;}
@@ -185,7 +185,7 @@ void SessionDiagnostics::audio(const QString &stage,const AudioBlock &block) {
 }
 void SessionDiagnostics::settings(const AppSettings &s) {
     if(!enabled())return;
-    QSettings stored(MadModemInstallation::settingsFilePath(),QSettings::IniFormat);QJsonObject config;
+    QSettings stored(M3Installation::settingsFilePath(),QSettings::IniFormat);QJsonObject config;
     for(const auto &key:stored.allKeys())config.insert(key,QJsonValue::fromVariant(stored.value(key)));
     record("settings.persisted",config);
     record("settings.snapshot",{{"input",s.audioInputName},{"output",s.audioOutputName},{"rate",s.audioSampleRate},{"ptt_method",s.pttMethod},{"ft_band",s.ft8Band},{"ft_deep",s.ft8DeepDecode},{"ft_dsp_plus",s.ft8DspPlusDecode},{"drift",s.ftDriftRxEnabled},{"drift_max",s.ftDriftMaxHzPerSec},{"gpu_sync",s.ftGpuSyncEnabled},{"gpu_decode",s.ftGpuDecodeEnabled}});

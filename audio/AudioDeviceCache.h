@@ -3,7 +3,7 @@
 // Process-wide cache of the audio device lists (Qt 5).
 //
 // QAudioDeviceInfo::availableDevices() probes every device through the audio
-// plugin and takes about a second or more. MadModem used to call it on every
+// plugin and takes about a second or more. MultiModeModem used to call it on every
 // RX start, every TX start (FT TX audio then began ~1.4 s into the slot) and
 // whenever the Settings dialog opened. The list is now read once and reused;
 // it is read again when the operator presses Refresh, or when a configured

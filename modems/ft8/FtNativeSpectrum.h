@@ -9,7 +9,7 @@
 #include <memory>
 #include <stdexcept>
 #include <vector>
-namespace MadModemFt {
+namespace M3Ft {
 // Native C++ implementation of the FT8 spectral downconversion described by
 // WSJT-X 3.0.2 ft8_downsample.f90. No decoder engine is called here.
 // One immutable 16 s spectrum is shared by candidate workers for ONE residual.
@@ -21,8 +21,8 @@ class FtNativeSpectrum {
  struct Inverse {
   std::unique_ptr<fftw_complex,ComplexFree> data{fftw_alloc_complex(outputSize)};
   fftw_plan plan=nullptr;
-  Inverse(){if(!data)throw std::bad_alloc();std::lock_guard<std::mutex> lock(MadModemDsp::fftwPlannerMutex);plan=fftw_plan_dft_1d(outputSize,data.get(),data.get(),FFTW_BACKWARD,FFTW_ESTIMATE);if(!plan)throw std::runtime_error("FT8 inverse FFT plan");}
-  ~Inverse(){std::lock_guard<std::mutex> lock(MadModemDsp::fftwPlannerMutex);fftw_destroy_plan(plan);}
+  Inverse(){if(!data)throw std::bad_alloc();std::lock_guard<std::mutex> lock(M3Dsp::fftwPlannerMutex);plan=fftw_plan_dft_1d(outputSize,data.get(),data.get(),FFTW_BACKWARD,FFTW_ESTIMATE);if(!plan)throw std::runtime_error("FT8 inverse FFT plan");}
+  ~Inverse(){std::lock_guard<std::mutex> lock(M3Dsp::fftwPlannerMutex);fftw_destroy_plan(plan);}
  };
 public:
  FtNativeSpectrum(const double*samples,int count):bins(inputSize/2+1){
@@ -30,9 +30,9 @@ public:
   std::unique_ptr<fftw_complex,ComplexFree> output(fftw_alloc_complex(inputSize/2+1));
   if(!input||!output)throw std::bad_alloc();count=std::max(0,std::min(inputSize,count));
   std::copy_n(samples,count,input.get());std::fill(input.get()+count,input.get()+inputSize,0.);
-  fftw_plan plan;{std::lock_guard<std::mutex> lock(MadModemDsp::fftwPlannerMutex);plan=fftw_plan_dft_r2c_1d(inputSize,input.get(),output.get(),FFTW_ESTIMATE);}
+  fftw_plan plan;{std::lock_guard<std::mutex> lock(M3Dsp::fftwPlannerMutex);plan=fftw_plan_dft_r2c_1d(inputSize,input.get(),output.get(),FFTW_ESTIMATE);}
   if(!plan)throw std::runtime_error("FT8 forward FFT plan");
-  fftw_execute(plan);{std::lock_guard<std::mutex> lock(MadModemDsp::fftwPlannerMutex);fftw_destroy_plan(plan);}
+  fftw_execute(plan);{std::lock_guard<std::mutex> lock(M3Dsp::fftwPlannerMutex);fftw_destroy_plan(plan);}
   for(int k=0;k<=inputSize/2;++k)bins[k]={output.get()[k][0],output.get()[k][1]};
  }
  void extract(double &frequency,std::vector<std::complex<double>>&out)const{

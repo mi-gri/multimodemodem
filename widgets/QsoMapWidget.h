@@ -21,7 +21,7 @@ class QPainter;
 class QShowEvent;
 class QPrinter;
 
-#ifdef MADMODEM_WITH_QT_LOCATION
+#ifdef M3_WITH_QT_LOCATION
 class QQuickView;
 #endif
 
@@ -188,7 +188,7 @@ private:
     bool m_onlineMapFailed = false;
     QString m_onlineMapFailureReason;
     std::function<QString(const QString &)> m_textTranslator;
-#ifdef MADMODEM_WITH_QT_LOCATION
+#ifdef M3_WITH_QT_LOCATION
     QQuickView *m_quickView = nullptr;
     QWidget *m_quickContainer = nullptr;
     bool m_quickSourceSet = false;

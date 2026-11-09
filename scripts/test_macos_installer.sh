@@ -3,8 +3,8 @@
 set -euo pipefail
 [[ "${GITHUB_ACTIONS:-}" == true && "${RUNNER_OS:-}" == macOS ]]
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-arch="${MADMODEM_OSX_ARCHITECTURES:?}"
-version="$(tr -d '\r\n' < "$root/MADMODEM_VERSION.txt")"
+arch="${M3_OSX_ARCHITECTURES:?}"
+version="$(tr -d '\r\n' < "$root/M3_VERSION.txt")"
 package="$root/dist/macos/MultiModeModem-$version-macOS-$arch-unsigned.pkg"
 app=/Applications/MultiModeModem.app
 trap 'echo "macOS installer verification failed at line $LINENO" >&2; pkgutil --pkg-info de.migri.multimodemodem || true; ls -ld "$app" "$app/Contents/MacOS" "$app/Contents/MacOS/managed-install.flag" 2>/dev/null || true' ERR

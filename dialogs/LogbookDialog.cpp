@@ -75,10 +75,10 @@ LogbookDialog::LogbookDialog(AdifLogbook *logbook, AppSettings *settings, QWidge
       m_logbook(logbook),
       m_settings(settings)
 {
-    setWindowTitle(L("MadModem logbook"));
+    setWindowTitle(L("MultiModeModem logbook"));
     setMinimumSize(700, 460);
-    resize(MadModemUi::size(1120, 720));
-    setObjectName(QStringLiteral("MadModemLogbookDialog"));
+    resize(M3Ui::size(1120, 720));
+    setObjectName(QStringLiteral("M3LogbookDialog"));
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(10, 10, 10, 10);
     mainLayout->setSpacing(8);
@@ -108,7 +108,7 @@ LogbookDialog::LogbookDialog(AdifLogbook *logbook, AppSettings *settings, QWidge
         action->setToolTip(L(tooltip));
         action->setStatusTip(L(statusTip.isEmpty() ? tooltip : statusTip));
     };
-    describeAction(m_actImport, QStringLiteral("Import an ADIF file into the MadModem logbook."), QStringLiteral("Import an ADIF log file."));
+    describeAction(m_actImport, QStringLiteral("Import an ADIF file into the MultiModeModem logbook."), QStringLiteral("Import an ADIF log file."));
     describeAction(m_actExportAll, QStringLiteral("Export the complete logbook as ADIF."), QStringLiteral("Export every QSO as ADIF."));
     describeAction(m_actExportResult, QStringLiteral("Export the currently filtered search result as ADIF."), QStringLiteral("Export visible/search result rows as ADIF."));
     describeAction(m_actExportSelectedAdif, QStringLiteral("Save the selected QSO rows as an ADIF file."), QStringLiteral("Save selected rows as ADIF."));
@@ -308,7 +308,7 @@ LogbookDialog::LogbookDialog(AdifLogbook *logbook, AppSettings *settings, QWidge
 
     refreshTable();
     updateSelectionActions();
-    MadModemUi::scaleWidgetTree(this);
+    M3Ui::scaleWidgetTree(this);
     if(auto* screen=QGuiApplication::primaryScreen()) resize(size().boundedTo(screen->availableGeometry().size()*0.9));
     QTimer::singleShot(0, this, &LogbookDialog::adjustColumnWidths);
 }
@@ -395,7 +395,7 @@ void LogbookDialog::retranslateQObjectTree(QObject *object)
 
 void LogbookDialog::retranslateVisibleText()
 {
-    setWindowTitle(L("MadModem logbook"));
+    setWindowTitle(L("MultiModeModem logbook"));
     retranslateQObjectTree(this);
     const QSignalBlocker block(m_period);
     const QStringList periods={L("All dates"),L("Today (UTC)"),L("Yesterday (UTC)"),L("Last 7 days"),L("Custom UTC interval")};
@@ -989,7 +989,7 @@ void LogbookDialog::copySelectedRowsAdif()
         QMessageBox::information(this, L("Copy selected rows"), L("Select one or more QSO records first."));
         return;
     }
-    QApplication::clipboard()->setText(AdifLogbook::recordsToAdif(records, QStringLiteral("Copied by MadModem")));
+    QApplication::clipboard()->setText(AdifLogbook::recordsToAdif(records, QStringLiteral("Copied by MultiModeModem")));
     if (m_statusBar != nullptr) {
         m_statusBar->showMessage(L("Copied %1 selected QSO row(s) as ADIF.").arg(records.size()), 5000);
     }
@@ -1104,7 +1104,7 @@ void LogbookDialog::deleteSelectedRecords()
     const int answer = QMessageBox::question(
         this,
         L("Delete selected QSOs"),
-        L("Delete %1 selected QSO record(s) from the logbook?\n\nThis rewrites the ADIF file and cannot be undone from MadModem.").arg(records.size()),
+        L("Delete %1 selected QSO record(s) from the logbook?\n\nThis rewrites the ADIF file and cannot be undone from MultiModeModem.").arg(records.size()),
         QMessageBox::Yes | QMessageBox::No,
         QMessageBox::No);
     if (answer != QMessageBox::Yes) {
@@ -1243,7 +1243,7 @@ QString LogbookDialog::htmlForRecords(const QVector<LogbookEntry> &records,
     for (int blockIndex = 0; blockIndex < columnBlocks.size(); ++blockIndex) {
         const QStringList blockKeys = columnBlocks.at(blockIndex);
         html += QString("<div class=\"block%1\">").arg(blockIndex > 0 ? QStringLiteral(" next") : QString());
-        html += "<h2>" + L("MadModem logbook").toHtmlEscaped() + "</h2>";
+        html += "<h2>" + L("MultiModeModem logbook").toHtmlEscaped() + "</h2>";
         html += QString("<p>%1: %2 &nbsp;&nbsp; %3: %4 &nbsp;&nbsp; %5: %6 UTC</p>")
                     .arg(L("Scope").toHtmlEscaped())
                     .arg(scopeLabel.toHtmlEscaped())
@@ -1300,10 +1300,10 @@ bool LogbookDialog::printRecordsToPrinter(const QVector<LogbookEntry> &records,
 #else
     printer.setOrientation(QPrinter::Landscape);
 #endif
-    printer.setDocName(L("MadModem logbook") + " - " + scopeLabel);
+    printer.setDocName(L("MultiModeModem logbook") + " - " + scopeLabel);
 
     QPrintDialog dialog(&printer, this);
-    dialog.setWindowTitle(L("Print MadModem logbook"));
+    dialog.setWindowTitle(L("Print MultiModeModem logbook"));
     dialog.setOption(QAbstractPrintDialog::PrintToFile, true);
     if (dialog.exec() != QDialog::Accepted) {
         return false;
@@ -1496,7 +1496,7 @@ QString LogbookDialog::htmlForStatistics(const QVector<LogbookEntry> &records,
     html += QStringLiteral("<html><head><meta charset='utf-8'><style>");
     html += QStringLiteral("@page{size:A4;margin:10mm;}body{font-family:sans-serif;font-size:8.5pt;color:#1d2733;}h1{font-size:20pt;margin:0 0 2mm 0;}h2{font-size:11pt;margin:0 0 2mm 0;}p{margin:1mm 0;}table{border-collapse:collapse;width:100%;table-layout:fixed;}th,td{border:0.45pt solid #c8ced8;padding:2.5px;text-align:left;vertical-align:middle;}th{background:#eef2f7;font-weight:700;}.num{text-align:right;width:18mm}.muted{color:#657386}.kpi{display:block;margin:4mm 0 4mm 0}.kpi table td{border:0.7pt solid #b8c0cc;padding:5px}.big{font-size:16pt;font-weight:700}.panel{margin:0 0 4mm 0;page-break-inside:avoid}.twocol{width:100%}.twocol td{width:50%;vertical-align:top;border:0;padding:0 2mm 0 0}.bar{height:6pt;background:#e7e7e7;border-radius:3px;overflow:hidden}.bar span{display:block;height:6pt;background:#2f7fc0}.foot{margin-top:3mm;font-size:7.2pt;color:#657386}");
     html += QStringLiteral("</style></head><body>");
-    html += QStringLiteral("<h1>%1</h1>").arg(L("MadModem logbook statistics").toHtmlEscaped());
+    html += QStringLiteral("<h1>%1</h1>").arg(L("MultiModeModem logbook statistics").toHtmlEscaped());
     html += QStringLiteral("<p>%1: <b>%2</b> &nbsp;&nbsp; %3: %4 UTC</p>")
                 .arg(L("Scope").toHtmlEscaped())
                 .arg(scopeLabel.toHtmlEscaped())
@@ -1564,7 +1564,7 @@ bool LogbookDialog::saveStatisticsToPdf(const QVector<LogbookEntry> &records,
 #endif
     printer.setOutputFormat(QPrinter::PdfFormat);
     printer.setOutputFileName(fileName);
-    printer.setDocName(L("MadModem logbook statistics") + QStringLiteral(" - ") + scopeLabel);
+    printer.setDocName(L("MultiModeModem logbook statistics") + QStringLiteral(" - ") + scopeLabel);
 
     QProgressDialog progress(L("Preparing statistics PDF..."), L("Cancel"), 0, 0, this);
     progress.setWindowTitle(L("Save statistics PDF"));
@@ -1633,7 +1633,7 @@ bool LogbookDialog::saveRecordsToPdf(const QVector<LogbookEntry> &records,
 #endif
     printer.setOutputFormat(QPrinter::PdfFormat);
     printer.setOutputFileName(fileName);
-    printer.setDocName(L("MadModem logbook") + " - " + scopeLabel);
+    printer.setDocName(L("MultiModeModem logbook") + " - " + scopeLabel);
 
     QProgressDialog progress(L("Preparing logbook PDF..."), L("Cancel"), 0, 0, this);
     progress.setWindowTitle(L("Save logbook PDF"));

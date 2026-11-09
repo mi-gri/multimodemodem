@@ -13,8 +13,8 @@
 // WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 // A PARTICULAR PURPOSE.  See COPYING.LESSER.txt and COPYING.txt in this folder.
 
-#ifndef MADMODEM_MMSSTV_RX_CORE_H
-#define MADMODEM_MMSSTV_RX_CORE_H
+#ifndef M3_MMSSTV_RX_CORE_H
+#define M3_MMSSTV_RX_CORE_H
 
 #include <array>
 #include <cmath>
@@ -99,8 +99,8 @@ struct ModeTiming
     bool martinOrder = true;
 };
 
-ModeTiming timingForMadModemMode(const char *label);
+ModeTiming timingForM3Mode(const char *label);
 
 } // namespace mmsstv_lgpl
 
-#endif // MADMODEM_MMSSTV_RX_CORE_H
+#endif // M3_MMSSTV_RX_CORE_H

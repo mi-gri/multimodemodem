@@ -109,7 +109,7 @@ inline Catalog discover(const QVector<LogbookEntry>& records, const Profiles& pr
     for(const auto& record:records) {
         const QString mode=record.mode.trimmed().toUpper();
         QString id=normalizedId(record.adifFields.value("CONTEST_ID"));
-        const QString rule=record.adifFields.value(mode=="CW"?"APP_MADMODEM_CW_RULE":"APP_MADMODEM_RTTY_RULE").trimmed().toUpper();
+        const QString rule=record.adifFields.value(mode=="CW"?"APP_M3_CW_RULE":"APP_M3_RTTY_RULE").trimmed().toUpper();
         if(profiles.contains(rule)) {
             if(!id.isEmpty() && id!=profiles.value(rule).id) { ++result.ambiguous; continue; }
             id=profiles.value(rule).id;

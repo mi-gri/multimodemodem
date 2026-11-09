@@ -11,8 +11,8 @@ MXE_BIN="$MXE_ROOT/usr/bin"
 MXE_CMAKE="$MXE_BIN/${MXE_TARGET}-cmake"
 MXE_PKG_CONFIG="$MXE_BIN/${MXE_TARGET}-pkg-config"
 HAMLIB_PREFIX="${HAMLIB_WIN_PREFIX:-$ROOT_DIR/third_party/hamlib_lgpl/install-win64-static}"
-BUILD_LEGACY="${MADMODEM_WINDOWS_BUILD_LEGACY:-on}"
-BUILD_AVX2="${MADMODEM_WINDOWS_BUILD_AVX2:-on}"
+BUILD_LEGACY="${M3_WINDOWS_BUILD_LEGACY:-on}"
+BUILD_AVX2="${M3_WINDOWS_BUILD_AVX2:-on}"
 
 case "$(uname -s)" in
     Linux*) ;;
@@ -64,9 +64,9 @@ build_variant() {
         -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
         -DHAMLIB_ROOT="$HAMLIB_PREFIX" \
         -DPKG_CONFIG_EXECUTABLE="$MXE_PKG_CONFIG" \
-        -DMADMODEM_REQUIRE_HAMLIB=ON \
-        -DMADMODEM_AUTOBUILD_HAMLIB=OFF \
-        -DMADMODEM_AVX2_BUILD="$avx2"
+        -DM3_REQUIRE_HAMLIB=ON \
+        -DM3_AUTOBUILD_HAMLIB=OFF \
+        -DM3_AVX2_BUILD="$avx2"
 
     cmake --build "$build_dir" --config "$BUILD_TYPE" --parallel "$JOBS"
 

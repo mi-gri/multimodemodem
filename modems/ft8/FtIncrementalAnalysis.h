@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace MadModemFt {
+namespace M3Ft {
 struct AnalysisConfig {
     quint64 epoch = 0;
     qint64 slotUtcMs = 0;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract MadModem .jsonl.gz (or legacy .jsonl), with optional crash recovery."""
+"""Extract MultiModeModem .jsonl.gz (or legacy .jsonl), with optional crash recovery."""
 import argparse
 import gzip
 from pathlib import Path

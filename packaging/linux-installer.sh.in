@@ -9,7 +9,7 @@ case "${1:-}" in
 esac
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-payload_line="$(awk '/^__MADMODEM_PAYLOAD__$/ { print NR + 1; exit }' "$0")"
+payload_line="$(awk '/^__M3_PAYLOAD__$/ { print NR + 1; exit }' "$0")"
 tail -n +"$payload_line" "$0" > "$work/payload.tar.gz"
 printf '%s  %s\n' '@SHA256@' "$work/payload.tar.gz" | sha256sum --check --status
 tar -xzf "$work/payload.tar.gz" -C "$work"
@@ -66,4 +66,4 @@ else
 fi
 echo 'MultiModeModem installation complete. Start it from the applications menu.'
 exit 0
-__MADMODEM_PAYLOAD__
+__M3_PAYLOAD__

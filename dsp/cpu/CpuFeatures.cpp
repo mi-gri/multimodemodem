@@ -3,31 +3,31 @@
 #include <QStringList>
 
 #if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__))
-#define MADMODEM_HAVE_GNU_X86_CPU_DISPATCH 1
+#define M3_HAVE_GNU_X86_CPU_DISPATCH 1
 #endif
 
 #if defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2) || defined(__SSE2__)
-#define MADMODEM_COMPILETIME_SSE2 1
+#define M3_COMPILETIME_SSE2 1
 #endif
 
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
-#define MADMODEM_COMPILETIME_NEON 1
+#define M3_COMPILETIME_NEON 1
 #endif
 
-namespace MadModemCpu {
+namespace M3Cpu {
 
 Features detect()
 {
     Features f;
 
-#if defined(MADMODEM_COMPILETIME_SSE2)
+#if defined(M3_COMPILETIME_SSE2)
     f.sse2 = true;
 #endif
-#if defined(MADMODEM_COMPILETIME_NEON)
+#if defined(M3_COMPILETIME_NEON)
     f.neon = true;
 #endif
 
-#if defined(MADMODEM_HAVE_GNU_X86_CPU_DISPATCH)
+#if defined(M3_HAVE_GNU_X86_CPU_DISPATCH)
     __builtin_cpu_init();
     f.sse2 = __builtin_cpu_supports("sse2") != 0;
     f.avx2 = __builtin_cpu_supports("avx2") != 0;
@@ -66,4 +66,4 @@ QString summary()
     return parts.join(QStringLiteral(", "));
 }
 
-} // namespace MadModemCpu
+} // namespace M3Cpu

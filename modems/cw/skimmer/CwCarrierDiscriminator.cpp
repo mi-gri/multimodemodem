@@ -7,7 +7,7 @@
 #include <limits>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 namespace {
 constexpr double kEpsilon = 1.0e-12;
 
@@ -104,7 +104,7 @@ void CwCarrierDiscriminator::reset() {
 
 void CwCarrierDiscriminator::resumeAfterGap() {
   // Preserve the adaptive level model; discard only states whose continuity is
-  // invalid once MadModem has intentionally stopped sampling during its own TX.
+  // invalid once MultiModeModem has intentionally stopped sampling during its own TX.
   m_acquiredCarrier = false;
   m_acquisitionEvidence = 0;
   m_probability = 0.5;
@@ -617,4 +617,4 @@ double CwCarrierDiscriminator::confidence() const { return m_confidence; }
 double CwCarrierDiscriminator::noiseLevel() const { return std::exp(m_noiseLog); }
 double CwCarrierDiscriminator::markLevel() const { return std::exp(m_markLog); }
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

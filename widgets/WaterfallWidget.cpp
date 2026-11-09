@@ -427,8 +427,8 @@ void WaterfallWidget::setPaletteName(const QString &name)
         normalized != QStringLiteral("fldigi") &&
         normalized != QStringLiteral("raptor") &&
         normalized != QStringLiteral("grayscale") &&
-        normalized != QStringLiteral("madmodem")) {
-        normalized = QStringLiteral("madmodem");
+        normalized != QStringLiteral("m3")) {
+        normalized = QStringLiteral("m3");
     }
 
     if (m_paletteName == normalized) {
@@ -568,7 +568,7 @@ void WaterfallWidget::paintGL()
     }
 
     const double frameMs = static_cast<double>(frameTimer.nsecsElapsed()) / 1000000.0;
-    auto &resources = MadModemRuntime::SystemResourceManager::instance();
+    auto &resources = M3Runtime::SystemResourceManager::instance();
     resources.observeGuiFrame(presentationLatencyMs > 0.0 ? presentationLatencyMs : frameMs);
     resources.observeWaterfallFrame(frameMs, queuedRowsBeforeUpload, gpuDrawn);
 
@@ -1932,7 +1932,7 @@ QRgb WaterfallWidget::colorForIntensity(quint8 value) const
      * Follow the WSJT-X Wide Graph gain law rather than applying a gamma curve
      * to an already levelled image.  DspEngine now supplies the same kind of
      * lower-envelope-subtracted dB value used by WSJT-X Flatten.  The saved
-     * MadModem default of 80% is the unity-gain position; moving the control
+     * MultiModeModem default of 80% is the unity-gain position; moving the control
      * changes gain exponentially, matching 10^(0.015 * PlotGain).
      */
     const double plotGain = percent - 80.0;

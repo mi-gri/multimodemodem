@@ -14,7 +14,7 @@
 #include <memory>
 #include <string>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 class CwSkimmerEngine;
 class SelectedToneCwTracker;
 class CwNeuralDecoder;
@@ -56,7 +56,7 @@ struct CwDiagnosticPoint
 Q_DECLARE_METATYPE(CwDiagnosticPoint)
 
 /**
- * @brief Native MadModem CW receiver.
+ * @brief Native MultiModeModem CW receiver.
  *
  * A full-passband FFT scanner discovers persistent carrier lanes. RX A and RX B
  * are two independent exact-tone receivers using the same clean-room native
@@ -161,8 +161,8 @@ private:
     bool m_autoBandwidth = true;
     double m_afcRangeHz = 20.0;
     QString m_decodeEngine = QStringLiteral("native");
-    std::unique_ptr<madmodem::cwskimmer::CwNeuralDecoder> m_neuralA;
-    std::unique_ptr<madmodem::cwskimmer::CwNeuralDecoder> m_neuralB;
+    std::unique_ptr<m3::cwskimmer::CwNeuralDecoder> m_neuralA;
+    std::unique_ptr<m3::cwskimmer::CwNeuralDecoder> m_neuralB;
 
     CwBandSkimmerWorker m_bandSkimmer;
     bool m_bandSkimmerEnabled = false;
@@ -179,9 +179,9 @@ private:
     QString m_selectedCommittedA;
     QString m_selectedCommittedB;
 
-    std::unique_ptr<madmodem::cwskimmer::CwSkimmerEngine> m_skimmer;
-    std::unique_ptr<madmodem::cwskimmer::SelectedToneCwTracker> m_toneTrackerA;
-    std::unique_ptr<madmodem::cwskimmer::SelectedToneCwTracker> m_toneTrackerB;
+    std::unique_ptr<m3::cwskimmer::CwSkimmerEngine> m_skimmer;
+    std::unique_ptr<m3::cwskimmer::SelectedToneCwTracker> m_toneTrackerA;
+    std::unique_ptr<m3::cwskimmer::SelectedToneCwTracker> m_toneTrackerB;
     QVector<CwDiagnosticPoint> m_pendingDiagnosticsA;
     QVector<CwDiagnosticPoint> m_pendingDiagnosticsB;
     CwDiagnosticPoint m_lastDiagnosticA;

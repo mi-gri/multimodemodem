@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <cstdint>
-namespace MadModemFtTiming {
+namespace M3FtTiming {
 constexpr int pttPrearmLeadMs = 650;
 constexpr int lateStartPreparationMs = 700;
 constexpr int generatedSignalAllowanceMs = 120;

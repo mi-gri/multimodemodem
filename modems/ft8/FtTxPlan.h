@@ -7,7 +7,7 @@
 /**
  * @brief Single source of truth for one pending/current FT4/FT8 transmission.
  *
- * MadModem previously kept the armed message in several independent strings
+ * MultiModeModem previously kept the armed message in several independent strings
  * (pending message, retry message, table row, banner text, last TX message).
  * FT automation is timing-critical; UI, scheduler and modulator must refer to
  * the same immutable plan for the selected slot.

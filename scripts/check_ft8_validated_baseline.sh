@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
-  echo "Usage: $0 MADMODEM_EXECUTABLE WAV_DIRECTORY" >&2
+  echo "Usage: $0 M3_EXECUTABLE WAV_DIRECTORY" >&2
   exit 2
 fi
 

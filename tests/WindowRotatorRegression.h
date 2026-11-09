@@ -47,7 +47,7 @@ inline int runWindowRotatorRegression(QApplication &app)
         check(QWidget::mouseGrabber()!=handle,"resize releases mouse capture");
     };
     for(const QString &theme:{QStringLiteral("avionica"),QStringLiteral("qt_default"),QStringLiteral("classic_dark")}){
-        MadModemUi::applyUiTheme(app,theme);
+        M3Ui::applyUiTheme(app,theme);
         QMainWindow window;window.resize(800,600);
         auto *combo=new QComboBox;combo->addItems({"RTTY","CW","FT8"});window.setCentralWidget(combo);
         auto *bar=window.menuBar();bar->setNativeMenuBar(false);
@@ -58,8 +58,8 @@ inline int runWindowRotatorRegression(QApplication &app)
             QObject::connect(menu->addAction("Select"),&QAction::triggered,&window,[&](){++activated;});menus<<menu;
         }
         QObject::connect(bar->addAction("Settings"),&QAction::triggered,&window,[&](){++activated;});
-        MadModemUi::installCockpitMainWindowChrome(&window);
-        MadModemUi::showMainWindowMaximized(&window);app.processEvents();
+        M3Ui::installCockpitMainWindowChrome(&window);
+        M3Ui::showMainWindowMaximized(&window);app.processEvents();
         check(window.isMaximized() && !window.isFullScreen(),"startup uses maximized window without fullscreen");
         auto *maximize=window.findChild<QPushButton*>("cockpitMaximizeButton");
         check(maximize!=nullptr,"custom maximize control exists");
@@ -136,7 +136,7 @@ inline int runWindowRotatorRegression(QApplication &app)
     check(!panel.recallManualPreset(0) && az->value()==100,"out-of-range saved position is refused without clamping");
     config.useElevation=false;panel.applyConfig(config);
     check(!el->isEnabled() && !elSlider->isEnabled() && el->value()==0,"azimuth-only rotators disable elevation");
-    const QString captureDir=qEnvironmentVariable("MADMODEM_UI_CAPTURE_DIR");
+    const QString captureDir=qEnvironmentVariable("M3_UI_CAPTURE_DIR");
     if(!captureDir.isEmpty()){QDir().mkpath(captureDir);panel.grab().save(QDir(captureDir).filePath("rotator_r9.png"));}
     panel.close();
     return all?0:1;

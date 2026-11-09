@@ -8,7 +8,7 @@
 #include <utility>
 #include "CwCtcPrefixDecoder.h"
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 
 // Independently trained causal temporal CNN + CTC. No external ML runtime or model download.
 // The feature bank follows the operator-selected tone, independently for A/B.

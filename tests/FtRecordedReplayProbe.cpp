@@ -13,7 +13,7 @@ int main(int argc,char **argv){
  // A fixed worker count can isolate arithmetic changes from OSD permit races.
  if(qEnvironmentVariableIsSet("PROBE_WORKERS")){
   int n=qMax(1,qEnvironmentVariableIntValue("PROBE_WORKERS"));
-  auto &r=MadModemRuntime::SystemResourceManager::instance();r.m_poolCapacity=n;r.m_maxLiveWorkers=n;
+  auto &r=M3Runtime::SystemResourceManager::instance();r.m_poolCapacity=n;r.m_maxLiveWorkers=n;
  }
  for(int i=1;i<argc;++i){QFile f(argv[i]);if(!f.open(QIODevice::ReadOnly))return 2;
   auto bytes=f.readAll();QVector<double> samples(bytes.size()/sizeof(double));std::memcpy(samples.data(),bytes.constData(),samples.size()*sizeof(double));

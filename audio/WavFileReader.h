@@ -6,7 +6,7 @@
 #include <QString>
 #include <QVector>
 
-namespace MadModemAudio {
+namespace M3Audio {
 
 struct WavFileFormat
 {
@@ -24,6 +24,6 @@ QVector<float> convertWavBytesToMono(const QByteArray &bytes,
                                      const WavFileFormat &format,
                                      QString *errorMessage = nullptr);
 
-} // namespace MadModemAudio
+} // namespace M3Audio
 
 #endif // WAVFILEREADER_H

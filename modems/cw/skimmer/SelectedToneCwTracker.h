@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 
 struct SelectedToneCwConfig {
   double toneHz = 700.0;
@@ -134,7 +134,7 @@ public:
   const SelectedToneCwConfig& config() const;
 
   void reset();
-  // Resume after MadModem intentionally stopped capture during its own CW TX.
+  // Resume after MultiModeModem intentionally stopped capture during its own CW TX.
   // Keeps the learned timing/carrier model but discards sample-continuity state.
   void resumeAfterLocalTransmit();
   void processFloatMono(const float* samples, std::size_t count,
@@ -157,4 +157,4 @@ private:
   std::unique_ptr<Impl> m_impl;
 };
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

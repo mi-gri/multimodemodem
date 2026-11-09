@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <utility>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 namespace {
 constexpr double kLogFloor = -80.0;
 
@@ -670,4 +670,4 @@ CwMorseBeamResult CwMorseBeamDecoder::snapshot() const {
   return result;
 }
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
-project(MadModemCwRouteProbe LANGUAGES CXX)
+project(M3CwRouteProbe LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC ON)
 get_filename_component(_default_source "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
-set(MADMODEM_SOURCE_DIR "${_default_source}" CACHE PATH "MadModem source revision to measure")
+set(M3_SOURCE_DIR "${_default_source}" CACHE PATH "MultiModeModem source revision to measure")
 find_package(Qt6 QUIET COMPONENTS Core Gui)
 if(Qt6_FOUND)
   set(QT Qt6)
@@ -12,7 +12,7 @@ else()
   set(QT Qt5)
 endif()
 find_package(Threads REQUIRED)
-set(_s "${MADMODEM_SOURCE_DIR}")
+set(_s "${M3_SOURCE_DIR}")
 add_library(cwcore STATIC
   ${_s}/modems/cw/skimmer/CwSkimmerEngine.cpp
   ${_s}/modems/cw/skimmer/CwCarrierDiscriminator.cpp

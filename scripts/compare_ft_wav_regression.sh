@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  compare_ft_wav_regression.sh OLD_MADMODEM NEW_MADMODEM MODE WAV_OR_DIR [...]
+  compare_ft_wav_regression.sh OLD_M3 NEW_M3 MODE WAV_OR_DIR [...]
 
 MODE is FT8 or FT4. Both executables are run with the same WAV files and
 --ft-depth max. The script compares per-file decode counts and reports any
@@ -23,7 +23,7 @@ mode=${3^^}
 shift 3
 
 if [[ ! -x "$old_exe" || ! -x "$new_exe" ]]; then
-  echo "ERROR: both MadModem paths must be executable" >&2
+  echo "ERROR: both MultiModeModem paths must be executable" >&2
   exit 2
 fi
 if [[ "$mode" != FT8 && "$mode" != FT4 ]]; then

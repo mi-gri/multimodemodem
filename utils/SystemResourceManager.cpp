@@ -24,7 +24,7 @@
 #include <sys/sysctl.h>
 #endif
 
-namespace MadModemRuntime {
+namespace M3Runtime {
 namespace {
 
 int fallbackLogicalCount()
@@ -516,4 +516,4 @@ double SystemResourceManager::sampleSystemCpuLoadLocked() noexcept
 #endif
 }
 
-} // namespace MadModemRuntime
+} // namespace M3Runtime

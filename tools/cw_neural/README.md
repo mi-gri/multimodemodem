@@ -1,6 +1,6 @@
 # Neural R13 — training and provenance
 
-MadModem 0.6.3 ships one neural CW receiver: **Neural R13**, model
+MultiModeModem 0.6.3 ships one neural CW receiver: **Neural R13**, model
 `mm-cw-r13-search`, alongside **Native R12**, the default. RX A and RX B use
 the selected engine independently. The band skimmer stays native. TX audio
 and serial KEY are independent of the RX engine.
@@ -38,7 +38,7 @@ header with an unvalidated checkpoint. Compare frozen candidates on disjoint
 audio and exact QSO/callsign/RST content before promotion. Historical scripts
 that compare legacy models require probes/checkpoints from those releases.
 
-Enable `BUILD_TESTING` and `MADMODEM_BUILD_CW_TESTS` to build the neural feature
+Enable `BUILD_TESTING` and `M3_BUILD_CW_TESTS` to build the neural feature
 probe, native regression and full-engine routing checks. `CwNeuralProbe`
 accepts `features` or `audio` and always runs R13. `CwRouteProbe` accepts only
 `native` or `neural_search`.

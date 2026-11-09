@@ -32,7 +32,7 @@
 #include <algorithm>
 #include <utility>
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
 #include <hamlib/rig.h>
 #endif
 
@@ -241,7 +241,7 @@ void addPresetIfUnique(QList<RadioPreset> *presets,
     seenIds->insert(hamlibId);
 }
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
 struct HamlibPresetBuildContext
 {
     QList<RadioPreset> *presets = nullptr;
@@ -321,7 +321,7 @@ QList<RadioPreset> buildRadioPresets()
     QList<RadioPreset> presets;
     QSet<int> seenIds;
 
-#ifdef MADMODEM_WITH_HAMLIB
+#ifdef M3_WITH_HAMLIB
     rig_set_debug(SessionDiagnostics::instance().enabled()?RIG_DEBUG_CACHE:RIG_DEBUG_NONE);
     rig_load_all_backends();
 
@@ -414,7 +414,7 @@ void RigControlSettingsDialog::buildUi()
     m_lblCompiled = new QLabel(this);
     m_lblCompiled->setWordWrap(true);
     m_lblCompiled->setStyleSheet(QStringLiteral("font-weight: 500;"));
-    MadModemUi::setSemanticRole(m_lblCompiled,
+    M3Ui::setSemanticRole(m_lblCompiled,
                                 HamlibController::isCompiledWithHamlib()
                                     ? QStringLiteral("positive")
                                     : QStringLiteral("negative"));
@@ -530,7 +530,7 @@ void RigControlSettingsDialog::buildUi()
     m_lblBaudHint = new QLabel(catGroup);
     m_lblBaudHint->setWordWrap(true);
     m_lblBaudHint->setStyleSheet(QStringLiteral("font-style: italic;"));
-    MadModemUi::setSemanticRole(m_lblBaudHint, QStringLiteral("muted"));
+    M3Ui::setSemanticRole(m_lblBaudHint, QStringLiteral("muted"));
 
     m_lblPoll = new QLabel(catGroup);
     m_spinPollMs = new QSpinBox(catGroup);
@@ -1254,7 +1254,7 @@ void RigControlSettingsDialog::onModelChanged()
     }
 
     // Do not auto-fill operational CAT/PTT fields when the user changes radio model.
-    // Older MadModem versions behaved conservatively: model selection only selects the
+    // Older MultiModeModem versions behaved conservatively: model selection only selects the
     // Hamlib backend ID and shows hints. Serial port, TCP address, baud rate and TX/PTT
     // route must remain exactly as loaded from settings or manually edited by the user.
     refreshBaudSuggestionForRigModel(rigId);
@@ -1393,7 +1393,7 @@ void RigControlSettingsDialog::setTestStatus(const QString &message, bool ok)
     if (m_lblTestStatus != nullptr) {
         m_lblTestStatus->setText(message);
         m_lblTestStatus->setStyleSheet(QStringLiteral("font-weight: 500;"));
-        MadModemUi::setSemanticRole(m_lblTestStatus,
+        M3Ui::setSemanticRole(m_lblTestStatus,
                                     ok ? QStringLiteral("positive")
                                        : QStringLiteral("negative"));
     }

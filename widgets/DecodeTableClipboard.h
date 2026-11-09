@@ -8,7 +8,7 @@
 #include <QTableWidget>
 #include <algorithm>
 
-namespace MadModemUi {
+namespace M3Ui {
 inline QString selectedDecodeRowsText(const QTableWidget &table)
 {
     if (!table.selectionModel()) return {};
@@ -44,4 +44,4 @@ inline void installDecodeTableCopy(QTableWidget *table)
         if (!text.isEmpty()) QApplication::clipboard()->setText(text);
     });
 }
-} // namespace MadModemUi
+} // namespace M3Ui

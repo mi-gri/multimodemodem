@@ -8,7 +8,7 @@
 
 int main(int argc, char** argv) {
     if (argc<4) { std::cerr << "features input.f32 logits.f32 | audio rate tone input.f32 [chunk]\n"; return 2; }
-    madmodem::cwskimmer::CwNeuralDecoder decoder;
+    m3::cwskimmer::CwNeuralDecoder decoder;
     const std::string mode=argv[1];
     if (mode=="features") {
 

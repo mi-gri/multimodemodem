@@ -1,7 +1,7 @@
 #include "updates/UpdateController.h"
 #include "settings/AppSettings.h"
-#include "MadModemVersion.h"
-#include "MadModemBuildInfo.h"
+#include "M3Version.h"
+#include "M3BuildInfo.h"
 #include <QApplication>
 #include <QWidget>
 #include <QMenu>
@@ -42,20 +42,21 @@ int main(int argc,char **argv){
     check(newer(release("build-0.6.3-999",true)).isEmpty(),"public-version downgrade offered");
     check(newer(release("v0.6.5",true))=="0.6.5","higher prerelease version ignored");
     check(newer(release("v0.6.5",false,true)).isEmpty(),"draft offered");
-    check(newer(release("v0.6.4",false,false,"Operator notes\n<!-- MadModem build: 116 -->"))=="0.6.4","version-tag rebuild ignored");
-    check(newer(release("v0.6.4",false,false,"<!-- MadModem build: 114 -->")).isEmpty(),"same stamped build repeated");
+    check(newer(release("v0.6.4",false,false,"Operator notes\n<!-- MultiModeModem build: 116 -->"))=="0.6.4","version-tag rebuild ignored");
+    check(newer(release("v0.6.4",false,false,"<!-- MultiModeModem build: 114 -->")).isEmpty(),"same stamped build repeated");
+    check(newer(release("v0.6.4",false,false,"<!-- MadModem build: 116 -->"))=="0.6.4","release stamped before the rename still read");   // m3-compat
     check(newer(release("build-0.6.4-115",true),"0.6.4",0)=="0.6.4","unidentified local build cannot acquire official identity");
     check(newer(release("v0.6.4"),"0.6.3",0)=="0.6.4","old client version bridge missing");
     check(newer(release("v0.6.4")).isEmpty(),"unknown same-version tag assumed newer");
     check(newer(release("main")).isEmpty(),"unversioned branch interpreted as release");
     check(newer(release("build-0.6.4-9999999999999999999999999")).isEmpty(),"overflow build accepted");
-    check(newer(release("build-0.6.4-115",false,false,"<!-- MadModem build: 116 -->")).isEmpty(),"contradictory identity accepted");
+    check(newer(release("build-0.6.4-115",false,false,"<!-- MultiModeModem build: 116 -->")).isEmpty(),"contradictory identity accepted");
     check(UpdateController::releaseBuildNumber(release("build-0.6.4-115",true))==115,"build not extracted");
     auto oldLatest=release("v0.6.3");oldLatest.insert("make_latest",true);
     auto newest=release("build-0.6.4-116",true);newest.insert("make_latest",false);
     auto best=UpdateController::newestPublishedRelease(QJsonArray{newest,release("v9.0.0",false,true),oldLatest,release("build-0.6.4-115",true)});
     check(best.value("tag_name")=="build-0.6.4-116","Latest badge or API order won over newer prerelease");
-    auto promoted=release("v0.6.4",false,false,"<!-- MadModem build: 117 -->");
+    auto promoted=release("v0.6.4",false,false,"<!-- MultiModeModem build: 117 -->");
     best=UpdateController::newestPublishedRelease(QJsonArray{newest,promoted});
     check(best.value("tag_name")=="v0.6.4","stamped version release not ranked by build");
     QJsonArray firstPage;
@@ -104,8 +105,8 @@ int main(int argc,char **argv){
     QWidget window;QMenu menu;bool idle=false;
     SimulatedUpdate updater(&window,&menu,[&]{return idle;});
     updater.pages[0]=firstPage;
-    const auto number=QStringLiteral(MADMODEM_BUILD_NUMBER).toULongLong()+1;
-    const QString newTag="build-"+QStringLiteral(MADMODEM_VERSION_STRING)+"-"+QString::number(number);
+    const auto number=QStringLiteral(M3_BUILD_NUMBER).toULongLong()+1;
+    const QString newTag="build-"+QStringLiteral(M3_VERSION_STRING)+"-"+QString::number(number);
     updater.pages[1]=QJsonArray{release(newTag,true)};
     updater.check();check(updater.requested.isEmpty(),"automatic check did not defer active operation");
     idle=true;QEventLoop loop;updater.finished=[&]{loop.quit();};

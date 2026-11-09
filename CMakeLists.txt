@@ -1,58 +1,58 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(MadModem
+project(MultiModeModem
     VERSION 0.6.5
     LANGUAGES CXX
 )
 
 # CMake project(VERSION) must stay numeric, but package/app metadata may carry
-# the MadModem suffix (for example 0.5.76t).  This keeps macOS crash reports,
+# the MultiModeModem suffix (for example 0.5.76t).  This keeps macOS crash reports,
 # release filenames and in-app version strings aligned without making CMake
 # parse a non-numeric project version.
-set(MADMODEM_PACKAGE_VERSION "${PROJECT_VERSION}")
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/MADMODEM_VERSION.txt")
-    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/MADMODEM_VERSION.txt" _madmodem_package_version_txt)
-    string(STRIP "${_madmodem_package_version_txt}" _madmodem_package_version_txt)
-    if(NOT _madmodem_package_version_txt STREQUAL "")
-        set(MADMODEM_PACKAGE_VERSION "${_madmodem_package_version_txt}")
+set(M3_PACKAGE_VERSION "${PROJECT_VERSION}")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/M3_VERSION.txt")
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/M3_VERSION.txt" _m3_package_version_txt)
+    string(STRIP "${_m3_package_version_txt}" _m3_package_version_txt)
+    if(NOT _m3_package_version_txt STREQUAL "")
+        set(M3_PACKAGE_VERSION "${_m3_package_version_txt}")
     endif()
 endif()
-message(STATUS "MadModem package/app version: ${MADMODEM_PACKAGE_VERSION}")
+message(STATUS "MultiModeModem package/app version: ${M3_PACKAGE_VERSION}")
 
-set(MADMODEM_SOURCE_REVISION "unmarked")
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/MADMODEM_SOURCE_REVISION.txt")
-    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/MADMODEM_SOURCE_REVISION.txt" _madmodem_source_revision_txt)
-    string(STRIP "${_madmodem_source_revision_txt}" _madmodem_source_revision_txt)
-    if(NOT _madmodem_source_revision_txt STREQUAL "")
-        set(MADMODEM_SOURCE_REVISION "${_madmodem_source_revision_txt}")
+set(M3_SOURCE_REVISION "unmarked")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/M3_SOURCE_REVISION.txt")
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/M3_SOURCE_REVISION.txt" _m3_source_revision_txt)
+    string(STRIP "${_m3_source_revision_txt}" _m3_source_revision_txt)
+    if(NOT _m3_source_revision_txt STREQUAL "")
+        set(M3_SOURCE_REVISION "${_m3_source_revision_txt}")
     endif()
 endif()
-message(STATUS "MadModem source revision: ${MADMODEM_SOURCE_REVISION}")
+message(STATUS "MultiModeModem source revision: ${M3_SOURCE_REVISION}")
 
 # One distribution workflow run identifies the SAME build on every platform.
 # Local builds remain 0 (unknown); source-regression workflow numbers are not
 # distribution identities. Configure once, rather than reading CI at runtime.
-set(MADMODEM_BUILD_NUMBER "$ENV{MADMODEM_BUILD_NUMBER}" CACHE STRING "Official distribution build number")
-if(NOT "$ENV{MADMODEM_BUILD_NUMBER}" STREQUAL "")
-    set(MADMODEM_BUILD_NUMBER "$ENV{MADMODEM_BUILD_NUMBER}" CACHE STRING "Official distribution build number" FORCE)
+set(M3_BUILD_NUMBER "$ENV{M3_BUILD_NUMBER}" CACHE STRING "Official distribution build number")
+if(NOT "$ENV{M3_BUILD_NUMBER}" STREQUAL "")
+    set(M3_BUILD_NUMBER "$ENV{M3_BUILD_NUMBER}" CACHE STRING "Official distribution build number" FORCE)
 endif()
-if(MADMODEM_BUILD_NUMBER STREQUAL "")
-    set(MADMODEM_BUILD_NUMBER "0")
+if(M3_BUILD_NUMBER STREQUAL "")
+    set(M3_BUILD_NUMBER "0")
 endif()
-if(NOT MADMODEM_BUILD_NUMBER MATCHES "^(0|[1-9][0-9]*)$" OR
-   MADMODEM_BUILD_NUMBER GREATER 2147483647)
-    message(FATAL_ERROR "MADMODEM_BUILD_NUMBER must be an integer from 0 to 2147483647")
+if(NOT M3_BUILD_NUMBER MATCHES "^(0|[1-9][0-9]*)$" OR
+   M3_BUILD_NUMBER GREATER 2147483647)
+    message(FATAL_ERROR "M3_BUILD_NUMBER must be an integer from 0 to 2147483647")
 endif()
-set(MADMODEM_BUILD_COMMIT "$ENV{MADMODEM_BUILD_COMMIT}" CACHE STRING "Distribution source commit")
-if(NOT "$ENV{MADMODEM_BUILD_COMMIT}" STREQUAL "")
-    set(MADMODEM_BUILD_COMMIT "$ENV{MADMODEM_BUILD_COMMIT}" CACHE STRING "Distribution source commit" FORCE)
+set(M3_BUILD_COMMIT "$ENV{M3_BUILD_COMMIT}" CACHE STRING "Distribution source commit")
+if(NOT "$ENV{M3_BUILD_COMMIT}" STREQUAL "")
+    set(M3_BUILD_COMMIT "$ENV{M3_BUILD_COMMIT}" CACHE STRING "Distribution source commit" FORCE)
 endif()
-if(NOT MADMODEM_BUILD_COMMIT STREQUAL "" AND
-   NOT MADMODEM_BUILD_COMMIT MATCHES "^[0-9a-fA-F]+$")
-    message(FATAL_ERROR "MADMODEM_BUILD_COMMIT must be a hexadecimal commit id")
+if(NOT M3_BUILD_COMMIT STREQUAL "" AND
+   NOT M3_BUILD_COMMIT MATCHES "^[0-9a-fA-F]+$")
+    message(FATAL_ERROR "M3_BUILD_COMMIT must be a hexadecimal commit id")
 endif()
-configure_file(cmake/MadModemBuildInfo.h.in generated/MadModemBuildInfo.h @ONLY)
-message(STATUS "MadModem distribution build: ${MADMODEM_BUILD_NUMBER}")
+configure_file(cmake/M3BuildInfo.h.in generated/M3BuildInfo.h @ONLY)
+message(STATUS "MultiModeModem distribution build: ${M3_BUILD_NUMBER}")
 
 # -------------------------------------------------------------------------
 # C++ standard
@@ -65,25 +65,25 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # -------------------------------------------------------------------------
 # Performance-oriented release flags
 # -------------------------------------------------------------------------
-# MadModem is DSP-heavy, especially FT4/FT8 candidate search and LDPC decode.
+# MultiModeModem is DSP-heavy, especially FT4/FT8 candidate search and LDPC decode.
 # Release builds therefore request the fastest safe portable options for both
 # Linux/GCC and Windows/MXE/MinGW.  We intentionally avoid -Ofast/fast-math by
 # default because modem DSP and timing code should keep IEEE behaviour.
 
-option(MADMODEM_MAX_OPTIMIZE
+option(M3_MAX_OPTIMIZE
     "Enable high-performance portable Release flags (-O3; LTO remains a separate opt-in)."
     ON)
-option(MADMODEM_NATIVE_OPTIMIZE
+option(M3_NATIVE_OPTIMIZE
     "Also tune generated code for the build machine CPU (-march=native). OFF keeps packages portable."
     OFF)
-option(MADMODEM_AVX2_BUILD
+option(M3_AVX2_BUILD
     "Build an AVX2/FMA/SSE4.2-only binary. OFF keeps Windows packages portable; FT8 still uses runtime AVX2 dispatch where safe."
     OFF)
-option(MADMODEM_ENABLE_LTO
+option(M3_ENABLE_LTO
     "Enable CMake IPO/LTO for Release builds. OFF by default because GCC LTO has produced undefined MainWindow private-slot references on some Linux builds."
     OFF)
-option(MADMODEM_MACOS_BUNDLE
-    "Build MadModem as a native macOS .app bundle when compiling on Apple platforms."
+option(M3_MACOS_BUNDLE
+    "Build MultiModeModem as a native macOS .app bundle when compiling on Apple platforms."
     ON)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -93,15 +93,15 @@ endif()
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static in-tree support libraries" FORCE)
 
 include(CheckIPOSupported)
-if(MADMODEM_MAX_OPTIMIZE)
-    if(MADMODEM_ENABLE_LTO)
-        check_ipo_supported(RESULT _madmodem_ipo_supported OUTPUT _madmodem_ipo_error)
-        if(_madmodem_ipo_supported)
+if(M3_MAX_OPTIMIZE)
+    if(M3_ENABLE_LTO)
+        check_ipo_supported(RESULT _m3_ipo_supported OUTPUT _m3_ipo_error)
+        if(_m3_ipo_supported)
             set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
         endif()
     else()
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF)
-        message(STATUS "MadModem LTO/IPO disabled by default to avoid GCC/LTO private-slot link regressions")
+        message(STATUS "MultiModeModem LTO/IPO disabled by default to avoid GCC/LTO private-slot link regressions")
     endif()
 
     add_compile_options($<$<CONFIG:Release>:-O3>)
@@ -117,19 +117,19 @@ if(MADMODEM_MAX_OPTIMIZE)
     endif()
 endif()
 
-if(MADMODEM_NATIVE_OPTIMIZE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+if(M3_NATIVE_OPTIMIZE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options($<$<CONFIG:Release>:-march=native>)
 endif()
 
-if(MADMODEM_AVX2_BUILD AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64|i[3-6]86")
-    message(WARNING "MADMODEM_AVX2_BUILD=ON creates an AVX2/FMA-only executable. Do not use it for generic Windows 10 packages or older CPUs.")
+if(M3_AVX2_BUILD AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64|i[3-6]86")
+    message(WARNING "M3_AVX2_BUILD=ON creates an AVX2/FMA-only executable. Do not use it for generic Windows 10 packages or older CPUs.")
     if(MSVC)
         add_compile_options($<$<CONFIG:Release>:/arch:AVX2>)
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         add_compile_options($<$<CONFIG:Release>:-mavx2> $<$<CONFIG:Release>:-mfma> $<$<CONFIG:Release>:-msse4.2>)
     endif()
 else()
-    message(STATUS "MadModem portable CPU baseline: global AVX2/FMA disabled; runtime-dispatched kernels may still use AVX2 on capable CPUs.")
+    message(STATUS "MultiModeModem portable CPU baseline: global AVX2/FMA disabled; runtime-dispatched kernels may still use AVX2 on capable CPUs.")
 endif()
 
 # -------------------------------------------------------------------------
@@ -144,7 +144,7 @@ set(CMAKE_AUTORCC ON)
 # Qt detection
 # -------------------------------------------------------------------------
 
-option(MADMODEM_REQUIRE_QT_LOCATION
+option(M3_REQUIRE_QT_LOCATION
     "Require Qt Quick/Location/Positioning for distribution builds instead of an offline-only map."
     OFF)
 find_package(Qt6 QUIET COMPONENTS Widgets SerialPort Multimedia OpenGLWidgets PrintSupport Network)
@@ -156,15 +156,15 @@ else()
 endif()
 # Optional package searches can reset Qt*_FOUND. Keep the selected Qt family
 # stable, including Help and OpenGL links below.
-if(MADMODEM_REQUIRE_QT_LOCATION)
+if(M3_REQUIRE_QT_LOCATION)
     find_package(${QT} REQUIRED COMPONENTS Quick Qml Positioning Location)
 else()
     find_package(${QT} QUIET COMPONENTS Quick Qml Positioning Location)
 endif()
 
-set(MADMODEM_WITH_QT_LOCATION OFF)
+set(M3_WITH_QT_LOCATION OFF)
 if(TARGET ${QT}::Quick AND TARGET ${QT}::Qml AND TARGET ${QT}::Location AND TARGET ${QT}::Positioning)
-    set(MADMODEM_WITH_QT_LOCATION ON)
+    set(M3_WITH_QT_LOCATION ON)
     message(STATUS "Qt Location QSO map backend enabled (${QT} Location/OSM with offline fallback)")
 else()
     message(STATUS "Qt Location QSO map backend not available; using offline planet_map.jpg fallback")
@@ -176,9 +176,9 @@ endif()
 
 find_package(${QT} QUIET COMPONENTS Help)
 
-set(MADMODEM_WITH_QT_HELP OFF)
+set(M3_WITH_QT_HELP OFF)
 if(TARGET ${QT}::Help)
-    set(MADMODEM_WITH_QT_HELP ON)
+    set(M3_WITH_QT_HELP ON)
     message(STATUS "Qt Help backend enabled for the MM online manual")
 else()
     message(STATUS "Qt Help module not available; using embedded HTML fallback help")
@@ -193,26 +193,26 @@ find_program(QHELPGENERATOR_EXECUTABLE
         "$ENV{PATH}"
 )
 
-set(MADMODEM_HELP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs/help")
-set(MADMODEM_HELP_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs/help")
-set(MADMODEM_HELP_LANGUAGES en it fr de no cs)
-file(MAKE_DIRECTORY "${MADMODEM_HELP_BINARY_DIR}")
-file(GLOB_RECURSE MADMODEM_HELP_SOURCE_FILES CONFIGURE_DEPENDS
-    "${MADMODEM_HELP_SOURCE_DIR}/*.html"
-    "${MADMODEM_HELP_SOURCE_DIR}/*.css"
-    "${MADMODEM_HELP_SOURCE_DIR}/*.qhp"
-    "${MADMODEM_HELP_SOURCE_DIR}/*.qhcp"
+set(M3_HELP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs/help")
+set(M3_HELP_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs/help")
+set(M3_HELP_LANGUAGES en it fr de no cs)
+file(MAKE_DIRECTORY "${M3_HELP_BINARY_DIR}")
+file(GLOB_RECURSE M3_HELP_SOURCE_FILES CONFIGURE_DEPENDS
+    "${M3_HELP_SOURCE_DIR}/*.html"
+    "${M3_HELP_SOURCE_DIR}/*.css"
+    "${M3_HELP_SOURCE_DIR}/*.qhp"
+    "${M3_HELP_SOURCE_DIR}/*.qhcp"
 )
 
-add_custom_target(MadModemHelpFiles ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${MADMODEM_HELP_SOURCE_DIR}" "${MADMODEM_HELP_BINARY_DIR}"
-    DEPENDS ${MADMODEM_HELP_SOURCE_FILES}
+add_custom_target(M3HelpFiles ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${M3_HELP_SOURCE_DIR}" "${M3_HELP_BINARY_DIR}"
+    DEPENDS ${M3_HELP_SOURCE_FILES}
     COMMENT "Copying localized MM HTML help files"
 )
 
-set(MADMODEM_QCH_OUTPUTS)
-foreach(MADMODEM_HELP_LANG IN LISTS MADMODEM_HELP_LANGUAGES)
-    list(APPEND MADMODEM_QCH_OUTPUTS "${MADMODEM_HELP_BINARY_DIR}/MM_${MADMODEM_HELP_LANG}.qch")
+set(M3_QCH_OUTPUTS)
+foreach(M3_HELP_LANG IN LISTS M3_HELP_LANGUAGES)
+    list(APPEND M3_QCH_OUTPUTS "${M3_HELP_BINARY_DIR}/MM_${M3_HELP_LANG}.qch")
 endforeach()
 
 if(QHELPGENERATOR_EXECUTABLE)
@@ -224,28 +224,28 @@ if(QHELPGENERATOR_EXECUTABLE)
     # embedded multilingual HTML fallback, .qch generation must never break the
     # application build.
     add_custom_command(
-        OUTPUT "${MADMODEM_HELP_BINARY_DIR}/MadModemQtHelp.stamp"
-        BYPRODUCTS ${MADMODEM_QCH_OUTPUTS} "${MADMODEM_HELP_BINARY_DIR}/qhelpgenerator.log"
+        OUTPUT "${M3_HELP_BINARY_DIR}/M3QtHelp.stamp"
+        BYPRODUCTS ${M3_QCH_OUTPUTS} "${M3_HELP_BINARY_DIR}/qhelpgenerator.log"
         COMMAND "${CMAKE_COMMAND}"
-            "-DHELP_SOURCE_DIR=${MADMODEM_HELP_SOURCE_DIR}"
-            "-DHELP_BINARY_DIR=${MADMODEM_HELP_BINARY_DIR}"
+            "-DHELP_SOURCE_DIR=${M3_HELP_SOURCE_DIR}"
+            "-DHELP_BINARY_DIR=${M3_HELP_BINARY_DIR}"
             "-DQHELPGENERATOR_EXECUTABLE=${QHELPGENERATOR_EXECUTABLE}"
-            "-DHELP_LANGUAGES=${MADMODEM_HELP_LANGUAGES}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateMadModemQtHelp.cmake"
-        COMMAND "${CMAKE_COMMAND}" -E touch "${MADMODEM_HELP_BINARY_DIR}/MadModemQtHelp.stamp"
-        DEPENDS ${MADMODEM_HELP_SOURCE_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateMadModemQtHelp.cmake"
+            "-DHELP_LANGUAGES=${M3_HELP_LANGUAGES}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateM3QtHelp.cmake"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${M3_HELP_BINARY_DIR}/M3QtHelp.stamp"
+        DEPENDS ${M3_HELP_SOURCE_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateM3QtHelp.cmake"
         COMMENT "Generating localized MM Qt Help manuals (.qch, optional)"
         VERBATIM
     )
-    add_custom_target(MadModemQtHelp ALL DEPENDS "${MADMODEM_HELP_BINARY_DIR}/MadModemQtHelp.stamp")
-    add_dependencies(MadModemQtHelp MadModemHelpFiles)
+    add_custom_target(M3QtHelp ALL DEPENDS "${M3_HELP_BINARY_DIR}/M3QtHelp.stamp")
+    add_dependencies(M3QtHelp M3HelpFiles)
 else()
     message(WARNING "qhelpgenerator not found; MM will still build with embedded multilingual HTML help, but .qch files will not be generated")
 endif()
 
 
 # -------------------------------------------------------------------------
-# Native MadModem CW receiver and carrier scanner
+# Native MultiModeModem CW receiver and carrier scanner
 # -------------------------------------------------------------------------
 find_package(Threads REQUIRED)
 find_package(ZLIB REQUIRED)
@@ -255,20 +255,20 @@ find_package(ZLIB REQUIRED)
 # components. No legacy Bayesian/geometric-rescue implementation is linked.
 # Build number for the title bar and logs: the distribution number when set,
 # otherwise a local counter that goes up with every build after a source change.
-set(MADMODEM_BUILD_NUMBER_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/MadModemBuildNumber.cpp")
+set(M3_BUILD_NUMBER_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/M3BuildNumber.cpp")
 find_package(Git QUIET)
 add_custom_target(m3_build_counter ALL
     COMMAND ${CMAKE_COMMAND}
         "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}"
-        "-DOUTPUT=${MADMODEM_BUILD_NUMBER_SOURCE}"
-        "-DFIXED_NUMBER=${MADMODEM_BUILD_NUMBER}"
+        "-DOUTPUT=${M3_BUILD_NUMBER_SOURCE}"
+        "-DFIXED_NUMBER=${M3_BUILD_NUMBER}"
         "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/MadModemBuildCounter.cmake"
-    BYPRODUCTS "${MADMODEM_BUILD_NUMBER_SOURCE}"
-    COMMENT "MadModem build number"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/M3BuildCounter.cmake"
+    BYPRODUCTS "${M3_BUILD_NUMBER_SOURCE}"
+    COMMENT "MultiModeModem build number"
     VERBATIM)
-add_library(m3_build_number STATIC "${MADMODEM_BUILD_NUMBER_SOURCE}" utils/BuildNumber.h)
+add_library(m3_build_number STATIC "${M3_BUILD_NUMBER_SOURCE}" utils/BuildNumber.h)
 target_include_directories(m3_build_number PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 add_dependencies(m3_build_number m3_build_counter)
 
@@ -350,8 +350,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # Native FT8/FT4 recovery from pinned MSHV source, isolated from TX/CAT.
-find_library(MADMODEM_FFTW3_LIBRARY NAMES fftw3 fftw3-3 libfftw3.so.3)
-if(NOT MADMODEM_FFTW3_LIBRARY)
+find_library(M3_FFTW3_LIBRARY NAMES fftw3 fftw3-3 libfftw3.so.3)
+if(NOT M3_FFTW3_LIBRARY)
     message(FATAL_ERROR "FT reference recovery requires FFTW3 double precision (libfftw3-dev / fftw / brew fftw)")
 endif()
 add_library(m3_ft_reference STATIC
@@ -363,10 +363,10 @@ add_library(m3_ft_reference STATIC
     third_party/mshv_gpl/ft_reference/decoderpom.cpp
     third_party/mshv_gpl/ft_reference/fft.cpp)
 target_include_directories(m3_ft_reference PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(m3_ft_reference PUBLIC ${QT}::Core m3_weak_signal_codec m3_diagnostics Threads::Threads "${MADMODEM_FFTW3_LIBRARY}")
+target_link_libraries(m3_ft_reference PUBLIC ${QT}::Core m3_weak_signal_codec m3_diagnostics Threads::Threads "${M3_FFTW3_LIBRARY}")
 include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-ftrivial-auto-var-init=zero" MADMODEM_FT_AUTO_INIT)
-if(MADMODEM_FT_AUTO_INIT)
+check_cxx_compiler_flag("-ftrivial-auto-var-init=zero" M3_FT_AUTO_INIT)
+if(M3_FT_AUTO_INIT)
     target_compile_options(m3_ft_reference PRIVATE -ftrivial-auto-var-init=zero)
 else()
     message(FATAL_ERROR "FT recovery requires a compiler supporting -ftrivial-auto-var-init=zero; select a current GCC or Clang toolchain")
@@ -431,7 +431,7 @@ endif()
 # Sources
 # -------------------------------------------------------------------------
 
-add_executable(MadModem
+add_executable(MultiModeModem
     main.cpp
     FtCqWorkListUi.cpp
     mainwindow.cpp
@@ -649,12 +649,12 @@ add_executable(MadModem
 # -------------------------------------------------------------------------
 
 if(WIN32)
-    set_target_properties(MadModem PROPERTIES
+    set_target_properties(MultiModeModem PROPERTIES
         WIN32_EXECUTABLE ON
     )
 
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/multimodemodem.rc")
-        target_sources(MadModem PRIVATE
+        target_sources(MultiModeModem PRIVATE
             multimodemodem.rc
         )
     endif()
@@ -664,18 +664,18 @@ endif()
 # macOS application bundle
 # -------------------------------------------------------------------------
 
-if(APPLE AND MADMODEM_MACOS_BUNDLE)
+if(APPLE AND M3_MACOS_BUNDLE)
     if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS deployment target" FORCE)
     endif()
-    set(MADMODEM_MACOS_BUNDLE_ID "de.migri.multimodemodem" CACHE STRING "macOS bundle identifier")
-    set(MADMODEM_MACOS_ICON "${CMAKE_CURRENT_BINARY_DIR}/MultiModeModem.icns")
+    set(M3_MACOS_BUNDLE_ID "de.migri.multimodemodem" CACHE STRING "macOS bundle identifier")
+    set(M3_MACOS_ICON "${CMAKE_CURRENT_BINARY_DIR}/MultiModeModem.icns")
 
     add_custom_command(
-        OUTPUT "${MADMODEM_MACOS_ICON}"
+        OUTPUT "${M3_MACOS_ICON}"
         COMMAND "${CMAKE_COMMAND}"
             "-DINPUT_ICON=${CMAKE_CURRENT_SOURCE_DIR}/icons/multimodemodem_1024.png"
-            "-DOUTPUT_ICON=${MADMODEM_MACOS_ICON}"
+            "-DOUTPUT_ICON=${M3_MACOS_ICON}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/GenerateMacOSIcon.cmake"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/icons/multimodemodem_1024.png"
                 "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/GenerateMacOSIcon.cmake"
@@ -683,26 +683,26 @@ if(APPLE AND MADMODEM_MACOS_BUNDLE)
         VERBATIM
     )
 
-    target_sources(MadModem PRIVATE "${MADMODEM_MACOS_ICON}")
-    set_source_files_properties("${MADMODEM_MACOS_ICON}" PROPERTIES
+    target_sources(MultiModeModem PRIVATE "${M3_MACOS_ICON}")
+    set_source_files_properties("${M3_MACOS_ICON}" PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources"
     )
 
-    set_target_properties(MadModem PROPERTIES
+    set_target_properties(MultiModeModem PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "MultiModeModem"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "${MADMODEM_MACOS_BUNDLE_ID}"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "${M3_MACOS_BUNDLE_ID}"
         MACOSX_BUNDLE_ICON_FILE "MultiModeModem.icns"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/Info.plist.in"
     )
 
-    # MadModem expects cty.csv beside QCoreApplication::applicationDirPath().
+    # MultiModeModem expects cty.csv beside QCoreApplication::applicationDirPath().
     # In a macOS bundle that is Contents/MacOS, so copy it there for unsigned CI packages.
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cty.csv")
-        add_custom_command(TARGET MadModem POST_BUILD
+        add_custom_command(TARGET MultiModeModem POST_BUILD
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different
                 "${CMAKE_CURRENT_SOURCE_DIR}/cty.csv"
-                "$<TARGET_BUNDLE_CONTENT_DIR:MadModem>/MacOS/cty.csv"
+                "$<TARGET_BUNDLE_CONTENT_DIR:MultiModeModem>/MacOS/cty.csv"
             COMMENT "Copying cty.csv into MultiModeModem.app/Contents/MacOS"
             VERBATIM
         )
@@ -711,49 +711,49 @@ if(APPLE AND MADMODEM_MACOS_BUNDLE)
 endif()
 
 
-add_dependencies(MadModem MadModemHelpFiles)
-if(TARGET MadModemQtHelp)
-    add_dependencies(MadModem MadModemQtHelp)
+add_dependencies(MultiModeModem M3HelpFiles)
+if(TARGET M3QtHelp)
+    add_dependencies(MultiModeModem M3QtHelp)
 endif()
 
 # Keep string literals and resource-generated UI text UTF-8 on Windows/MinGW/MSVC.
 if(MSVC)
-    target_compile_options(MadModem PRIVATE /utf-8)
+    target_compile_options(MultiModeModem PRIVATE /utf-8)
 elseif(APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # Apple Clang already emits UTF-8 narrow strings by default; keep only the
     # explicit input encoding flag to avoid compiler-version-specific charset
     # option issues on GitHub macOS runners.
-    target_compile_options(MadModem PRIVATE -finput-charset=UTF-8)
+    target_compile_options(MultiModeModem PRIVATE -finput-charset=UTF-8)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(MadModem PRIVATE -finput-charset=UTF-8 -fexec-charset=UTF-8)
+    target_compile_options(MultiModeModem PRIVATE -finput-charset=UTF-8 -fexec-charset=UTF-8)
 endif()
 
-target_compile_definitions(MadModem PRIVATE MADMODEM_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(MultiModeModem PRIVATE M3_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 # -------------------------------------------------------------------------
 # Link libraries
 # -------------------------------------------------------------------------
 
 
 # Copy the external, data-driven RTTY/CW contest rule databases next to the executable.
-# Contest rules are intentionally not compiled into MadModem: replacing these files
+# Contest rules are intentionally not compiled into MultiModeModem: replacing these files
 # updates exchanges/macros/scoring without rebuilding the application.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rtty_rules")
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/rtty_rules" "${CMAKE_CURRENT_BINARY_DIR}/rtty_rules" COPYONLY)
-    add_custom_command(TARGET MadModem POST_BUILD
+    add_custom_command(TARGET MultiModeModem POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${CMAKE_CURRENT_SOURCE_DIR}/rtty_rules"
-            "$<TARGET_FILE_DIR:MadModem>/rtty_rules"
-        COMMENT "Copying external rtty_rules next to MadModem"
+            "$<TARGET_FILE_DIR:MultiModeModem>/rtty_rules"
+        COMMENT "Copying external rtty_rules next to MultiModeModem"
         VERBATIM)
 endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cw_rules")
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cw_rules" "${CMAKE_CURRENT_BINARY_DIR}/cw_rules" COPYONLY)
-    add_custom_command(TARGET MadModem POST_BUILD
+    add_custom_command(TARGET MultiModeModem POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${CMAKE_CURRENT_SOURCE_DIR}/cw_rules"
-            "$<TARGET_FILE_DIR:MadModem>/cw_rules"
-        COMMENT "Copying external cw_rules next to MadModem"
+            "$<TARGET_FILE_DIR:MultiModeModem>/cw_rules"
+        COMMENT "Copying external cw_rules next to MultiModeModem"
         VERBATIM)
 endif()
 
@@ -763,13 +763,13 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cty.csv")
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cty.csv" "${CMAKE_CURRENT_BINARY_DIR}/cty.csv" COPYONLY)
 endif()
 
-target_include_directories(MadModem PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/opencl_headers" "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/generated")
-set_property(TARGET MadModem PROPERTY AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(MultiModeModem PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/opencl_headers" "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set_property(TARGET MultiModeModem PROPERTY AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}")
 if(WIN32)
-    target_link_libraries(MadModem PRIVATE winmm)
+    target_link_libraries(MultiModeModem PRIVATE winmm)
 endif()
 
-target_link_libraries(MadModem PRIVATE
+target_link_libraries(MultiModeModem PRIVATE
     m3_ft_reference
     m3_diagnostics
     m3_cwskimmer
@@ -783,21 +783,21 @@ target_link_libraries(MadModem PRIVATE
     ${QT}::PrintSupport
     ${QT}::Network
 )
-if(MADMODEM_WITH_QT_LOCATION)
-    target_compile_definitions(MadModem PRIVATE MADMODEM_WITH_QT_LOCATION=1)
-    target_link_libraries(MadModem PRIVATE
+if(M3_WITH_QT_LOCATION)
+    target_compile_definitions(MultiModeModem PRIVATE M3_WITH_QT_LOCATION=1)
+    target_link_libraries(MultiModeModem PRIVATE
         ${QT}::Quick
         ${QT}::Qml
         ${QT}::Location
         ${QT}::Positioning
     )
 endif()
-if(MADMODEM_WITH_QT_HELP)
-    target_compile_definitions(MadModem PRIVATE MADMODEM_WITH_QT_HELP=1)
-    target_link_libraries(MadModem PRIVATE ${QT}::Help)
+if(M3_WITH_QT_HELP)
+    target_compile_definitions(MultiModeModem PRIVATE M3_WITH_QT_HELP=1)
+    target_link_libraries(MultiModeModem PRIVATE ${QT}::Help)
 endif()
 if(QT STREQUAL "Qt6")
-    target_link_libraries(MadModem PRIVATE Qt6::OpenGLWidgets)
+    target_link_libraries(MultiModeModem PRIVATE Qt6::OpenGLWidgets)
 endif()
 
 include(GNUInstallDirs)
@@ -809,7 +809,7 @@ include(GNUInstallDirs)
 # v1.18 keeps the policy from "optional stub if missing" to "real Hamlib
 # must be linked" by default.  The source package includes Hamlib under
 # third_party/hamlib_lgpl/source and the build scripts compile it before
-# configuring MadModem.
+# configuring MultiModeModem.
 #
 # Native Linux:
 #   ./third_party/hamlib_lgpl/build_hamlib.sh
@@ -820,60 +820,60 @@ include(GNUInstallDirs)
 #   $MXE_ROOT/usr/bin/x86_64-w64-mingw32.static-cmake -S . -B build-win64-static \
 #       -DHAMLIB_ROOT=$PWD/third_party/hamlib_lgpl/install-win64-static
 
-option(MADMODEM_REQUIRE_HAMLIB
+option(M3_REQUIRE_HAMLIB
     "Fail configuration when Hamlib is not available. v1.40 defaults this ON for all-in-one CAT/PTT builds."
     ON)
 
 set(HAMLIB_ROOT "" CACHE PATH "Hamlib install prefix produced by bundled build scripts or a system prefix")
-set(MADMODEM_BUNDLED_HAMLIB_PREFIX_LINUX
+set(M3_BUNDLED_HAMLIB_PREFIX_LINUX
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/hamlib_lgpl/install-linux-x86_64"
     CACHE PATH "Native Linux Hamlib prefix produced by third_party/hamlib_lgpl/build_hamlib.sh")
-set(MADMODEM_BUNDLED_HAMLIB_PREFIX_WIN64_STATIC
+set(M3_BUNDLED_HAMLIB_PREFIX_WIN64_STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/hamlib_lgpl/install-win64-static"
     CACHE PATH "Windows/MXE Hamlib prefix produced by third_party/hamlib_lgpl/build_hamlib_mxe.sh")
-set(MADMODEM_BUNDLED_HAMLIB_PREFIX_LEGACY
+set(M3_BUNDLED_HAMLIB_PREFIX_LEGACY
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/hamlib_lgpl/install"
     CACHE PATH "Legacy bundled Hamlib prefix")
 
-set(_MADMODEM_HAMLIB_HINTS)
+set(_M3_HAMLIB_HINTS)
 if(HAMLIB_ROOT)
-    list(APPEND _MADMODEM_HAMLIB_HINTS "${HAMLIB_ROOT}")
+    list(APPEND _M3_HAMLIB_HINTS "${HAMLIB_ROOT}")
 endif()
-if(WIN32 AND EXISTS "${MADMODEM_BUNDLED_HAMLIB_PREFIX_WIN64_STATIC}")
-    list(APPEND _MADMODEM_HAMLIB_HINTS "${MADMODEM_BUNDLED_HAMLIB_PREFIX_WIN64_STATIC}")
+if(WIN32 AND EXISTS "${M3_BUNDLED_HAMLIB_PREFIX_WIN64_STATIC}")
+    list(APPEND _M3_HAMLIB_HINTS "${M3_BUNDLED_HAMLIB_PREFIX_WIN64_STATIC}")
 endif()
-if(UNIX AND NOT APPLE AND EXISTS "${MADMODEM_BUNDLED_HAMLIB_PREFIX_LINUX}")
-    list(APPEND _MADMODEM_HAMLIB_HINTS "${MADMODEM_BUNDLED_HAMLIB_PREFIX_LINUX}")
+if(UNIX AND NOT APPLE AND EXISTS "${M3_BUNDLED_HAMLIB_PREFIX_LINUX}")
+    list(APPEND _M3_HAMLIB_HINTS "${M3_BUNDLED_HAMLIB_PREFIX_LINUX}")
 endif()
-if(EXISTS "${MADMODEM_BUNDLED_HAMLIB_PREFIX_LEGACY}")
-    list(APPEND _MADMODEM_HAMLIB_HINTS "${MADMODEM_BUNDLED_HAMLIB_PREFIX_LEGACY}")
+if(EXISTS "${M3_BUNDLED_HAMLIB_PREFIX_LEGACY}")
+    list(APPEND _M3_HAMLIB_HINTS "${M3_BUNDLED_HAMLIB_PREFIX_LEGACY}")
 endif()
 
-option(MADMODEM_AUTOBUILD_HAMLIB
+option(M3_AUTOBUILD_HAMLIB
     "Automatically build bundled Hamlib from source during CMake configuration when it is missing."
     OFF)
 
-if(MADMODEM_AUTOBUILD_HAMLIB)
-    set(_MADMODEM_AUTOBUILD_PREFIX "")
-    set(_MADMODEM_AUTOBUILD_SCRIPT "")
+if(M3_AUTOBUILD_HAMLIB)
+    set(_M3_AUTOBUILD_PREFIX "")
+    set(_M3_AUTOBUILD_SCRIPT "")
     if(WIN32)
-        set(_MADMODEM_AUTOBUILD_PREFIX "${MADMODEM_BUNDLED_HAMLIB_PREFIX_WIN64_STATIC}")
-        set(_MADMODEM_AUTOBUILD_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/hamlib_lgpl/build_hamlib_mxe.sh")
+        set(_M3_AUTOBUILD_PREFIX "${M3_BUNDLED_HAMLIB_PREFIX_WIN64_STATIC}")
+        set(_M3_AUTOBUILD_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/hamlib_lgpl/build_hamlib_mxe.sh")
     elseif(UNIX AND NOT APPLE)
-        set(_MADMODEM_AUTOBUILD_PREFIX "${MADMODEM_BUNDLED_HAMLIB_PREFIX_LINUX}")
-        set(_MADMODEM_AUTOBUILD_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/hamlib_lgpl/build_hamlib.sh")
+        set(_M3_AUTOBUILD_PREFIX "${M3_BUNDLED_HAMLIB_PREFIX_LINUX}")
+        set(_M3_AUTOBUILD_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/hamlib_lgpl/build_hamlib.sh")
     endif()
 
-    if(_MADMODEM_AUTOBUILD_PREFIX AND _MADMODEM_AUTOBUILD_SCRIPT
-       AND EXISTS "${_MADMODEM_AUTOBUILD_SCRIPT}"
-       AND NOT EXISTS "${_MADMODEM_AUTOBUILD_PREFIX}/include/hamlib/rig.h")
-        message(STATUS "Bundled Hamlib is missing; building it now: ${_MADMODEM_AUTOBUILD_PREFIX}")
+    if(_M3_AUTOBUILD_PREFIX AND _M3_AUTOBUILD_SCRIPT
+       AND EXISTS "${_M3_AUTOBUILD_SCRIPT}"
+       AND NOT EXISTS "${_M3_AUTOBUILD_PREFIX}/include/hamlib/rig.h")
+        message(STATUS "Bundled Hamlib is missing; building it now: ${_M3_AUTOBUILD_PREFIX}")
         execute_process(
             COMMAND ${CMAKE_COMMAND} -E env
-                    "HAMLIB_PREFIX=${_MADMODEM_AUTOBUILD_PREFIX}"
+                    "HAMLIB_PREFIX=${_M3_AUTOBUILD_PREFIX}"
                     "HAMLIB_STATIC=on"
                     "HAMLIB_SHARED=off"
-                    "${_MADMODEM_AUTOBUILD_SCRIPT}"
+                    "${_M3_AUTOBUILD_SCRIPT}"
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             RESULT_VARIABLE _hamlib_build_result
         )
@@ -882,8 +882,8 @@ if(MADMODEM_AUTOBUILD_HAMLIB)
         endif()
     endif()
 
-    if(_MADMODEM_AUTOBUILD_PREFIX AND EXISTS "${_MADMODEM_AUTOBUILD_PREFIX}")
-        list(PREPEND _MADMODEM_HAMLIB_HINTS "${_MADMODEM_AUTOBUILD_PREFIX}")
+    if(_M3_AUTOBUILD_PREFIX AND EXISTS "${_M3_AUTOBUILD_PREFIX}")
+        list(PREPEND _M3_HAMLIB_HINTS "${_M3_AUTOBUILD_PREFIX}")
     endif()
 endif()
 
@@ -892,25 +892,25 @@ endif()
 # find_path/find_library.  The explicit prefix step is important for MXE because
 # CMAKE_FIND_ROOT_PATH can otherwise re-root absolute HAMLIB_ROOT hints and miss
 # third_party/hamlib_lgpl/install-win64-static even when Hamlib was built there.
-list(REMOVE_DUPLICATES _MADMODEM_HAMLIB_HINTS)
-if(_MADMODEM_HAMLIB_HINTS)
-    message(STATUS "Hamlib search prefixes: ${_MADMODEM_HAMLIB_HINTS}")
+list(REMOVE_DUPLICATES _M3_HAMLIB_HINTS)
+if(_M3_HAMLIB_HINTS)
+    message(STATUS "Hamlib search prefixes: ${_M3_HAMLIB_HINTS}")
 endif()
 
-set(_MADMODEM_ORIGINAL_PKG_CONFIG_PATH "$ENV{PKG_CONFIG_PATH}")
-set(_MADMODEM_ORIGINAL_PKG_CONFIG_LIBDIR "$ENV{PKG_CONFIG_LIBDIR}")
-set(_MADMODEM_HAMLIB_PKGCONFIG_DIRS)
-foreach(_prefix IN LISTS _MADMODEM_HAMLIB_HINTS)
+set(_M3_ORIGINAL_PKG_CONFIG_PATH "$ENV{PKG_CONFIG_PATH}")
+set(_M3_ORIGINAL_PKG_CONFIG_LIBDIR "$ENV{PKG_CONFIG_LIBDIR}")
+set(_M3_HAMLIB_PKGCONFIG_DIRS)
+foreach(_prefix IN LISTS _M3_HAMLIB_HINTS)
     if(EXISTS "${_prefix}/lib/pkgconfig")
-        list(APPEND _MADMODEM_HAMLIB_PKGCONFIG_DIRS "${_prefix}/lib/pkgconfig")
+        list(APPEND _M3_HAMLIB_PKGCONFIG_DIRS "${_prefix}/lib/pkgconfig")
     endif()
     if(EXISTS "${_prefix}/lib64/pkgconfig")
-        list(APPEND _MADMODEM_HAMLIB_PKGCONFIG_DIRS "${_prefix}/lib64/pkgconfig")
+        list(APPEND _M3_HAMLIB_PKGCONFIG_DIRS "${_prefix}/lib64/pkgconfig")
     endif()
 endforeach()
-list(REMOVE_DUPLICATES _MADMODEM_HAMLIB_PKGCONFIG_DIRS)
+list(REMOVE_DUPLICATES _M3_HAMLIB_PKGCONFIG_DIRS)
 
-foreach(_pcdir IN LISTS _MADMODEM_HAMLIB_PKGCONFIG_DIRS)
+foreach(_pcdir IN LISTS _M3_HAMLIB_PKGCONFIG_DIRS)
     if("$ENV{PKG_CONFIG_PATH}" STREQUAL "")
         set(ENV{PKG_CONFIG_PATH} "${_pcdir}")
     else()
@@ -922,7 +922,7 @@ endforeach()
 # sysroot.  Add the private Hamlib pkgconfig directory there too so target
 # pkg-config can see hamlib.pc without using any native .pc files.
 if(CMAKE_CROSSCOMPILING)
-    foreach(_pcdir IN LISTS _MADMODEM_HAMLIB_PKGCONFIG_DIRS)
+    foreach(_pcdir IN LISTS _M3_HAMLIB_PKGCONFIG_DIRS)
         if("$ENV{PKG_CONFIG_LIBDIR}" STREQUAL "")
             set(ENV{PKG_CONFIG_LIBDIR} "${_pcdir}")
         else()
@@ -937,34 +937,34 @@ if(PKG_CONFIG_FOUND)
 endif()
 
 # Do not leak project-specific pkg-config search paths into later configure
-# checks or parent projects that include MadModem as a subdirectory.
-set(ENV{PKG_CONFIG_PATH} "${_MADMODEM_ORIGINAL_PKG_CONFIG_PATH}")
-set(ENV{PKG_CONFIG_LIBDIR} "${_MADMODEM_ORIGINAL_PKG_CONFIG_LIBDIR}")
+# checks or parent projects that include MultiModeModem as a subdirectory.
+set(ENV{PKG_CONFIG_PATH} "${_M3_ORIGINAL_PKG_CONFIG_PATH}")
+set(ENV{PKG_CONFIG_LIBDIR} "${_M3_ORIGINAL_PKG_CONFIG_LIBDIR}")
 
-set(MADMODEM_HAMLIB_FOUND OFF)
+set(M3_HAMLIB_FOUND OFF)
 set(HAMLIB_LIBRARY_DIR "")
 set(HAMLIB_INCLUDE_DIR "")
 set(HAMLIB_LIBRARY "")
 
 if(TARGET PkgConfig::HAMLIB_PC)
-    target_compile_definitions(MadModem PRIVATE MADMODEM_WITH_HAMLIB=1)
-    target_link_libraries(MadModem PRIVATE PkgConfig::HAMLIB_PC)
+    target_compile_definitions(MultiModeModem PRIVATE M3_WITH_HAMLIB=1)
+    target_link_libraries(MultiModeModem PRIVATE PkgConfig::HAMLIB_PC)
     # MSYS2/MinGW static Hamlib can reference GetAdaptersAddresses from iphlpapi.
     # Keep this Windows-only and leave all non-Windows link lines unchanged.
     if(WIN32)
-        target_link_libraries(MadModem PRIVATE ws2_32 setupapi winmm iphlpapi)
+        target_link_libraries(MultiModeModem PRIVATE ws2_32 setupapi winmm iphlpapi)
     endif()
     if(HAMLIB_PC_LIBRARY_DIRS)
         list(GET HAMLIB_PC_LIBRARY_DIRS 0 HAMLIB_LIBRARY_DIR)
     endif()
-    set(MADMODEM_HAMLIB_FOUND ON)
+    set(M3_HAMLIB_FOUND ON)
     message(STATUS "Hamlib support enabled via pkg-config: ${HAMLIB_PC_VERSION}")
 else()
     # First, trust an explicit install prefix by checking the concrete files.
     # This avoids MXE root-path rewriting problems seen with find_path/find_library.
-    foreach(_prefix IN LISTS _MADMODEM_HAMLIB_HINTS)
+    foreach(_prefix IN LISTS _M3_HAMLIB_HINTS)
         if(NOT HAMLIB_INCLUDE_DIR AND EXISTS "${_prefix}/include/hamlib/rig.h")
-            set(_MADMODEM_HAMLIB_CANDIDATE_LIBS
+            set(_M3_HAMLIB_CANDIDATE_LIBS
                 "${_prefix}/lib/libhamlib.a"
                 "${_prefix}/lib/libhamlib.dll.a"
                 "${_prefix}/lib/libhamlib-4.a"
@@ -976,7 +976,7 @@ else()
                 "${_prefix}/lib64/libhamlib-4.dll.a"
                 "${_prefix}/lib64/hamlib.lib"
             )
-            foreach(_lib IN LISTS _MADMODEM_HAMLIB_CANDIDATE_LIBS)
+            foreach(_lib IN LISTS _M3_HAMLIB_CANDIDATE_LIBS)
                 if(EXISTS "${_lib}")
                     set(HAMLIB_INCLUDE_DIR "${_prefix}/include")
                     set(HAMLIB_LIBRARY "${_lib}")
@@ -990,13 +990,13 @@ else()
     if(NOT HAMLIB_INCLUDE_DIR OR NOT HAMLIB_LIBRARY)
         find_path(HAMLIB_INCLUDE_DIR
             NAMES hamlib/rig.h
-            HINTS ${_MADMODEM_HAMLIB_HINTS}
+            HINTS ${_M3_HAMLIB_HINTS}
             PATH_SUFFIXES include
             NO_DEFAULT_PATH
         )
         find_library(HAMLIB_LIBRARY
             NAMES hamlib hamlib-4 libhamlib libhamlib-4
-            HINTS ${_MADMODEM_HAMLIB_HINTS}
+            HINTS ${_M3_HAMLIB_HINTS}
             PATH_SUFFIXES lib lib64
             NO_DEFAULT_PATH
         )
@@ -1005,40 +1005,40 @@ else()
     if(NOT HAMLIB_INCLUDE_DIR OR NOT HAMLIB_LIBRARY)
         find_path(HAMLIB_INCLUDE_DIR
             NAMES hamlib/rig.h
-            HINTS ${_MADMODEM_HAMLIB_HINTS}
+            HINTS ${_M3_HAMLIB_HINTS}
             PATH_SUFFIXES include
         )
         find_library(HAMLIB_LIBRARY
             NAMES hamlib hamlib-4 libhamlib libhamlib-4
-            HINTS ${_MADMODEM_HAMLIB_HINTS}
+            HINTS ${_M3_HAMLIB_HINTS}
             PATH_SUFFIXES lib lib64
         )
     endif()
 
     if(HAMLIB_INCLUDE_DIR AND HAMLIB_LIBRARY)
-        target_compile_definitions(MadModem PRIVATE MADMODEM_WITH_HAMLIB=1)
-        target_include_directories(MadModem PRIVATE ${HAMLIB_INCLUDE_DIR})
-        target_link_libraries(MadModem PRIVATE ${HAMLIB_LIBRARY})
+        target_compile_definitions(MultiModeModem PRIVATE M3_WITH_HAMLIB=1)
+        target_include_directories(MultiModeModem PRIVATE ${HAMLIB_INCLUDE_DIR})
+        target_link_libraries(MultiModeModem PRIVATE ${HAMLIB_LIBRARY})
         get_filename_component(HAMLIB_LIBRARY_DIR "${HAMLIB_LIBRARY}" DIRECTORY)
 
         # Direct static fallback dependencies.  pkg-config is preferred because
         # it is more exact, especially for MXE; these are the common minimums.
         if(UNIX AND NOT APPLE)
-            target_link_libraries(MadModem PRIVATE m pthread ${CMAKE_DL_LIBS})
+            target_link_libraries(MultiModeModem PRIVATE m pthread ${CMAKE_DL_LIBS})
         endif()
         if(WIN32)
-            target_link_libraries(MadModem PRIVATE ws2_32 setupapi winmm iphlpapi)
+            target_link_libraries(MultiModeModem PRIVATE ws2_32 setupapi winmm iphlpapi)
         endif()
 
-        set(MADMODEM_HAMLIB_FOUND ON)
+        set(M3_HAMLIB_FOUND ON)
         message(STATUS "Hamlib support enabled: ${HAMLIB_LIBRARY}")
     endif()
 endif()
 
-if(NOT MADMODEM_HAMLIB_FOUND)
+if(NOT M3_HAMLIB_FOUND)
     set(_msg "Hamlib was not found. v1.40 requires Hamlib for all-in-one CAT/PTT builds.
 "
-             "Searched prefixes: ${_MADMODEM_HAMLIB_HINTS}
+             "Searched prefixes: ${_M3_HAMLIB_HINTS}
 "
              "Build the bundled copy first:
 "
@@ -1048,8 +1048,8 @@ if(NOT MADMODEM_HAMLIB_FOUND)
 "
              "Then re-run CMake with -DHAMLIB_ROOT=<that install prefix>.
 "
-             "Set -DMADMODEM_REQUIRE_HAMLIB=OFF only for developer stub builds.")
-    if(MADMODEM_REQUIRE_HAMLIB)
+             "Set -DM3_REQUIRE_HAMLIB=OFF only for developer stub builds.")
+    if(M3_REQUIRE_HAMLIB)
         message(FATAL_ERROR "${_msg}")
     else()
         message(WARNING "${_msg}")
@@ -1059,21 +1059,21 @@ endif()
 # If a dynamic bundled Hamlib is used on Linux, make development runs work and
 # install the runtime library beside the application.  Static Hamlib builds need
 # no runtime copy.
-if(MADMODEM_HAMLIB_FOUND AND HAMLIB_LIBRARY_DIR)
+if(M3_HAMLIB_FOUND AND HAMLIB_LIBRARY_DIR)
     if(HAMLIB_LIBRARY_DIR MATCHES "third_party/hamlib_lgpl")
         if(UNIX AND NOT APPLE)
-            set_target_properties(MadModem PROPERTIES
+            set_target_properties(MultiModeModem PROPERTIES
                 BUILD_RPATH "${HAMLIB_LIBRARY_DIR}"
                 INSTALL_RPATH "\$ORIGIN/../lib;\$ORIGIN")
         endif()
-        file(GLOB MADMODEM_HAMLIB_RUNTIME_LIBS
+        file(GLOB M3_HAMLIB_RUNTIME_LIBS
             "${HAMLIB_LIBRARY_DIR}/libhamlib.so*"
             "${HAMLIB_LIBRARY_DIR}/libhamlib*.dylib"
             "${HAMLIB_LIBRARY_DIR}/hamlib*.dll"
             "${HAMLIB_LIBRARY_DIR}/libhamlib*.dll"
         )
-        if(MADMODEM_HAMLIB_RUNTIME_LIBS)
-            install(FILES ${MADMODEM_HAMLIB_RUNTIME_LIBS}
+        if(M3_HAMLIB_RUNTIME_LIBS)
+            install(FILES ${M3_HAMLIB_RUNTIME_LIBS}
                 DESTINATION ${CMAKE_INSTALL_LIBDIR})
         endif()
     endif()
@@ -1083,11 +1083,10 @@ endif()
 # Install
 # -------------------------------------------------------------------------
 
-# MultiModeModem (m³): the target stays "MadModem" (upstream merges, test
-# scripts use CMakeFiles/MadModem.dir); the program file is MultiModeModem.
-set_target_properties(MadModem PROPERTIES OUTPUT_NAME MultiModeModem)
+# The target and the program file are both MultiModeModem.
+set_target_properties(MultiModeModem PROPERTIES OUTPUT_NAME MultiModeModem)
 
-install(TARGETS MadModem
+install(TARGETS MultiModeModem
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     BUNDLE DESTINATION .
 )
@@ -1115,7 +1114,7 @@ if(BUILD_TESTING)
     set_tests_properties(m3_ft_ldpc_check PROPERTIES TIMEOUT 30)
     add_executable(m3_ft_native_spectrum tests/FtNativeSpectrumRegression.cpp)
     target_include_directories(m3_ft_native_spectrum PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(m3_ft_native_spectrum PRIVATE Threads::Threads "${MADMODEM_FFTW3_LIBRARY}")
+    target_link_libraries(m3_ft_native_spectrum PRIVATE Threads::Threads "${M3_FFTW3_LIBRARY}")
     add_test(NAME m3_ft_native_spectrum COMMAND m3_ft_native_spectrum)
     set_tests_properties(m3_ft_native_spectrum PROPERTIES TIMEOUT 30)
     add_executable(m3_ft_coherent_alignment tests/FtCoherentAlignmentRegression.cpp)
@@ -1164,13 +1163,13 @@ if(BUILD_TESTING)
     target_link_libraries(m3_update_regression PRIVATE ${QT}::Core ${QT}::Gui ${QT}::Widgets ${QT}::Network)
     add_test(NAME m3_update_regression COMMAND m3_update_regression)
     set_tests_properties(m3_update_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 20)
-    add_test(NAME m3_async_architecture_regression COMMAND MadModem --architecture-regression)
+    add_test(NAME m3_async_architecture_regression COMMAND MultiModeModem --architecture-regression)
     set_tests_properties(m3_async_architecture_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
-    add_test(NAME m3_window_rotator_regression COMMAND MadModem --window-rotator-regression)
+    add_test(NAME m3_window_rotator_regression COMMAND MultiModeModem --window-rotator-regression)
     set_tests_properties(m3_window_rotator_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
-    add_test(NAME m3_runtime_workers_regression COMMAND MadModem --runtime-regression)
+    add_test(NAME m3_runtime_workers_regression COMMAND MultiModeModem --runtime-regression)
     set_tests_properties(m3_runtime_workers_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
-    add_test(NAME m3_settings_ui_regression COMMAND MadModem --ui-regression)
+    add_test(NAME m3_settings_ui_regression COMMAND MultiModeModem --ui-regression)
     set_tests_properties(m3_settings_ui_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
     add_executable(m3_tx_pull_regression tests/TxPullRegression.cpp audio/TxOutputDevice.h)
     target_include_directories(m3_tx_pull_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -1247,9 +1246,9 @@ if(BUILD_TESTING)
     endif()
 
     if(Python3_Interpreter_FOUND)
-        set(MADMODEM_GUARD_UNIX_ARGS)
+        set(M3_GUARD_UNIX_ARGS)
         if(UNIX)
-            set(MADMODEM_GUARD_UNIX_ARGS --with-unix-checks)
+            set(M3_GUARD_UNIX_ARGS --with-unix-checks)
         endif()
 
         if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -1261,16 +1260,16 @@ if(BUILD_TESTING)
 
         add_test(NAME m3_architecture_guard
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_guard_suite.py"
-                    architecture ${MADMODEM_GUARD_UNIX_ARGS})
+                    architecture ${M3_GUARD_UNIX_ARGS})
         add_test(NAME m3_ui_contest_guard
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_guard_suite.py"
-                    ui ${MADMODEM_GUARD_UNIX_ARGS})
+                    ui ${M3_GUARD_UNIX_ARGS})
         add_test(NAME m3_ft_runtime_guard
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_guard_suite.py"
-                    ft ${MADMODEM_GUARD_UNIX_ARGS})
+                    ft ${M3_GUARD_UNIX_ARGS})
         add_test(NAME m3_release_audit
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_guard_suite.py"
-                    release ${MADMODEM_GUARD_UNIX_ARGS})
+                    release ${M3_GUARD_UNIX_ARGS})
     endif()
 
     add_executable(m3_receiver_filter_regression
@@ -1321,7 +1320,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cw_rules")
 endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cty.csv")
-    if(APPLE AND MADMODEM_MACOS_BUNDLE)
+    if(APPLE AND M3_MACOS_BUNDLE)
         install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cty.csv"
             DESTINATION MultiModeModem.app/Contents/MacOS
         )
@@ -1351,11 +1350,11 @@ endif()
 # -------------------------------------------------------------------------
 # Optional FT parser/sequencer regression test harness
 # -------------------------------------------------------------------------
-option(MADMODEM_BUILD_FT_TESTS
+option(M3_BUILD_FT_TESTS
     "Build a small QtCore-only FT parser/sequencer regression test executable."
     ${BUILD_TESTING})
 
-if(MADMODEM_BUILD_FT_TESTS)
+if(M3_BUILD_FT_TESTS)
     add_executable(m3_ft_sequencer_selftest
         tests/FtSequencerSelfTest.cpp
         modems/ft8/FtDecodedText.h
@@ -1376,16 +1375,16 @@ endif()
 # -------------------------------------------------------------------------
 # Optional selected-tone CW acquisition/speed regression test
 # -------------------------------------------------------------------------
-option(MADMODEM_BUILD_CW_TESTS
+option(M3_BUILD_CW_TESTS
     "Build the pure-C++ selected-tone CW regression test executable."
     OFF)
 
-if(MADMODEM_BUILD_CW_TESTS)
-    add_executable(MadModemCwNativeRegression
+if(M3_BUILD_CW_TESTS)
+    add_executable(M3CwNativeRegression
         tests/CwNativeRegression.cpp
     )
-    target_include_directories(MadModemCwNativeRegression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(MadModemCwNativeRegression PRIVATE m3_cwskimmer)
+    target_include_directories(M3CwNativeRegression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(M3CwNativeRegression PRIVATE m3_cwskimmer)
 endif()
 
 if(BUILD_TESTING)
@@ -1592,7 +1591,7 @@ endif()
 
 if(BUILD_TESTING)
     # Tests read and write settings; keep them away from the operator's
-    # ~/.config/MultiModeModem (see MadModemInstallation::configDirectory).
+    # ~/.config/MultiModeModem (see M3Installation::configDirectory).
     get_property(_m3_all_tests DIRECTORY PROPERTY TESTS)
     set_property(TEST ${_m3_all_tests} APPEND PROPERTY ENVIRONMENT "M3_CONFIG_DIR=${CMAKE_BINARY_DIR}/test-config")
 endif()

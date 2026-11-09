@@ -28,7 +28,12 @@ QString cleanAdifValue(QString value)
 
 QString fieldKey(QString name)
 {
-    return name.trimmed().toUpper();
+    QString key = name.trimmed().toUpper();
+    // Logs written before the rename carry APP_M3_* fields; they are
+    // read as APP_M3_* (and written that way on the next full rewrite).
+    static const QString legacyPrefix = QStringLiteral("APP_MADMODEM_");   // m3-compat
+    if (key.startsWith(legacyPrefix)) key.replace(0, legacyPrefix.size(), QStringLiteral("APP_M3_"));
+    return key;
 }
 
 void putField(LogbookEntry *entry, const QString &name, const QString &value)
@@ -401,8 +406,8 @@ QString AdifLogbook::defaultPath()
 {
     const QDir executable(QCoreApplication::applicationDirPath());
     const QString legacy = executable.filePath(QStringLiteral("logbook.adi"));
-    if (MadModemInstallation::isManaged()) {
-        return MadModemInstallation::userFile(executable.absolutePath(),
+    if (M3Installation::isManaged()) {
+        return M3Installation::userFile(executable.absolutePath(),
             QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation),
             QStringLiteral("logbook.adi"));
     }
@@ -635,7 +640,7 @@ bool AdifLogbook::exportRecordsAdif(const QString &fileName,
         return false;
     }
 
-    file.write(recordsToAdif(records, "Exported by MadModem").toUtf8());
+    file.write(recordsToAdif(records, "Exported by MultiModeModem").toUtf8());
     if (file.error() != QFile::NoError) {
         if (errorMessage != nullptr) {
             *errorMessage = file.errorString();

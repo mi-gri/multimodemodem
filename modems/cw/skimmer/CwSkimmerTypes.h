@@ -4,7 +4,7 @@
 #include <functional>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 
 constexpr int kDefaultPriorityCount = 8;
 constexpr int kSkimmerChannels = 16;
@@ -37,4 +37,4 @@ struct CwSkimmerChannelState {
 
 using CwSkimmerCallback = std::function<void(const CwSkimmerEvent&)>;
 
-} // namespace madmodem::cwskimmer
+} // namespace m3::cwskimmer

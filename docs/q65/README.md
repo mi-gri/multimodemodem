@@ -1,6 +1,6 @@
 # Q65 engine — 0.6.5
 
-Q65A, Q65B, Q65C and Q65D use one MadModem receive/transmit path under
+Q65A, Q65B, Q65C and Q65D use one MultiModeModem receive/transmit path under
 `modems/q65/`. It is compiled in every normal Linux, Windows and macOS build;
 there is no FFTW dependency, optional decoder switch or runtime fallback.
 

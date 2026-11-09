@@ -1,4 +1,4 @@
-# Building MadModem 0.6.5
+# Building MultiModeModem 0.6.5
 
 Use a C++17 compiler, CMake 3.16+, Qt 5.15 or Qt 6, Hamlib, FFTW3 double precision
 and zlib development libraries. Qt modules: Widgets, Network, Multimedia, SerialPort,
@@ -14,7 +14,7 @@ sudo apt install build-essential cmake ninja-build pkg-config python3 zlib1g-dev
   libqt5serialport5-dev libqt5opengl5-dev
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON -DHAMLIB_ROOT=/usr \
-  -DMADMODEM_REQUIRE_HAMLIB=ON -DMADMODEM_AUTOBUILD_HAMLIB=OFF
+  -DM3_REQUIRE_HAMLIB=ON -DM3_AUTOBUILD_HAMLIB=OFF
 cmake --build build --parallel 2
 ```
 

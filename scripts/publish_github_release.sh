@@ -8,7 +8,7 @@ assets_dir="$(cd "${1:?Expected directory containing downloaded packages}" && pw
 : "${GITHUB_SHA:?Missing build commit}"
 : "${GITHUB_RUN_NUMBER:?Missing workflow run number}"
 bash "$root/scripts/ci_release_version_guard.sh"
-version="$(tr -d '\r\n' < "$root/MADMODEM_VERSION.txt")"
+version="$(tr -d '\r\n' < "$root/M3_VERSION.txt")"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
 
 # Collect the complete distribution set; do not publish logs or a partial release.

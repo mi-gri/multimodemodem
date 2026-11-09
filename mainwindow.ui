@@ -17,7 +17,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string notr="true">MadModem 0.6.5</string>
+   <string notr="true">MultiModeModem 0.6.5</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="mainVerticalLayout">
@@ -1462,7 +1462,7 @@
     <property name="title">
      <string>Help</string>
     </property>
-    <addaction name="actionAboutMadModem" />
+    <addaction name="actionAboutM3" />
    </widget>
    <addaction name="menuFile" />
    <addaction name="menuSettings" />
@@ -1489,7 +1489,7 @@
     <string>Text macros...</string>
    </property>
   </action>
-  <action name="actionAboutMadModem">
+  <action name="actionAboutM3">
    <property name="text">
     <string>About MM</string>
    </property>

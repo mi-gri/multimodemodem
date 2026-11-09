@@ -40,11 +40,11 @@
 namespace {
 QString L18n(const QString &source)
 {
-    return MadModemI18n::text(source);
+    return M3I18n::text(source);
 }
 QString P18n(const QString &source)
 {
-    return MadModemI18n::placeholder(source);
+    return M3I18n::placeholder(source);
 }
 }
 
@@ -519,7 +519,7 @@ SstvImageEditorDialog::SstvImageEditorDialog(QWidget *parent)
     : QDialog(parent)
 {
     setWindowTitle(L18n(QStringLiteral("SSTV QSO / QSL image editor")));
-    resize(MadModemUi::size(1100, 820));
+    resize(M3Ui::size(1100, 820));
     setMinimumSize(640, 480);
 
     m_canvas = new SstvEditorCanvas(this);
@@ -720,7 +720,7 @@ SstvImageEditorDialog::SstvImageEditorDialog(QWidget *parent)
     m_canvas->changed=[this]{refreshElements();updateTxPreview();};
     m_canvas->clearHistory();m_savedDocument=projectData();
     refreshElements();
-    MadModemUi::scaleWidgetTree(this);
+    M3Ui::scaleWidgetTree(this);
     QTimer::singleShot(0,this,[this]{fitImage();});
 }
 

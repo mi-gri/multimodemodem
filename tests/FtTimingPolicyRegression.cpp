@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../modems/ft8/FtTimingPolicy.h"
-using namespace MadModemFtTiming;
+using namespace M3FtTiming;
 static_assert(latestFullFrameArmMs(15000,12640)==1340,"FT8 complete-frame admission");
 static_assert(latestFullFrameArmMs(7500,5040)==1440,"FT4 complete-frame admission");
 static_assert(recoveryDeadlineUtcMs(0,15000,12640)==16150,"FT8 RX + late-reply recovery deadline");

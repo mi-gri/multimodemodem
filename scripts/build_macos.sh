@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="MultiModeModem"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
-ARCHS="${MADMODEM_OSX_ARCHITECTURES:-$(uname -m)}"
-BUILD_DIR="${MADMODEM_MACOS_BUILD_DIR:-$ROOT_DIR/build-macos-$ARCHS}"
+ARCHS="${M3_OSX_ARCHITECTURES:-$(uname -m)}"
+BUILD_DIR="${M3_MACOS_BUILD_DIR:-$ROOT_DIR/build-macos-$ARCHS}"
 DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
 
 # macOS runners use a case-insensitive filesystem.  A stale root VERSION/version
 # file shadows the C++17 standard <version> header when any target has the
 # project root in its include path.  v0.5.76h replaced VERSION with
-# MADMODEM_VERSION.txt, but repositories updated by copy-over may still keep
+# M3_VERSION.txt, but repositories updated by copy-over may still keep
 # the old tracked file.  Remove it defensively in CI/local builds.
 rm -f "$ROOT_DIR/VERSION" "$ROOT_DIR/version" 2>/dev/null || true
 
@@ -58,8 +58,8 @@ cmake -S "$ROOT_DIR" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_OSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" \
     -DCMAKE_OSX_ARCHITECTURES="$ARCHS" \
     -DHAMLIB_ROOT="$HAMLIB_PREFIX" \
-    -DMADMODEM_REQUIRE_HAMLIB=ON \
-    -DMADMODEM_MACOS_BUNDLE=ON \
+    -DM3_REQUIRE_HAMLIB=ON \
+    -DM3_MACOS_BUNDLE=ON \
     "$@"
 
 cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" --parallel "${JOBS:-$(sysctl -n hw.ncpu)}"

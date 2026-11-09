@@ -476,7 +476,7 @@ private:
         if (m_owner->isFullScreen() || m_owner->isMaximized()) {
             m_owner->showNormal();
         } else {
-            MadModemUi::showMainWindowMaximized(m_owner);
+            M3Ui::showMainWindowMaximized(m_owner);
         }
         QTimer::singleShot(0, this, [this]() { updateMaximizeButtonIcon(); });
     }
@@ -753,11 +753,11 @@ protected:
                 if (!dlg->testAttribute(Qt::WA_DontShowOnScreen)) {
                     const bool wasVisible = dlg->isVisible();
                     installDialogChrome(dlg);
-                    MadModemUi::enableWindowResize(dlg);
+                    M3Ui::enableWindowResize(dlg);
                     if (wasVisible && (dlg->windowFlags() & Qt::FramelessWindowHint)) {
                         dlg->show();
                     }
-                    MadModemUi::polishCockpitWidgetTree(dlg);
+                    M3Ui::polishCockpitWidgetTree(dlg);
                 }
             }
         }
@@ -776,7 +776,7 @@ void ensureThemeApplicationFilter(QApplication &app)
 
 } // namespace
 
-namespace MadModemUi {
+namespace M3Ui {
 
 void applyCockpitTheme(QApplication &app)
 {
@@ -785,7 +785,7 @@ void applyCockpitTheme(QApplication &app)
     ensureThemeApplicationFilter(app);
 
     app.setStyleSheet(QString::fromLatin1(R"QSS(
-/* MadModem cockpit / avionics theme.  Embedded in code for Linux and MXE static builds. */
+/* MultiModeModem cockpit / avionics theme.  Embedded in code for Linux and MXE static builds. */
 * {
     selection-background-color: #ff9a20;
     selection-color: #050505;
@@ -1297,4 +1297,4 @@ void applyUiTheme(QApplication &app, const QString &themeKey)
     }
 }
 
-} // namespace MadModemUi
+} // namespace M3Ui

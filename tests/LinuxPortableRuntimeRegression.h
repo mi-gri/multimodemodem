@@ -6,7 +6,7 @@
 #include <QPluginLoader>
 #include <QTextStream>
 #include <QSslSocket>
-#ifdef MADMODEM_WITH_QT_LOCATION
+#ifdef M3_WITH_QT_LOCATION
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QScopedPointer>
@@ -30,7 +30,7 @@ inline int runLinuxPortableRuntimeRegression()
         }
     }
     if (!QSslSocket::supportsSsl()) { out << "FAIL OpenSSL runtime\n"; ok = false; }
-#ifdef MADMODEM_WITH_QT_LOCATION
+#ifdef M3_WITH_QT_LOCATION
     QQmlEngine engine;
     QQmlComponent component(&engine);
     component.setData("import QtQuick 2.12\nimport QtLocation 5.12\nimport QtPositioning 5.12\n"

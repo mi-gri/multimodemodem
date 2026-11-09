@@ -1,4 +1,4 @@
-# GitHub distribution — MadModem 0.6.5
+# GitHub distribution — MultiModeModem 0.6.5
 
 Copy the complete source directory contents into the repository root, including
 `.github`. To clean up documents left after overlaying an older source tree,

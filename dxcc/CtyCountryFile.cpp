@@ -130,7 +130,7 @@ bool CtyCountryFile::loadFromFile(const QString &path)
         e.ituZone = f.value(5).toInt();
         e.latitude = f.value(6).toDouble();
         // country-files.com cty.csv stores longitude with the ham-radio
-        // convention: positive west, negative east.  MadModem map geometry uses
+        // convention: positive west, negative east.  MultiModeModem map geometry uses
         // the normal GIS convention: positive east.  Invert once at load time,
         // otherwise European DXCC centroids fall on the wrong side of Greenwich.
         e.longitude = -f.value(7).toDouble();

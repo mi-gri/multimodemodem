@@ -191,7 +191,7 @@ double FqcToneEstimator::processSample(double sample)
     return m_lastFrequencyHz;
 }
 
-ModeTiming timingForMadModemMode(const char *label)
+ModeTiming timingForM3Mode(const char *label)
 {
     ModeTiming t;
 

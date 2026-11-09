@@ -85,7 +85,7 @@ Item {
         // Use the public OpenStreetMap raster tiles directly and force the
         // corresponding CustomMap type below.  This avoids Qt's provider list
         // picking Thunderforest/Mapbox/HERE-like map types that require API keys.
-        PluginParameter { name: "osm.useragent"; value: "MadModem/2.00 (QSO-map; GPL-3.0; contact=IZ6NNH)" }
+        PluginParameter { name: "osm.useragent"; value: "MultiModeModem/2.00 (QSO-map, based on MadModem; GPL-3.0; contact=DO3BOX)" }
         PluginParameter { name: "osm.mapping.providersrepository.disabled"; value: true }
         PluginParameter { name: "osm.mapping.host"; value: "https://tile.openstreetmap.org/" }
         PluginParameter { name: "osm.mapping.copyright"; value: "© OpenStreetMap contributors" }

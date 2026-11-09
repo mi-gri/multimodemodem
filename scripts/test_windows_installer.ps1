@@ -4,7 +4,7 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') {
     throw 'Installer verification requires a disposable GitHub Windows runner'
 }
 $root = Split-Path $PSScriptRoot -Parent
-$version = (Get-Content "$root/MADMODEM_VERSION.txt" -Raw).Trim()
+$version = (Get-Content "$root/M3_VERSION.txt" -Raw).Trim()
 $setup = "$root/dist/packages/MultiModeModem-$version-Windows-x64-Setup.exe"
 $destination = Join-Path $env:RUNNER_TEMP 'MultiModeModem Installer Test'
 $logDirectory = Join-Path $env:RUNNER_TEMP 'multimodemodem-installer-logs'

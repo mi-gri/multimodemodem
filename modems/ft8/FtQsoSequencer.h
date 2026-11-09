@@ -12,7 +12,7 @@
  * No audio, CAT, UI or QTimer code belongs here.  The sequencer consumes a
  * parsed decode context and returns a deterministic TX plan/action.  This is
  * the equivalent architectural role of WSJT-X auto_sequence()/processMessage(),
- * but adapted to MadModem's separated scheduler/audio workers.
+ * but adapted to MultiModeModem's separated scheduler/audio workers.
  */
 class FtQsoSequencer final
 {

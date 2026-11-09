@@ -80,9 +80,9 @@ assert 'audio-start token was already cleared, but slot boundary still matches' 
 
 # CAT is armed in the quiet tail and the time-critical TX path must never block
 # behind the FT decoder's boundary/deep decode queue.
-assert 'constexpr int kFtPttPrearmLeadMs = MadModemFtTiming::pttPrearmLeadMs;' in CPP
+assert 'constexpr int kFtPttPrearmLeadMs = M3FtTiming::pttPrearmLeadMs;' in CPP
 assert 'constexpr int pttPrearmLeadMs = 650;' in TIMING
-assert 'MadModemFtTiming::latestFullFrameArmMs(profile.slotMs, profile.signalMs)' in CPP
+assert 'M3FtTiming::latestFullFrameArmMs(profile.slotMs, profile.signalMs)' in CPP
 start_begin = CPP.index('void MainWindow::startFtPreparedSlotTransmit()')
 start_end = CPP.index('void MainWindow::stopImageTx()', start_begin)
 start_tx = CPP[start_begin:start_end]

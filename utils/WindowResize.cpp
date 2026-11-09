@@ -149,7 +149,7 @@ private:
 };
 }
 
-void MadModemUi::enableWindowResize(QWidget *window) {
+void M3Ui::enableWindowResize(QWidget *window) {
     if (!window || !window->isWindow() || window->property("cockpitEmbeddedDialog").toBool() ||
         window->property("mmWindowResizeInstalled").toBool()) return;
     const auto type = window->windowType();

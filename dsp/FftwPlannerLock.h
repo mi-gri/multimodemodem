@@ -1,4 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <mutex>
-namespace MadModemDsp { inline std::mutex fftwPlannerMutex; }
+namespace M3Dsp { inline std::mutex fftwPlannerMutex; }

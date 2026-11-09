@@ -30,7 +30,7 @@ def main():
     lines=['# Confronto decoder CW — R7','',
         'CER = (sostituzioni + cancellazioni + inserimenti) / caratteri di riferimento, spazi inclusi.',
         'La tabella principale usa gli stessi messaggi per tutti i motori. Ogni messaggio riparte a decoder azzerato.',
-        'Native è il vero percorso CwDecoder di MadModem, con impostazioni predefinite e WPM automatici; DeepCW è il modello ufficiale eseguito esternamente.',
+        'Native è il vero percorso CwDecoder di MultiModeModem, con impostazioni predefinite e WPM automatici; DeepCW è il modello ufficiale eseguito esternamente.',
         'DeepCW usa il frontend Python ufficiale e finestre di 5–20 s: gli audio più corti sono completati con silenzio; quelli oltre 20 s sono esclusi dal sottoinsieme comune.',
         'Non vengono forniti al decoder testo atteso o velocità vera. Gli altri motori ricevono gli stessi campioni in blocchi di 997 campioni.',
         '','| Prova comune | Messaggi / caratteri | '+' | '.join(engines)+' |',

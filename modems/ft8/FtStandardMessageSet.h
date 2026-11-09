@@ -10,7 +10,7 @@
  * @brief One authoritative generator for the six standard FT4/FT8 messages.
  *
  * WSJT-X keeps the currently selected standard message as QSO state, not as a
- * collection of unrelated UI strings.  MadModem uses this small value object as
+ * collection of unrelated UI strings.  MultiModeModem uses this small value object as
  * the single source for Tx1..Tx6 so the table, sequencer, pending FtTxPlan and
  * retry logic all agree on the exact text.
  */

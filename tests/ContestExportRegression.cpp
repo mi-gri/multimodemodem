@@ -28,8 +28,8 @@ int main(int argc,char** argv) {
     QApplication app(argc,argv);
     try {
         auto e=qso(2026), restart=qso(2026,6), old=qso(2025);
-        e.adifFields["APP_MADMODEM_RTTY_SESSION"]="a";
-        restart.adifFields["APP_MADMODEM_RTTY_SESSION"]="b";
+        e.adifFields["APP_M3_RTTY_SESSION"]="a";
+        restart.adifFields["APP_M3_RTTY_SESSION"]="b";
         auto inferred=qso(2026,7); inferred.adifFields.remove("CONTEST_ID");
         auto other=qso(2026); other.adifFields["CONTEST_ID"]="OTHER-RTTY";
         auto outside=qso(2026); outside.utc=outside.utc.addDays(2);
@@ -56,7 +56,7 @@ int main(int argc,char** argv) {
         profileFile.close();
         auto profileRecord=e;
         profileRecord.adifFields.remove("CONTEST_ID");
-        profileRecord.adifFields["APP_MADMODEM_RTTY_RULE"]="arrl_rtty_roundup";
+        profileRecord.adifFields["APP_M3_RTTY_RULE"]="arrl_rtty_roundup";
         const auto named=ContestExport::discover({profileRecord},ContestExport::loadProfiles({profileFile.fileName()}));
         check(named.editions.size()==1 && named.editions[0].name=="ARRL RTTY Roundup", "installed profile names and legacy IDs resolved");
         QString error;
@@ -69,13 +69,13 @@ int main(int argc,char** argv) {
         check(CqWwRtty::cabrillo({exchange},{},&error).contains("K6ABC 599 03 CA"),"recorded exchange strings recovered without invented zones");
         exchange.adifFields["SRX_STRING"]="599 1234";
         check(CqWwRtty::cabrillo({exchange},{},&error).isEmpty(),"serial number is not guessed as a CQ zone");
-        auto rule=e; rule.adifFields.remove("CONTEST_ID"); rule.adifFields["APP_MADMODEM_RTTY_RULE"]="cq_ww_rtty";
+        auto rule=e; rule.adifFields.remove("CONTEST_ID"); rule.adifFields["APP_M3_RTTY_RULE"]="cq_ww_rtty";
         check(ContestExport::discover({rule}).editions.size()==1,"legacy rule-only record recognized");
         auto generic=other; generic.utc=generic.utc.addDays(7);
         check(ContestExport::discover({other,generic}).editions.size()==2,"separate runs of a generic contest in one year");
         for(const auto& theme: {QStringLiteral("classic_dark"),QStringLiteral("qt_default"),QStringLiteral("avionica")}) {
-            MadModemUi::applyUiTheme(app,theme);
-            MadModemI18n::setLanguageCode("it");
+            M3Ui::applyUiTheme(app,theme);
+            M3I18n::setLanguageCode("it");
             auto invalid=qso(2026,8); invalid.freq.clear();
             ContestExportWizard wizard({e,restart,invalid,old});
             wizard.show(); app.processEvents();

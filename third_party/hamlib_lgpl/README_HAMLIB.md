@@ -34,7 +34,7 @@ third_party/hamlib_lgpl/install-win64-static
 Pass the matching prefix to CMake:
 
 ```bash
-cmake -S . -B build-linux -DHAMLIB_ROOT="$PWD/third_party/hamlib_lgpl/install-linux-x86_64" -DMADMODEM_REQUIRE_HAMLIB=ON
+cmake -S . -B build-linux -DHAMLIB_ROOT="$PWD/third_party/hamlib_lgpl/install-linux-x86_64" -DM3_REQUIRE_HAMLIB=ON
 ```
 
 The normal top-level helpers do this automatically:

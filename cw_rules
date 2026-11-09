@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "updated_utc": "2026-08-19",
-  "description": "MadModem CW Contest Engine rules. Runtime-reloadable contest profiles; exchange, macros, serials, dupes and scoring are data, not hard-coded in the CW modem.",
+  "description": "MultiModeModem CW Contest Engine rules. Runtime-reloadable contest profiles; exchange, macros, serials, dupes and scoring are data, not hard-coded in the CW modem.",
   "profiles": [
     {
       "id": "ari_40_80_cw",
@@ -213,7 +213,7 @@
       "scoring": {
         "supported": false,
         "formula": "POINTS * MULTS",
-        "note": "Lo scoring ARI International dipende dalla classe geografica e dai moltiplicatori annuali; MadModem conserva exchange e log ma non mostra un totale potenzialmente fuorviante."
+        "note": "Lo scoring ARI International dipende dalla classe geografica e dai moltiplicatori annuali; MultiModeModem conserva exchange e log ma non mostra un totale potenzialmente fuorviante."
       },
       "source": {
         "url": "https://www.ari.it/contest-hf/ari-international.html",

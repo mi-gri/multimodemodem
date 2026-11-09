@@ -6,7 +6,7 @@
 #include <complex>
 #include <vector>
 #include <cmath>
-namespace MadModemAudio {
+namespace M3Audio {
 inline int previousPowerOfTwo(int value)
 {
     int p = 1;

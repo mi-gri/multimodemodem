@@ -13,11 +13,11 @@ endif()
 
 get_filename_component(_out_dir "${OUTPUT_ICON}" DIRECTORY)
 file(MAKE_DIRECTORY "${_out_dir}")
-set(_iconset "${_out_dir}/MadModem.iconset")
+set(_iconset "${_out_dir}/MultiModeModem.iconset")
 file(REMOVE_RECURSE "${_iconset}")
 file(MAKE_DIRECTORY "${_iconset}")
 
-function(_madmodem_make_icon px name)
+function(_m3_make_icon px name)
     execute_process(
         COMMAND "${SIPS_EXECUTABLE}" -z ${px} ${px} "${INPUT_ICON}" --out "${_iconset}/${name}"
         RESULT_VARIABLE _res
@@ -29,16 +29,16 @@ function(_madmodem_make_icon px name)
     endif()
 endfunction()
 
-_madmodem_make_icon(16   "icon_16x16.png")
-_madmodem_make_icon(32   "icon_16x16@2x.png")
-_madmodem_make_icon(32   "icon_32x32.png")
-_madmodem_make_icon(64   "icon_32x32@2x.png")
-_madmodem_make_icon(128  "icon_128x128.png")
-_madmodem_make_icon(256  "icon_128x128@2x.png")
-_madmodem_make_icon(256  "icon_256x256.png")
-_madmodem_make_icon(512  "icon_256x256@2x.png")
-_madmodem_make_icon(512  "icon_512x512.png")
-_madmodem_make_icon(1024 "icon_512x512@2x.png")
+_m3_make_icon(16   "icon_16x16.png")
+_m3_make_icon(32   "icon_16x16@2x.png")
+_m3_make_icon(32   "icon_32x32.png")
+_m3_make_icon(64   "icon_32x32@2x.png")
+_m3_make_icon(128  "icon_128x128.png")
+_m3_make_icon(256  "icon_128x128@2x.png")
+_m3_make_icon(256  "icon_256x256.png")
+_m3_make_icon(512  "icon_256x256@2x.png")
+_m3_make_icon(512  "icon_512x512.png")
+_m3_make_icon(1024 "icon_512x512@2x.png")
 
 execute_process(
     COMMAND "${ICONUTIL_EXECUTABLE}" -c icns "${_iconset}" -o "${OUTPUT_ICON}"

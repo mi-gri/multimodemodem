@@ -1,5 +1,5 @@
-#ifndef MADMODEM_SSTV_VIS_H
-#define MADMODEM_SSTV_VIS_H
+#ifndef M3_SSTV_VIS_H
+#define M3_SSTV_VIS_H
 #include <QString>
 #include <QtGlobal>
 #include <cmath>

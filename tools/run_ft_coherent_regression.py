@@ -16,7 +16,7 @@ a = p.parse_args()
 build = a.build.resolve()
 source = Path(__file__).resolve().parents[1]
 flags = {}
-for line in (build / 'CMakeFiles/MadModem.dir/flags.make').read_text().splitlines():
+for line in (build / 'CMakeFiles/MultiModeModem.dir/flags.make').read_text().splitlines():
     if ' = ' in line:
         key, value = line.split(' = ', 1)
         flags[key] = shlex.split(value)
@@ -25,7 +25,7 @@ if a.sanitize:
     name += '-sanitized'
 output = build / name
 obj = output.with_suffix('.o')
-link = shlex.split((build / 'CMakeFiles/MadModem.dir/link.txt').read_text())
+link = shlex.split((build / 'CMakeFiles/MultiModeModem.dir/link.txt').read_text())
 extra = ['-O1']
 if a.sanitize:
     extra += ['-g', '-fno-omit-frame-pointer', '-fsanitize=address,undefined']
@@ -35,11 +35,11 @@ def compile_file(path, target):
                     '-c', str(path), '-o', str(target)], cwd=build, check=True)
 compile_file(source / 'tests' / a.probe, obj)
 link[link.index('-o') + 1] = str(output)
-link[link.index('CMakeFiles/MadModem.dir/main.cpp.o')] = str(obj)
+link[link.index('CMakeFiles/MultiModeModem.dir/main.cpp.o')] = str(obj)
 if a.sanitize:
     receiver = build / (name + '-receiver.o')
     compile_file(source / 'modems/ft8/Ft8RxDecoder.cpp', receiver)
-    link[link.index('CMakeFiles/MadModem.dir/modems/ft8/Ft8RxDecoder.cpp.o')] = str(receiver)
+    link[link.index('CMakeFiles/MultiModeModem.dir/modems/ft8/Ft8RxDecoder.cpp.o')] = str(receiver)
     link += ['-fsanitize=address,undefined']
 subprocess.run(link, cwd=build, check=True)
 output.chmod(0o755)

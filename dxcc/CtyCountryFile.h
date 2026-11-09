@@ -10,7 +10,7 @@
  * @brief Lightweight loader for AD1C/K1EA country-files.com cty.csv.
  *
  * The file is intentionally loaded from the executable directory, so users can
- * update DXCC/prefix data by replacing cty.csv without rebuilding MadModem.
+ * update DXCC/prefix data by replacing cty.csv without rebuilding MultiModeModem.
  */
 class CtyCountryFile
 {
@@ -50,7 +50,7 @@ public:
     LookupResult lookupEntityNameOrPrefix(const QString &query) const;
 
     /**
-     * Returns the best map/grid reference MadModem can derive from the
+     * Returns the best map/grid reference MultiModeModem can derive from the
      * available data.  Exact 6/8-character station locators are preserved.
      * Empty or coarse 4-character locators are refined with the cty.csv
      * DXCC centroid only when that reference is consistent with the decoded

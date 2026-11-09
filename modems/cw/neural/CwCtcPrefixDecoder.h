@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace madmodem::cwskimmer {
+namespace m3::cwskimmer {
 
 // Acoustic-only bounded CTC search. No vocabulary, callsign or language prior.
 // Graves et al., ICML 2006: prefix alignment sums and blank section boundaries.

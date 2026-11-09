@@ -38,8 +38,8 @@ int main(int argc,char** argv) {
   QFile file(path);check(file.open(QIODevice::WriteOnly),"fixture opens");file.write(AdifLogbook::recordsToAdif(contacts).toUtf8());file.close();
   AdifLogbook log(path);QString error;check(log.load(&error),"fixture loads");
   for(const auto& theme:{QStringLiteral("classic_dark"),QStringLiteral("qt_default"),QStringLiteral("avionica")}) {
-   MadModemUi::applyUiTheme(app,theme);MadModemI18n::setLanguageCode("it");
-   LogbookDialog dialog(&log);dialog.setTextTranslator([](const QString& text){return MadModemI18n::text(text);});dialog.resize(960,640);dialog.show();app.processEvents();
+   M3Ui::applyUiTheme(app,theme);M3I18n::setLanguageCode("it");
+   LogbookDialog dialog(&log);dialog.setTextTranslator([](const QString& text){return M3I18n::text(text);});dialog.resize(960,640);dialog.show();app.processEvents();
    auto* table=dialog.findChild<QTableWidget*>("logbookTable");
    auto* band=dialog.findChild<QComboBox*>("logbookBand");auto* mode=dialog.findChild<QComboBox*>("logbookMode");
    auto* period=dialog.findChild<QComboBox*>("logbookPeriod");auto* scope=dialog.findChild<QComboBox*>("logbookOutputScope");
@@ -85,8 +85,8 @@ int main(int argc,char** argv) {
   migrated.rotatorTrackSelectedQso=true;check(migrated.save(),"explicit tracking preference saves");
   AppSettings enabled;enabled.load();check(enabled.rotatorTrackSelectedQso,"explicit opt-in survives restart");
   // Test map controls without contacting a tile server.
-  qputenv("MADMODEM_OSM_TILE_BASE","http://127.0.0.1:9/{z}/{x}/{y}.png");
-  QWidget page;QVBoxLayout layout(&page);QsoMapWidget map;map.setTextTranslator([](const QString& text){return MadModemI18n::text(text);});map.setRecords(contacts);map.setModeFilter("FT8");map.setHomeGrid("JN63");
+  qputenv("M3_OSM_TILE_BASE","http://127.0.0.1:9/{z}/{x}/{y}.png");
+  QWidget page;QVBoxLayout layout(&page);QsoMapWidget map;map.setTextTranslator([](const QString& text){return M3I18n::text(text);});map.setRecords(contacts);map.setModeFilter("FT8");map.setHomeGrid("JN63");
   auto* controls=map.createControls(&page);layout.addWidget(controls);layout.addWidget(&map);page.resize(960,640);page.show();app.processEvents();
   auto* source=controls->findChild<QComboBox*>("mapSource");auto* period=controls->findChild<QComboBox*>("mapPeriod");
   source->setCurrentIndex(1);check(map.displayBehavior()==QsoMapWidget::DisplayBehavior::HeardToday && !period->isEnabled(),"heard-today source exposes fixed date scope");

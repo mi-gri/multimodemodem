@@ -40,7 +40,7 @@ checks = {
         and "invalid or non-finite sample" in wav_reader
         and "tests/WavFileReaderTest.cpp" in cmake
         and "bool parseWavHeader(QFile &file, WavStreamFormat" not in main
-        and main.count("MadModemAudio::parseWavHeader(file, wav, errorMessage)") == 2
+        and main.count("M3Audio::parseWavHeader(file, wav, errorMessage)") == 2
     ),
     "bounded UI audio relay": (
         "BoundedAudioDispatcher" in main
@@ -81,8 +81,8 @@ checks = {
     ),
     "Q65 RX has one always-built native path": (
         "Q65NativeEngine.cpp" in cmake
-        and "MADMODEM_ENABLE_Q65" not in cmake
-        and "MADMODEM_FFTW3_LIBRARY" not in re.search(r"target_link_libraries\(m3_q65\b(.*?)\)", cmake, re.S).group(1)
+        and "M3_ENABLE_Q65" not in cmake
+        and "M3_FFTW3_LIBRARY" not in re.search(r"target_link_libraries\(m3_q65\b(.*?)\)", cmake, re.S).group(1)
         and "Q65 RX start blocked" not in main
         and "findSyncCandidates" in q65_engine
         and "q65_intrinsics_ff" in q65_engine
@@ -94,11 +94,11 @@ checks = {
     ),
     "offline image WAV loop is non-reentrant": "QCoreApplication::processEvents" not in main,
     "OSM TLS remains verified": "ignoreSslErrors" not in map_source,
-    "OSM tile responses are bounded": "madmodemTileOversize" in map_source,
+    "OSM tile responses are bounded": "m3TileOversize" in map_source,
     "Hamlib configure has no default build side effect": (
-        "option(MADMODEM_AUTOBUILD_HAMLIB" in cmake
+        "option(M3_AUTOBUILD_HAMLIB" in cmake
         and "Automatically build bundled Hamlib" in cmake
-        and "\n    OFF)" in cmake[cmake.index("option(MADMODEM_AUTOBUILD_HAMLIB"):]
+        and "\n    OFF)" in cmake[cmake.index("option(M3_AUTOBUILD_HAMLIB"):]
     ),
 }
 

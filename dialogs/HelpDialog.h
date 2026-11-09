@@ -11,7 +11,7 @@ class QSplitter;
 class QPushButton;
 class QLineEdit;
 
-#ifdef MADMODEM_WITH_QT_HELP
+#ifdef M3_WITH_QT_HELP
 class QHelpEngine;
 class QHelpContentWidget;
 class QHelpIndexWidget;
@@ -59,7 +59,7 @@ private:
     QPushButton *m_whatsThisButton = nullptr;
     QLineEdit *m_searchEdit = nullptr;
 
-#ifdef MADMODEM_WITH_QT_HELP
+#ifdef M3_WITH_QT_HELP
     QHelpEngine *m_helpEngine = nullptr;
     QHelpContentWidget *m_contentWidget = nullptr;
     QHelpIndexWidget *m_indexWidget = nullptr;
