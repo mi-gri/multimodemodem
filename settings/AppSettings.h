@@ -399,6 +399,19 @@ public:
         "Rig",
         "73"
     };
+    // JS8 macro bar (Settings -> User / QTH / Macros, section JS8).  Sent
+    // to the station in "To:" unless the text starts with a call or @group.
+    static QStringList defaultJs8MacroLabels()
+    {
+        return {"HW CPY?", "SNR", "QSL?", "NAME/QTH", "GRID?", "INFO?", "HEARING?", "QUERY MSGS", "73"};
+    }
+    static QStringList defaultJs8MacroTexts()
+    {
+        return {"HW CPY?", "SNR {RST}", "QSL?", "NAME {MYNAME}, QTH {MYQTH} {MYGRID}", "GRID?", "INFO?",
+                "HEARING?", "QUERY MSGS", "TNX FER QSO, 73 {MYNAME}"};
+    }
+    QStringList js8MacroLabels = defaultJs8MacroLabels();
+    QStringList js8MacroTexts = defaultJs8MacroTexts();
     QStringList textMacroTexts = {
         "CQ CQ CQ de {MYCALL} {MYCALL} {MYCALL} pse k",
         "{CALL} de {MYCALL} tnx fer call. ur rst {RST} {RST}. hw cpy? {CALL} de {MYCALL} kn",

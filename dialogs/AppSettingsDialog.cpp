@@ -1135,6 +1135,42 @@ QWidget *AppSettingsDialog::makeUserQthMacrosPage()
         macrosLayout->addWidget(macroGroup);
     }
 
+    // JS8 macros: one line each, sent directed to the station in "To:".
+    QGroupBox *js8Group = new QGroupBox(L(QStringLiteral("JS8 macros")), macrosContent);
+    js8Group->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+    QGridLayout *js8Grid = new QGridLayout(js8Group);
+    js8Grid->setContentsMargins(10, 12, 10, 10);
+    js8Grid->setHorizontalSpacing(8);
+    js8Grid->setVerticalSpacing(5);
+    js8Grid->setColumnStretch(2, 1);
+    QLabel *js8Hint = new QLabel(L(QStringLiteral("Sent to the station in \"To:\" unless the text starts with a call or @group; Shift+click only puts the text into the message field. Tokens as above, {CALL} is the station in \"To:\", {MYGRID} the 4-character locator. JS8 sends upper-case letters, digits and common punctuation only.")), js8Group);
+    js8Hint->setWordWrap(true);
+    js8Grid->addWidget(js8Hint, 0, 0, 1, 3);
+    m_js8MacroLabelEdits.clear();
+    m_js8MacroTextEdits.clear();
+    for (int i = 0; i < 9; ++i) {
+        QLineEdit *labelEdit = makeLineEdit(js8Group, QStringLiteral("JS8 button label %1").arg(i + 1));
+        labelEdit->setMaximumWidth(140);
+        labelEdit->setText(m_initialSettings.js8MacroLabels.value(i, AppSettings::defaultJs8MacroLabels().value(i)));
+        QLineEdit *textEdit = new QLineEdit(js8Group);
+        textEdit->setText(m_initialSettings.js8MacroTexts.value(i));
+        textEdit->setPlaceholderText(L(QStringLiteral("e.g. HW CPY?")));
+        js8Grid->addWidget(new QLabel(QString::number(i + 1), js8Group), i + 1, 0);
+        js8Grid->addWidget(labelEdit, i + 1, 1);
+        js8Grid->addWidget(textEdit, i + 1, 2);
+        m_js8MacroLabelEdits.append(labelEdit);
+        m_js8MacroTextEdits.append(textEdit);
+    }
+    auto *js8Defaults = new QPushButton(L(QStringLiteral("Restore defaults")), js8Group);
+    connect(js8Defaults, &QPushButton::clicked, this, [this]() {
+        for (int i = 0; i < m_js8MacroLabelEdits.size(); ++i) {
+            m_js8MacroLabelEdits[i]->setText(AppSettings::defaultJs8MacroLabels().value(i));
+            m_js8MacroTextEdits[i]->setText(AppSettings::defaultJs8MacroTexts().value(i));
+        }
+    });
+    js8Grid->addWidget(js8Defaults, 10, 2, Qt::AlignRight);
+    macrosLayout->addWidget(js8Group);
+
     macrosLayout->addStretch(1);
 
     splitLayout->addWidget(variablesContent);
@@ -2697,6 +2733,17 @@ void AppSettingsDialog::collectSettings()
         }
         merged.textMacroLabels = labels;
         merged.textMacroTexts = texts;
+        if (!m_js8MacroLabelEdits.isEmpty()) {
+            QStringList js8Labels;
+            QStringList js8Texts;
+            for (int i = 0; i < m_js8MacroLabelEdits.size(); ++i) {
+                const QString label = m_js8MacroLabelEdits[i]->text().trimmed();
+                js8Labels << (label.isEmpty() ? QString::number(i + 1) : label);
+                js8Texts << m_js8MacroTextEdits[i]->text().trimmed();
+            }
+            merged.js8MacroLabels = js8Labels;
+            merged.js8MacroTexts = js8Texts;
+        }
 
         // Keep the legacy FT identity synchronized.  Other parts of the app
         // still consume these fields for standard FT messages and QSO-map home

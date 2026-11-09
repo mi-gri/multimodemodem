@@ -542,3 +542,17 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'mode_off_standard':('rig is elsewhere','radio altrove','radio ailleurs','Funkgerät steht woanders','radioen står et annet sted','rádio je jinde'),
  'scheduler_use_frequency_list':('Use the frequency list entry for the band','Usa la voce dell’elenco frequenze per la banda','Utiliser l’entrée de la liste des fréquences pour la bande','Frequenz aus der Frequenzliste für das Band verwenden','Bruk frekvenslistens oppføring for båndet','Použít položku seznamu kmitočtů pro pásmo'),
 }.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'JS8 macros':('JS8 macros','Macro JS8','Macros JS8','JS8-Makros','JS8-makroer','Makra JS8'),
+ 'Sent to the station in "To:" unless the text starts with a call or @group; Shift+click only puts the text into the message field. Tokens as above, {CALL} is the station in "To:", {MYGRID} the 4-character locator. JS8 sends upper-case letters, digits and common punctuation only.':(
+  'Sent to the station in "To:" unless the text starts with a call or @group; Shift+click only puts the text into the message field. Tokens as above, {CALL} is the station in "To:", {MYGRID} the 4-character locator. JS8 sends upper-case letters, digits and common punctuation only.',
+  'Inviate alla stazione in "A:" se il testo non inizia con un nominativo o @gruppo; Maiusc+clic inserisce il testo solo nel campo messaggio. Token come sopra, {CALL} è la stazione in "A:", {MYGRID} il locatore a 4 caratteri. JS8 invia solo maiuscole, cifre e punteggiatura comune.',
+  'Envoyées à la station de « À : » sauf si le texte commence par un indicatif ou un @groupe ; Maj+clic place seulement le texte dans le champ message. Jetons comme ci-dessus, {CALL} est la station de « À : », {MYGRID} le locator à 4 caractères. JS8 n’envoie que majuscules, chiffres et ponctuation courante.',
+  'Werden an die Station in „An:“ gesendet, außer der Text beginnt mit einem Rufzeichen oder einer @Gruppe; Umschalt+Klick setzt den Text nur ins Nachrichtenfeld. Platzhalter wie oben, {CALL} ist die Station in „An:“, {MYGRID} der 4-stellige Locator. JS8 überträgt nur Großbuchstaben, Ziffern und gängige Satzzeichen.',
+  'Sendes til stasjonen i «Til:» med mindre teksten begynner med et kallesignal eller @gruppe; Shift+klikk legger bare teksten i meldingsfeltet. Koder som over, {CALL} er stasjonen i «Til:», {MYGRID} lokatoren med 4 tegn. JS8 sender bare store bokstaver, sifre og vanlig tegnsetting.',
+  'Odesílají se stanici v poli „Pro:“, pokud text nezačíná značkou nebo @skupinou; Shift+klik vloží text jen do pole zprávy. Proměnné jako výše, {CALL} je stanice v poli „Pro:“, {MYGRID} 4místný lokátor. JS8 přenáší jen velká písmena, číslice a běžnou interpunkci.'),
+ 'e.g. HW CPY?':('e.g. HW CPY?','es. HW CPY?','p. ex. HW CPY?','z. B. HW CPY?','f.eks. HW CPY?','např. HW CPY?'),
+}.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'js8_macro_click_hint':('Click: send to the station in To. Shift+click: put into the message field.','Clic: invia alla stazione in A. Maiusc+clic: inserisci nel campo messaggio.','Clic : envoyer à la station de À. Maj+clic : placer dans le champ message.','Klick: an die Station in An senden. Umschalt+Klick: ins Nachrichtenfeld übernehmen.','Klikk: send til stasjonen i Til. Shift+klikk: legg i meldingsfeltet.','Klik: odeslat stanici v poli Pro. Shift+klik: vložit do pole zprávy.'),
+}.items()})

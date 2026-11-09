@@ -828,6 +828,12 @@ void AppSettings::load()
     textMacroLabels = settings.value("Text/macroLabels", textMacroLabels).toStringList();
     textMacroTexts = settings.value("Text/macroTexts", textMacroTexts).toStringList();
     normalizeTextMacros(textMacroLabels, textMacroTexts);
+    js8MacroLabels = settings.value("JS8/macroLabels", defaultJs8MacroLabels()).toStringList();
+    js8MacroTexts = settings.value("JS8/macroTexts", defaultJs8MacroTexts()).toStringList();
+    while (js8MacroLabels.size() < 9) js8MacroLabels << defaultJs8MacroLabels().value(js8MacroLabels.size());
+    while (js8MacroTexts.size() < 9) js8MacroTexts << defaultJs8MacroTexts().value(js8MacroTexts.size());
+    js8MacroLabels = js8MacroLabels.mid(0, 9);
+    js8MacroTexts = js8MacroTexts.mid(0, 9);
 
     // Station identity belongs only to Settings -> User/QTH.  Do not migrate or
     // fall back to legacy FT8-only keys; if User/QTH is empty, TX will be blocked
@@ -1159,6 +1165,8 @@ bool AppSettings::save() const
     settings.setValue("Text/power", textPower);
     settings.setValue("Text/macroLabels", textMacroLabels);
     settings.setValue("Text/macroTexts", textMacroTexts);
+    settings.setValue("JS8/macroLabels", js8MacroLabels);
+    settings.setValue("JS8/macroTexts", js8MacroTexts);
 
     settings.sync();
 

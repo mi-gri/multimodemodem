@@ -709,6 +709,9 @@ private slots:
     void js8OperatorActivity();
     void js8UpdateBandUi();
     void js8RefreshBandList();
+    void js8RefreshMacroButtons();
+    void js8RunMacro(int index, bool editOnly);
+    QString js8ExpandMacro(const QString &source) const;
     // Working-frequency list (ModeFrequencyUi.cpp)
     QWidget *createModeBandGroup(QWidget *parent, const QString &listMode);
     void refreshModeBandLists();
@@ -2245,6 +2248,7 @@ private:
     QLineEdit *m_editJs8Info = nullptr;
     QLineEdit *m_editJs8StatusText = nullptr;
     QPushButton *m_btnJs8Inbox = nullptr;
+    QList<QPushButton *> m_js8MacroButtons;
     QTimer *m_js8Timer = nullptr;
     Js8CommandBuffer m_js8Commands;
     Js8Inbox m_js8Inbox;

@@ -14,6 +14,7 @@
 #include "modems/js8/Js8Message.h"
 #include "modems/js8/Js8NativeEngine.h"
 #include "modems/js8/tx/Js8Transmitter.h"
+#include "settings/AppSettings.h"
 #include "utils/StandardFrequencies.h"
 
 #include <QCoreApplication>
@@ -541,6 +542,15 @@ int main(int argc, char **argv)
         check(b[7100] == 0.0f && (std::fabs(b[7300]) > 0.0f || std::fabs(b[7400]) > 0.0f), "early pull waits 100 ms");
     }
 
+    // Every default JS8 macro, with its tokens filled in, can be sent.
+    for (const QString &macro : AppSettings::defaultJs8MacroTexts()) {
+        QString text = macro;
+        text.replace("{RST}", "-09").replace("{MYNAME}", "MICHAEL").replace("{MYQTH}", "BONN").replace("{MYGRID}", "JO30");
+        const auto frames = Js8Message::buildFrames("DO3BOX", "JO30", "DL1ABC", text, Js8Mode::Submode::Normal, true);
+        check(!frames.isEmpty(), "JS8 macro encodes: " + text.toStdString());
+        const QString shown = Js8Message::preview(frames, Js8Mode::Submode::Normal);
+        check(shown.contains("DL1ABC"), "JS8 macro directed: " + shown.toStdString());
+    }
     testCommandsAndReplies();
     testStandardFrequencies();
     testMultiDecode();

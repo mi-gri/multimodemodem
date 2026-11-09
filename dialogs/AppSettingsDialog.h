@@ -166,6 +166,8 @@ private:
     QLineEdit *m_editPower = nullptr;
     QList<QLineEdit *> m_macroLabelEdits;
     QList<QPlainTextEdit *> m_macroTextEdits;
+    QList<QLineEdit *> m_js8MacroLabelEdits;
+    QList<QLineEdit *> m_js8MacroTextEdits;
     LogbookSettingsDialog *m_logbookPage = nullptr;
     BandSchedulerDialog *m_schedulerPage = nullptr;
     class FrequencyListEditor *m_frequencyPage = nullptr;

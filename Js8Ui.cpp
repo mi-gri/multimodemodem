@@ -174,11 +174,29 @@ void MainWindow::setupJs8DisplayPage()
     txRow->addWidget(m_btnJs8Snr);
     txRow->addWidget(m_btnJs8Inbox);
 
+    // Macro bar (Settings -> User / QTH / Macros, JS8).
+    auto *macroRow = new QHBoxLayout();
+    macroRow->setSpacing(4);
+    m_js8MacroButtons.clear();
+    for (int i = 0; i < 9; ++i) {
+        auto *button = new QPushButton(m_js8DisplayPage);
+        button->setProperty("i18nSkipSelf", true);
+        button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        button->setMinimumWidth(40);
+        connect(button, &QPushButton::clicked, this, [this, i]() {
+            js8RunMacro(i, (QApplication::keyboardModifiers() & Qt::ShiftModifier) != 0);
+        });
+        macroRow->addWidget(button);
+        m_js8MacroButtons << button;
+    }
+    js8RefreshMacroButtons();
+
     m_lblJs8TxStatus = new QLabel(m_js8DisplayPage);
     m_lblJs8TxStatus->setWordWrap(true);
 
     layout->addWidget(vertical, 1);
     layout->addLayout(txRow);
+    layout->addLayout(macroRow);
     layout->addWidget(m_lblJs8TxStatus);
 
     // Header and button texts are already localised or are protocol words.
@@ -1156,4 +1174,45 @@ void MainWindow::showJs8Inbox()
     });
     dialog.exec();
     js8UpdateInboxButton();
+}
+
+QString MainWindow::js8ExpandMacro(const QString &source) const
+{
+    QString text = source;
+    const QString to = m_editJs8To != nullptr ? m_editJs8To->text().trimmed().toUpper() : QString();
+    text.replace(QStringLiteral("{CALL}"), to, Qt::CaseInsensitive);
+    text.replace(QStringLiteral("{MYGRID}"), stationLocator().trimmed().left(4).toUpper(), Qt::CaseInsensitive);
+    text = expandTextTemplate(text);
+    text.replace(QLatin1Char('\n'), QLatin1Char(' '));
+    return Js8Message::normalizeText(text).simplified();
+}
+
+void MainWindow::js8RefreshMacroButtons()
+{
+    for (int i = 0; i < m_js8MacroButtons.size(); ++i) {
+        QPushButton *button = m_js8MacroButtons.at(i);
+        const QString label = m_settings.js8MacroLabels.value(i, AppSettings::defaultJs8MacroLabels().value(i));
+        const QString text = m_settings.js8MacroTexts.value(i);
+        button->setText(label);
+        button->setEnabled(!text.trimmed().isEmpty());
+        button->setToolTip(text + QStringLiteral("\n\n") +
+                           uiText("js8_macro_click_hint", "Click: send to the station in To. Shift+click: put into the message field."));
+    }
+}
+
+void MainWindow::js8RunMacro(int index, bool editOnly)
+{
+    const QString source = m_settings.js8MacroTexts.value(index).trimmed();
+    if (source.isEmpty()) return;
+    const QString text = js8ExpandMacro(source);
+    if (text.isEmpty()) return;
+    if (editOnly) {
+        if (m_editJs8Tx != nullptr) {
+            m_editJs8Tx->setText(text);
+            m_editJs8Tx->setFocus();
+        }
+        js8OperatorActivity();
+        return;
+    }
+    js8Send(text, m_editJs8To != nullptr ? m_editJs8To->text().trimmed().toUpper() : QString());
 }

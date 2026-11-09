@@ -21424,6 +21424,7 @@ void MainWindow::refreshTextMacroButtons()
         }
     }
     applyLabels(m_hellMacroButtons);
+    js8RefreshMacroButtons();
 }
 
 QString MainWindow::expandTextTemplate(const QString &source) const

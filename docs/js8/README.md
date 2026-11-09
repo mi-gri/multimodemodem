@@ -67,6 +67,12 @@ scheduler; there is no even/odd sequence in JS8.
   already starts with a call, @group, CQ or HEARTBEAT.  *CQ*, *HB* and *SNR?*
   send the standard messages.  STOP cancels an armed transmission and empties
   the automatic queue.
+- **Macros**: the bar below the message line holds nine JS8 macros
+  (Settings → User / QTH / Macros, section *JS8 macros*; defaults HW CPY?,
+  SNR {RST}, QSL?, NAME/QTH, GRID?, INFO?, HEARING?, QUERY MSGS, 73).  A click
+  sends the macro to the station in *To*, Shift+click only puts it into the
+  message line.  Tokens as for the other modes; {CALL} is the station in
+  *To*, {MYGRID} the four-character locator.
 - Left click in the waterfall sets the RX offset (and TX when "TX offset
   follows RX offset" is on); right click sets only TX.  The waterfall marks
   the period starts of the selected speed.
