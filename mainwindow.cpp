@@ -8330,6 +8330,7 @@ void MainWindow::setupMsk144Page()
     QVBoxLayout *outer = new QVBoxLayout(m_pageMsk144Settings);
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(8);
+    outer->addWidget(createModeBandGroup(m_pageMsk144Settings, QStringLiteral("MSK144")));
 
     QGroupBox *rxGroup = new QGroupBox(uiText("msk144_rx_tx_settings", "MSK144 RX/TX settings"), m_pageMsk144Settings);
     QGridLayout *grid = new QGridLayout(rxGroup);
@@ -8592,6 +8593,7 @@ void MainWindow::setupQ65Page()
     QVBoxLayout *outer = new QVBoxLayout(m_pageQ65Settings);
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(8);
+    outer->addWidget(createModeBandGroup(m_pageQ65Settings, QStringLiteral("Q65")));
 
     QGroupBox *rxGroup = new QGroupBox(uiText("q65_rx_tx_settings", "Q65 RX/TX settings"), m_pageQ65Settings);
     QGridLayout *grid = new QGridLayout(rxGroup);
@@ -12250,6 +12252,7 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
         if (!listOk) appendLog(QStringLiteral("Frequency list in the settings is unreadable; the default list is used."));
         M3StandardFrequencies::setCurrent(frequencies, m_settings.frequencyRegion);
         js8RefreshBandList();
+        refreshModeBandLists();
         updateFtBandFrequencyUi();
     }
     if (appearanceChanged) {
@@ -12702,6 +12705,7 @@ void MainWindow::handleRigFrequencyChanged(double frequencyHz)
         js8RefreshActivity();
     }
     updateJs8BandFromCat(frequencyHz);
+    followCatForModeBands(frequencyHz);
     updateFtBandFrequencyUi();
     updateRigControlStatusUi();
     updateRttyContestBandFromCat();
@@ -13999,6 +14003,16 @@ void MainWindow::handleModeChanged(const QString &modeName)
             ui->stkModeSettings->setCurrentWidget(m_pageJs8Settings);
         }
         applyJs8Settings();
+        // As FT8/FT4: switching to JS8 tunes the rig to the JS8 frequency of
+        // the band it is on (the saved JS8 band without a CAT reading).
+        if (m_cmbJs8Band != nullptr && m_lastRigFrequencyHz > 0.0) {
+            const int idx = m_cmbJs8Band->findText(bandFromFrequencyHz(m_lastRigFrequencyHz));
+            if (idx >= 0 && idx != m_cmbJs8Band->currentIndex()) {
+                const QSignalBlocker block(m_cmbJs8Band);
+                m_cmbJs8Band->setCurrentIndex(idx);
+            }
+        }
+        if (m_settings.frequencyQsyOnModeChange) js8QsyToSelectedBand();
         js8UpdateBandUi();
         setDecoderReady(QStringLiteral("JS8 ") + Js8Mode::submodeName(currentJs8Submode()));
     } else if (Ft8Mode::isFamilyMode(modeName)) {
@@ -14006,7 +14020,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
             ui->stkModeSettings->setCurrentWidget(m_pageFt8Settings);
         }
         applyFt8Settings();
-        qsyRigToSelectedFtBand();
+        if (m_settings.frequencyQsyOnModeChange) qsyRigToSelectedFtBand();
         const Ft8Mode::Profile profile = Ft8Mode::profileForMode(modeName);
         if (profile.interoperableCoreAvailable) {
             setDecoderReady(profile.shortLabel);
@@ -14016,6 +14030,8 @@ void MainWindow::handleModeChanged(const QString &modeName)
         }
         updateFt8SlotStatus();
     }
+
+    qsyForModeChange(modeName);
 
     if (m_btnShowRuntimeLog != nullptr) {
         m_btnShowRuntimeLog->setVisible(Ft8Mode::isFamilyMode(modeName) || Msk144Mode::isMode(modeName) ||

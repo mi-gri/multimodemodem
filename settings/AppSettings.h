@@ -246,6 +246,7 @@ public:
     // built-in WSJT-X/JS8Call defaults.  IARU region filter: ALL, R1, R2, R3.
     QString frequencyListJson;
     QString frequencyRegion = "ALL";
+    bool frequencyQsyOnModeChange = true;   // tune to the mode's frequency on a mode change
     bool ft8DeepDecode = true; // internal compatibility flag: adaptive enables subtract/rescan.
     bool ft8DspPlusDecode = false; // deprecated compatibility flag; forced false.
     int ft8CqRepeatTimeoutMinutes = 5;

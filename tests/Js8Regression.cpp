@@ -22,6 +22,7 @@
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFile>
+#include <QSet>
 #include <QTemporaryDir>
 #include <QTimer>
 
@@ -282,6 +283,33 @@ static void testStandardFrequencies()
     setCurrent({}, "ALL");
     check(dialHz("JS8", "40m") == 7078000.0, "empty list restores defaults");
     check(bandOf(10136000.0) == "30m" && bandOf(432174000.0) == "70cm" && bandOf(9000000.0).isEmpty(), "bandOf");
+
+    // MultiModeModem mode names and the other modes' defaults.
+    check(listModeForName("RTTY Text") == "RTTY" && listModeForName("PSK Text") == "PSK" &&
+          listModeForName("MFSK Text") == "MFSK" && listModeForName("CW Morse") == "CW" &&
+          listModeForName("Feld Hell") == "HELL" && listModeForName("SSTV RX") == "SSTV" &&
+          listModeForName("MeteoFax / HF WEFAX RX") == "WEFAX" && listModeForName("Q65") == "Q65" &&
+          listModeForName("MSK144") == "MSK144" && listModeForName("FT4") == "FT4" && listModeForName("JS8") == "JS8" &&
+          listModeForName("Radio Telescope").isEmpty(), "mode name mapping");
+    for (const QString &mode : modes()) check(hasStandard(mode), "defaults for " + mode.toStdString());
+    check(dialHz("CW", "20m") == 14060000.0 && dialHz("RTTY", "20m") == 14080000.0 && dialHz("PSK", "20m") == 14070000.0 &&
+          dialHz("HELL", "20m") == 14063000.0 && dialHz("SSTV", "20m") == 14230000.0 && dialHz("MFSK", "30m") == 10147000.0,
+          "text and image mode defaults");
+    setCurrent({}, "R1");
+    check(dialHz("SSTV", "40m") == 7165000.0 && dialHz("PSK", "40m") == 7040000.0, "SSTV/PSK region 1");
+    setCurrent({}, "R2");
+    check(dialHz("SSTV", "40m") == 7171000.0 && dialHz("PSK", "40m") == 7070000.0, "SSTV/PSK region 2");
+    setCurrent({}, "ALL");
+    check(preferredAnyBandHz("WEFAX") == 7878100.0 && nearEntry("WEFAX", 3853000.0, 5000.0) &&
+          !nearEntry("WEFAX", 14074000.0, 5000.0), "weather fax stations");
+    // Every preferred entry is unique per mode, band and region.
+    QSet<QString> seen;
+    for (const Entry &e : defaults()) {
+        if (!e.preferred) continue;
+        const QString key = e.mode + "|" + bandOf(e.hz) + "|" + e.region;
+        check(!seen.contains(key), "one preferred entry for " + key.toStdString());
+        seen.insert(key);
+    }
 }
 
 // The live receiver cuts its own periods for every speed when multi-decoding.

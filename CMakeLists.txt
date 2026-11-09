@@ -475,6 +475,7 @@ add_executable(MultiModeModem
     main.cpp
     FtCqWorkListUi.cpp
     Js8Ui.cpp
+    ModeFrequencyUi.cpp
     mainwindow.cpp
     FtAutomationLog.cpp
     updates/UpdateController.cpp updates/UpdateController.h

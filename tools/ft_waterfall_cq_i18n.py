@@ -487,13 +487,13 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 }.items()})
 SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
  'Frequencies':('Frequencies','Frequenze','Fréquences','Frequenzen','Frekvenser','Kmitočty'),
- 'Working frequencies per mode and band, as in WSJT-X/JTDX. The band selectors and the band scheduler use the preferred frequency of a band; without one, the first entry. Frequencies are dial frequencies (USB) in MHz.':(
-  'Working frequencies per mode and band, as in WSJT-X/JTDX. The band selectors and the band scheduler use the preferred frequency of a band; without one, the first entry. Frequencies are dial frequencies (USB) in MHz.',
-  'Frequenze di lavoro per modo e banda, come in WSJT-X/JTDX. I selettori di banda e lo scheduler usano la frequenza preferita della banda; se manca, la prima voce. Le frequenze sono frequenze di sintonia (USB) in MHz.',
-  'Fréquences de travail par mode et bande, comme dans WSJT-X/JTDX. Les sélecteurs de bande et le planificateur utilisent la fréquence préférée de la bande ; à défaut, la première entrée. Les fréquences sont des fréquences d’affichage (USB) en MHz.',
-  'Arbeitsfrequenzen je Modus und Band, wie in WSJT-X/JTDX. Bandauswahl und Scheduler verwenden die bevorzugte Frequenz eines Bandes, sonst den ersten Eintrag. Angegeben werden Dial-Frequenzen (USB) in MHz.',
-  'Arbeidsfrekvenser per modus og bånd, som i WSJT-X/JTDX. Båndvelgere og planleggeren bruker båndets foretrukne frekvens, ellers første oppføring. Frekvensene er VFO-frekvenser (USB) i MHz.',
-  'Pracovní kmitočty podle druhu provozu a pásma, jako ve WSJT-X/JTDX. Volba pásma a plánovač používají preferovaný kmitočet pásma, jinak první položku. Kmitočty jsou kmitočty VFO (USB) v MHz.'),
+ 'Working frequencies per mode and band, as in WSJT-X/JTDX. Band selectors, mode changes and the band scheduler use the preferred frequency of a band; without one, the first entry. Frequencies are dial frequencies in MHz (USB, SSTV on 80/40 m LSB).':(
+  'Working frequencies per mode and band, as in WSJT-X/JTDX. Band selectors, mode changes and the band scheduler use the preferred frequency of a band; without one, the first entry. Frequencies are dial frequencies in MHz (USB, SSTV on 80/40 m LSB).',
+  'Frequenze di lavoro per modo e banda, come in WSJT-X/JTDX. Selettori di banda, cambi di modo e scheduler usano la frequenza preferita della banda; se manca, la prima voce. Le frequenze sono frequenze di sintonia in MHz (USB, SSTV su 80/40 m LSB).',
+  'Fréquences de travail par mode et bande, comme dans WSJT-X/JTDX. Sélecteurs de bande, changements de mode et planificateur utilisent la fréquence préférée de la bande ; à défaut, la première entrée. Fréquences d’affichage en MHz (USB, SSTV en LSB sur 80/40 m).',
+  'Arbeitsfrequenzen je Modus und Band, wie in WSJT-X/JTDX. Bandauswahl, Moduswechsel und Scheduler verwenden die bevorzugte Frequenz eines Bandes, sonst den ersten Eintrag. Angegeben werden Dial-Frequenzen in MHz (USB, SSTV auf 80/40 m LSB).',
+  'Arbeidsfrekvenser per modus og bånd, som i WSJT-X/JTDX. Båndvelgere, modusbytte og planleggeren bruker båndets foretrukne frekvens, ellers første oppføring. Frekvensene er VFO-frekvenser i MHz (USB, SSTV på 80/40 m LSB).',
+  'Pracovní kmitočty podle druhu provozu a pásma, jako ve WSJT-X/JTDX. Volba pásma, změna druhu provozu a plánovač používají preferovaný kmitočet pásma, jinak první položku. Kmitočty VFO v MHz (USB, SSTV na 80/40 m LSB).'),
  'IARU region':('IARU region','Regione IARU','Région IARU','IARU-Region','IARU-region','Oblast IARU'),
  'All regions':('All regions','Tutte le regioni','Toutes les régions','Alle Regionen','Alle regioner','Všechny oblasti'),
  'Region 1 (Europe, Africa, Middle East)':('Region 1 (Europe, Africa, Middle East)','Regione 1 (Europa, Africa, Medio Oriente)','Région 1 (Europe, Afrique, Moyen-Orient)','Region 1 (Europa, Afrika, Naher Osten)','Region 1 (Europa, Afrika, Midtøsten)','Oblast 1 (Evropa, Afrika, Blízký východ)'),
@@ -507,13 +507,13 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
  'Preferred':('Preferred','Preferita','Préférée','Bevorzugt','Foretrukket','Preferovaný'),
  'Description':('Description','Descrizione','Description','Beschreibung','Beskrivelse','Popis'),
  'Restore defaults':('Restore defaults','Ripristina predefiniti','Rétablir les valeurs par défaut','Standardwerte','Gjenopprett standard','Obnovit výchozí'),
- 'Replaces the list with the defaults of WSJT-X 3.0 (FT8, FT4, MSK144, Q65) and JS8Call 2.2.0 (JS8).':(
-  'Replaces the list with the defaults of WSJT-X 3.0 (FT8, FT4, MSK144, Q65) and JS8Call 2.2.0 (JS8).',
-  'Sostituisce l’elenco con i valori predefiniti di WSJT-X 3.0 (FT8, FT4, MSK144, Q65) e JS8Call 2.2.0 (JS8).',
-  'Remplace la liste par les valeurs par défaut de WSJT-X 3.0 (FT8, FT4, MSK144, Q65) et JS8Call 2.2.0 (JS8).',
-  'Ersetzt die Liste durch die Vorgaben von WSJT-X 3.0 (FT8, FT4, MSK144, Q65) und JS8Call 2.2.0 (JS8).',
-  'Erstatter listen med standardverdiene fra WSJT-X 3.0 (FT8, FT4, MSK144, Q65) og JS8Call 2.2.0 (JS8).',
-  'Nahradí seznam výchozími hodnotami WSJT-X 3.0 (FT8, FT4, MSK144, Q65) a JS8Call 2.2.0 (JS8).'),
+ 'Replaces the list with the defaults: WSJT-X 3.0 (FT8, FT4, MSK144, Q65), JS8Call 2.2.0 (JS8) and customary activity frequencies of the other modes.':(
+  'Replaces the list with the defaults: WSJT-X 3.0 (FT8, FT4, MSK144, Q65), JS8Call 2.2.0 (JS8) and customary activity frequencies of the other modes.',
+  'Sostituisce l’elenco con i predefiniti: WSJT-X 3.0 (FT8, FT4, MSK144, Q65), JS8Call 2.2.0 (JS8) e le frequenze di attività abituali degli altri modi.',
+  'Remplace la liste par les valeurs par défaut : WSJT-X 3.0 (FT8, FT4, MSK144, Q65), JS8Call 2.2.0 (JS8) et les fréquences d’activité habituelles des autres modes.',
+  'Ersetzt die Liste durch die Vorgaben: WSJT-X 3.0 (FT8, FT4, MSK144, Q65), JS8Call 2.2.0 (JS8) und die üblichen Aktivitätsfrequenzen der übrigen Modi.',
+  'Erstatter listen med standardverdiene: WSJT-X 3.0 (FT8, FT4, MSK144, Q65), JS8Call 2.2.0 (JS8) og vanlige aktivitetsfrekvenser for de andre modusene.',
+  'Nahradí seznam výchozími hodnotami: WSJT-X 3.0 (FT8, FT4, MSK144, Q65), JS8Call 2.2.0 (JS8) a obvyklé kmitočty aktivity ostatních druhů provozu.'),
  'Replace the frequency list with the defaults? Your own entries are lost.':(
   'Replace the frequency list with the defaults? Your own entries are lost.',
   'Sostituire l’elenco frequenze con i predefiniti? Le voci personali andranno perse.',
@@ -524,4 +524,21 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
  'Not a valid frequency in MHz; this row is not saved.':('Not a valid frequency in MHz; this row is not saved.','Frequenza in MHz non valida; questa riga non viene salvata.','Fréquence en MHz invalide ; cette ligne n’est pas enregistrée.','Keine gültige Frequenz in MHz; diese Zeile wird nicht gespeichert.','Ugyldig frekvens i MHz; denne raden lagres ikke.','Neplatný kmitočet v MHz; tento řádek se neuloží.'),
  '%1 entries':('%1 entries','%1 voci','%1 entrées','%1 Einträge','%1 oppføringer','%1 položek'),
  '%1 invalid (not saved)':('%1 invalid (not saved)','%1 non valide (non salvate)','%1 invalide(s) (non enregistrée(s))','%1 ungültig (nicht gespeichert)','%1 ugyldige (lagres ikke)','%1 neplatných (neuloží se)'),
+}.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ "Tune the rig to the mode's frequency when the mode changes (CAT)":("Tune the rig to the mode's frequency when the mode changes (CAT)",'Sintonizza la radio sulla frequenza del modo al cambio di modo (CAT)','Accorder la radio sur la fréquence du mode lors d’un changement de mode (CAT)','Beim Moduswechsel auf die Frequenz des Modus abstimmen (CAT)','Still radioen til modusens frekvens ved modusbytte (CAT)','Při změně druhu provozu naladit jeho kmitočet (CAT)'),
+ 'On a mode change the rig is tuned to the preferred frequency of that mode on the current band, if the list has one. Weather fax tunes to its preferred station.':(
+  'On a mode change the rig is tuned to the preferred frequency of that mode on the current band, if the list has one. Weather fax tunes to its preferred station.',
+  'Al cambio di modo la radio va sulla frequenza preferita di quel modo nella banda attuale, se l’elenco ne ha una. Il fax meteo va sulla stazione preferita.',
+  'Lors d’un changement de mode, la radio est accordée sur la fréquence préférée de ce mode dans la bande actuelle, si la liste en contient une. Le fax météo va sur sa station préférée.',
+  'Beim Moduswechsel stimmt m3 das Funkgerät auf die bevorzugte Frequenz des Modus im aktuellen Band ab, sofern die Liste eine enthält. Wetterfax geht auf die bevorzugte Station.',
+  'Ved modusbytte stilles radioen til modusens foretrukne frekvens på gjeldende bånd, hvis listen har en. Værfaks går til foretrukket stasjon.',
+  'Při změně druhu provozu se rádio naladí na preferovaný kmitočet tohoto provozu v aktuálním pásmu, pokud jej seznam obsahuje. Meteofax přeladí na preferovanou stanici.'),
+}.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'mode_band_tooltip':('Select a band to tune the CAT-connected rig to the preferred frequency of this mode (Settings → Frequencies).','Seleziona una banda per portare la radio CAT sulla frequenza preferita di questo modo (Impostazioni → Frequenze).','Choisissez une bande pour accorder la radio CAT sur la fréquence préférée de ce mode (Paramètres → Fréquences).','Band wählen, um das CAT-Funkgerät auf die bevorzugte Frequenz dieses Modus zu stellen (Einstellungen → Frequenzen).','Velg et bånd for å stille CAT-radioen til modusens foretrukne frekvens (Innstillinger → Frekvenser).','Vyberte pásmo pro naladění rádia CAT na preferovaný kmitočet tohoto provozu (Nastavení → Kmitočty).'),
+ 'mode_standard_frequency':('Frequency from the list (%1)','Frequenza dall’elenco (%1)','Fréquence de la liste (%1)','Frequenz aus der Liste (%1)','Frekvens fra listen (%1)','Kmitočet ze seznamu (%1)'),
+ 'mode_no_frequencies':('No frequencies for this mode in Settings → Frequencies.','Nessuna frequenza per questo modo in Impostazioni → Frequenze.','Aucune fréquence pour ce mode dans Paramètres → Fréquences.','Keine Frequenzen für diesen Modus unter Einstellungen → Frequenzen.','Ingen frekvenser for denne modusen i Innstillinger → Frekvenser.','Pro tento provoz nejsou v Nastavení → Kmitočty žádné kmitočty.'),
+ 'mode_off_standard':('rig is elsewhere','radio altrove','radio ailleurs','Funkgerät steht woanders','radioen står et annet sted','rádio je jinde'),
+ 'scheduler_use_frequency_list':('Use the frequency list entry for the band','Usa la voce dell’elenco frequenze per la banda','Utiliser l’entrée de la liste des fréquences pour la bande','Frequenz aus der Frequenzliste für das Band verwenden','Bruk frekvenslistens oppføring for båndet','Použít položku seznamu kmitočtů pro pásmo'),
 }.items()})

@@ -1048,7 +1048,9 @@ void MainWindow::js8QsyToSelectedBand()
         appendLog(QStringLiteral("JS8 band %1 selected; CAT is disabled, rig not tuned.").arg(m_cmbJs8Band->currentText()));
         return;
     }
+    if (m_lastRigFrequencyHz > 0.0 && qAbs(m_lastRigFrequencyHz - target) < 1.0) return;   // already there
     tuneRigTo(target, QStringLiteral("JS8 ") + m_cmbJs8Band->currentText());
+    js8Settings().setValue(QStringLiteral("JS8/band"), m_cmbJs8Band->currentText());
 }
 
 void MainWindow::updateJs8BandFromCat(double frequencyHz)

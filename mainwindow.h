@@ -709,6 +709,13 @@ private slots:
     void js8OperatorActivity();
     void js8UpdateBandUi();
     void js8RefreshBandList();
+    // Working-frequency list (ModeFrequencyUi.cpp)
+    QWidget *createModeBandGroup(QWidget *parent, const QString &listMode);
+    void refreshModeBandLists();
+    void updateModeBandUis();
+    void followCatForModeBands(double frequencyHz);
+    void qsyModeBand(const QString &listMode);
+    void qsyForModeChange(const QString &modeName);
     void js8QsyToSelectedBand();
     void updateJs8BandFromCat(double frequencyHz);
     void js8UpdateInboxButton();
@@ -2219,6 +2226,12 @@ private:
     QVector<Js8Message::Frame> m_js8PendingFrames;
     QString m_js8PendingText;
     int m_js8PendingTxHz = 0;             // 0 = TX offset of the spin box
+    struct ModeBandWidgets
+    {
+        QComboBox *band = nullptr;
+        QLabel *status = nullptr;
+    };
+    QHash<QString, ModeBandWidgets> m_modeBandWidgets;   // list mode -> band selector (MSK144, Q65)
     QComboBox *m_cmbJs8Band = nullptr;
     QLabel *m_lblJs8BandStatus = nullptr;
     QWidget *m_js8FrequencySlot = nullptr;

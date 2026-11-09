@@ -567,6 +567,7 @@ void AppSettings::load()
     frequencyListJson = settings.value("Frequencies/list").toString();
     frequencyRegion = settings.value("Frequencies/region", QStringLiteral("ALL")).toString().trimmed().toUpper();
     if (frequencyRegion != "R1" && frequencyRegion != "R2" && frequencyRegion != "R3") frequencyRegion = "ALL";
+    frequencyQsyOnModeChange = settings.value("Frequencies/qsyOnModeChange", true).toBool();
     ft8RxFrequencyHz = settings.value("FT8/rxFrequencyHz", ft8RxFrequencyHz).toInt();
     ft8TxFrequencyHz = settings.value("FT8/txFrequencyHz", ft8TxFrequencyHz).toInt();
     ft8CqTarget = settings.value("FT8/cqTarget", ft8CqTarget).toString().trimmed().toUpper();
@@ -1024,6 +1025,7 @@ bool AppSettings::save() const
     if (frequencyListJson.trimmed().isEmpty()) settings.remove("Frequencies/list");
     else settings.setValue("Frequencies/list", frequencyListJson);
     settings.setValue("Frequencies/region", frequencyRegion);
+    settings.setValue("Frequencies/qsyOnModeChange", frequencyQsyOnModeChange);
     settings.setValue("FT8/rxFrequencyHz", ft8RxFrequencyHz);
     settings.setValue("FT8/txFrequencyHz", ft8TxFrequencyHz);
     settings.setValue("FT8/cqTarget", ft8CqTarget);

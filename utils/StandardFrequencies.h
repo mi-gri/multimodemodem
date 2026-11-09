@@ -21,8 +21,11 @@
  *
  * defaults() is taken from WSJT-X 3.0 (models/FrequencyList.cpp, the modes
  * MultiModeModem offers: FT8, FT4, MSK144, Q65) and JS8Call 2.2.0
- * (FrequencyList.cpp, JS8).  The list in use is stored in the settings as
- * JSON; an empty setting means the defaults.
+ * (FrequencyList.cpp, JS8).  The other modes use customary activity
+ * frequencies: IARU Region 1 HF band plan 2020 (CW QRP centres), the Feld
+ * Hell Club list, common PSK31/RTTY/MFSK/SSTV calling frequencies and the
+ * DWD (Hamburg/Pinneberg) radiofax schedule.  The list in use is stored in
+ * the settings as JSON; an empty setting means the defaults.
  */
 namespace M3StandardFrequencies {
 
@@ -44,7 +47,28 @@ struct Entry
 inline QStringList modes()
 {
     return {QStringLiteral("FT8"), QStringLiteral("FT4"), QStringLiteral("JS8"), QStringLiteral("MSK144"),
-            QStringLiteral("Q65")};
+            QStringLiteral("Q65"), QStringLiteral("RTTY"), QStringLiteral("PSK"), QStringLiteral("MFSK"),
+            QStringLiteral("CW"), QStringLiteral("HELL"), QStringLiteral("SSTV"), QStringLiteral("WEFAX")};
+}
+
+/// List mode of a MultiModeModem mode name ("RTTY Text" -> "RTTY",
+/// "Q65-60A" -> "Q65"); empty for modes without frequencies (Radio Telescope).
+inline QString listModeForName(const QString &modeName)
+{
+    const QString u = modeName.trimmed().toUpper();
+    if (u.startsWith(QLatin1String("FT4"))) return QStringLiteral("FT4");
+    if (u.startsWith(QLatin1String("FT8"))) return QStringLiteral("FT8");
+    if (u.startsWith(QLatin1String("JS8"))) return QStringLiteral("JS8");
+    if (u.startsWith(QLatin1String("MSK144"))) return QStringLiteral("MSK144");
+    if (u.startsWith(QLatin1String("Q65"))) return QStringLiteral("Q65");
+    if (u.startsWith(QLatin1String("RTTY"))) return QStringLiteral("RTTY");
+    if (u.startsWith(QLatin1String("PSK"))) return QStringLiteral("PSK");
+    if (u.startsWith(QLatin1String("MFSK"))) return QStringLiteral("MFSK");
+    if (u.startsWith(QLatin1String("CW"))) return QStringLiteral("CW");
+    if (u.contains(QLatin1String("HELL"))) return QStringLiteral("HELL");
+    if (u.startsWith(QLatin1String("SSTV"))) return QStringLiteral("SSTV");
+    if (u.contains(QLatin1String("WEFAX")) || u.contains(QLatin1String("FAX"))) return QStringLiteral("WEFAX");
+    return QString();
 }
 
 inline QStringList regions()
@@ -150,6 +174,74 @@ inline QVector<Entry> defaults()
         {28078000, "JS8", "ALL", "", true},
         {50318000, "JS8", "ALL", "", true},
         {144178000, "JS8", "ALL", "", true},
+        // RTTY: activity frequencies (lower end of the usual RTTY segments).
+        {3590000, "RTTY", "ALL", "", true},
+        {7040000, "RTTY", "ALL", "", true},
+        {14080000, "RTTY", "ALL", "", true},
+        {21080000, "RTTY", "ALL", "", true},
+        {28080000, "RTTY", "ALL", "", true},
+        // PSK31: usual calling frequencies (dial, USB).
+        {1838000, "PSK", "ALL", "", true},
+        {3580000, "PSK", "ALL", "", true},
+        {7040000, "PSK", "R1", "", true},
+        {7070000, "PSK", "R2", "", true},
+        {7070000, "PSK", "R3", "", true},
+        {10142000, "PSK", "ALL", "", true},
+        {14070000, "PSK", "ALL", "", true},
+        {18100000, "PSK", "ALL", "", true},
+        {21070000, "PSK", "ALL", "", true},
+        {24920000, "PSK", "ALL", "", true},
+        {28120000, "PSK", "ALL", "", true},
+        {28070000, "PSK", "ALL", "", false},
+        {50290000, "PSK", "ALL", "", true},
+        {144144000, "PSK", "ALL", "", true},
+        // MFSK (MFSK16): usual activity frequencies.
+        {1838000, "MFSK", "ALL", "", true},
+        {3580000, "MFSK", "ALL", "", true},
+        {7037000, "MFSK", "ALL", "", true},
+        {10147000, "MFSK", "ALL", "", true},
+        {14072000, "MFSK", "ALL", "", true},
+        {18105000, "MFSK", "ALL", "", true},
+        {21080000, "MFSK", "ALL", "", true},
+        {24929000, "MFSK", "ALL", "", true},
+        {28080000, "MFSK", "ALL", "", true},
+        // CW: IARU Region 1 QRP centres of activity (HF band plan 2020).
+        {1836000, "CW", "ALL", "QRP", true},
+        {3560000, "CW", "ALL", "QRP", true},
+        {7030000, "CW", "ALL", "QRP", true},
+        {10116000, "CW", "ALL", "QRP (customary)", true},
+        {14060000, "CW", "ALL", "QRP", true},
+        {18086000, "CW", "ALL", "QRP", true},
+        {21060000, "CW", "ALL", "QRP", true},
+        {24906000, "CW", "ALL", "QRP", true},
+        {28060000, "CW", "ALL", "QRP", true},
+        {50090000, "CW", "ALL", "calling", true},
+        {144050000, "CW", "ALL", "calling", true},
+        // Feld Hell: Feld Hell Club frequencies.
+        {1843000, "HELL", "ALL", "Feld Hell Club", true},
+        {3578000, "HELL", "ALL", "Feld Hell Club", true},
+        {7080000, "HELL", "ALL", "Feld Hell Club", true},
+        {10137000, "HELL", "ALL", "Feld Hell Club", true},
+        {14063000, "HELL", "ALL", "Feld Hell Club", true},
+        {18098000, "HELL", "ALL", "Feld Hell Club", true},
+        {21063000, "HELL", "ALL", "Feld Hell Club", true},
+        {24924000, "HELL", "ALL", "Feld Hell Club", true},
+        {28063000, "HELL", "ALL", "Feld Hell Club", true},
+        {50286000, "HELL", "ALL", "Feld Hell Club", true},
+        // SSTV calling frequencies (80/40 m in LSB).
+        {3735000, "SSTV", "R1", "LSB", true},
+        {3845000, "SSTV", "R2", "LSB", true},
+        {7165000, "SSTV", "R1", "LSB", true},
+        {7171000, "SSTV", "R2", "LSB", true},
+        {14230000, "SSTV", "ALL", "", true},
+        {14233000, "SSTV", "ALL", "digital SSTV", false},
+        {21340000, "SSTV", "ALL", "", true},
+        {28680000, "SSTV", "ALL", "", true},
+        {50680000, "SSTV", "ALL", "", true},
+        // Weather fax: DWD Hamburg/Pinneberg, dial USB 1.9 kHz below the centre.
+        {3853100, "WEFAX", "ALL", "DWD DDH3 (3855.0 kHz)", false},
+        {7878100, "WEFAX", "ALL", "DWD DDK3 (7880.0 kHz)", true},
+        {13880600, "WEFAX", "ALL", "DWD DDK6 (13882.5 kHz)", false},
     };
     QVector<Entry> out;
     for (const Raw &r : raw)
@@ -240,6 +332,29 @@ inline double dialHz(const QVector<Entry> &entries, const QString &region, const
 inline double dialHz(const QString &mode, const QString &band)
 {
     return dialHz(detail::state().entries, detail::state().region, mode, band);
+}
+
+/// The preferred (else first) entry of @p mode in the current region,
+/// regardless of band; 0 if none.  For broadcast modes such as WEFAX.
+inline double preferredAnyBandHz(const QString &mode)
+{
+    const QString m = mode.trimmed().toUpper();
+    double first = 0.0;
+    for (const Entry &e : detail::state().entries) {
+        if (e.mode != m || !regionMatches(e.region, detail::state().region)) continue;
+        if (e.preferred) return e.hz;
+        if (first <= 0.0) first = e.hz;
+    }
+    return first;
+}
+
+/// True if @p hz lies within @p toleranceHz of an entry of @p mode.
+inline bool nearEntry(const QString &mode, double hz, double toleranceHz)
+{
+    const QString m = mode.trimmed().toUpper();
+    for (const Entry &e : detail::state().entries)
+        if (e.mode == m && regionMatches(e.region, detail::state().region) && std::fabs(e.hz - hz) <= toleranceHz) return true;
+    return false;
 }
 
 /// True if the list has any entry for @p mode.

@@ -823,7 +823,7 @@ QWidget *AppSettingsDialog::buildSettingsPage(InitialPage page)
             entries = M3StandardFrequencies::fromJson(m_initialSettings.frequencyListJson, &ok);
         if (!ok || entries.isEmpty()) entries = M3StandardFrequencies::defaults();
         m_frequencyPage = new FrequencyListEditor(entries, m_initialSettings.frequencyRegion,
-                                                  [this](const QString &source) { return L(source); }, this);
+                                                  m_initialSettings.frequencyQsyOnModeChange, [this](const QString &source) { return L(source); }, this);
         return m_frequencyPage;
     }
     case InitialPage::Scheduler:
@@ -2649,6 +2649,7 @@ void AppSettingsDialog::collectSettings()
         merged.frequencyListJson = entries == M3StandardFrequencies::defaults() ? QString()
                                                                                : M3StandardFrequencies::toJson(entries);
         merged.frequencyRegion = m_frequencyPage->region();
+        merged.frequencyQsyOnModeChange = m_frequencyPage->qsyOnModeChange();
     }
 
     if (m_audioPage != nullptr) {

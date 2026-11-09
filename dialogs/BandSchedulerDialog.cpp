@@ -80,7 +80,7 @@ QStringList BandSchedulerDialog::defaultModes()
     return { QStringLiteral("MeteoFax / HF WEFAX RX"), QStringLiteral("SSTV RX"),
              QStringLiteral("RTTY Text"), QStringLiteral("PSK Text"), QStringLiteral("MFSK Text"),
              QStringLiteral("CW Morse"), QStringLiteral("Feld Hell"), QStringLiteral("FT4"), QStringLiteral("FT8"),
-             QStringLiteral("JS8") };
+             QStringLiteral("JS8"), QStringLiteral("MSK144"), QStringLiteral("Q65") };
 }
 
 QStringList BandSchedulerDialog::defaultBands()
@@ -145,7 +145,7 @@ void BandSchedulerDialog::buildUi()
     m_bandCombo = new QComboBox(editorGroup);
     m_bandCombo->addItems(defaultBands());
 
-    m_chkFtStandard = new QCheckBox(L(QStringLiteral("scheduler_use_mode_standard"), QStringLiteral("Use the standard frequency of the band (FT4/FT8/JS8)")), editorGroup);
+    m_chkFtStandard = new QCheckBox(L(QStringLiteral("scheduler_use_frequency_list"), QStringLiteral("Use the frequency list entry for the band")), editorGroup);
     m_freqMHz = new QDoubleSpinBox(editorGroup);
     m_freqMHz->setDecimals(6);
     m_freqMHz->setMinimum(0.100000);
@@ -280,7 +280,7 @@ void BandSchedulerDialog::setEditorEntry(const ScheduledQsyEntry &entry)
 void BandSchedulerDialog::updateEditorStandardFrequency()
 {
     const QString mode = normalizedMode(m_modeCombo->currentText());
-    const bool isFt = M3StandardFrequencies::hasStandard(mode);
+    const bool isFt = !M3StandardFrequencies::listModeForName(mode).isEmpty();
     m_chkFtStandard->setEnabled(isFt);
     if (!isFt) {
         m_chkFtStandard->setChecked(false);
@@ -321,10 +321,10 @@ QList<ScheduledQsyEntry> BandSchedulerDialog::entries() const
 
 double BandSchedulerDialog::standardFtFrequencyHz(const QString &modeName, const QString &band)
 {
-    if (!M3StandardFrequencies::hasStandard(modeName)) return 0.0;
-    const double hz = M3StandardFrequencies::dialHz(modeName, band);
-    if (hz <= 0.0 && modeName.compare(QStringLiteral("FT4"), Qt::CaseInsensitive) == 0)
-        return M3StandardFrequencies::dialHz(QStringLiteral("FT8"), band);
+    const QString mode = M3StandardFrequencies::listModeForName(modeName);
+    if (mode.isEmpty() || !M3StandardFrequencies::hasStandard(mode)) return 0.0;
+    const double hz = M3StandardFrequencies::dialHz(mode, band);
+    if (hz <= 0.0 && mode == QStringLiteral("FT4")) return M3StandardFrequencies::dialHz(QStringLiteral("FT8"), band);
     return hz;
 }
 

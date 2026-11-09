@@ -74,16 +74,30 @@ scheduler; there is no even/odd sequence in JS8.
 
 ## Frequencies
 
-*Settings → Frequencies* holds the working-frequency list of all weak-signal
-modes, as the Frequencies tab of WSJT-X/JTDX: mode, dial frequency, IARU
-region, description and a *preferred* mark per band.  The FT and JS8 band
-selectors and the band scheduler use the preferred entry of a band (else the
-first one); FT4 falls back to FT8 on bands without an FT4 entry.  The
-defaults are the WSJT-X 3.0 list (FT8, FT4, MSK144, Q65) and the JS8Call
-2.2.0 list (JS8: 1.842, 3.578, 7.078, 10.130, 14.078, 18.104, 21.078, 24.922,
-28.078, 50.318, 144.178 MHz); *Restore defaults* reloads them.  An unchanged
-list is stored as "defaults", so corrections of the built-in list reach
-existing installations.
+*Settings → Frequencies* holds the working-frequency list of all modes, as
+the Frequencies tab of WSJT-X/JTDX: mode, dial frequency, IARU region,
+description and a *preferred* mark per band.  The preferred entry of a band
+(else the first one) is used by
+
+- the band selectors of FT8/FT4, JS8, MSK144 and Q65,
+- a mode change (option, on by default): the rig is tuned to the new mode's
+  frequency on the band it is on; weather fax goes to its preferred station
+  unless the rig already sits on a listed station,
+- the band scheduler (*Use the frequency list entry for the band*).
+
+FT4 falls back to FT8 on bands without an FT4 entry.  Defaults:
+
+| Mode | Source |
+|------|--------|
+| FT8, FT4, MSK144, Q65 | WSJT-X 3.0 default list |
+| JS8 | JS8Call 2.2.0 (1.842, 3.578, 7.078, 10.130, 14.078, 18.104, 21.078, 24.922, 28.078, 50.318, 144.178 MHz) |
+| CW | IARU Region 1 HF band plan 2020, QRP centres of activity (30 m: customary 10.116), 6/2 m calling |
+| Feld Hell | Feld Hell Club frequency list |
+| PSK31, RTTY, MFSK, SSTV | customary calling/activity frequencies (40 m PSK and SSTV per region; SSTV 80/40 m in LSB) |
+| Weather fax | DWD Hamburg/Pinneberg DDH3 3855.0, DDK3 7880.0, DDK6 13882.5 kHz (dial USB 1.9 kHz lower) |
+
+*Restore defaults* reloads them.  An unchanged list is stored as "defaults",
+so corrections of the built-in list reach existing installations.
 
 ## Directed commands and automatic operation
 

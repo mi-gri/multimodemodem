@@ -178,7 +178,8 @@ of its message grouping, directed-command replies, relay and inbox rules and
 its standard frequency list (`Js8CommandBuffer`, `Js8AutoReply`, `Js8Inbox`,
 `utils/StandardFrequencies.h`).  The other default working frequencies in
 `utils/StandardFrequencies.h` are those of WSJT-X 3.0 (`models/FrequencyList.cpp`,
-GPL-3.0-or-later).  JS8Call is
+GPL-3.0-or-later); the other modes use public band-plan and activity
+frequencies (IARU Region 1, Feld Hell Club, DWD radiofax schedule).  JS8Call is
 based on WSJT-X (Joe Taylor K1JT and the WSJT development group).  CRC++ by
 Daniel Bahr is BSD 3-clause.  Details: `third_party/js8call_gpl/NOTICE.md`.
 

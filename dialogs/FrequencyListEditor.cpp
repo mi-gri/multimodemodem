@@ -3,6 +3,7 @@
 
 #include <QAbstractItemView>
 #include <QBrush>
+#include <QCheckBox>
 #include <QColor>
 #include <QComboBox>
 #include <QHBoxLayout>
@@ -25,13 +26,13 @@ QString mhzText(double hz) { return QString::number(hz / 1e6, 'f', 6); }
 } // namespace
 
 FrequencyListEditor::FrequencyListEditor(const QVector<M3StandardFrequencies::Entry> &entries, const QString &region,
-                                         Translator translator, QWidget *parent)
+                                         bool qsyOnModeChange, Translator translator, QWidget *parent)
     : QWidget(parent), m_translator(std::move(translator))
 {
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(8, 8, 8, 8);
 
-    auto *intro = new QLabel(L(QStringLiteral("Working frequencies per mode and band, as in WSJT-X/JTDX. The band selectors and the band scheduler use the preferred frequency of a band; without one, the first entry. Frequencies are dial frequencies (USB) in MHz.")), this);
+    auto *intro = new QLabel(L(QStringLiteral("Working frequencies per mode and band, as in WSJT-X/JTDX. Band selectors, mode changes and the band scheduler use the preferred frequency of a band; without one, the first entry. Frequencies are dial frequencies in MHz (USB, SSTV on 80/40 m LSB).")), this);
     intro->setWordWrap(true);
     layout->addWidget(intro);
 
@@ -52,6 +53,10 @@ FrequencyListEditor::FrequencyListEditor(const QVector<M3StandardFrequencies::En
     for (const QString &mode : M3StandardFrequencies::modes()) m_filter->addItem(mode, mode);
     top->addWidget(m_filter);
     layout->addLayout(top);
+    m_qsyOnModeChange = new QCheckBox(L(QStringLiteral("Tune the rig to the mode's frequency when the mode changes (CAT)")), this);
+    m_qsyOnModeChange->setChecked(qsyOnModeChange);
+    m_qsyOnModeChange->setToolTip(L(QStringLiteral("On a mode change the rig is tuned to the preferred frequency of that mode on the current band, if the list has one. Weather fax tunes to its preferred station.")));
+    layout->addWidget(m_qsyOnModeChange);
 
     m_table = new QTableWidget(0, ColCount, this);
     m_table->setHorizontalHeaderLabels({L(QStringLiteral("Mode")), L(QStringLiteral("Band")),
@@ -72,7 +77,7 @@ FrequencyListEditor::FrequencyListEditor(const QVector<M3StandardFrequencies::En
     auto *add = new QPushButton(L(QStringLiteral("Add")), this);
     auto *remove = new QPushButton(L(QStringLiteral("Delete")), this);
     auto *restore = new QPushButton(L(QStringLiteral("Restore defaults")), this);
-    restore->setToolTip(L(QStringLiteral("Replaces the list with the defaults of WSJT-X 3.0 (FT8, FT4, MSK144, Q65) and JS8Call 2.2.0 (JS8).")));
+    restore->setToolTip(L(QStringLiteral("Replaces the list with the defaults: WSJT-X 3.0 (FT8, FT4, MSK144, Q65), JS8Call 2.2.0 (JS8) and customary activity frequencies of the other modes.")));
     buttons->addWidget(add);
     buttons->addWidget(remove);
     buttons->addStretch(1);
@@ -256,6 +261,7 @@ QVector<M3StandardFrequencies::Entry> FrequencyListEditor::entries() const
 }
 
 QString FrequencyListEditor::region() const { return m_region->currentData().toString(); }
+bool FrequencyListEditor::qsyOnModeChange() const { return m_qsyOnModeChange->isChecked(); }
 
 int FrequencyListEditor::invalidRows() const
 {

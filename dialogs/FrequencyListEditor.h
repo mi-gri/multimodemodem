@@ -7,6 +7,7 @@
 #include <QWidget>
 #include <functional>
 
+class QCheckBox;
 class QComboBox;
 class QLabel;
 class QTableWidget;
@@ -26,11 +27,12 @@ public:
     using Translator = std::function<QString(const QString &)>;
 
     FrequencyListEditor(const QVector<M3StandardFrequencies::Entry> &entries, const QString &region,
-                        Translator translator, QWidget *parent = nullptr);
+                        bool qsyOnModeChange, Translator translator, QWidget *parent = nullptr);
 
     /// Valid rows in table order; rows with an unreadable frequency are left out.
     QVector<M3StandardFrequencies::Entry> entries() const;
     QString region() const;
+    bool qsyOnModeChange() const;
     int invalidRows() const;
 
 private:
@@ -48,6 +50,7 @@ private:
     Translator m_translator;
     QComboBox *m_region = nullptr;
     QComboBox *m_filter = nullptr;
+    QCheckBox *m_qsyOnModeChange = nullptr;
     QTableWidget *m_table = nullptr;
     QLabel *m_summary = nullptr;
     bool m_loading = false;
