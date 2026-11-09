@@ -4,6 +4,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include "AppSettingsDialog.h"
+#include "FrequencyListEditor.h"
 #include "../network/WavelogClient.h"
 #include <QFormLayout>
 #include "../utils/RuntimeI18n.h"
@@ -654,6 +655,7 @@ AppSettingsDialog::AppSettingsDialog(const AppSettings &settings,
     addSettingsTab(InitialPage::Display, L(QStringLiteral("Display / FT colours")), shouldBuildNow(InitialPage::Display));
     addSettingsTab(InitialPage::FtDecoder, QStringLiteral("FT8 / FT4"), shouldBuildNow(InitialPage::FtDecoder));
     addSettingsTab(InitialPage::Rotator, L(QStringLiteral("Rotator")), shouldBuildNow(InitialPage::Rotator));
+    addSettingsTab(InitialPage::Frequencies, L(QStringLiteral("Frequencies")), shouldBuildNow(InitialPage::Frequencies));
     addSettingsTab(InitialPage::Scheduler, L(QStringLiteral("Scheduler")), shouldBuildNow(InitialPage::Scheduler));
     addSettingsTab(InitialPage::SoundCardCalibration, L(QStringLiteral("Soundcard calibration")), shouldBuildNow(InitialPage::SoundCardCalibration));
     addSettingsTab(InitialPage::Diagnostics, L(QStringLiteral("Diagnostics")), shouldBuildNow(InitialPage::Diagnostics));
@@ -814,6 +816,16 @@ QWidget *AppSettingsDialog::buildSettingsPage(InitialPage page)
         return makeDiagnosticsPage();
     case InitialPage::FtDecoder:
         return makeFtDecoderPage();
+    case InitialPage::Frequencies: {
+        bool ok = false;
+        QVector<M3StandardFrequencies::Entry> entries;
+        if (!m_initialSettings.frequencyListJson.trimmed().isEmpty())
+            entries = M3StandardFrequencies::fromJson(m_initialSettings.frequencyListJson, &ok);
+        if (!ok || entries.isEmpty()) entries = M3StandardFrequencies::defaults();
+        m_frequencyPage = new FrequencyListEditor(entries, m_initialSettings.frequencyRegion,
+                                                  [this](const QString &source) { return L(source); }, this);
+        return m_frequencyPage;
+    }
     case InitialPage::Scheduler:
         m_schedulerPage = new BandSchedulerDialog(m_initialSchedulerEntries,
                                                   m_schedulerTranslator,
@@ -2436,9 +2448,10 @@ void AppSettingsDialog::setInitialPage(InitialPage page)
     case InitialPage::Appearance: index = 3; break;
     case InitialPage::FtDecoder: index = 4; break;
     case InitialPage::Rotator: index = 5; break;
-    case InitialPage::Scheduler: index = 6; break;
-    case InitialPage::SoundCardCalibration: index = 7; break;
-    case InitialPage::Diagnostics: index = 8; break;
+    case InitialPage::Frequencies: index = 6; break;
+    case InitialPage::Scheduler: index = 7; break;
+    case InitialPage::SoundCardCalibration: index = 8; break;
+    case InitialPage::Diagnostics: index = 9; break;
     }
     if (index >= 0 && index < m_tabs->count()) {
         ensureSettingsTabBuilt(index);
@@ -2628,6 +2641,15 @@ void AppSettingsDialog::collectSettings()
     if (m_spinFtDriftMax) merged.ftDriftMaxHzPerSec = m_spinFtDriftMax->value();
     if (m_chkFtGpuSync) merged.ftGpuSyncEnabled = m_chkFtGpuSync->isChecked();
     if (m_chkFtGpuDecode) merged.ftGpuDecodeEnabled = m_chkFtGpuDecode->isChecked();
+
+    if (m_frequencyPage != nullptr) {
+        const QVector<M3StandardFrequencies::Entry> entries = m_frequencyPage->entries();
+        // The unchanged default list is stored as "defaults", so later
+        // corrections of the built-in list reach the operator.
+        merged.frequencyListJson = entries == M3StandardFrequencies::defaults() ? QString()
+                                                                               : M3StandardFrequencies::toJson(entries);
+        merged.frequencyRegion = m_frequencyPage->region();
+    }
 
     if (m_audioPage != nullptr) {
         const AppSettings audio = m_audioPage->settings();

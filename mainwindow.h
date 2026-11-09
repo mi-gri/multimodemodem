@@ -39,6 +39,9 @@
 #include "modems/q65/Q65Mode.h"
 #include "modems/q65/Q65Decoder.h"
 #include "modems/js8/Js8Decoder.h"
+#include "modems/js8/Js8AutoReply.h"
+#include "modems/js8/Js8CommandBuffer.h"
+#include "modems/js8/Js8Inbox.h"
 #include "modems/js8/Js8Message.h"
 #include "settings/AppSettings.h"
 #include "logbook/AdifLogbook.h"
@@ -698,6 +701,22 @@ private slots:
     void js8SetOffset(int hz, bool rx, bool tx);
     void updateJs8WaterfallMarkers();
     Js8Mode::Submode currentJs8Submode() const;
+    /// Sends JS8 text now (operator) or from the queue (automatic); false if busy.
+    bool js8Transmit(const QString &text, const QString &to, bool automatic, int txHz = 0);
+    void js8Enqueue(const QString &text, bool lowPriority, const QString &reason, int txHz = 0);
+    void js8Tick();
+    void js8ProcessCommand(const Js8Command &command);
+    void js8OperatorActivity();
+    void js8UpdateBandUi();
+    void js8RefreshBandList();
+    void js8QsyToSelectedBand();
+    void updateJs8BandFromCat(double frequencyHz);
+    void js8UpdateInboxButton();
+    void showJs8Inbox();
+    void js8ScheduleRepeats();
+    int js8FreeHeartbeatOffset() const;
+    int js8WaterfallPeriodMs() const;
+    QStringList js8RecentCalls() const;
 
     /**
      * @brief Arms/cancels the single UTC-period TX scheduler shared by MSK144
@@ -1466,6 +1485,12 @@ private:
     // Dial frequency and TX meters (power, SWR) read by CAT, beside the clock.
     void setupRigReadoutPanel();
     void updateRigReadout();
+    /// Mouse wheel on the frequency readout: tunes the digit under the pointer.
+    void tuneRigFromReadoutWheel(int notches, double x);
+    /// Double-click on the frequency readout: asks for a dial frequency.
+    void promptRigFrequency();
+    /// QSY by CAT (connects first if needed); false if CAT is off or TX runs.
+    bool tuneRigTo(double frequencyHz, const QString &reason);
     void setupCatRotatorModule();
     void setupCatRotatorSideTab();
     void applyCatRotatorSettings();
@@ -2155,6 +2180,7 @@ private:
         QString current;   // message since the last "last frame"
         QString from;
         bool complete = false;
+        Js8Mode::Submode submode = Js8Mode::Submode::Normal;
     };
     struct Js8Heard
     {
@@ -2192,6 +2218,38 @@ private:
     QMap<QString, Js8Heard> m_js8Heard;
     QVector<Js8Message::Frame> m_js8PendingFrames;
     QString m_js8PendingText;
+    int m_js8PendingTxHz = 0;             // 0 = TX offset of the spin box
+    QComboBox *m_cmbJs8Band = nullptr;
+    QLabel *m_lblJs8BandStatus = nullptr;
+    QWidget *m_js8FrequencySlot = nullptr;
+    QCheckBox *m_chkJs8MultiDecode = nullptr;
+    QCheckBox *m_chkJs8Auto = nullptr;
+    QCheckBox *m_chkJs8HbAck = nullptr;
+    QCheckBox *m_chkJs8Relay = nullptr;
+    QComboBox *m_cmbJs8HbInterval = nullptr;
+    QComboBox *m_cmbJs8CqInterval = nullptr;
+    QSpinBox *m_spinJs8Watchdog = nullptr;
+    QLineEdit *m_editJs8Info = nullptr;
+    QLineEdit *m_editJs8StatusText = nullptr;
+    QPushButton *m_btnJs8Inbox = nullptr;
+    QTimer *m_js8Timer = nullptr;
+    Js8CommandBuffer m_js8Commands;
+    Js8Inbox m_js8Inbox;
+    struct Js8QueuedTx
+    {
+        QString text;
+        bool lowPriority = false;
+        QString reason;
+        int txHz = 0;
+        qint64 queuedMs = 0;
+    };
+    QVector<Js8QueuedTx> m_js8TxQueue;
+    QString m_js8LastTxText;
+    qint64 m_js8NextHeartbeatMs = 0;
+    qint64 m_js8NextCqMs = 0;
+    qint64 m_js8LastOperatorMs = 0;
+    bool m_js8WatchdogTripped = false;
+    QHash<QString, qint64> m_js8AllCallReplyMs;   // @ALLCALL/HB answers per station
 
     using Ft8SequencerState = FtQsoSequencer::State;
 
@@ -2418,6 +2476,10 @@ private:
     QVector<Ft8AudioActivity> m_ft8RecentAudioActivity;
     FtStandardMessageSet m_ftStandardMessages;
     double m_lastRigFrequencyHz = 0.0;
+    double m_rigTuneTargetHz = 0.0;       // frequency shown while a readout QSY is on its way
+    qint64 m_rigTuneHoldUntilMs = 0;
+    int m_rigWheelRemainder = 0;          // partial wheel steps (touchpads)
+    QTimer *m_rigTuneTimer = nullptr;
     QDoubleSpinBox *m_spinTxLevel = nullptr;  // TX level in dB, see audio/TxLevel.h
     bool m_txLevelTune = false;               // the control shows and sets the Tune level
     QTimer m_txLevelSaveTimer;                // spin box steps are saved once they settle

@@ -21,6 +21,8 @@
 #include <QTimeEdit>
 #include <QVBoxLayout>
 
+#include "../utils/StandardFrequencies.h"
+
 #include <algorithm>
 
 namespace {
@@ -31,6 +33,7 @@ QString normalizedMode(const QString &mode)
     const QString m = mode.trimmed();
     if (m.compare(QStringLiteral("FT4"), Qt::CaseInsensitive) == 0) return QStringLiteral("FT4");
     if (m.compare(QStringLiteral("FT8"), Qt::CaseInsensitive) == 0) return QStringLiteral("FT8");
+    if (m.compare(QStringLiteral("JS8"), Qt::CaseInsensitive) == 0) return QStringLiteral("JS8");
     return m;
 }
 }
@@ -76,7 +79,8 @@ QStringList BandSchedulerDialog::defaultModes()
 {
     return { QStringLiteral("MeteoFax / HF WEFAX RX"), QStringLiteral("SSTV RX"),
              QStringLiteral("RTTY Text"), QStringLiteral("PSK Text"), QStringLiteral("MFSK Text"),
-             QStringLiteral("CW Morse"), QStringLiteral("Feld Hell"), QStringLiteral("FT4"), QStringLiteral("FT8") };
+             QStringLiteral("CW Morse"), QStringLiteral("Feld Hell"), QStringLiteral("FT4"), QStringLiteral("FT8"),
+             QStringLiteral("JS8") };
 }
 
 QStringList BandSchedulerDialog::defaultBands()
@@ -141,7 +145,7 @@ void BandSchedulerDialog::buildUi()
     m_bandCombo = new QComboBox(editorGroup);
     m_bandCombo->addItems(defaultBands());
 
-    m_chkFtStandard = new QCheckBox(L(QStringLiteral("scheduler_use_ft_standard"), QStringLiteral("Use FT4/FT8 standard frequency for selected band")), editorGroup);
+    m_chkFtStandard = new QCheckBox(L(QStringLiteral("scheduler_use_mode_standard"), QStringLiteral("Use the standard frequency of the band (FT4/FT8/JS8)")), editorGroup);
     m_freqMHz = new QDoubleSpinBox(editorGroup);
     m_freqMHz->setDecimals(6);
     m_freqMHz->setMinimum(0.100000);
@@ -276,8 +280,7 @@ void BandSchedulerDialog::setEditorEntry(const ScheduledQsyEntry &entry)
 void BandSchedulerDialog::updateEditorStandardFrequency()
 {
     const QString mode = normalizedMode(m_modeCombo->currentText());
-    const bool isFt = (mode.compare(QStringLiteral("FT4"), Qt::CaseInsensitive) == 0 ||
-                       mode.compare(QStringLiteral("FT8"), Qt::CaseInsensitive) == 0);
+    const bool isFt = M3StandardFrequencies::hasStandard(mode);
     m_chkFtStandard->setEnabled(isFt);
     if (!isFt) {
         m_chkFtStandard->setChecked(false);
@@ -290,10 +293,10 @@ void BandSchedulerDialog::updateEditorStandardFrequency()
     m_freqMHz->setEnabled(!m_chkFtStandard->isChecked() || standard <= 0.0);
     if (m_hint != nullptr) {
         if (isFt && standard > 0.0) {
-            m_hint->setText(L(QStringLiteral("scheduler_ft_hint"), QStringLiteral("FT standard for this entry: %1. Manual frequency remains available when the standard checkbox is off."))
+            m_hint->setText(L(QStringLiteral("scheduler_mode_standard_hint"), QStringLiteral("Standard frequency for this entry: %1. Manual frequency remains available when the standard checkbox is off."))
                             .arg(frequencyText(standard)));
         } else if (isFt) {
-            m_hint->setText(L(QStringLiteral("scheduler_ft_no_standard_hint"), QStringLiteral("No built-in FT standard frequency is known for this band/mode; enter the frequency manually.")));
+            m_hint->setText(L(QStringLiteral("scheduler_no_mode_standard_hint"), QStringLiteral("No built-in standard frequency is known for this band/mode; enter the frequency manually.")));
         } else {
             m_hint->setText(L(QStringLiteral("scheduler_manual_hint"), QStringLiteral("Non-FT modes use the manual frequency field. The scheduler only requests CAT QSY; it never starts TX.")));
         }
@@ -318,23 +321,11 @@ QList<ScheduledQsyEntry> BandSchedulerDialog::entries() const
 
 double BandSchedulerDialog::standardFtFrequencyHz(const QString &modeName, const QString &band)
 {
-    const bool ft4 = modeName.compare(QStringLiteral("FT4"), Qt::CaseInsensitive) == 0;
-    struct FtFreq { const char *band; double ft8Hz; double ft4Hz; };
-    static const FtFreq table[] = {
-        {"160m", 1840000.0, 0.0}, {"80m", 3573000.0, 3575000.0},
-        {"60m", 5357000.0, 0.0}, {"40m", 7074000.0, 7047500.0},
-        {"30m", 10136000.0, 10140000.0}, {"20m", 14074000.0, 14080000.0},
-        {"17m", 18100000.0, 18104000.0}, {"15m", 21074000.0, 21140000.0},
-        {"12m", 24915000.0, 24919000.0}, {"10m", 28074000.0, 28180000.0},
-        {"6m", 50313000.0, 50318000.0}, {"2m", 144174000.0, 144170000.0},
-        {"70cm", 432174000.0, 432174000.0}, {"23cm", 1296174000.0, 1296174000.0}
-    };
-    for (const FtFreq &entry : table) {
-        if (band.compare(QString::fromLatin1(entry.band), Qt::CaseInsensitive) == 0) {
-            return ft4 && entry.ft4Hz > 0.0 ? entry.ft4Hz : entry.ft8Hz;
-        }
-    }
-    return 0.0;
+    if (!M3StandardFrequencies::hasStandard(modeName)) return 0.0;
+    const double hz = M3StandardFrequencies::dialHz(modeName, band);
+    if (hz <= 0.0 && modeName.compare(QStringLiteral("FT4"), Qt::CaseInsensitive) == 0)
+        return M3StandardFrequencies::dialHz(QStringLiteral("FT8"), band);
+    return hz;
 }
 
 QString BandSchedulerDialog::serializeEntries(const QList<ScheduledQsyEntry> &entries)

@@ -27,3 +27,11 @@ the Fortran routines `js8?_decode.f90`, `syncjs8.f90`, `js8_downsample.f90`,
 `syncjs8d.f90`, `js8dec.f90`, `subtractjs8.f90`, `baselinejs8.f90`,
 `genjs8.f90`, `encode174.f90`, `bpdecode174.f90`, `osd174.f90` and
 `chkcrc12a.f90` of JS8Call 2.2.0.
+
+`Js8CommandBuffer`, `Js8AutoReply` and `Js8Inbox` in `modems/js8/` port the
+message buffering, directed-command replies, relay handling and message
+store of JS8Call's `mainwindow.cpp` (`processCompoundActivity`,
+`processBufferedActivity`, `processCommandActivity`,
+`parseRelayPathCallsigns`, `since`, `getNextMessageIdForCallsign`); the inbox
+is kept in a JSON file instead of SQLite.  The JS8 standard frequencies in
+`utils/StandardFrequencies.h` are those of JS8Call's `FrequencyList.cpp`.

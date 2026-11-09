@@ -64,7 +64,8 @@ public:
         FtDecoder,
         SoundCardCalibration,
         Diagnostics,
-        Display
+        Display,
+        Frequencies
     };
 
     explicit AppSettingsDialog(const AppSettings &settings,
@@ -167,6 +168,7 @@ private:
     QList<QPlainTextEdit *> m_macroTextEdits;
     LogbookSettingsDialog *m_logbookPage = nullptr;
     BandSchedulerDialog *m_schedulerPage = nullptr;
+    class FrequencyListEditor *m_frequencyPage = nullptr;
     SoundCardCalibrationDialog *m_calibrationPage = nullptr;
     QWidget *m_rotatorPage = nullptr;
     QHash<int, InitialPage> m_deferredSettingsTabs;

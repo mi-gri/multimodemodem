@@ -40,6 +40,7 @@ public:
         QString from;            // sender, when the frame names it
         QString to;              // directed target
         QString command;         // directed command, e.g. " SNR?"
+        QString extra;           // directed number, e.g. "-12" after " SNR"
         QString grid;
     };
 
@@ -61,6 +62,18 @@ public:
     static bool dictionaryAvailable();
     /// Characters accepted in free text (upper case letters, digits, punctuation).
     static QString normalizeText(const QString &text);
+
+    // Directed-command helpers of JS8Call's Varicode.
+    static QString formatSnr(int snrDb);                 // "+05", "-12"
+    static bool isCommandBuffered(const QString &command);
+    static int commandChecksumBits(const QString &command); // 0, 16 or 32
+    static bool checksumValid(const QString &checksum, const QString &text, int bits);
+    static QString checksum(const QString &text, int bits);
+    static QString rstrip(const QString &text);
+    static QString lstrip(const QString &text);
+    static QStringList parseCallsigns(const QString &text);
+    /// Base call of a portable call (DL/K1ABC/P -> K1ABC), as Radio::base_callsign.
+    static QString baseCallsign(const QString &call);
 };
 
 #endif // JS8MESSAGE_H

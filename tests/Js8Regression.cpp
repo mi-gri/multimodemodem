@@ -6,17 +6,24 @@
 //                                     signals (for cross-checks with JS8Call's
 //                                     js8 decoder: js8 -8 -b A -d 3 file.wav)
 //   m3_js8_regression --decode FILE SUBMODE   decode a 12 kHz 16-bit WAV
+#include "modems/js8/Js8AutoReply.h"
+#include "modems/js8/Js8CommandBuffer.h"
 #include "modems/js8/Js8Decoder.h"
+#include "modems/js8/Js8Inbox.h"
 #include "modems/js8/Js8Ldpc.h"
 #include "modems/js8/Js8Message.h"
 #include "modems/js8/Js8NativeEngine.h"
 #include "modems/js8/tx/Js8Transmitter.h"
+#include "utils/StandardFrequencies.h"
 
 #include <QCoreApplication>
 #include <QDataStream>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QFile>
+#include <QTemporaryDir>
+#include <QTimer>
 
 #include <cmath>
 #include <iostream>
@@ -80,6 +87,238 @@ static QVector<Js8Decode> decodeAll(const QVector<float> &x, Js8Mode::Submode su
     c.submode = submode;
     c.depth = depth;
     return Js8Decoder::decodeSamples(x, QDateTime::currentDateTimeUtc(), c);
+}
+
+// Frames as the receiver sees them, one period apart, without audio.
+static QVector<Js8Decode> asDecodes(const QVector<Js8Message::Frame> &frames, Js8Mode::Submode submode, double hz,
+                                    const QDateTime &start)
+{
+    QVector<Js8Decode> out;
+    const int period = Js8Mode::parameters(submode).periodSeconds;
+    for (int i = 0; i < frames.size(); ++i) {
+        const auto u = Js8Message::unpack(frames.at(i).frame, frames.at(i).bits, submode);
+        Js8Decode d;
+        d.utc = start.addSecs(qint64(i) * period);
+        d.submode = submode;
+        d.frame = frames.at(i).frame;
+        d.bits = frames.at(i).bits;
+        d.snrDb = -12;
+        d.frequencyHz = hz;
+        d.text = u.text;
+        d.frameType = u.frameType;
+        d.first = u.first;
+        d.last = u.last;
+        d.heartbeat = u.heartbeat;
+        d.cq = u.cq;
+        d.directed = u.directed;
+        d.from = u.from;
+        d.to = u.to;
+        d.command = u.command;
+        d.extra = u.extra;
+        d.grid = u.grid;
+        d.compound = u.frameType == 1;
+        out << d;
+    }
+    return out;
+}
+
+// Sends text from one station and returns the commands the other one assembles.
+static QVector<Js8Command> overTheAir(const QString &fromCall, const QString &to, const QString &text,
+                                      Js8CommandBuffer *buffer = nullptr, bool corrupt = false)
+{
+    Js8CommandBuffer local;
+    Js8CommandBuffer &b = buffer != nullptr ? *buffer : local;
+    const auto frames = Js8Message::buildFrames(fromCall, "JO31", to, text, Js8Mode::Submode::Normal, true);
+    check(!frames.isEmpty(), "frames for " + text.toStdString());
+    QVector<Js8Decode> decodes = asDecodes(frames, Js8Mode::Submode::Normal, 1200.0, QDateTime::currentDateTimeUtc());
+    if (corrupt) {
+        check(decodes.size() >= 3, "corruption test needs data frames");
+        decodes[1].text += QStringLiteral("X");
+    }
+    QVector<Js8Command> out;
+    for (const Js8Decode &d : decodes) out += b.add(d);
+    return out;
+}
+
+static void testCommandsAndReplies()
+{
+    QTemporaryDir dir;
+    check(dir.isValid(), "temp dir");
+    Js8Inbox inbox(dir.filePath(QStringLiteral("inbox.json")));
+    check(inbox.load(), "empty inbox loads");
+
+    Js8ReplyContext me;
+    me.myCall = QStringLiteral("DL1ABC");
+    me.myGrid = QStringLiteral("JN58");
+    me.autoReply = true;
+    me.inbox = &inbox;
+    me.heardRecentFirst = QStringList{QStringLiteral("DO3BOX"), QStringLiteral("K1ABC"), QStringLiteral("G4XYZ")};
+
+    // SNR? -> "DO3BOX SNR -12", which goes out as a directed SNR frame.
+    {
+        const auto cmds = overTheAir("DO3BOX", "DL1ABC", "SNR?");
+        check(cmds.size() == 1 && cmds.first().command == " SNR?" && cmds.first().from == "DO3BOX" &&
+              cmds.first().to == "DL1ABC", "SNR? command");
+        const Js8ReplyAction a = Js8AutoReply::process(cmds.first(), me);
+        check(a.toMe && a.reply == "DO3BOX SNR -12", "SNR reply: " + a.reply.toStdString());
+        const auto back = overTheAir("DL1ABC", QString(), a.reply);
+        check(back.size() == 1 && back.first().command == " SNR" && back.first().extra == "-12", "SNR report round trip");
+    }
+    // GRID?, HEARING?, INFO? without info text, @ALLCALL without AUTO.
+    {
+        const auto grid = overTheAir("DO3BOX", "DL1ABC", "GRID?");
+        check(Js8AutoReply::process(grid.first(), me).reply == "DO3BOX GRID JN58", "GRID reply");
+        const auto hearing = overTheAir("DO3BOX", "DL1ABC", "HEARING?");
+        check(Js8AutoReply::process(hearing.first(), me).reply == "DO3BOX HEARING K1ABC G4XYZ", "HEARING reply");
+        const auto info = overTheAir("DO3BOX", "DL1ABC", "INFO?");
+        check(Js8AutoReply::process(info.first(), me).reply.isEmpty(), "no INFO reply without info text");
+        Js8ReplyContext withInfo = me;
+        withInfo.info = QStringLiteral("IC7300 50W DIPOLE");
+        check(Js8AutoReply::process(info.first(), withInfo).reply == "DO3BOX INFO IC7300 50W DIPOLE", "INFO reply");
+        const auto other = overTheAir("DO3BOX", "K1ABC", "SNR?");
+        check(Js8AutoReply::process(other.first(), me).reply.isEmpty(), "no reply to another station's query");
+    }
+    // MSG: buffered over several frames, checksum checked, stored in the inbox.
+    {
+        const QString body = QStringLiteral("HELLO MICHAEL, MEET YOU ON 40M TONIGHT AT 1900 UTC");
+        const auto cmds = overTheAir("DO3BOX", "DL1ABC", "MSG " + body);
+        check(cmds.size() == 1 && cmds.first().command == " MSG" && cmds.first().buffered, "MSG command");
+        check(cmds.first().text == body, "MSG text: " + cmds.first().text.toStdString());
+        Js8ReplyContext manual = me;
+        manual.autoReply = false;   // messages are stored even without AUTO
+        const Js8ReplyAction a = Js8AutoReply::process(cmds.first(), manual);
+        check(a.inboxId > 0 && a.reply == "DO3BOX ACK", "MSG stored and acknowledged");
+        check(inbox.unreadCount() == 1, "one unread message");
+        Js8Inbox reread(inbox.path());
+        check(reread.load() && reread.find(a.inboxId) != nullptr && reread.find(a.inboxId)->text == body, "inbox persisted");
+
+        Js8CommandBuffer buffer;
+        const auto broken = overTheAir("DO3BOX", "DL1ABC", "MSG " + body, &buffer, true);
+        check(broken.isEmpty() && buffer.checksumFailures() == 1, "corrupted MSG is discarded");
+    }
+    // MSG TO: kept for K1ABC, then fetched with QUERY MSGS / QUERY MSG n.
+    {
+        const auto store = overTheAir("DO3BOX", "DL1ABC", "MSG TO:K1ABC SEE YOU AT THE HAMFEST");
+        check(store.size() == 1 && store.first().command == " MSG TO:", "MSG TO: command");
+        const Js8ReplyAction a = Js8AutoReply::process(store.first(), me);
+        check(a.storedId > 0 && a.reply == "DO3BOX ACK", "MSG TO: stored");
+        check(inbox.nextStoredIdFor("K1ABC") == a.storedId, "stored for K1ABC");
+
+        const auto query = overTheAir("K1ABC", "DL1ABC", "QUERY MSGS");
+        check(query.size() == 1 && query.first().command.startsWith(" QUERY MSGS"), "QUERY MSGS command");
+        check(Js8AutoReply::process(query.first(), me).reply == QStringLiteral("K1ABC YES MSG ID %1").arg(a.storedId),
+              "QUERY MSGS answer");
+        const auto fetch = overTheAir("K1ABC", "DL1ABC", QStringLiteral("QUERY MSG %1").arg(a.storedId));
+        check(fetch.size() == 1 && fetch.first().command == " QUERY", "QUERY MSG command");
+        const Js8ReplyAction delivered = Js8AutoReply::process(fetch.first(), me);
+        check(delivered.reply == "K1ABC MSG SEE YOU AT THE HAMFEST FROM DO3BOX", "delivery: " + delivered.reply.toStdString());
+        check(Js8AutoReply::process(query.first(), me).reply == "K1ABC NO", "nothing left after delivery");
+        const auto wrong = overTheAir("G4XYZ", "DL1ABC", QStringLiteral("QUERY MSG %1").arg(a.storedId));
+        check(Js8AutoReply::process(wrong.first(), me).reply.isEmpty(), "message only for its addressee");
+    }
+    // Relay: DO3BOX -> DL1ABC -> K1ABC, and the ACK path back.
+    {
+        const auto relay = overTheAir("DO3BOX", "DL1ABC", "DL1ABC>K1ABC HELLO VIA RELAY");
+        check(relay.size() == 1 && relay.first().command == ">", "relay command");
+        const Js8ReplyAction hop = Js8AutoReply::process(relay.first(), me);
+        check(hop.reply == "K1ABC>HELLO VIA RELAY *DE* DO3BOX", "relay forward: " + hop.reply.toStdString());
+        const auto arrived = overTheAir("DL1ABC", QString(), hop.reply);
+        check(arrived.size() == 1 && arrived.first().to == "K1ABC" && arrived.first().command == ">", "forwarded relay");
+        Js8ReplyContext k1 = me;
+        k1.myCall = QStringLiteral("K1ABC");
+        const Js8ReplyAction last = Js8AutoReply::process(arrived.first(), k1);
+        check(last.toMe && last.reply == "DL1ABC>DO3BOX ACK", "relay ACK path: " + last.reply.toStdString());
+        Js8ReplyContext noRelay = me;
+        noRelay.relay = false;
+        check(Js8AutoReply::process(relay.first(), noRelay).reply.isEmpty(), "relay can be disabled");
+    }
+    // Heartbeats: acknowledged only with AUTO and HB ACK.
+    {
+        const auto hb = overTheAir("DO3BOX", QString(), "DO3BOX: " + Js8Message::heartbeatText("JO31"));
+        check(hb.size() == 1 && hb.first().command == " HEARTBEAT" && hb.first().grid == "JO31", "heartbeat command");
+        check(Js8AutoReply::process(hb.first(), me).reply.isEmpty(), "no HB ACK by default");
+        Js8ReplyContext ack = me;
+        ack.heartbeatAck = true;
+        const Js8ReplyAction a = Js8AutoReply::process(hb.first(), ack);
+        check(a.lowPriority && a.reply == "DO3BOX HEARTBEAT SNR -12", "HB ACK: " + a.reply.toStdString());
+        const auto back = overTheAir("DL1ABC", QString(), a.reply);
+        check(back.size() == 1 && back.first().command == " HEARTBEAT SNR", "HB ACK round trip");
+    }
+    // Helpers.
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    check(Js8AutoReply::since(now.addSecs(-5), now) == "now" && Js8AutoReply::since(now.addSecs(-125), now) == "2m" &&
+          Js8AutoReply::since(now.addSecs(-7300), now) == "2h", "since()");
+    check(Js8Message::baseCallsign("DL/K1ABC") == "K1ABC" && Js8Message::baseCallsign("DO3BOX/P") == "DO3BOX", "base call");
+    check(Js8AutoReply::parseRelayPath("DL1ABC", "HELLO *DE* DO3BOX").join('>') == "DL1ABC>DO3BOX", "relay path");
+}
+
+static void testStandardFrequencies()
+{
+    using namespace M3StandardFrequencies;
+    setCurrent({}, "ALL");
+    check(dialHz("JS8", "20m") == 14078000.0 && dialHz("JS8", "40m") == 7078000.0 && dialHz("JS8", "30m") == 10130000.0,
+          "JS8 standard frequencies");
+    check(dialHz("JS8", "60m") == 0.0 && !bands("JS8").contains("60m") && bands("JS8").contains("2m"), "JS8 bands");
+    // Preferred entries win over DXpedition frequencies listed before them.
+    check(dialHz("FT8", "80m") == 3573000.0 && dialHz("FT8", "40m") == 7074000.0 && dialHz("FT8", "20m") == 14074000.0,
+          "FT8 preferred frequencies");
+    check(dialHz("FT4", "40m") == 7047500.0 && dialHz("FT4", "160m") == 0.0, "FT4 frequencies");
+    check(dialHz("Q65", "6m") == 50275000.0, "Q65 preferred");
+    // Region filter: MSK144 6 m differs between IARU regions.
+    setCurrent({}, "R1");
+    check(dialHz("MSK144", "6m") == 50380000.0 && dialHz("FT8", "4m") == 70154000.0, "region 1");
+    setCurrent({}, "R2");
+    check(dialHz("MSK144", "6m") == 50260000.0 && dialHz("FT8", "4m") == 0.0, "region 2");
+    // Stored lists: JSON round trip and an operator's own frequency.
+    QVector<Entry> own = defaults();
+    check(fromJson(toJson(own)) == own, "JSON round trip");
+    own.append({"JS8", 7110000.0, "ALL", "local net", true});
+    for (Entry &e : own)
+        if (e.mode == "JS8" && qRound64(e.hz) == 7078000) e.preferred = false;
+    setCurrent(fromJson(toJson(own)), "ALL");
+    check(dialHz("JS8", "40m") == 7110000.0, "own preferred JS8 frequency");
+    bool ok = true;
+    check(fromJson("not json", &ok).isEmpty() && !ok, "unreadable list");
+    setCurrent({}, "ALL");
+    check(dialHz("JS8", "40m") == 7078000.0, "empty list restores defaults");
+    check(bandOf(10136000.0) == "30m" && bandOf(432174000.0) == "70cm" && bandOf(9000000.0).isEmpty(), "bandOf");
+}
+
+// The live receiver cuts its own periods for every speed when multi-decoding.
+static void testMultiDecode()
+{
+    const auto normal = Js8Message::buildFrames("DO3BOX", "JO31", "DL1ABC", "HW CPY?", Js8Mode::Submode::Normal);
+    const auto turbo = Js8Message::buildFrames("K1ABC", "FN42", QString(), Js8Message::cqText("FN42"), Js8Mode::Submode::Turbo);
+    QVector<float> x(31 * 12000, 0.0f);
+    const QVector<float> a = waveform(normal, Js8Mode::Submode::Normal, 1800.0);
+    const QVector<float> b = waveform(turbo, Js8Mode::Submode::Turbo, 900.0);
+    for (int i = 0; i < a.size() && i < x.size(); ++i) x[i] += 0.5f * a[i];
+    for (int i = 0; i < b.size() && i < x.size(); ++i) x[i] += 0.5f * b[i];
+    addNoise(x, 0.5 * 0.95 / std::sqrt(2.0), -8.0, 777);
+
+    Js8Decoder decoder;
+    decoder.setSubmode(Js8Mode::Submode::Normal);
+    decoder.setMultiDecode(true);
+    bool gotNormal = false, gotTurbo = false;
+    QEventLoop loop;
+    QObject::connect(&decoder, &Js8Decoder::decoded, &loop, [&](const Js8Decode &d) {
+        if (d.submode == Js8Mode::Submode::Normal && d.frame == normal.first().frame) gotNormal = true;
+        if (d.submode == Js8Mode::Submode::Turbo && d.frame == turbo.first().frame) gotTurbo = true;
+        if (gotNormal && gotTurbo) loop.quit();
+    });
+    const qint64 startNs = qint64(1700000010) * 1000000000LL;   // a 30 s boundary
+    for (int i = 0; i < x.size(); i += 1200) {
+        AudioBlock block;
+        block.sampleRate = 12000;
+        block.samples = x.mid(i, 1200);
+        block.firstSampleIndex = i;
+        block.firstSampleUtcNs = startNs + qint64(i) * 1000000000LL / 12000;
+        decoder.processAudioBlock(block);
+    }
+    QTimer::singleShot(120000, &loop, &QEventLoop::quit);
+    if (!(gotNormal && gotTurbo)) loop.exec();
+    check(gotNormal, "multi-decode: Normal frame");
+    check(gotTurbo, "multi-decode: Turbo frame");
 }
 
 int main(int argc, char **argv)
@@ -274,6 +513,10 @@ int main(int argc, char **argv)
         check(b[7100] == 0.0f && (std::fabs(b[7300]) > 0.0f || std::fabs(b[7400]) > 0.0f), "early pull waits 100 ms");
     }
 
-    std::cout << "PASS js8 dictionary/messages/ldpc/loopback(A,B,C,E)/weak/multi-frame\n";
+    testCommandsAndReplies();
+    testStandardFrequencies();
+    testMultiDecode();
+
+    std::cout << "PASS js8 dictionary/messages/ldpc/loopback(A,B,C,E)/weak/multi-frame/commands/inbox/relay/multi-decode\n";
     return 0;
 }

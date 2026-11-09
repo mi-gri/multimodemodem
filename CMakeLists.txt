@@ -441,6 +441,12 @@ add_library(m3_js8 STATIC
     modems/js8/Js8Message.cpp
     modems/js8/Js8Decoder.h
     modems/js8/Js8Decoder.cpp
+    modems/js8/Js8CommandBuffer.h
+    modems/js8/Js8CommandBuffer.cpp
+    modems/js8/Js8Inbox.h
+    modems/js8/Js8Inbox.cpp
+    modems/js8/Js8AutoReply.h
+    modems/js8/Js8AutoReply.cpp
     modems/js8/tx/Js8Transmitter.h
     modems/js8/tx/Js8Transmitter.cpp
     third_party/js8call_gpl/Varicode.h
@@ -636,6 +642,8 @@ add_executable(MultiModeModem
     dialogs/HelpDialog.cpp
     dialogs/BandSchedulerDialog.h
     dialogs/BandSchedulerDialog.cpp
+    dialogs/FrequencyListEditor.h
+    dialogs/FrequencyListEditor.cpp
     dialogs/AppSettingsDialog.h
     dialogs/AppSettingsDialog.cpp
     dialogs/AudioSettingsDialog.ui

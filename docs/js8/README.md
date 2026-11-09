@@ -25,7 +25,8 @@ JSC-compressed free text) is JS8Call's own `Varicode`/`JSC` code in
 ## Receive path
 
 `Js8Decoder` cuts the 12 kHz audio at UTC period boundaries of the selected
-speed and hands each period to `Js8NativeEngine` on its own thread.  The
+speed (with *Decode all speeds*: of all four speeds, each with its own period
+grid) and hands each period to `Js8NativeEngine` on its own thread.  The
 engine is a C++ port of JS8Call's Fortran receiver: Costas sync search over
 the whole band, per-candidate downsampling, ±¼ symbol and ±2.5 Hz fine sync,
 soft bit metrics, belief propagation, optional ordered-statistics decoding,
@@ -47,20 +48,78 @@ scheduler; there is no even/odd sequence in JS8.
 
 ## Operating
 
-- **Band activity** shows the running text per audio offset; ✓ marks a
-  completed message.  Double-click moves RX (and TX) to that offset.
+- **Frequency**: the band selector tunes a CAT-connected rig to the
+  preferred JS8 frequency of the band from *Settings → Frequencies*; the CAT
+  readout above it shows the dial frequency (mouse wheel over a digit tunes,
+  double-click enters a frequency).  A CAT QSY to another band selects the
+  band.
+- **Band activity** shows the running text per audio offset and speed
+  (A Normal, B Fast, C Turbo, E Slow; other speeds in grey); ✓ marks a
+  completed message.  Double-click moves RX (and TX) to that offset and
+  selects its speed.
 - **Heard stations** lists calls from heartbeats, CQs and directed messages
   with SNR, grid and offset.  A click selects the station (field *To*) and
   fills the QSO form.
 - **Messages** shows complete messages at the RX offset, messages to you
-  (orange) and @ALLCALL traffic, plus your own transmissions (red).
+  (orange) and @ALLCALL traffic, plus your own transmissions (red, automatic
+  ones marked AUTO).
 - *Send* transmits the text directed to the selected station unless the text
   already starts with a call, @group, CQ or HEARTBEAT.  *CQ*, *HB* and *SNR?*
-  send the standard messages.  STOP cancels an armed transmission.
+  send the standard messages.  STOP cancels an armed transmission and empties
+  the automatic queue.
 - Left click in the waterfall sets the RX offset (and TX when "TX offset
-  follows RX offset" is on); right click sets only TX.
+  follows RX offset" is on); right click sets only TX.  The waterfall marks
+  the period starts of the selected speed.
 - QSOs are logged with mode `JS8`.
 
-Not implemented yet: automatic replies (SNR?, HEARING?, INFO?, message
-store-and-forward), relays, inbox, decoding several speeds at once and
-heartbeat/CQ repeat timers.
+## Frequencies
+
+*Settings → Frequencies* holds the working-frequency list of all weak-signal
+modes, as the Frequencies tab of WSJT-X/JTDX: mode, dial frequency, IARU
+region, description and a *preferred* mark per band.  The FT and JS8 band
+selectors and the band scheduler use the preferred entry of a band (else the
+first one); FT4 falls back to FT8 on bands without an FT4 entry.  The
+defaults are the WSJT-X 3.0 list (FT8, FT4, MSK144, Q65) and the JS8Call
+2.2.0 list (JS8: 1.842, 3.578, 7.078, 10.130, 14.078, 18.104, 21.078, 24.922,
+28.078, 50.318, 144.178 MHz); *Restore defaults* reloads them.  An unchanged
+list is stored as "defaults", so corrections of the built-in list reach
+existing installations.
+
+## Directed commands and automatic operation
+
+Frames of one transmission are collected per offset (`Js8CommandBuffer`, as
+JS8Call's message buffer): compound calls are resolved and the buffered
+commands (MSG, MSG TO:, QUERY, relay `>`, GRID, CMD) are checked against their
+CRC-16 before they count.  `Js8AutoReply` then applies JS8Call's rules:
+
+| Received (to you)         | Answer                                  |
+|---------------------------|-----------------------------------------|
+| `SNR?`                    | `CALL SNR -12`                          |
+| `GRID?`                   | `CALL GRID JO31LK`                      |
+| `INFO?` / `STATUS?`       | `CALL INFO …` / `CALL STATUS …` (if set)|
+| `HEARING?`                | up to four stations heard in the last hour |
+| `AGN?`                    | your last transmission again            |
+| `MSG text`                | stored in the inbox, `CALL ACK`         |
+| `MSG TO:CALL2 text`       | kept for CALL2, `CALL ACK`              |
+| `QUERY MSGS`              | `CALL YES MSG ID n` or `CALL NO`        |
+| `QUERY MSG n`             | `CALL MSG text FROM ORIGIN` (only to the addressee) |
+| `QUERY CALL CALL2`        | `CALL YES +05 (12m)` if CALL2 was heard |
+| `CALL2>text` (relay)      | forwarded as `CALL2>text *DE* SENDER`   |
+| heartbeat (with HB ACK)   | `CALL HEARTBEAT SNR -12 [MSG ID n]`     |
+
+- **AUTO** sends these answers by itself in the next free period.  Without
+  AUTO nothing is sent automatically: a received MSG is still stored, and the
+  answer to a question addressed to you is put into the message field for
+  *Send*.  @ALLCALL questions and heartbeats are answered only with AUTO, at
+  most once per station in 15 minutes.
+- **Heartbeat every / CQ every** repeat a heartbeat (on a free offset between
+  500 and 1000 Hz) or CQ (on the TX offset); they pause while a station is
+  selected.
+- The **idle watchdog** stops all automatic transmissions after the set time
+  without operator action; any action (send, select, settings) resumes them.
+- The **inbox** (button under the messages) lists received messages and the
+  ones kept for others (file `js8_inbox.json` next to the settings).  Opening
+  it marks new messages read; *Reply* addresses the sender.
+
+Not implemented: @group membership (only @ALLCALL and @HB are recognised),
+APRS/JS8NET spotting and the JS8Call TCP/UDP API.

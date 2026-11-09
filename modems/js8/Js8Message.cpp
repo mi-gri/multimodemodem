@@ -63,14 +63,17 @@ Js8Message::Unpacked Js8Message::unpack(const QString &frame, int bits, Js8Mode:
     } else if (d.frameType() == js8::Varicode::FrameCompoundDirected) {
         const QStringList parts = d.directedMessage();
         u.directed = true;
+        u.from = parts.value(0);   // "<....>": the call follows in a compound frame
         u.to = parts.value(1);
         u.command = parts.value(2);
+        u.extra = parts.value(3);
     } else if (d.isDirectedMessage()) {
         const QStringList parts = d.directedMessage();
         u.directed = true;
         u.from = parts.value(0);
         u.to = parts.value(1);
         u.command = parts.value(2);
+        u.extra = parts.value(3);
     }
     return u;
 }
@@ -101,4 +104,55 @@ QString Js8Message::normalizeText(const QString &text)
     QString t = text.toUpper();
     t.replace(QRegularExpression(QStringLiteral("[\\r\\n\\t]+")), QStringLiteral(" "));
     return t.trimmed();
+}
+
+QString Js8Message::formatSnr(int snrDb)
+{
+    return js8::Varicode::formatSNR(snrDb);
+}
+
+bool Js8Message::isCommandBuffered(const QString &command)
+{
+    QMutexLocker locker(&varicodeMutex());
+    return js8::Varicode::isCommandBuffered(command);
+}
+
+int Js8Message::commandChecksumBits(const QString &command)
+{
+    QMutexLocker locker(&varicodeMutex());
+    return js8::Varicode::isCommandChecksumed(command);
+}
+
+bool Js8Message::checksumValid(const QString &checksum, const QString &text, int bits)
+{
+    if (bits == 32) return js8::Varicode::checksum32Valid(checksum, text);
+    if (bits == 16) return js8::Varicode::checksum16Valid(checksum, text);
+    return true;
+}
+
+QString Js8Message::checksum(const QString &text, int bits)
+{
+    if (bits == 32) return js8::Varicode::checksum32(text);
+    if (bits == 16) return js8::Varicode::checksum16(text);
+    return QString();
+}
+
+QString Js8Message::rstrip(const QString &text) { return js8::Varicode::rstrip(text); }
+QString Js8Message::lstrip(const QString &text) { return js8::Varicode::lstrip(text); }
+
+QStringList Js8Message::parseCallsigns(const QString &text)
+{
+    QMutexLocker locker(&varicodeMutex());
+    return js8::Varicode::parseCallsigns(text);
+}
+
+QString Js8Message::baseCallsign(const QString &call)
+{
+    QString c = call.trimmed().toUpper();
+    const int slash = c.indexOf(QLatin1Char('/'));
+    if (slash >= 0) {
+        const int right = c.size() - slash - 1;
+        c = right >= slash ? c.mid(slash + 1) : c.left(slash);
+    }
+    return c;
 }

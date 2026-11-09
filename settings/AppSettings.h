@@ -242,6 +242,10 @@ public:
     bool ftGpuDecodeEnabled = false;
     bool ftDriftRxEnabled = false;
     double ftDriftMaxHzPerSec = 2.0;
+    // Working-frequency list (Settings -> Frequencies) as JSON; empty = the
+    // built-in WSJT-X/JS8Call defaults.  IARU region filter: ALL, R1, R2, R3.
+    QString frequencyListJson;
+    QString frequencyRegion = "ALL";
     bool ft8DeepDecode = true; // internal compatibility flag: adaptive enables subtract/rescan.
     bool ft8DspPlusDecode = false; // deprecated compatibility flag; forced false.
     int ft8CqRepeatTimeoutMinutes = 5;

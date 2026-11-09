@@ -6,6 +6,9 @@
 #include <QMetaObject>
 #include <QtGlobal>
 
+#include <array>
+#include <memory>
+
 namespace {
 constexpr int kRate = 12000;
 }
@@ -31,8 +34,15 @@ Js8Decoder::~Js8Decoder()
 
 void Js8Decoder::setSubmode(Js8Mode::Submode submode)
 {
-    if (m_config.submode == submode) return;
+    if (m_config.submode == submode && !m_captures.isEmpty()) return;
     m_config.submode = submode;
+    reset();
+}
+
+void Js8Decoder::setMultiDecode(bool enabled)
+{
+    if (m_multiDecode == enabled && !m_captures.isEmpty()) return;
+    m_multiDecode = enabled;
     reset();
 }
 
@@ -52,23 +62,32 @@ void Js8Decoder::invalidate()
     m_jobs.clear();
 }
 
+void Js8Decoder::rebuildCaptures()
+{
+    m_captures.clear();
+    const QList<Js8Mode::Submode> modes = m_multiDecode ? Js8Mode::allSubmodes() : QList<Js8Mode::Submode>{m_config.submode};
+    for (Js8Mode::Submode s : modes) {
+        Capture c;
+        c.submode = s;
+        m_captures << c;
+    }
+}
+
 void Js8Decoder::reset()
 {
     m_resampler.reset();
-    m_samples.clear();
-    m_periodStart = QDateTime();
-    m_periodId = -1;
+    rebuildCaptures();
     m_nextOutputUtcNs = 0;
     m_outputRemainder = 0;
     m_lastInputEndUtcNs = 0;
     m_captureGeneration = 0;
-    m_timelineValid = false;
     invalidate();
     const Js8Mode::Parameters p = Js8Mode::parameters(m_config.submode);
-    emit statusChanged(QStringLiteral("JS8 %1 RX: %2 s periods, depth %3")
+    emit statusChanged(QStringLiteral("JS8 %1 RX: %2 s periods, depth %3%4")
                            .arg(Js8Mode::submodeName(m_config.submode))
                            .arg(p.periodSeconds)
-                           .arg(m_config.depth));
+                           .arg(m_config.depth)
+                           .arg(m_multiDecode ? QStringLiteral(", all speeds") : QString()));
 }
 
 void Js8Decoder::processAudioBlock(const AudioBlock &block)
@@ -77,10 +96,14 @@ void Js8Decoder::processAudioBlock(const AudioBlock &block)
     appendResampled(block);
 }
 
-void Js8Decoder::flushPeriod() { finishPeriod(true); }
+void Js8Decoder::flushPeriod()
+{
+    for (Capture &c : m_captures) finishPeriod(c, true);
+}
 
 void Js8Decoder::appendResampled(const AudioBlock &block)
 {
+    if (m_captures.isEmpty()) rebuildCaptures();
     qint64 startNs = block.firstSampleUtcNs;
     if (startNs <= 0) {
         const qint64 durationNs = qint64(block.samples.size()) * 1000000000LL / qMax(1, block.sampleRate);
@@ -93,11 +116,9 @@ void Js8Decoder::appendResampled(const AudioBlock &block)
                       qAbs(startNs - m_lastInputEndUtcNs) > qMax<qint64>(qint64{5000000}, sampleNs * qint64{4});
     if (generationChanged || jump) {
         m_resampler.reset();
-        m_samples.clear();
-        m_periodId = -1;
+        rebuildCaptures();
         m_nextOutputUtcNs = 0;
         m_outputRemainder = 0;
-        m_timelineValid = false;
     }
     if (block.captureGeneration != 0) m_captureGeneration = block.captureGeneration;
 
@@ -108,18 +129,20 @@ void Js8Decoder::appendResampled(const AudioBlock &block)
         m_nextOutputUtcNs = startNs - m_resampler.delayNanoseconds();
         m_outputRemainder = 0;
     }
-    const Js8Mode::Parameters p = Js8Mode::parameters(m_config.submode);
-    const qint64 periodNs = qint64(p.periodSeconds) * 1000000000LL;
-    const int needed = p.nmax();
     for (double v : resampled) {
-        const qint64 id = m_nextOutputUtcNs / periodNs;
-        if (id != m_periodId) {
-            if (m_periodId >= 0) finishPeriod(false);
-            beginPeriod(id, m_nextOutputUtcNs);
-        }
-        if (!m_periodSubmitted && m_samples.size() < needed) {
-            m_samples.append(float(qBound(-1.0, v, 1.0)));
-            if (m_samples.size() == needed) finishPeriod(false);
+        const float sample = float(qBound(-1.0, v, 1.0));
+        for (Capture &c : m_captures) {
+            const Js8Mode::Parameters p = Js8Mode::parameters(c.submode);
+            const qint64 periodNs = qint64(p.periodSeconds) * 1000000000LL;
+            const qint64 id = m_nextOutputUtcNs / periodNs;
+            if (id != c.periodId) {
+                if (c.periodId >= 0) finishPeriod(c, false);
+                beginPeriod(c, id, m_nextOutputUtcNs);
+            }
+            if (!c.submitted && c.samples.size() < p.nmax()) {
+                c.samples.append(sample);
+                if (c.samples.size() == p.nmax()) finishPeriod(c, false);
+            }
         }
         m_outputRemainder += 1000000000LL;
         m_nextOutputUtcNs += m_outputRemainder / kRate;
@@ -127,47 +150,50 @@ void Js8Decoder::appendResampled(const AudioBlock &block)
     }
 }
 
-void Js8Decoder::beginPeriod(qint64 periodId, qint64 firstSampleUtcNs)
+void Js8Decoder::beginPeriod(Capture &c, qint64 periodId, qint64 firstSampleUtcNs)
 {
-    const Js8Mode::Parameters p = Js8Mode::parameters(m_config.submode);
+    const Js8Mode::Parameters p = Js8Mode::parameters(c.submode);
     const qint64 periodNs = qint64(p.periodSeconds) * 1000000000LL;
-    m_periodId = periodId;
-    m_periodSubmitted = false;
-    m_periodStart = QDateTime::fromMSecsSinceEpoch(periodId * periodNs / 1000000LL, Qt::UTC);
-    m_samples.clear();
-    m_samples.reserve(p.nmax());
+    c.periodId = periodId;
+    c.submitted = false;
+    c.start = QDateTime::fromMSecsSinceEpoch(periodId * periodNs / 1000000LL, Qt::UTC);
+    c.samples.clear();
+    c.samples.reserve(p.nmax());
     const qint64 offsetNs = qMax<qint64>(qint64{0}, firstSampleUtcNs - periodId * periodNs);
     const int missing = int(qMin<qint64>(p.nmax(), offsetNs * kRate / 1000000000LL));
     // A late start inside the first second still holds complete frames of
     // the faster submodes and most of a Normal frame; pad with silence.
-    m_timelineValid = missing <= kRate;
-    if (missing > 0) m_samples.fill(0.0f, missing);
+    c.timelineValid = missing <= kRate;
+    if (missing > 0) c.samples.fill(0.0f, missing);
 }
 
-void Js8Decoder::finishPeriod(bool force)
+void Js8Decoder::finishPeriod(Capture &c, bool force)
 {
-    if (m_periodId < 0 || m_samples.isEmpty() || m_periodSubmitted) return;
-    const Js8Mode::Parameters p = Js8Mode::parameters(m_config.submode);
-    if (m_samples.size() < p.nmax()) {
+    if (c.periodId < 0 || c.samples.isEmpty() || c.submitted) return;
+    const Js8Mode::Parameters p = Js8Mode::parameters(c.submode);
+    if (c.samples.size() < p.nmax()) {
         if (!force) return;           // the period ended early; nothing complete
-        m_samples.resize(p.nmax());   // flush: pad
+        c.samples.resize(p.nmax());   // flush: pad
     }
-    m_periodSubmitted = true;
-    if (!m_timelineValid && !force) {
-        emit statusChanged(QStringLiteral("JS8 period skipped: audio started too late in the period."));
-        m_samples.clear();
+    c.submitted = true;
+    if (!c.timelineValid && !force) {
+        if (c.submode == m_config.submode)
+            emit statusChanged(QStringLiteral("JS8 period skipped: audio started too late in the period."));
+        c.samples.clear();
         return;
     }
     Job job;
-    job.samples = m_samples;
-    job.start = m_periodStart;
+    job.samples = c.samples;
+    job.start = c.start;
     job.config = m_config;
+    job.config.submode = c.submode;
     job.generation = m_generation.load(std::memory_order_acquire);
-    m_samples.clear();
+    c.samples.clear();
     bool accepted = false;
     {
         std::lock_guard<std::mutex> lock(m_jobsMutex);
-        if (!m_stop && m_jobs.size() < 2) { m_jobs.push_back(std::move(job)); accepted = true; }
+        const size_t limit = size_t(2 * qMax(1, int(m_captures.size())));
+        if (!m_stop && m_jobs.size() < limit) { m_jobs.push_back(std::move(job)); accepted = true; }
     }
     if (accepted) m_jobsAvailable.notify_one();
     else emit statusChanged(QStringLiteral("JS8 decode backlog full: period skipped."));
@@ -195,7 +221,9 @@ static Js8Decode toDecode(const Js8NativeEngine::Result &r, const QDateTime &sta
     d.from = u.from;
     d.to = u.to;
     d.command = u.command;
+    d.extra = u.extra;
     d.grid = u.grid;
+    d.compound = u.frameType == 1;   // Varicode::FrameCompound
     return d;
 }
 
@@ -211,7 +239,8 @@ QVector<Js8Decode> Js8Decoder::decodeSamples(const QVector<float> &samples12k, c
 
 void Js8Decoder::decodeLoop()
 {
-    Js8NativeEngine engine;
+    // One engine per submode keeps its FFT plans across periods.
+    std::array<std::unique_ptr<Js8NativeEngine>, 5> engines;
     for (;;) {
         Job job;
         {
@@ -223,8 +252,10 @@ void Js8Decoder::decodeLoop()
         }
         if (job.generation != m_generation.load(std::memory_order_acquire)) continue;
         QVector<Js8Decode> decodes;
+        auto &engine = engines[size_t(qBound(0, int(job.config.submode), 4))];
+        if (!engine) engine = std::make_unique<Js8NativeEngine>();
         try {
-            for (const Js8NativeEngine::Result &r : engine.decode(job.samples, job.config))
+            for (const Js8NativeEngine::Result &r : engine->decode(job.samples, job.config))
                 decodes << toDecode(r, job.start, job.config.submode);
         } catch (...) {
             QMetaObject::invokeMethod(this, [this] { emit statusChanged(QStringLiteral("JS8 decode failed; RX continues.")); },
@@ -232,11 +263,11 @@ void Js8Decoder::decodeLoop()
             continue;
         }
         const quint64 generation = job.generation;
-        const int period = Js8Mode::parameters(job.config.submode).periodSeconds;
-        QMetaObject::invokeMethod(this, [this, decodes, generation, period] {
+        const int submode = int(job.config.submode);
+        QMetaObject::invokeMethod(this, [this, decodes, generation, submode] {
             if (generation != m_generation.load(std::memory_order_acquire)) return;
             for (const Js8Decode &d : decodes) emit decoded(d);
-            emit periodDecoded(decodes.size(), period);
+            emit periodDecoded(decodes.size(), submode);
         }, Qt::QueuedConnection);
     }
 }

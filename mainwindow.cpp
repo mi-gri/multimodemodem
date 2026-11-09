@@ -42,6 +42,7 @@
 #include "modems/msk144/Msk144Mode.h"
 #include "modems/msk144/tx/Msk144Transmitter.h"
 #include "modems/js8/Js8Mode.h"
+#include "utils/StandardFrequencies.h"
 #include "modems/q65/tx/Q65Transmitter.h"
 #include "utils/UiScale.h"
 #include "utils/RuntimeI18n.h"
@@ -124,6 +125,7 @@
 #include <QMetaObject>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <cmath>
 #include <QEvent>
 #include <QProgressDialog>
@@ -3666,6 +3668,27 @@ QString MainWindow::extractCallsignFromText(const QString &text) const
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    if (event != nullptr && watched != nullptr && watched == m_lcdRigReadoutFrequency) {
+        if (event->type() == QEvent::Wheel) {
+            auto *wheel = static_cast<QWheelEvent *>(event);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+            const double x = wheel->position().x();
+#else
+            const double x = wheel->posF().x();
+#endif
+            m_rigWheelRemainder += wheel->angleDelta().y();
+            const int notches = m_rigWheelRemainder / 120;
+            m_rigWheelRemainder %= 120;
+            if (notches != 0) tuneRigFromReadoutWheel(notches, x);
+            event->accept();
+            return true;
+        }
+        if (event->type() == QEvent::MouseButtonDblClick) {
+            promptRigFrequency();
+            event->accept();
+            return true;
+        }
+    }
     if (event != nullptr && event->type() == QEvent::MouseButtonRelease) {
         QWidget *viewport = qobject_cast<QWidget *>(watched);
         QPlainTextEdit *terminal = (viewport != nullptr) ? qobject_cast<QPlainTextEdit *>(viewport->parentWidget()) : nullptr;
@@ -12218,6 +12241,17 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
     const bool catChanged = fullApply || catSettingsKey(*previousSettings) != catSettingsKey(m_settings);
     const bool rotatorChanged = fullApply || rotatorSettingsKey(*previousSettings) != rotatorSettingsKey(m_settings);
 
+    if (fullApply || previousSettings->frequencyListJson != m_settings.frequencyListJson ||
+        previousSettings->frequencyRegion != m_settings.frequencyRegion) {
+        bool listOk = true;
+        QVector<M3StandardFrequencies::Entry> frequencies;
+        if (!m_settings.frequencyListJson.trimmed().isEmpty())
+            frequencies = M3StandardFrequencies::fromJson(m_settings.frequencyListJson, &listOk);
+        if (!listOk) appendLog(QStringLiteral("Frequency list in the settings is unreadable; the default list is used."));
+        M3StandardFrequencies::setCurrent(frequencies, m_settings.frequencyRegion);
+        js8RefreshBandList();
+        updateFtBandFrequencyUi();
+    }
     if (appearanceChanged) {
         applyUiAppearanceSettings();
     }
@@ -12447,7 +12481,96 @@ void MainWindow::setupRigReadoutPanel()
     layout->setColumnStretch(0, 1);
     layout->setColumnMinimumWidth(2, m_lblRigReadoutPower->fontMetrics().horizontalAdvance(uiText("rig_readout_power", "PWR %1 W").arg(100)) + 4);
     readout->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power, SWR and ALC reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
+    m_lcdRigReadoutFrequency->setToolTip(uiText("rig_readout_tune_tooltip", "Dial frequency read by CAT. Mouse wheel over a digit tunes that digit; double-click enters a frequency (MHz, kHz or Hz). Not possible while transmitting."));
+    m_lcdRigReadoutFrequency->installEventFilter(this);
+    m_lcdRigReadoutFrequency->setCursor(Qt::SizeVerCursor);
+    m_rigTuneTimer = new QTimer(this);
+    m_rigTuneTimer->setSingleShot(true);
+    m_rigTuneTimer->setInterval(150);
+    connect(m_rigTuneTimer, &QTimer::timeout, this, [this]() {
+        if (m_rigTuneTargetHz > 0.0 && tuneRigTo(m_rigTuneTargetHz, QStringLiteral("frequency display"))) {
+            m_rigTuneHoldUntilMs = QDateTime::currentMSecsSinceEpoch() + 1500;
+        } else {
+            m_rigTuneTargetHz = 0.0;
+        }
+        updateRigReadout();
+    });
     m_grpRigReadout = group;
+}
+
+bool MainWindow::tuneRigTo(double frequencyHz, const QString &reason)
+{
+    if (frequencyHz < 100000.0 || frequencyHz > 11000000000.0 || m_rigController == nullptr) return false;
+    if (!m_settings.hamlibCatEnabled) {
+        appendLog(QStringLiteral("QSY to %1 not possible: CAT is disabled.").arg(formatRigFrequency(frequencyHz)));
+        return false;
+    }
+    if (m_txRunning || m_txPreparationPending) {
+        appendLog(QStringLiteral("QSY to %1 refused: transmitting.").arg(formatRigFrequency(frequencyHz)));
+        return false;
+    }
+    if (!m_rigController->isConnected()) invokeRigConfigureFromSettings();
+    invokeRigSetFrequency(frequencyHz);
+    appendLog(QStringLiteral("CAT QSY (%1): %2.").arg(reason, formatRigFrequency(frequencyHz)));
+    return true;
+}
+
+void MainWindow::tuneRigFromReadoutWheel(int notches, double x)
+{
+    if (m_lcdRigReadoutFrequency == nullptr || notches == 0 || m_txRunning || m_txPreparationPending) return;
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    const bool pending = m_rigTuneTargetHz > 0.0 && (m_rigTuneTimer->isActive() || nowMs < m_rigTuneHoldUntilMs);
+    const double base = pending ? m_rigTuneTargetHz : m_lastRigFrequencyHz;
+    if (base <= 0.0) return;
+    // QLCDNumber right-aligns its digits in equal cells; the small decimal
+    // points take no cell.  The cell under the pointer selects the step.
+    const int digits = qMax(1, m_lcdRigReadoutFrequency->digitCount());
+    const double width = qMax(1, m_lcdRigReadoutFrequency->width());
+    const int cell = qBound(0, int(x * digits / width), digits - 1);
+    const int power = qBound(0, digits - 1 - cell, 9);
+    double step = 1.0;
+    for (int i = 0; i < power; ++i) step *= 10.0;
+    const double target = qMax(100000.0, base + notches * step);
+    m_rigTuneTargetHz = target;
+    m_rigTuneTimer->start();
+    updateRigReadout();
+}
+
+void MainWindow::promptRigFrequency()
+{
+    if (m_txRunning || m_txPreparationPending) {
+        appendLog(QStringLiteral("QSY refused: transmitting."));
+        return;
+    }
+    const double current = m_lastRigFrequencyHz > 0.0 ? m_lastRigFrequencyHz : 14078000.0;
+    bool ok = false;
+    const QString input = QInputDialog::getText(this, uiText("rig_set_frequency_title", "Set frequency"),
+                                                uiText("rig_set_frequency_label", "Dial frequency (e.g. 14.078 MHz, 14078 kHz or 14078000 Hz):"),
+                                                QLineEdit::Normal, QString::number(current / 1000000.0, 'f', 6), &ok);
+    if (!ok) return;
+    QString text = input.trimmed().toLower().remove(QLatin1Char(' '));
+    double scale = 0.0;
+    if (text.endsWith(QStringLiteral("mhz"))) { scale = 1e6; text.chop(3); }
+    else if (text.endsWith(QStringLiteral("khz"))) { scale = 1e3; text.chop(3); }
+    else if (text.endsWith(QStringLiteral("hz"))) { scale = 1.0; text.chop(2); }
+    text.replace(QLatin1Char(','), QLatin1Char('.'));
+    if (text.count(QLatin1Char('.')) > 1) {   // 14.078.000: grouped Hz
+        text.remove(QLatin1Char('.'));
+        if (scale == 0.0) scale = 1.0;
+    }
+    bool number = false;
+    const double value = text.toDouble(&number);
+    if (!number || value <= 0.0) {
+        appendLog(QStringLiteral("Invalid frequency: %1").arg(input));
+        return;
+    }
+    if (scale == 0.0) scale = value < 1000.0 ? 1e6 : (value < 1e7 ? 1e3 : 1.0);
+    const double hz = std::round(value * scale);
+    if (tuneRigTo(hz, QStringLiteral("entered"))) {
+        m_rigTuneTargetHz = hz;
+        m_rigTuneHoldUntilMs = QDateTime::currentMSecsSinceEpoch() + 1500;
+        updateRigReadout();
+    }
 }
 
 void MainWindow::updateRigReadout()
@@ -12457,16 +12580,23 @@ void MainWindow::updateRigReadout()
     // other modes in its own group at the bottom of the Mode tab.
     const bool ftMode = m_ftFrequencySlot != nullptr && ui != nullptr && ui->cmbMode != nullptr &&
                         Ft8Mode::isFamilyMode(ui->cmbMode->currentText());
-    QWidget *host = ftMode ? m_ftFrequencySlot : m_grpRigReadout;
+    const bool js8Mode = m_js8FrequencySlot != nullptr && ui != nullptr && ui->cmbMode != nullptr &&
+                         Js8Mode::isMode(ui->cmbMode->currentText());
+    QWidget *host = ftMode ? m_ftFrequencySlot : (js8Mode ? m_js8FrequencySlot : m_grpRigReadout);
     if (m_rigReadoutWidget->parentWidget() != host) {
         auto *hostLayout = qobject_cast<QBoxLayout *>(host->layout());
         if (hostLayout != nullptr) hostLayout->insertWidget(0, m_rigReadoutWidget);
     }
     m_rigReadoutWidget->setVisible(m_settings.hamlibCatEnabled);
-    m_grpRigReadout->setVisible(m_settings.hamlibCatEnabled && !ftMode);
+    m_grpRigReadout->setVisible(m_settings.hamlibCatEnabled && !ftMode && !js8Mode);
 
     if (m_lcdRigReadoutFrequency != nullptr) {
-        const qint64 hz = qRound64(m_lastRigFrequencyHz);
+        // While a QSY from the readout is on its way, show its target.
+        const bool tuning = m_rigTuneTargetHz > 0.0 &&
+                            ((m_rigTuneTimer != nullptr && m_rigTuneTimer->isActive()) ||
+                             QDateTime::currentMSecsSinceEpoch() < m_rigTuneHoldUntilMs);
+        if (!tuning) m_rigTuneTargetHz = 0.0;
+        const qint64 hz = qRound64(tuning ? m_rigTuneTargetHz : m_lastRigFrequencyHz);
         QString text = QStringLiteral("--.---.---");
         int digits = 8;
         if (hz > 0) {
@@ -12565,6 +12695,13 @@ void MainWindow::handleRigFrequencyChanged(double frequencyHz)
         appendLog(message);
     }
 
+    // JS8 band activity belongs to one dial frequency.
+    if (previousFrequencyHz > 0 && qAbs(frequencyHz - previousFrequencyHz) >= 1000.0 && !m_js8Activity.isEmpty()) {
+        m_js8Activity.clear();
+        m_js8Commands.clear();
+        js8RefreshActivity();
+    }
+    updateJs8BandFromCat(frequencyHz);
     updateFtBandFrequencyUi();
     updateRigControlStatusUi();
     updateRttyContestBandFromCat();
@@ -12693,33 +12830,12 @@ QString MainWindow::bandFromFrequencyHz(double frequencyHz) const
 
 double MainWindow::ftStandardFrequencyHz(const QString &modeName, const QString &band) const
 {
+    if (Js8Mode::isMode(modeName)) return M3StandardFrequencies::dialHz(QStringLiteral("JS8"), band);
     const bool ft4 = Ft8Mode::profileForMode(modeName).shortLabel.compare(QStringLiteral("FT4"), Qt::CaseInsensitive) == 0 ||
                      modeName.compare(QStringLiteral("FT4"), Qt::CaseInsensitive) == 0;
-    struct FtFreq { const char *band; double ft8Hz; double ft4Hz; };
-    static const FtFreq table[] = {
-        {"160m", 1840000.0, 0.0},
-        {"80m", 3573000.0, 3575000.0},
-        {"60m", 5357000.0, 0.0},
-        {"40m", 7074000.0, 7047500.0},
-        {"30m", 10136000.0, 10140000.0},
-        {"20m", 14074000.0, 14080000.0},
-        {"17m", 18100000.0, 18104000.0},
-        {"15m", 21074000.0, 21140000.0},
-        {"12m", 24915000.0, 24919000.0},
-        {"10m", 28074000.0, 28180000.0},
-        {"6m", 50313000.0, 50318000.0},
-        {"2m", 144174000.0, 144170000.0},
-        {"70cm", 432174000.0, 432174000.0},
-        {"23cm", 1296174000.0, 1296174000.0}
-    };
-    const QString wanted = band.trimmed();
-    for (const FtFreq &entry : table) {
-        if (wanted.compare(QString::fromLatin1(entry.band), Qt::CaseInsensitive) == 0) {
-            const double hz = ft4 && entry.ft4Hz > 0.0 ? entry.ft4Hz : entry.ft8Hz;
-            return hz;
-        }
-    }
-    return 0.0;
+    // FT4 falls back to the FT8 frequency on bands without an FT4 entry.
+    const double ft4Hz = ft4 ? M3StandardFrequencies::dialHz(QStringLiteral("FT4"), band) : 0.0;
+    return ft4Hz > 0.0 ? ft4Hz : M3StandardFrequencies::dialHz(QStringLiteral("FT8"), band);
 }
 
 QString MainWindow::ftBandFromFrequencyHz(double frequencyHz) const
@@ -13183,6 +13299,14 @@ void MainWindow::applyScheduledQsy(const ScheduledQsyEntry &entry)
             m_settings.ft8Band = entry.band;
             refreshFt8StandardMessages();
             updateFtBandFrequencyUi();
+        }
+    }
+
+    if (Js8Mode::isMode(targetMode) && m_cmbJs8Band != nullptr && !entry.band.isEmpty()) {
+        const int idx = m_cmbJs8Band->findText(entry.band, Qt::MatchFixedString);
+        if (idx >= 0) {
+            const QSignalBlocker block(m_cmbJs8Band);
+            m_cmbJs8Band->setCurrentIndex(idx);
         }
     }
 
@@ -13753,7 +13877,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetBinHz(modeName)));
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setTargetRowSeconds",
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetRowSeconds(modeName, m_settings.ftWaterfallRowMs)));
-    if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(waterfallPeriodMs(modeName));
+    if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(Js8Mode::isMode(modeName) ? js8WaterfallPeriodMs() : waterfallPeriodMs(modeName));
     if(m_txPreparationPending)stopImageTx();
     if (m_nativeWeakSignalTxPending) {
         const bool sameFamily =
@@ -13875,6 +13999,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
             ui->stkModeSettings->setCurrentWidget(m_pageJs8Settings);
         }
         applyJs8Settings();
+        js8UpdateBandUi();
         setDecoderReady(QStringLiteral("JS8 ") + Js8Mode::submodeName(currentJs8Submode()));
     } else if (Ft8Mode::isFamilyMode(modeName)) {
         if (m_pageFt8Settings != nullptr) {
@@ -14829,7 +14954,8 @@ void MainWindow::scheduleNativeWeakSignalPeriodTx()
     if (!m_nativeWeakSignalPreparedModulator && js8) {
         const int sampleRate = (m_settings.audioSampleRate == 44100 || m_settings.audioSampleRate == 48000 ||
                                 m_settings.audioSampleRate == 96000) ? m_settings.audioSampleRate : 48000;
-        const double hz = m_spinJs8TxFreq != nullptr ? m_spinJs8TxFreq->value() : 1500;
+        const double hz = m_js8PendingTxHz > 0 ? m_js8PendingTxHz
+                                               : (m_spinJs8TxFreq != nullptr ? m_spinJs8TxFreq->value() : 1500);
         const auto generation = ++m_nativeTxPreparationGeneration;
         m_txWaveformPreparer->prepareJs8(m_js8PendingFrames, currentJs8Submode(), sampleRate, hz,
             [this, generation, modeName](std::unique_ptr<TxModulator> waveform, const QString &error) {
@@ -24398,7 +24524,7 @@ void MainWindow::startRx()
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetBinHz(modeName)));
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setTargetRowSeconds",
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetRowSeconds(modeName, m_settings.ftWaterfallRowMs)));
-    if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(waterfallPeriodMs(modeName));
+    if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(Js8Mode::isMode(modeName) ? js8WaterfallPeriodMs() : waterfallPeriodMs(modeName));
     const bool cwRttyMode = modeName == CwDecoder::modeName() ||
                             modeName == RttyDecoder::modeName();
     const bool fastResumeCwRtty = m_fastResumeCwRttyRxPending &&

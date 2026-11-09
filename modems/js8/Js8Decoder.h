@@ -38,7 +38,9 @@ struct Js8Decode
     QString from;
     QString to;
     QString command;
+    QString extra;              // directed number (SNR of " SNR", " HEARTBEAT SNR")
     QString grid;
+    bool compound = false;      // frame carries a compound (portable) call
 };
 Q_DECLARE_METATYPE(Js8Decode)
 
@@ -46,7 +48,8 @@ Q_DECLARE_METATYPE(Js8Decode)
  * @brief Live JS8 receiver: collects UTC periods and decodes them off-thread.
  *
  * Audio is resampled to 12 kHz and cut at UTC period boundaries of the
- * selected submode (15/10/6/30 s).  Each complete period is decoded by
+ * selected submode (15/10/6/30 s).  With multi-decoding, every submode cuts
+ * its own periods from the same audio.  Each complete period is decoded by
  * Js8NativeEngine in a worker thread; results come back as Js8Decode.
  */
 class Js8Decoder : public QObject
@@ -60,6 +63,8 @@ public:
     bool liveInputEnabled() const { return m_liveInputEnabled.load(std::memory_order_acquire); }
 
     void setSubmode(Js8Mode::Submode submode);
+    /// Decodes all four submodes at once (more CPU), not only the selected one.
+    void setMultiDecode(bool enabled);
     void setDecodeDepth(int depth);
     void setRxFrequencyHz(int hz);
     void setTxFrequencyHz(int hz);
@@ -76,13 +81,24 @@ public slots:
 
 signals:
     void decoded(const Js8Decode &decode);
-    void periodDecoded(int count, int periodSeconds);
+    void periodDecoded(int count, int submode);
     void statusChanged(const QString &status);
 
 private:
+    struct Capture
+    {
+        Js8Mode::Submode submode = Js8Mode::Submode::Normal;
+        QVector<float> samples;
+        QDateTime start;
+        qint64 periodId = -1;
+        bool submitted = false;
+        bool timelineValid = false;
+    };
+
     void appendResampled(const AudioBlock &block);
-    void beginPeriod(qint64 periodId, qint64 firstSampleUtcNs);
-    void finishPeriod(bool force);
+    void rebuildCaptures();
+    void beginPeriod(Capture &capture, qint64 periodId, qint64 firstSampleUtcNs);
+    void finishPeriod(Capture &capture, bool force);
     void invalidate();
     void decodeLoop();
 
@@ -96,16 +112,13 @@ private:
 
     std::atomic<bool> m_liveInputEnabled{false};
     LinearResampler m_resampler;
-    QVector<float> m_samples;
     Js8NativeEngine::Configuration m_config;
-    QDateTime m_periodStart;
-    qint64 m_periodId = -1;
+    bool m_multiDecode = false;
+    QVector<Capture> m_captures;
     qint64 m_nextOutputUtcNs = 0;
     qint64 m_outputRemainder = 0;
     qint64 m_lastInputEndUtcNs = 0;
     quint64 m_captureGeneration = 0;
-    bool m_timelineValid = false;
-    bool m_periodSubmitted = false;
 
     std::atomic<quint64> m_generation{1};
     std::mutex m_jobsMutex;
