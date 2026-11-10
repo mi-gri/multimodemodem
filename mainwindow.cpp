@@ -1,3 +1,4 @@
+#include "utils/AppIcon.h"
 #include "utils/ApplicationIdentity.h"
 #include "runtime/SessionDiagnostics.h"
 #include "modems/ft8/FtDiagnostics.h"
@@ -1398,7 +1399,7 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::handleTextAssistAnalysisReady, Qt::QueuedConnection);
     m_textAssistThread->start();
 
-    setWindowIcon(QIcon(":/icons/multimodemodem.png"));
+    setWindowIcon(M3AppIcon::icon());
     if (ui->txtLog != nullptr) {
         ui->txtLog->setMaximumBlockCount(5000);
     }
@@ -24299,7 +24300,7 @@ void MainWindow::showAboutM3()
     header->setSpacing(14);
 
     QLabel *icon = new QLabel(&dialog);
-    icon->setPixmap(QIcon(QStringLiteral(":/icons/multimodemodem.png")).pixmap(48, 48));
+    icon->setPixmap(M3AppIcon::icon().pixmap(48, 48));
     icon->setFixedSize(54, 54);
     header->addWidget(icon, 0, Qt::AlignTop);
 

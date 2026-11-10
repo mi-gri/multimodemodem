@@ -1,3 +1,4 @@
+#include "utils/AppIcon.h"
 #include "utils/ApplicationIdentity.h"
 #include "utils/InstallationPaths.h"
 #include "utils/ProductName.h"
@@ -146,7 +147,7 @@ int main(int argc, char *argv[])
     M3Installation::adoptUpstreamUserData();
     QCoreApplication::setApplicationVersion(QStringLiteral(M3_VERSION_STRING));
     app.setApplicationDisplayName(M3Identity::windowTitle());
-    app.setWindowIcon(QIcon(":/icons/multimodemodem.png"));
+    app.setWindowIcon(M3AppIcon::icon());
 
     // Windows GUI executables can make QCommandLineParser::showVersion open
     // a modal message box when no console is attached. Keep the standalone
