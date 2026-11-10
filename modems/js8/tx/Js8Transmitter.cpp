@@ -10,6 +10,9 @@
 #include <algorithm>
 #include <cmath>
 
+// M_PI is not defined by MinGW with -std=c++17 (no GNU extensions).
+namespace { constexpr double kJs8Pi = 3.14159265358979323846; }
+
 namespace {
 constexpr double kTwoPi = 6.283185307179586476925286766559;
 }
@@ -89,7 +92,7 @@ void Js8Transmitter::buildWaveform(const std::function<bool()> &cancelled)
             if (phase > kTwoPi) phase -= kTwoPi;
             double gain = 1.0;
             const int edge = qMin(n + 1, count - n);
-            if (edge < ramp) gain = 0.5 - 0.5 * std::cos(M_PI * edge / ramp);
+            if (edge < ramp) gain = 0.5 - 0.5 * std::cos(kJs8Pi * edge / ramp);
             m_samples[first + n] = float(0.95 * gain * std::sin(phase));
         }
     }

@@ -16,6 +16,9 @@
 #include <stdexcept>
 #include <vector>
 
+// M_PI is not defined by MinGW with -std=c++17 (no GNU extensions).
+namespace { constexpr double kJs8Pi = 3.14159265358979323846; }
+
 namespace {
 
 using cd = std::complex<double>;
@@ -167,7 +170,7 @@ struct Js8NativeEngine::Impl
         double sum = 0.0;
         std::vector<double> window(static_cast<size_t>(nfilt + 1));
         for (int j = -nfilt / 2; j <= nfilt / 2; ++j) {
-            const double v = std::pow(std::cos(M_PI * j / nfilt), 2);
+            const double v = std::pow(std::cos(kJs8Pi * j / nfilt), 2);
             window[size_t(j + nfilt / 2)] = v;
             sum += v;
         }
@@ -180,7 +183,7 @@ struct Js8NativeEngine::Impl
         for (int i = 0; i < nmax; ++i) filterSpectrum[size_t(i)] = cd(w[i][0], w[i][1]) / double(nmax);
 
         taper.resize(size_t(p.ndd + 1));
-        for (int i = 0; i <= p.ndd; ++i) taper[size_t(i)] = 0.5 * (1.0 + std::cos(i * M_PI / p.ndd));
+        for (int i = 0; i <= p.ndd; ++i) taper[size_t(i)] = 0.5 * (1.0 + std::cos(i * kJs8Pi / p.ndd));
 
         for (int a = 0; a < 3; ++a) {
             csync[a].assign(size_t(7 * p.nDownSps), cd());
