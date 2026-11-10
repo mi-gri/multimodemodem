@@ -87,7 +87,9 @@ int main(int argc, char **argv)
     check(!WavelogClient::isInsecureUrl("http://127.0.0.1:8086/index.php") && !WavelogClient::isInsecureUrl("http://localhost/") &&
           !WavelogClient::isInsecureUrl("http://192.168.1.20/wavelog") && !WavelogClient::isInsecureUrl("http://10.1.2.3") &&
           !WavelogClient::isInsecureUrl("http://wavelog/index.php") && !WavelogClient::isInsecureUrl("http://nas.local/wavelog") &&
-          !WavelogClient::isInsecureUrl("http://[::1]:8080/"), "local http allowed");
+          !WavelogClient::isInsecureUrl("http://[::1]:8080/") && !WavelogClient::isInsecureUrl("http://[fd12:3456::1]/") &&
+          !WavelogClient::isInsecureUrl("http://[fe80::1]/"), "local http allowed");
+    check(WavelogClient::isInsecureUrl("http://[2a00:1450:4001::200e]/index.php"), "public IPv6 over http refused");
     WavelogClient::Config config{"x", "KEY", "7"};
     {   // Plain http to a public host is refused unless explicitly allowed.
         WavelogClient guard;

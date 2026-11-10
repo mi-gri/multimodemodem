@@ -26,6 +26,14 @@ QString cleanAdifValue(QString value)
     return value;
 }
 
+// ADIF forbids ',', ':', '<', '>', '{', '}' in field names. '%' and whitespace
+// are refused as well so a name can never alter the tag written around it.
+bool validFieldKey(const QString &key)
+{
+    static const QRegularExpression forbidden(QStringLiteral("[,:<>{}%\\s]"));
+    return !key.isEmpty() && key.size() <= 128 && !forbidden.match(key).hasMatch();
+}
+
 QString fieldKey(QString name)
 {
     QString key = name.trimmed().toUpper();
@@ -55,16 +63,15 @@ void putField(LogbookEntry *entry, const QString &name, const QString &value)
 QString adifTag(const QString &name, const QString &value)
 {
     const QString cleaned = cleanAdifValue(value);
-    if (cleaned.isEmpty()) {
+    const QString key = fieldKey(name);
+    if (cleaned.isEmpty() || !validFieldKey(key)) {
         return QString();
     }
 
     // ADIF field lengths are byte counts, not QString character counts.  Use
     // UTF-8 byte size so non-ASCII names/comments round-trip correctly.
-    return QString("<%1:%2>%3 ")
-        .arg(fieldKey(name))
-        .arg(cleaned.toUtf8().size())
-        .arg(cleaned);
+    // Single-pass arg(): a '%N' inside the name or value is never re-expanded.
+    return QStringLiteral("<%1:%2>%3 ").arg(key, QString::number(cleaned.toUtf8().size()), cleaned);
 }
 
 QString valueFromMap(const LogbookEntry &entry, const QString &name)
@@ -175,6 +182,10 @@ ParsedRecord parseRecordFieldsBytes(const QByteArray &record)
         const int valueStart = gt + 1;
         if (valueStart > n || byteLength > n - valueStart) {
             break;
+        }
+        if (!validFieldKey(name)) {   // skip the declared value of a malformed name
+            i = valueStart + byteLength;
+            continue;
         }
         const QByteArray valueBytes = record.mid(valueStart, qMin(byteLength, n - valueStart));
         const QString value = QString::fromUtf8(valueBytes);

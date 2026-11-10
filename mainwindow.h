@@ -2276,6 +2276,7 @@ private:
     qint64 m_js8LastOperatorMs = 0;
     bool m_js8WatchdogTripped = false;
     QHash<QString, qint64> m_js8AllCallReplyMs;   // @ALLCALL/HB answers per station
+    QHash<QString, QPair<qint64, int>> m_js8DirectedReplyBudget;   // window start, automatic directed answers
 
     using Ft8SequencerState = FtQsoSequencer::State;
 

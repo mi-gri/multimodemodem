@@ -47,5 +47,15 @@ int main(int argc, char **argv) {
           !legacyFields[0].adifFields.contains("APP_MADMODEM_QSO_ID"), "fields written before the rename are read as APP_M3_*");   // m3-compat
     const auto malformed = AdifLogbook::parseAdif("<CALL:2147483647>X");
     check(malformed.isEmpty(), "oversized field rejected without overflow");
+    const auto hostileName = AdifLogbook::parseAdif("<CALL:6>IZ6NNH <APP_X%3:12><CALL:4>EVIL <EOR>");
+    check(hostileName.size() == 1 && hostileName[0].callsign == "IZ6NNH" && !hostileName[0].adifFields.contains("APP_X%3"),
+          "field name with '%' is dropped with its value");
+    if (!hostileName.isEmpty()) {
+        LogbookEntry injected = hostileName[0];
+        injected.adifFields.insert("APP_Y%1", "<CALL:4>EVIL");
+        injected.adifFieldOrder.append("APP_Y%1");
+        const QString written = AdifLogbook::entryToAdif(injected);
+        check(!written.contains("EVIL") && written.contains("<CALL:6>IZ6NNH"), "hostile field name is not written");
+    }
     return ok ? 0 : 1;
 }

@@ -79,11 +79,14 @@ bool WavelogClient::isInsecureUrl(const QString &baseUrl)
     const QUrl url = endpoint(baseUrl, QString());
     if (url.scheme().compare(QStringLiteral("http"), Qt::CaseInsensitive) != 0) return false;
     const QString host = url.host().toLower();
-    if (host == QStringLiteral("localhost") || host.endsWith(QStringLiteral(".local")) ||
-        host.endsWith(QStringLiteral(".lan")) || host.endsWith(QStringLiteral(".home.arpa")) || !host.contains(QLatin1Char('.')))
-        return false;
     QHostAddress address;
-    if (!address.setAddress(host)) return true;   // public DNS name over plain http
+    if (!address.setAddress(host)) {
+        // Host names: intranet single labels and local suffixes are allowed.
+        // IP literals are checked below, since IPv6 literals never contain '.'.
+        return !(host == QStringLiteral("localhost") || host.endsWith(QStringLiteral(".local")) ||
+                 host.endsWith(QStringLiteral(".lan")) || host.endsWith(QStringLiteral(".home.arpa")) ||
+                 !host.contains(QLatin1Char('.')));
+    }
     if (address.isLoopback() || address.isLinkLocal()) return false;
     const QPair<QHostAddress, int> privateNets[] = {
         QHostAddress::parseSubnet(QStringLiteral("10.0.0.0/8")),

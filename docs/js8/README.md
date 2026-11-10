@@ -135,7 +135,11 @@ CRC-16 before they count.  `Js8AutoReply` then applies JS8Call's rules:
   AUTO nothing is sent automatically: a received MSG is still stored, and the
   answer to a question addressed to you is put into the message field for
   *Send*.  @ALLCALL questions and heartbeats are answered only with AUTO, at
-  most once per station in 15 minutes.
+  most once per station in 15 minutes.  Directed questions get at most four
+  automatic answers per station in 10 minutes; further ones are only logged,
+  since callsigns are not authenticated.
+- **Relay and store messages** is off by default: relays (`>`) and
+  `MSG TO:` messages for other stations are then ignored.
 - **Heartbeat every / CQ every** repeat a heartbeat (on a free offset between
   500 and 1000 Hz) or CQ (on the TX offset); they pause while a station is
   selected.

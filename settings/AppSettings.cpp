@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QFile>
+#include <QFileInfo>
 #include <QHash>
 #include <QRegularExpression>
 #include <QSet>
@@ -844,6 +845,19 @@ void AppSettings::load()
 
 bool AppSettings::save() const
 {
+#ifndef Q_OS_WIN
+    // Restrict the file before secrets are written. QSettings rewrites through
+    // a save file that keeps the existing permissions, so the QRZ password and
+    // Wavelog API key are never readable by others, not even briefly.
+    {
+        const QString path = settingsFilePath();
+        QDir().mkpath(QFileInfo(path).absolutePath());
+        QFile file(path);
+        if (file.exists() || file.open(QIODevice::WriteOnly | QIODevice::NewOnly)) {
+            file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+        }
+    }
+#endif
     QSettings settings(settingsFilePath(), QSettings::IniFormat);
     settings.setValue("Diagnostics/sessionEnabled", sessionDiagnosticsEnabled);
     settings.setValue("Diagnostics/folder", sessionDiagnosticsFolder);

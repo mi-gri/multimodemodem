@@ -48,6 +48,8 @@ constexpr int kJs8MaxHeard = 200;
 constexpr int kJs8MaxTextChars = 400;
 constexpr int kJs8MaxQueue = 6;
 constexpr qint64 kJs8AllCallReplyMs = 15 * 60 * 1000;   // one @ALLCALL/HB answer per station
+constexpr qint64 kJs8DirectedReplyWindowMs = 10 * 60 * 1000;   // automatic directed answers per station ...
+constexpr int kJs8DirectedReplyLimit = 4;                       // ... at most this many per window
 constexpr qint64 kJs8HeardAgingMs = 60 * 60 * 1000;     // HEARING?/QUERY CALL look back one hour
 
 QSettings js8Settings() { return QSettings(AppSettings::settingsFilePath(), QSettings::IniFormat); }
@@ -369,7 +371,7 @@ void MainWindow::setupJs8Page()
     m_chkJs8HbAck->setToolTip(uiText("js8_hb_ack_tooltip", "With AUTO, answer heartbeats with HEARTBEAT SNR (at most once per station in 15 minutes)."));
     autoGrid->addWidget(m_chkJs8HbAck, arow++, 0, 1, 4);
     m_chkJs8Relay = new QCheckBox(uiText("js8_relay_short", "Relay and store messages"), autoGroup);
-    m_chkJs8Relay->setChecked(settings.value(QStringLiteral("JS8/relay"), true).toBool());
+    m_chkJs8Relay->setChecked(settings.value(QStringLiteral("JS8/relay"), false).toBool());
     m_chkJs8Relay->setToolTip(uiText("js8_relay_tooltip", "Forward relay messages (CALL>CALL text) and keep MSG TO: messages for other stations until they fetch them."));
     autoGrid->addWidget(m_chkJs8Relay, arow++, 0, 1, 4);
 
@@ -746,7 +748,7 @@ void MainWindow::js8ProcessCommand(const Js8Command &command)
     ctx.status = m_editJs8StatusText != nullptr ? Js8Message::normalizeText(m_editJs8StatusText->text()) : QString();
     ctx.autoReply = m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked() && !m_js8WatchdogTripped;
     ctx.heartbeatAck = m_chkJs8HbAck != nullptr && m_chkJs8HbAck->isChecked();
-    ctx.relay = m_chkJs8Relay == nullptr || m_chkJs8Relay->isChecked();
+    ctx.relay = m_chkJs8Relay != nullptr && m_chkJs8Relay->isChecked();
     ctx.heardRecentFirst = js8RecentCalls();
     ctx.heardReport = [this](const QString &call) -> QString {
         const QDateTime now = QDateTime::currentDateTimeUtc();
@@ -780,6 +782,16 @@ void MainWindow::js8ProcessCommand(const Js8Command &command)
             const qint64 last = m_js8AllCallReplyMs.value(command.from, 0);
             if (last > 0 && nowMs - last < kJs8AllCallReplyMs) return;
             m_js8AllCallReplyMs.insert(command.from, nowMs);
+        } else {
+            // Callsigns are unauthenticated: a station repeating directed
+            // queries or relays must not key this transmitter without limit.
+            auto &budget = m_js8DirectedReplyBudget[command.from];
+            if (budget.first == 0 || nowMs - budget.first >= kJs8DirectedReplyWindowMs) budget = {nowMs, 0};
+            if (budget.second >= kJs8DirectedReplyLimit) {
+                appendLog(QStringLiteral("JS8 automatic reply to %1 suppressed (rate limit)").arg(command.from));
+                return;
+            }
+            ++budget.second;
         }
         // Heartbeat acknowledgements go to a free offset of the HB sub-band;
         // answers to directed queries to the TX offset.
