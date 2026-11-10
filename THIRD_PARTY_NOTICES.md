@@ -186,3 +186,10 @@ Daniel Bahr is BSD 3-clause.  Details: `third_party/js8call_gpl/NOTICE.md`.
 ## zlib — compressed session logs
 
 Session diagnostics use the platform zlib library (zlib license) for standard gzip compression. Project and license: https://zlib.net/. No zlib source is embedded by this change.
+
+## TweetNaCl — update signature verification
+
+`updates/Ed25519Verify.cpp` ports the Ed25519 verification of TweetNaCl
+20140427 by Daniel J. Bernstein, Bernard van Gastel, Wesley Janssen, Tanja
+Lange, Peter Schwabe and Sjaak Smetsers (public domain, https://tweetnacl.cr.yp.to/),
+adapted to C++ with SHA-512 from Qt and a canonical-S check per RFC 8032.

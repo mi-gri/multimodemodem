@@ -479,6 +479,7 @@ add_executable(MultiModeModem
     mainwindow.cpp
     FtAutomationLog.cpp
     updates/UpdateController.cpp updates/UpdateController.h
+    updates/Ed25519Verify.cpp updates/Ed25519Verify.h updates/UpdateSigningKeys.h
     callsign/QrzLookupPanel.cpp callsign/QrzLookupPanel.h widgets/FrequencyScaleTicks.h
     widgets/CurrentPageStack.h
     mainwindow.h
@@ -1201,7 +1202,7 @@ if(BUILD_TESTING)
     add_test(NAME m3_ft_incremental_producer COMMAND m3_ft_incremental_producer)
     set_tests_properties(m3_ft_incremental_producer PROPERTIES TIMEOUT 10)
     add_executable(m3_update_regression tests/UpdateReleaseRegression.cpp
-        updates/UpdateController.cpp utils/RuntimeI18n.cpp
+        updates/UpdateController.cpp updates/Ed25519Verify.cpp utils/RuntimeI18n.cpp
         settings/AppSettings.cpp rotator/RotatorPeakSearch.cpp)
     target_include_directories(m3_update_regression PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/generated")

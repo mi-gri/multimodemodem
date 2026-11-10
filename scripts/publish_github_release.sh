@@ -7,6 +7,9 @@ assets_dir="$(cd "${1:?Expected directory containing downloaded packages}" && pw
 : "${GH_REPO:?Missing GitHub repository}"
 : "${GITHUB_SHA:?Missing build commit}"
 : "${GITHUB_RUN_NUMBER:?Missing workflow run number}"
+# Ed25519 private key (PEM) that signs SHA256SUMS.txt; m3 installs updates only
+# with a valid signature (updates/UpdateSigningKeys.h).
+: "${M3_UPDATE_SIGNING_KEY:?Missing update signing key (secret M3_UPDATE_SIGNING_KEY)}"
 bash "$root/scripts/ci_release_version_guard.sh"
 version="$(tr -d '\r\n' < "$root/M3_VERSION.txt")"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
@@ -66,6 +69,21 @@ done
     for package in "${packages[@]}"; do sha256sum "${package##*/}"; done > SHA256SUMS.txt
 )
 packages+=("$publish_dir/SHA256SUMS.txt")
+
+# Sign the checksum list before anything is uploaded. The key's public half must
+# be compiled into m3, otherwise every client would refuse this release.
+keys_header="${M3_UPDATE_KEYS_HEADER:-$root/updates/UpdateSigningKeys.h}"
+key_file="$publish_dir/update-signing.pem"
+( umask 077; printf '%s\n' "$M3_UPDATE_SIGNING_KEY" > "$key_file" )
+public_key="$(openssl pkey -in "$key_file" -pubout -outform DER | tail -c 32 | od -An -tx1 | tr -d ' \n')"
+if [[ ! "$public_key" =~ ^[0-9a-f]{64}$ ]] || ! grep -q "\"$public_key\"" "$keys_header"; then
+    echo "ERROR: the update signing key is not an Ed25519 key listed in ${keys_header##*/}." >&2
+    exit 1
+fi
+openssl pkeyutl -sign -inkey "$key_file" -rawin -in "$publish_dir/SHA256SUMS.txt" -out "$publish_dir/SHA256SUMS.txt.sig"
+openssl pkeyutl -verify -inkey "$key_file" -rawin -in "$publish_dir/SHA256SUMS.txt" -sigfile "$publish_dir/SHA256SUMS.txt.sig" >/dev/null
+rm -f -- "$key_file"
+packages+=("$publish_dir/SHA256SUMS.txt.sig")
 
 prerelease=false
 create_options=()

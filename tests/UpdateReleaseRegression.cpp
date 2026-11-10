@@ -1,4 +1,5 @@
 #include "updates/UpdateController.h"
+#include "updates/Ed25519Verify.h"
 #include "settings/AppSettings.h"
 #include "M3Version.h"
 #include "M3BuildInfo.h"
@@ -100,6 +101,38 @@ int main(int argc,char **argv){
     check(UpdateController::selectAsset(assets,{"absent.tar.gz","test.zip"}).value("name")=="test.zip","ZIP fallback ignored");
     check(UpdateController::selectAsset(assets,{"managed.run"}).isEmpty(),"portable selected for managed install");
     std::cout<<"PASS Linux bundle/legacy/host identity, Ubuntu derivatives, unknown ABI rejection, TAR preference and ZIP fallback\n";
+    {   // Ed25519 against RFC 8032 section 7.1 tests 1 and 2.
+        const auto h=[](const char *s){return QByteArray::fromHex(s);};
+        const QByteArray pk1=h("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
+        const QByteArray sig1=h("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b");
+        const QByteArray pk2=h("3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c");
+        const QByteArray sig2=h("92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00");
+        check(M3Ed25519::verify(sig1,{},pk1) && M3Ed25519::verify(sig2,h("72"),pk2),"RFC 8032 signature rejected");
+        check(!M3Ed25519::verify(sig2,h("73"),pk2) && !M3Ed25519::verify(sig2,h("72"),pk1),"wrong message or key accepted");
+        // S + L verifies in plain TweetNaCl; RFC 8032 requires S < L.
+        static const unsigned char order[32]={0xed,0xd3,0xf5,0x5c,0x1a,0x63,0x12,0x58,0xd6,0x9c,0xf7,0xa2,0xde,0xf9,0xde,0x14,
+                                              0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x10};
+        QByteArray malleable=sig1;int carry=0;
+        for(int i=0;i<32;++i){const int v=(unsigned char)malleable[32+i]+order[i]+carry;malleable[32+i]=char(v&255);carry=v>>8;}
+        check(!M3Ed25519::verify(malleable,{},pk1),"non-canonical S accepted");
+        check(!M3Ed25519::verify(sig1.left(63),{},pk1) && !M3Ed25519::verify(sig1,{},pk1.left(31)),"short signature or key accepted");
+    }
+    {   // Signed checksum list: fixture key, never a release key.
+        const QByteArray key=QByteArray::fromHex("7b684f23c73b75b2783663b75b9e3958d02123acdb217e84f84d901f7da28001");
+        const QByteArray sums=QByteArray(64,'a')+"  MultiModeModem-9.9.9-Windows-64bit-Installer-AutoCPU.exe\n"+
+                              QByteArray(64,'b')+"  MultiModeModem-9.9.9-macOS-Intel-Portable.zip\n";
+        const QByteArray signature=QByteArray::fromHex("8be3c6d410d2df6012b8905e039cf33a983a026ecad6899130074f36fbcae1fe9fdf56790ed24ce82b90cdc406936d6421bd5de60bac4e950f08c2eec5d3a805");
+        QString reason;
+        check(UpdateController::verifiedChecksum(sums,signature,"MultiModeModem-9.9.9-macOS-Intel-Portable.zip",{key},&reason)==QByteArray(64,'b'),"signed checksum not returned");
+        check(UpdateController::verifiedChecksum(sums,signature,"absent.zip",{key},&reason).isEmpty() && !reason.isEmpty(),"missing package accepted");
+        QByteArray forged=sums;forged[0]='c';
+        check(UpdateController::verifiedChecksum(forged,signature,"MultiModeModem-9.9.9-Windows-64bit-Installer-AutoCPU.exe",{key}).isEmpty(),"altered checksum list accepted");
+        check(UpdateController::verifiedChecksum(sums,signature,"MultiModeModem-9.9.9-macOS-Intel-Portable.zip",UpdateController::signingKeys()).isEmpty(),"fixture signature accepted by the release keys");
+        check(UpdateController::verifiedChecksum(sums,{},"MultiModeModem-9.9.9-macOS-Intel-Portable.zip",{key}).isEmpty(),"unsigned checksum list accepted");
+        check(!UpdateController::signingKeys().isEmpty(),"no release signing key compiled in");
+        for(const auto &k:UpdateController::signingKeys())check(k.size()==32,"malformed release signing key");
+    }
+    std::cout<<"PASS Ed25519 RFC 8032 vectors, canonical S, signed checksum list accepted, forged/unsigned/foreign-key lists refused\n";
     QSettings settings(AppSettings::settingsFilePath(),QSettings::IniFormat);
     settings.setValue("Updates/checkAtStartup",false);settings.sync();
     QWidget window;QMenu menu;bool idle=false;

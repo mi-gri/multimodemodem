@@ -23,6 +23,11 @@ public:
     static QString linuxPlatform(const QString& marker, const QString& bundleInfo, const QString& osRelease);
     static QStringList linuxAssetNames(const QString& version, bool managed, const QString& platform, quint64 releaseBuild = 0);
     static QJsonObject selectAsset(const QJsonObject& release, const QStringList& names);
+    /// SHA-256 (lowercase hex) of @p name from a checksum list whose Ed25519
+    /// signature verifies against one of @p keys; empty with @p reason otherwise.
+    static QByteArray verifiedChecksum(const QByteArray& sums, const QByteArray& signature, const QString& name,
+                                       const QList<QByteArray>& keys, QString* reason = nullptr);
+    static QList<QByteArray> signingKeys();
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 private:

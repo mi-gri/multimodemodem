@@ -5,6 +5,8 @@
 #include "../settings/AppSettings.h"
 #include "../utils/InstallationPaths.h"
 #include "../utils/RuntimeI18n.h"
+#include "Ed25519Verify.h"
+#include "UpdateSigningKeys.h"
 #include <QAction>
 #include <QApplication>
 #include <QCryptographicHash>
@@ -278,16 +280,18 @@ void UpdateController::offer(const QJsonObject& release) {
     const QStringList names = assetNames(m_version, m_managed, m_releaseBuild);
     const QJsonObject asset = selectAsset(release, names);
     const QString name = asset.value("name").toString();
-    QJsonObject sums;
+    QJsonObject sums, signature;
     for (const auto& value : release.value("assets").toArray()) {
         const auto item = value.toObject();
         if (item.value("name").toString() == "SHA256SUMS.txt") sums = item;
+        if (item.value("name").toString() == "SHA256SUMS.txt.sig") signature = item;
     }
-    if (name.isEmpty() || asset.isEmpty() || sums.isEmpty()) {
+    if (name.isEmpty() || asset.isEmpty() || sums.isEmpty() || signature.isEmpty()) {
         m_busy = false;
         if (m_manual) {
             QString reason;
             if (sums.isEmpty()) reason = uiText("update_missing_checksums", "The release has no SHA256SUMS.txt file to verify downloads.");
+            else if (signature.isEmpty()) reason = uiText("update_missing_signature", "The release is not signed (SHA256SUMS.txt.sig is missing), so it cannot be installed automatically.");
             else if (names.isEmpty()) reason = uiText("update_unknown_bundle", "The Linux package type could not be identified. Download the package for your distribution.");
             else reason = uiText("update_missing_compatible_package", "The release has no compatible package. Expected: %1").arg(names.join(QStringLiteral("\n")));
             QMessageBox::information(m_window, ProductName::longName(), uiText("update_manual_download_reason", "A newer release is available. %1\n\nOpening the release page.").arg(reason));
@@ -295,27 +299,49 @@ void UpdateController::offer(const QJsonObject& release) {
         }
         return;
     }
-    const QUrl url(asset.value("browser_download_url").toString()), sumsUrl(sums.value("browser_download_url").toString());
+    const QUrl url(asset.value("browser_download_url").toString()), sumsUrl(sums.value("browser_download_url").toString()),
+        signatureUrl(signature.value("browser_download_url").toString());
     const qint64 size = static_cast<qint64>(asset.value("size").toDouble());
-    if (!assetUrl(url) || !assetUrl(sumsUrl) || size <= 0 || size > qint64{2}*1024*1024*1024) { fail(uiText("update_invalid", "Invalid release information.")); return; }
+    if (!assetUrl(url) || !assetUrl(sumsUrl) || !assetUrl(signatureUrl) || size <= 0 || size > qint64{2}*1024*1024*1024) { fail(uiText("update_invalid", "Invalid release information.")); return; }
     QString message = uiText("update_offer", "MultiModeModem %1 is available. Download the update?\n\nCurrent version: %2\nPackage: %3").arg(versionLabel(m_version, m_releaseBuild), versionLabel(QStringLiteral(M3_VERSION_STRING), QStringLiteral(M3_BUILD_NUMBER).toULongLong()), name);
     if (release.value("prerelease").toBool()) message += "\n\n" + uiText("update_prerelease", "This is a pre-release.");
     message += "\n\n" + (m_managed ? uiText("update_installer_info", "After verification, you can close MM and start the installer. Settings and logbooks are preserved; the installer may request license acceptance or system permission.") : uiText("update_portable_info", "The portable copy will remain portable. After confirmation MM closes, a full backup is kept beside the program folder, the package is replaced and MM restarts."));
     if (QMessageBox::question(m_window, ProductName::longName(), message, QMessageBox::Yes|QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) { m_busy = false; return; }
     if (m_cancelled || !m_idle()) { m_busy = false; return; }
     m_manual = true;
-    fetch(sumsUrl, 1024*1024, [this, url, name, size](const QByteArray& bytes) {
-        QByteArray sha;
-        for (const auto& line : bytes.split('\n')) {
-            const auto match = QRegularExpression("^([a-fA-F0-9]{64}) [ *](.+)$").match(QString::fromUtf8(line).trimmed());
-            if (match.hasMatch() && match.captured(2) == name) {
-                if (!sha.isEmpty()) { fail(uiText("update_invalid", "Invalid release information.")); return; }
-                sha = match.captured(1).toLatin1().toLower();
-            }
-        }
-        if (sha.isEmpty()) { fail(uiText("update_checksum_missing", "The release has no checksum for this package. Update cancelled.")); return; }
-        download(url, name, sha, size);
+    fetch(sumsUrl, 1024*1024, [this, url, name, size, signatureUrl](const QByteArray& sums) {
+        fetch(signatureUrl, 4096, [this, url, name, size, sums](const QByteArray& signature) {
+            QString reason;
+            const QByteArray sha = verifiedChecksum(sums, signature, name, signingKeys(), &reason);
+            if (sha.isEmpty()) { fail(reason); return; }
+            download(url, name, sha, size);
+        });
     });
+}
+QList<QByteArray> UpdateController::signingKeys() {
+    QList<QByteArray> keys;
+    for (const char* hex : M3UpdateSigning::kPublicKeys) keys.append(QByteArray::fromHex(hex));
+    return keys;
+}
+QByteArray UpdateController::verifiedChecksum(const QByteArray& sums, const QByteArray& signature, const QString& name,
+                                              const QList<QByteArray>& keys, QString* reason) {
+    auto refuse = [reason](const QString& text) { if (reason) *reason = text; return QByteArray(); };
+    // The signature covers the exact bytes of SHA256SUMS.txt; only then are
+    // its lines trusted. A release copied without the private key cannot pass.
+    bool signedByKey = false;
+    for (const auto& key : keys) if (M3Ed25519::verify(signature, sums, key)) { signedByKey = true; break; }
+    if (!signedByKey) return refuse(uiText("update_signature_invalid", "The release signature is not valid. Update cancelled; no program files were changed."));
+    static const QRegularExpression line("^([a-fA-F0-9]{64}) [ *](.+)$");
+    QByteArray sha;
+    for (const auto& raw : sums.split('\n')) {
+        const auto match = line.match(QString::fromUtf8(raw).trimmed());
+        if (match.hasMatch() && match.captured(2) == name) {
+            if (!sha.isEmpty()) return refuse(uiText("update_invalid", "Invalid release information."));
+            sha = match.captured(1).toLatin1().toLower();
+        }
+    }
+    if (sha.isEmpty()) return refuse(uiText("update_checksum_missing", "The release has no checksum for this package. Update cancelled."));
+    return sha;
 }
 void UpdateController::download(const QUrl& url, const QString& name, const QByteArray& sha, qint64 size) {
     m_directory = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/updates/" + QUuid::createUuid().toString(QUuid::WithoutBraces);
