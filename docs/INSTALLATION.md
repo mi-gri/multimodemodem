@@ -1,7 +1,7 @@
 # Installation — MultiModeModem 0.6.5
 
 Download the installer or portable package matching your system from
-[GitHub Releases](https://github.com/l-papadopol/MM/releases). Close MM before installation.
+[GitHub Releases](https://github.com/mi-gri/MultiModeModem/releases). Close MM before installation.
 
 | System | Installer | Portable |
 | --- | --- | --- |

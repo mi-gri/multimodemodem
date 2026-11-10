@@ -49,7 +49,7 @@ CAT/PTT, antenna rotator control and an ADIF logbook in one Qt desktop applicati
 
 ## Download e installazione / Downloads
 
-Scaricare il pacchetto dalla pagina [Releases](https://github.com/l-papadopol/MM/releases).
+Scaricare il pacchetto dalla pagina [Releases](https://github.com/mi-gri/MultiModeModem/releases).
 
 | Sistema / System | Download |
 | --- | --- |
