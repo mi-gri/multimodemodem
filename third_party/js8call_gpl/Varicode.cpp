@@ -23,6 +23,8 @@
 // WSJT-X DecodedText) is left out.  Everything else is JS8Call 2.2.0.
 #define QT_NO_DEBUG_OUTPUT
 #include <QDebug>
+#include <QStringView>
+#include <algorithm>
 #include <QMap>
 #include <QSet>
 
@@ -339,7 +341,7 @@ QMap<int, int> dbm2mw = {
 int mwattsToDbm(int mwatts){
     int dbm = 0;
     auto values = dbm2mw.values();
-    qSort(values);
+    std::sort(values.begin(), values.end());
     foreach(auto mw, values){
         if(mw < mwatts){ continue; }
         dbm = dbm2mw.key(mw);
@@ -397,14 +399,16 @@ QString Varicode::unescape(const QString &text){
     QString unescaped(text);
 #if JS8_USE_ESCAPE_SUB_CHAR
     static const int size = 5;
-    QRegExp r("([\\x1A][0-9a-fA-F]{4})");
+    static const QRegularExpression r("([\\x1A][0-9a-fA-F]{4})");
 #else
     static const int size = 6;
-    QRegExp r("(([uU][+]|\\\\[uU])[0-9a-fA-F]{4})");
+    static const QRegularExpression r("(([uU][+]|\\\\[uU])[0-9a-fA-F]{4})");
 #endif
+    // m3: QRegularExpression instead of QRegExp (removed in Qt 6).
     int pos = 0;
-    while ((pos = r.indexIn(unescaped, pos)) != -1) {
-        unescaped.replace(pos++, size, QChar(r.cap(1).right(4).toUShort(0, 16)));
+    for (QRegularExpressionMatch m = r.match(unescaped, pos); m.hasMatch(); m = r.match(unescaped, pos)) {
+        pos = m.capturedStart(1);
+        unescaped.replace(pos++, size, QChar(m.captured(1).right(4).toUShort(nullptr, 16)));
     }
 
     return unescaped;
@@ -557,7 +561,7 @@ QList<QPair<int, QVector<bool>>> Varicode::huffEncode(const QMap<QString, QStrin
     int i = 0;
 
     auto keys = huff.keys();
-    qSort(keys.begin(), keys.end(), [](QString const &a, QString const &b){
+    std::sort(keys.begin(), keys.end(), [](QString const &a, QString const &b){
         auto alen = a.length();
         auto blen = b.length();
         if(blen < alen){
@@ -573,7 +577,7 @@ QList<QPair<int, QVector<bool>>> Varicode::huffEncode(const QMap<QString, QStrin
     while(i < text.length()){
         bool found = false;
         foreach(auto ch, keys){
-            if(text.midRef(i).startsWith(ch)){
+            if(QStringView(text).mid(i).startsWith(ch)){
                 out.append({ ch.length(), Varicode::strToBits(huff[ch])});
                 i += ch.length();
                 found = true;
@@ -618,7 +622,8 @@ QString Varicode::huffDecode(QMap<QString, QString> const &huff, QVector<bool> c
 }
 
 QSet<QString> Varicode::huffValidChars(const QMap<QString, QString> &huff){
-    return QSet<QString>::fromList(huff.keys());
+    const auto keys = huff.keys();
+    return QSet<QString>(keys.begin(), keys.end());
 }
 
 // convert char* array of 0 bytes and 1 bytes to bool vector
@@ -811,7 +816,7 @@ QString Varicode::pack72bits(quint64 value, quint8 rem){
 // 21 bits for the data + 1 bit for a flag indicator
 // giving us a total of 5.5 bits per character
 quint32 Varicode::packAlphaNumeric22(QString const& value, bool isFlag){
-    QString word = QString(value).replace(QRegExp("[^A-Z0-9/ ]"), "");
+    QString word = QString(value).replace(QRegularExpression("[^A-Z0-9/ ]"), "");
     if(word.length() < 4){
         word = word + QString(" ").repeated(4-word.length());
     }
@@ -862,7 +867,7 @@ QString Varicode::unpackAlphaNumeric22(quint32 packed, bool *isFlag){
 //
 // giving us a total of 4.5-5.55 bits per character
 quint64 Varicode::packAlphaNumeric50(QString const& value){
-    QString word = QString(value).replace(QRegExp("[^A-Z0-9 /@]"), "");
+    QString word = QString(value).replace(QRegularExpression("[^A-Z0-9 /@]"), "");
     if(word.length() > 3 && word.at(3) != '/'){
         word.insert(3, ' ');
     }
@@ -1230,9 +1235,9 @@ bool Varicode::isCommandAutoreply(const QString &cmd){
     return directed_cmds.contains(cmd) && (autoreply_cmds.contains(directed_cmds[cmd]));
 }
 
-bool isValidCompoundCallsign(QStringRef callsign){
+bool isValidCompoundCallsign(const QString &callsign){
     // compound calls cannot be > 9 characters after removing the /
-    if(callsign.toString().replace("/", "").length() > 9){
+    if(QString(callsign).remove(QLatin1Char('/')).length() > 9){
         return false;
     }
 
@@ -1243,7 +1248,7 @@ bool isValidCompoundCallsign(QStringRef callsign){
     //
     // this is so arbitrary words < 10 characters in length don't end up coded as callsigns
     if(callsign.contains("/")){
-        auto base = callsign.toString().left(callsign.indexOf("/"));
+        auto base = callsign.left(callsign.indexOf("/"));
         return !basecalls.contains(base);
     }
 
@@ -1273,7 +1278,7 @@ bool Varicode::isValidCallsign(const QString &callsign, bool *pIsCompound){
     match = QRegularExpression("^" + compound_callsign_pattern).match(callsign);
 
     if(match.hasMatch() && (match.capturedLength() == callsign.length())){
-        bool isValid = isValidCompoundCallsign(match.capturedRef(0));
+        bool isValid = isValidCompoundCallsign(match.captured(0));
 
         if(pIsCompound) *pIsCompound = isValid;
         return isValid;
@@ -1298,9 +1303,9 @@ bool Varicode::isCompoundCallsign(const QString &callsign){
         return false;
     }
 
-    bool isValid = isValidCompoundCallsign(match.capturedRef(0));
+    bool isValid = isValidCompoundCallsign(match.captured(0));
 
-    qDebug() << "is valid compound?" << match.capturedRef(0) << isValid;
+    qDebug() << "is valid compound?" << match.captured(0) << isValid;
 
     return isValid;
 }
