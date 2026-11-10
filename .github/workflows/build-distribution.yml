@@ -22,7 +22,7 @@ jobs:
     name: Validate source version and release metadata
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Check all release identities before platform setup
         run: bash scripts/ci_release_version_guard.sh
       - name: Verify rejection of mixed source versions
@@ -35,7 +35,7 @@ jobs:
     name: Ubuntu 24.04 / Mint 22 x64 portable, RUN and DEB
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install build and runtime dependencies
         run: |
           sudo apt-get update
@@ -62,7 +62,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD/dist/packages:/packages:ro" -v "$PWD/scripts:/checks:ro" ubuntu:24.04 \
             bash -c 'apt-get update && apt-get install -y python3 binutils libgl1 libegl1 fonts-dejavu-core && python3 /checks/test_linux_portable.py /packages/*.tar.gz'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: portable-ubuntu24-x64
           path: |
@@ -76,7 +76,7 @@ jobs:
           python3 scripts/package_linux_installer.py --build-dir build-installer --format deb
           test -s dist/packages/MultiModeModem-*-Ubuntu24.04-amd64.deb
           bash scripts/test_linux_installer.sh dist/packages/*-Setup.run
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: installer-ubuntu24-x64
           path: |
@@ -96,7 +96,7 @@ jobs:
             zlib-devel hamlib-devel fftw-devel qt5-qtbase-devel qt5-qttools-devel qt5-qtmultimedia-devel \
             qt5-qtserialport-devel qt5-qtdeclarative-devel qt5-qtlocation-devel \
             qt5-qtwayland openssl-libs mesa-libGL-devel rpm-build which findutils
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build application
         run: |
           cmake -S . -B build-installer -G Ninja -DCMAKE_BUILD_TYPE=Release \
@@ -111,7 +111,7 @@ jobs:
         run: |
           cmake --install build-installer --prefix "$PWD/dist/linux"
           bash scripts/package_linux_github.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: portable-fedora43-x64
           path: |
@@ -125,7 +125,7 @@ jobs:
           python3 scripts/package_linux_installer.py --build-dir build-installer --format rpm
           test -s dist/packages/multimodemodem-*.fc43.x86_64.rpm
           bash scripts/test_linux_installer.sh dist/packages/*-Setup.run
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: installer-fedora43-x64
           path: |
@@ -138,8 +138,8 @@ jobs:
     needs: fedora
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
         with:
           name: portable-fedora43-x64
           path: portable
@@ -153,7 +153,7 @@ jobs:
     name: Windows x64 portable and automatic CPU installer
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -190,7 +190,7 @@ jobs:
       - name: Create portable ZIPs
         shell: msys2 {0}
         run: bash scripts/package_windows_msys2.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: portable-windows-x64-legacy-and-avx2
           path: dist/packages/*-standalone.zip
@@ -204,12 +204,12 @@ jobs:
         run: ./scripts/test_windows_installer.ps1
       - name: Preserve Windows installer diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-installer-logs
           path: ${{ runner.temp }}/multimodemodem-installer-logs/
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: installer-windows-x64
           path: dist/packages/*-Setup.exe
@@ -232,7 +232,7 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: '15.0'
       JOBS: '2'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install dependencies
         run: brew install cmake ninja pkg-config qt qtlocation hamlib fftw
       - name: Build application
@@ -242,7 +242,7 @@ jobs:
       - name: Bundle runtime and create portable archives
         timeout-minutes: 15
         run: bash scripts/package_macos.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: portable-macos-${{ matrix.arch }}
           path: |
@@ -253,7 +253,7 @@ jobs:
         run: bash scripts/package_macos_installer.sh
       - name: Verify installation and reinstall
         run: bash scripts/test_macos_installer.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: installer-macos-${{ matrix.arch }}
           path: dist/macos/*.pkg
@@ -267,13 +267,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
         with:
           pattern: portable-*
           merge-multiple: true
           path: release-assets
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: installer-*
           merge-multiple: true
