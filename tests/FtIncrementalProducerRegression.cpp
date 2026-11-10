@@ -22,8 +22,11 @@ int main(int argc,char**argv){
  need(submitMs<100,"capture waited for the blocked preprocessing worker");
  need(!producer.snapshot(audio,c.slotUtcMs),"cancelled generation published");
  M3Ft::IncrementalAnalysis failed([](const QVector<double>&,int)->std::vector<double>{throw std::bad_alloc();},{});
+ // Keep the tails contiguous: a gap would replace the unprocessed offset-0
+ // tail, the worker would skip it and never reach the throwing builder.
  need(failed.submit(c,0,audio),"failure fixture rejected");wait.restart();bool refused=false;
- while(wait.elapsed()<2000){if(!failed.submit(c,6000,audio)){refused=true;break;}QThread::msleep(1);}
+ for(int offset=audio.size();wait.elapsed()<10000;offset+=audio.size()){
+  if(!failed.submit(c,offset,audio)){refused=true;break;}QThread::msleep(1);}
  need(refused&&!failed.snapshot(audio,c.slotUtcMs),"worker failure did not fall back to uncached decoding");
  std::cout<<"PASS capture submit/snapshot/invalidate do not wait for blocked producer; cancelled publication rejected; worker exception falls back\n";
 }
