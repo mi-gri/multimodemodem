@@ -34,6 +34,7 @@
 namespace {
 
 QString g_activeThemeKey = QStringLiteral("avionica");
+bool g_themeApplied = false;
 
 struct ThemeSpec
 {
@@ -1264,10 +1265,16 @@ void setSemanticRole(QWidget *widget, const QString &role)
     widget->update();
 }
 
+bool isUiThemeApplied(const QString &themeKey)
+{
+    return g_themeApplied && g_activeThemeKey == normalizedThemeKey(themeKey);
+}
+
 void applyUiTheme(QApplication &app, const QString &themeKey)
 {
     const QString key = normalizedThemeKey(themeKey);
     g_activeThemeKey = key;
+    g_themeApplied = true;
     ensureThemeApplicationFilter(app);
 
     if (key == QStringLiteral("avionica")) {

@@ -1,4 +1,4 @@
-# Installation — MultiModeModem 0.6.5
+# Installation — MultiModeModem 0.6.6
 
 Download the installer or portable package matching your system from
 [GitHub Releases](https://github.com/mi-gri/MultiModeModem/releases). Close MM before installation.
@@ -31,6 +31,13 @@ Linux XDG overrides and explicitly chosen logbook paths are respected. Portable
 copies retain executable-adjacent data. Back up settings, ADIF files and recordings
 before replacing a portable folder; do not delete the old copy until checked.
 Uninstalling MM must not be used to delete personal data.
+
+Several configurations: `MultiModeModem --config NAME` uses `configs/NAME.mad` in
+the settings folder (created as a copy of the default settings), `--config FILE.mad`
+a file of its own. Only one instance runs per configuration: a second start on the
+same settings file shows a message and exits, because both would overwrite each
+other's settings and logbook. Instances with different configurations run side by
+side. A lock left by a crashed instance (`settings.mad.instance`) is taken over.
 
 Help provides update checking and its startup setting. Published prereleases are
 included; versions and build numbers determine ordering, independently of Latest.

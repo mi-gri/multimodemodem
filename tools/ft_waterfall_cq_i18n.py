@@ -567,3 +567,84 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'update_missing_signature':('The release is not signed (SHA256SUMS.txt.sig is missing), so it cannot be installed automatically.','La release non è firmata (manca SHA256SUMS.txt.sig), quindi non può essere installata automaticamente.','La version n’est pas signée (SHA256SUMS.txt.sig manque) et ne peut donc pas être installée automatiquement.','Das Release ist nicht signiert (SHA256SUMS.txt.sig fehlt) und kann daher nicht automatisch installiert werden.','Utgivelsen er ikke signert (SHA256SUMS.txt.sig mangler) og kan derfor ikke installeres automatisk.','Vydání není podepsané (chybí SHA256SUMS.txt.sig), proto je nelze nainstalovat automaticky.'),
  'update_signature_invalid':('The release signature is not valid. Update cancelled; no program files were changed.','La firma della release non è valida. Aggiornamento annullato; nessun file del programma è stato modificato.','La signature de la version n’est pas valide. Mise à jour annulée ; aucun fichier du programme n’a été modifié.','Die Signatur des Releases ist ungültig. Update abgebrochen; es wurden keine Programmdateien geändert.','Signaturen for utgivelsen er ugyldig. Oppdateringen er avbrutt; ingen programfiler ble endret.','Podpis vydání není platný. Aktualizace zrušena; žádné soubory programu nebyly změněny.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'instance_default_configuration':('default configuration','configurazione predefinita','configuration par défaut','Standardkonfiguration','standardkonfigurasjon','výchozí konfigurace'),
+ 'instance_already_running':(
+  'MultiModeModem is already running with this configuration (%1, process %2). A second instance would overwrite its settings and logbook.\\n\\nClose the running instance first, or start another one with its own configuration: --config NAME.',
+  'MultiModeModem è già in esecuzione con questa configurazione (%1, processo %2). Una seconda istanza sovrascriverebbe impostazioni e log.\\n\\nChiudi prima l’istanza in esecuzione, oppure avviane un’altra con una configurazione propria: --config NOME.',
+  'MultiModeModem fonctionne déjà avec cette configuration (%1, processus %2). Une deuxième instance écraserait ses paramètres et son carnet.\\n\\nFermez d’abord l’instance en cours, ou démarrez-en une autre avec sa propre configuration : --config NOM.',
+  'MultiModeModem läuft bereits mit dieser Konfiguration (%1, Prozess %2). Eine zweite Instanz würde deren Einstellungen und Logbuch überschreiben.\\n\\nBeende zuerst die laufende Instanz oder starte eine weitere mit eigener Konfiguration: --config NAME.',
+  'MultiModeModem kjører allerede med denne konfigurasjonen (%1, prosess %2). En ny instans ville overskrive innstillingene og loggen.\\n\\nLukk den kjørende instansen først, eller start en annen med egen konfigurasjon: --config NAVN.',
+  'MultiModeModem již běží s touto konfigurací (%1, proces %2). Druhá instance by přepsala jeho nastavení a deník.\\n\\nNejprve ukončete běžící instanci, nebo spusťte další s vlastní konfigurací: --config NÁZEV.'),
+}.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'frequency_group_other':('Outside amateur bands','Fuori dalle bande radioamatoriali','Hors bandes amateur','Außerhalb der Amateurfunkbänder','Utenfor amatørbåndene','Mimo radioamatérská pásma'),
+ 'stored_frequencies':('Stored','Memorizzate','Enregistrées','Gespeichert','Lagret','Uložené'),
+ 'stored_frequencies_tooltip':(
+  'Frequencies of this mode and band from Settings → Frequencies. Selecting one tunes the CAT-connected rig.',
+  'Frequenze di questo modo e banda da Impostazioni → Frequenze. Selezionandone una si sintonizza la radio CAT.',
+  'Fréquences de ce mode et de cette bande dans Paramètres → Fréquences. En choisir une accorde la radio CAT.',
+  'Frequenzen dieses Modus und Bands aus Einstellungen → Frequenzen. Eine Auswahl stimmt das CAT-Funkgerät darauf ab.',
+  'Frekvenser for denne modusen og dette båndet fra Innstillinger → Frekvenser. Et valg stiller CAT-radioen dit.',
+  'Kmitočty tohoto provozu a pásma z Nastavení → Kmitočty. Výběr naladí rádio CAT.'),
+ 'stored_frequencies_none_selected':('(rig not on a stored frequency)','(radio non su una frequenza memorizzata)','(radio hors fréquence enregistrée)','(Funkgerät nicht auf gespeicherter Frequenz)','(radioen er ikke på en lagret frekvens)','(rádio není na uloženém kmitočtu)'),
+ 'frequency_entry':('Enter','Inserisci','Saisir','Eingabe','Inntast','Zadat'),
+ 'frequency_entry_placeholder':('e.g. 14.080 MHz or 4583 kHz, Enter tunes','es. 14.080 MHz o 4583 kHz, Invio sintonizza','p. ex. 14.080 MHz ou 4583 kHz, Entrée accorde','z. B. 14.080 MHz oder 4583 kHz, Enter stimmt ab','f.eks. 14.080 MHz eller 4583 kHz, Enter stiller inn','např. 14.080 MHz nebo 4583 kHz, Enter naladí'),
+ 'frequency_entry_tooltip':(
+  'Dial frequency to tune the CAT-connected rig to, also outside the amateur bands (receive). Without a unit, values below 1000 are MHz, larger ones kHz.',
+  'Frequenza di sintonia per la radio CAT, anche fuori dalle bande radioamatoriali (ricezione). Senza unità, valori sotto 1000 sono MHz, gli altri kHz.',
+  'Fréquence d’accord de la radio CAT, aussi hors bandes amateur (réception). Sans unité, les valeurs inférieures à 1000 sont en MHz, les autres en kHz.',
+  'Frequenz, auf die das CAT-Funkgerät abgestimmt wird, auch außerhalb der Amateurfunkbänder (Empfang). Ohne Einheit sind Werte unter 1000 MHz, größere kHz.',
+  'Frekvens CAT-radioen stilles til, også utenfor amatørbåndene (mottak). Uten enhet er verdier under 1000 MHz, større kHz.',
+  'Kmitočet, na který se rádio CAT naladí, i mimo radioamatérská pásma (příjem). Bez jednotky jsou hodnoty pod 1000 MHz, větší kHz.'),
+}.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Add missing defaults':('Add missing defaults','Aggiungi predefiniti mancanti','Compléter les défauts','Fehlende Standardwerte ergänzen','Legg til manglende standarder','Doplnit chybějící výchozí'),
+ 'Adds every default frequency that is not in the list, for all modes. Your own entries and preferred marks stay.':(
+  'Adds every default frequency that is not in the list, for all modes. Your own entries and preferred marks stay.',
+  'Aggiunge tutte le frequenze predefinite che mancano nell’elenco, per tutti i modi. Le tue voci e le preferite restano.',
+  'Ajoute toutes les fréquences par défaut absentes de la liste, pour tous les modes. Vos entrées et vos préférées restent.',
+  'Fügt alle Standardfrequenzen hinzu, die in der Liste fehlen, für alle Modi. Eigene Einträge und Bevorzugt-Markierungen bleiben erhalten.',
+  'Legger til alle standardfrekvenser som mangler i listen, for alle moduser. Egne oppføringer og foretrukne markeringer beholdes.',
+  'Přidá všechny výchozí kmitočty, které v seznamu chybí, pro všechny druhy provozu. Vlastní položky a označení preferovaných zůstanou.'),
+ '%1 default frequencies added.':('%1 default frequencies added.','%1 frequenze predefinite aggiunte.','%1 fréquences par défaut ajoutées.','%1 Standardfrequenzen hinzugefügt.','%1 standardfrekvenser lagt til.','Přidáno %1 výchozích kmitočtů.'),
+ 'All default frequencies are already in the list.':('All default frequencies are already in the list.','Tutte le frequenze predefinite sono già nell’elenco.','Toutes les fréquences par défaut sont déjà dans la liste.','Alle Standardfrequenzen sind bereits in der Liste.','Alle standardfrekvensene er allerede i listen.','Všechny výchozí kmitočty už v seznamu jsou.'),
+}.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'about_subtitle':('Amateur radio digital modem and station hub.','Modem digitale e centro di stazione per radioamatori.','Modem numérique et centre de station pour radioamateurs.','Digitales Modem und Stationszentrale für den Amateurfunk.','Digitalt modem og stasjonssentral for amatørradio.','Digitální modem a centrum stanice pro radioamatéry.'),
+ 'about_based_on':('Based on %1 %2.','Basato su %1 %2.','Basé sur %1 %2.','Basiert auf %1 %2.','Basert på %1 %2.','Založeno na %1 %2.'),
+ 'about_fork_label':('MultiModeModem:','MultiModeModem:','MultiModeModem :','MultiModeModem:','MultiModeModem:','MultiModeModem:'),
+ 'about_fork_text':(
+  'fork of %1 maintained by Michael Grigutsch, DO3BOX, github.com/mi-gri/MultiModeModem.',
+  'fork di %1 curato da Michael Grigutsch, DO3BOX, github.com/mi-gri/MultiModeModem.',
+  'dérivé de %1 maintenu par Michael Grigutsch, DO3BOX, github.com/mi-gri/MultiModeModem.',
+  'Fork von %1, gepflegt von Michael Grigutsch, DO3BOX, github.com/mi-gri/MultiModeModem.',
+  'fork av %1 vedlikeholdt av Michael Grigutsch, DO3BOX, github.com/mi-gri/MultiModeModem.',
+  'odnož %1, kterou spravuje Michael Grigutsch, DO3BOX, github.com/mi-gri/MultiModeModem.'),
+ 'about_madmodem_text':('Papadopol Lucian-Ioan, IZ6NNH, www.madexp.it',)*6,
+ 'about_license_label':('License:','Licenza:','Licence :','Lizenz:','Lisens:','Licence:'),
+ 'about_credits_label':('Thanks to:','Ringraziamenti:','Remerciements :','Dank an:','Takk til:','Poděkování:'),
+ 'about_credits_text':(
+  'WSJT-X authors (FT8/FT4, MSK144, Q65), JTDX team (decode display, PSK Reporter client), JS8Call (JS8), principal %1 tester IK7IMK Nick.',
+  'autori di WSJT-X (FT8/FT4, MSK144, Q65), team JTDX (visualizzazione decodifiche, client PSK Reporter), JS8Call (JS8), tester principale di %1 IK7IMK Nick.',
+  'auteurs de WSJT-X (FT8/FT4, MSK144, Q65), équipe JTDX (affichage des décodages, client PSK Reporter), JS8Call (JS8), testeur principal de %1 IK7IMK Nick.',
+  'WSJT-X-Autoren (FT8/FT4, MSK144, Q65), JTDX-Team (Decode-Anzeige, PSK-Reporter-Client), JS8Call (JS8), %1-Haupttester IK7IMK Nick.',
+  'WSJT-X-forfatterne (FT8/FT4, MSK144, Q65), JTDX-teamet (dekodingsvisning, PSK Reporter-klient), JS8Call (JS8), hovedtester for %1 IK7IMK Nick.',
+  'autoři WSJT-X (FT8/FT4, MSK144, Q65), tým JTDX (zobrazení dekódů, klient PSK Reporter), JS8Call (JS8), hlavní tester %1 IK7IMK Nick.'),
+ 'about_modes_label':('Modes:','Modi:','Modes :','Betriebsarten:','Moduser:','Druhy provozu:'),
+ 'about_includes_label':('Includes:','Include:','Comprend :','Enthält:','Inneholder:','Obsahuje:'),
+ 'about_includes_text':(
+  'CAT/PTT via Hamlib/HRD, rotator control, radio telescope, ADIF logbook, QSO map, PSK Reporter and Wavelog.',
+  'CAT/PTT tramite Hamlib/HRD, controllo rotore, radiotelescopio, log ADIF, mappa QSO, PSK Reporter e Wavelog.',
+  'CAT/PTT via Hamlib/HRD, commande de rotor, radiotélescope, carnet ADIF, carte des QSO, PSK Reporter et Wavelog.',
+  'CAT/PTT über Hamlib/HRD, Rotorsteuerung, Radioteleskop, ADIF-Logbuch, QSO-Karte, PSK Reporter und Wavelog.',
+  'CAT/PTT via Hamlib/HRD, rotorstyring, radioteleskop, ADIF-logg, QSO-kart, PSK Reporter og Wavelog.',
+  'CAT/PTT přes Hamlib/HRD, ovládání rotátoru, radioteleskop, deník ADIF, mapa spojení, PSK Reporter a Wavelog.'),
+ 'about_legal':(
+  'Full legal notices: LICENSE.md and THIRD_PARTY_NOTICES.md.',
+  'Note legali complete: LICENSE.md e THIRD_PARTY_NOTICES.md.',
+  'Mentions légales complètes : LICENSE.md et THIRD_PARTY_NOTICES.md.',
+  'Vollständige rechtliche Hinweise: LICENSE.md und THIRD_PARTY_NOTICES.md.',
+  'Fullstendige juridiske merknader: LICENSE.md og THIRD_PARTY_NOTICES.md.',
+  'Úplné právní informace: LICENSE.md a THIRD_PARTY_NOTICES.md.'),
+}.items()})

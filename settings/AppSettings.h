@@ -245,6 +245,7 @@ public:
     // Working-frequency list (Settings -> Frequencies) as JSON; empty = the
     // built-in WSJT-X/JS8Call defaults.  IARU region filter: ALL, R1, R2, R3.
     QString frequencyListJson;
+    QStringList frequencyListModes;     // modes the saved list knew (new modes get defaults)
     QString frequencyRegion = "ALL";
     bool frequencyQsyOnModeChange = true;   // tune to the mode's frequency on a mode change
     bool ft8DeepDecode = true; // internal compatibility flag: adaptive enables subtract/rescan.

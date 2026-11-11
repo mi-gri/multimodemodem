@@ -89,10 +89,16 @@ the Frequencies tab of WSJT-X/JTDX: mode, dial frequency, IARU region,
 description and a *preferred* mark per band.  The preferred entry of a band
 (else the first one) is used by
 
-- the band selectors of FT8/FT4, JS8, MSK144 and Q65,
+- the side tab *Frequency* (beside *Mode*) for every mode: *Band* (FT and
+  JS8 keep theirs in the Mode tab), *Stored* (all entries of the mode on that band; selecting one tunes)
+  and *Enter* (any dial frequency, e.g. `14.080 MHz`, `4583 kHz`; Enter
+  tunes).  Entries outside the amateur bands, such as weather RTTY and fax
+  stations, form the group *Outside amateur bands*; the Radio Telescope page
+  has only the entry,
 - a mode change (option, on by default): the rig is tuned to the new mode's
-  frequency on the band it is on; weather fax goes to its preferred station
-  unless the rig already sits on a listed station,
+  frequency on the band it is on.  It stays where it is when it already sits
+  on a stored frequency of the new mode or outside the amateur bands (receiving
+  a utility station); weather fax otherwise goes to its preferred station,
 - the band scheduler (*Use the frequency list entry for the band*).
 
 FT4 falls back to FT8 on bands without an FT4 entry.  Defaults:
@@ -105,9 +111,15 @@ FT4 falls back to FT8 on bands without an FT4 entry.  Defaults:
 | Feld Hell | Feld Hell Club frequency list |
 | PSK31, RTTY, MFSK, SSTV | customary calling/activity frequencies (40 m PSK and SSTV per region; SSTV 80/40 m in LSB) |
 | Weather fax | DWD Hamburg/Pinneberg DDH3 3855.0, DDK3 7880.0, DDK6 13882.5 kHz (dial USB 1.9 kHz lower) |
+| Weather RTTY | DWD DDH47 147.3, DDK2 4583.0, DDH7 7646.0, DDK9 10100.8, DDH9 11039.0, DDH8 14467.3 kHz, 50 Bd / 450 Hz (dial USB 2.35 kHz lower, RTTY preset *DWD weather*) |
 
-*Restore defaults* reloads them.  An unchanged list is stored as "defaults",
-so corrections of the built-in list reach existing installations.
+*Restore defaults* reloads them and drops own entries; *Add missing
+defaults* adds the default entries the list lacks and keeps own entries and
+preferred marks.  An unchanged list (in any order) is stored as "defaults",
+so corrections of the built-in list reach existing installations.  A saved
+list remembers the modes it knew: modes added later (such as RTTY, SSTV and
+weather fax for lists saved before they had defaults) get their default
+entries when the list is loaded.
 
 ## Directed commands and automatic operation
 

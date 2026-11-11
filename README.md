@@ -1,41 +1,43 @@
-# MultiModeModem (m³) 0.6.5
+# MultiModeModem (m³) 0.6.6
 
 **MultiModeModem (m³)** is a fork of **[MadModem](https://github.com/l-papadopol/MM)**
 by **Lucian-Ioan Papadopol, IZ6NNH** ([madexp.it](https://www.madexp.it)), maintained by
 DO3BOX at [mi-gri/MultiModeModem](https://github.com/mi-gri/MultiModeModem).
-It keeps everything MultiModeModem offers (digital modes, waterfall, CAT/PTT, rotator,
-editable ADIF logbook, Auto QSO) and adds JTDX-style FT operation: decode colours,
-waterfall, decode filters (CQ/end, worked, countries, continents), late-final handling and
-PSK Reporter spots.
+It keeps everything MadModem offers (digital modes, waterfall, CAT/PTT, rotator,
+editable ADIF logbook, Auto QSO) and adds JTDX-style FT operation (decode colours,
+waterfall, decode filters, late-final handling), JS8 in all four speeds, a frequency
+list for all modes, PSK Reporter spots, Wavelog/Cloudlog upload and signed updates.
 
 **MultiModeModem (m³)** ist ein Fork von MadModem (IZ6NNH). Er behält alle
-MultiModeModem-Funktionen und ergänzt einen FT-Betrieb im Stil von JTDX.
+MadModem-Funktionen und ergänzt einen FT-Betrieb im Stil von JTDX, JS8, eine
+Frequenzliste für alle Modi, PSK-Reporter-Spots, Wavelog-Upload und signierte Updates.
 
 ### Origin and credits / Herkunft
 
 - **MadModem** — Lucian-Ioan Papadopol, IZ6NNH: application, modems, logbook, UI.
-  Version numbers (0.6.5) follow MultiModeModem; the m³ build number counts on top.
+  m³ started from MadModem 0.6.5 and numbers its own versions from 0.6.6 on.
 - **WSJT-X** — Joe Taylor, K1JT, and the WSJT development group: FT8/FT4/MSK144/Q65 protocols.
 - **JTDX** — JTDX team: model for the FT decode display, colours and filters; PSK Reporter
   client (Edson Pereira PY2SDR, with fixes by CE3TSK from jtdx_contest).
-- License: GPLv3, as MultiModeModem. Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- **JS8Call** — Jordan Sherer, KN4CRD: JS8 protocol, message layer and receiver.
+- License: GPL-3.0-or-later, see [LICENSE.md](LICENSE.md). Third-party notices:
+  [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-The program file is `MultiModeModem`, its settings and data folders are named
-`MultiModeModem` as well (settings and the default logbook are copied once from the
-`MultiModeModem` folders on first start; MultiModeModem itself is left untouched). Source
-identifiers keep the upstream name so upstream changes can still be merged.
+The program file is `MultiModeModem`, and its settings and data folders are named
+`MultiModeModem` as well. Settings and the default logbook are copied once from the
+`MadModem` folders on first start; MadModem itself is left untouched.
 
 ---
 
 The original MadModem description follows.
 
-## MultiModeModem 0.6.5
+## MadModem 0.6.5
 
-**MultiModeModem (MM)** è un'applicazione libera per radioamatori: modi digitali, audio,
+**MadModem (MM)** è un'applicazione libera per radioamatori: modi digitali, audio,
 waterfall, controllo della radio e del rotore, logbook e mappe in un unico programma.
 Sviluppato da **Lucian-Ioan Papadopol, IZ6NNH** — [madexp.it](https://www.madexp.it).
 
-**MultiModeModem** is free amateur-radio software combining digital modes, a waterfall,
+**MadModem** is free amateur-radio software combining digital modes, a waterfall,
 CAT/PTT, antenna rotator control and an ADIF logbook in one Qt desktop application.
 
 ## Funzioni / Features
@@ -80,5 +82,5 @@ See [Troubleshooting](docs/TROUBLESHOOTING.md).
 - [GitHub distribution workflow](docs/DISTRIBUTION.md)
 - [Documentation](docs/README.md) · [Release notes](RELEASE_NOTES.md)
 
-Licensed under GNU GPLv3; see [COPYING](COPYING), [LICENSE.md](LICENSE.md),
+Licensed under GNU GPL-3.0-or-later; see [COPYING](COPYING), [LICENSE.md](LICENSE.md),
 [authors](AUTHORS.md) and [third-party notices](THIRD_PARTY_NOTICES.md).

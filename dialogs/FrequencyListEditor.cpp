@@ -78,11 +78,18 @@ FrequencyListEditor::FrequencyListEditor(const QVector<M3StandardFrequencies::En
     auto *remove = new QPushButton(L(QStringLiteral("Delete")), this);
     auto *restore = new QPushButton(L(QStringLiteral("Restore defaults")), this);
     restore->setToolTip(L(QStringLiteral("Replaces the list with the defaults: WSJT-X 3.0 (FT8, FT4, MSK144, Q65), JS8Call 2.2.0 (JS8) and customary activity frequencies of the other modes.")));
+    auto *addDefaults = new QPushButton(L(QStringLiteral("Add missing defaults")), this);
+    addDefaults->setToolTip(L(QStringLiteral("Adds every default frequency that is not in the list, for all modes. Your own entries and preferred marks stay.")));
+    // Two rows: the default-list buttons are long in some languages.
     buttons->addWidget(add);
     buttons->addWidget(remove);
     buttons->addStretch(1);
-    buttons->addWidget(restore);
     layout->addLayout(buttons);
+    auto *defaultButtons = new QHBoxLayout();
+    defaultButtons->addWidget(addDefaults);
+    defaultButtons->addWidget(restore);
+    defaultButtons->addStretch(1);
+    layout->addLayout(defaultButtons);
     m_summary = new QLabel(this);
     m_summary->setWordWrap(true);
     layout->addWidget(m_summary);
@@ -114,6 +121,14 @@ FrequencyListEditor::FrequencyListEditor(const QVector<M3StandardFrequencies::En
         std::sort(rows.begin(), rows.end(), std::greater<int>());
         for (int row : rows) m_table->removeRow(row);
         updateSummary();
+    });
+    connect(addDefaults, &QPushButton::clicked, this, [this]() {
+        int added = 0;
+        const auto merged = M3StandardFrequencies::withMissingDefaults(this->entries(), &added);
+        if (added > 0) load(merged);
+        QMessageBox::information(this, L(QStringLiteral("Add missing defaults")),
+                                 added > 0 ? L(QStringLiteral("%1 default frequencies added.")).arg(added)
+                                           : L(QStringLiteral("All default frequencies are already in the list.")));
     });
     connect(restore, &QPushButton::clicked, this, [this]() {
         if (QMessageBox::question(this, L(QStringLiteral("Restore defaults")),

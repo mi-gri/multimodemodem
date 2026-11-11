@@ -58,6 +58,7 @@
 #include "third_party/decodium_gpl/port/NtpClient.hpp"
 
 #include <QComboBox>
+#include <functional>
 #include <QColor>
 #include <QDateTime>
 #include <QImage>
@@ -715,6 +716,13 @@ private slots:
     QString js8ExpandMacro(const QString &source) const;
     // Working-frequency list (ModeFrequencyUi.cpp)
     QWidget *createModeBandGroup(QWidget *parent, const QString &listMode);
+    int addFrequencyPickerRows(QGridLayout *grid, int row, QWidget *parent, std::function<QString()> listMode,
+                               std::function<QString()> band);
+    void refreshFrequencyPickers();
+    QWidget *frequencyTabPage(const QString &pageKey);
+    void installModeFrequencyGroup(const QString &listMode);
+    void updateSideTabsForMode(const QString &modeName);
+    QString frequencyGroupLabel(const QString &group) const;
     void refreshModeBandLists();
     void updateModeBandUis();
     void followCatForModeBands(double frequencyHz);
@@ -2243,7 +2251,19 @@ private:
         QComboBox *band = nullptr;
         QLabel *status = nullptr;
     };
-    QHash<QString, ModeBandWidgets> m_modeBandWidgets;   // list mode -> band selector (MSK144, Q65)
+    QHash<QString, ModeBandWidgets> m_modeBandWidgets;   // list mode -> band selector (all modes but FT/JS8)
+    // Stored-frequency list and frequency entry, on every mode page.  FT and
+    // JS8 keep their own band selector; listMode/band return what applies.
+    struct FrequencyPicker
+    {
+        QComboBox *stored = nullptr;
+        QLineEdit *entry = nullptr;
+        std::function<QString()> listMode;
+        std::function<QString()> band;
+        QString signature;   // list mode + band + list version the combo was filled for
+    };
+    QVector<FrequencyPicker> m_frequencyPickers;
+    int m_frequencyListVersion = 0;
     QComboBox *m_cmbJs8Band = nullptr;
     QLabel *m_lblJs8BandStatus = nullptr;
     QWidget *m_js8FrequencySlot = nullptr;
@@ -2590,6 +2610,9 @@ private:
     quint64 m_audioInputRequest = 0;
     std::function<void()> m_audioStopCompletion;
     QWidget *m_tabQrz = nullptr;
+    QWidget *m_tabFrequency = nullptr;          // Frequency group of the current mode
+    QStackedWidget *m_stkFrequency = nullptr;
+    QHash<QString, QWidget *> m_frequencyPages; // "FT", "JS8", list mode, "" (Radio Telescope)
     QrzLookupPanel *m_qrzLookupPanel = nullptr;
     bool m_txRunning = false;
     bool m_offlineAnalysisActive = false;

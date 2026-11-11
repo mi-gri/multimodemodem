@@ -112,9 +112,16 @@ def main() -> int:
                     f"first: {stale_english[:8]}"
                 )
         else:
+            from de_ui_completion_i18n import DE as _DE_COMPLETION
+            reviewed_sources = _DE_COMPLETION if lang == "de" else {}
+            # A value reviewed under one key is reviewed for every key with the
+            # same English source (uiText key and generated text.<source> twin).
+            reviewed_pairs = {(canonical[k], v) for k, v in KEY_EXACT.get(lang, {}).items() if k in canonical}
             mixed = [
                 key for key, english in canonical.items()
                 if key not in KEY_EXACT.get(lang, {})
+                and english not in reviewed_sources
+                and (english, data.get(key)) not in reviewed_pairs
                 and data.get(key) != english
                 and looks_like_mixed_sentence(data.get(key, ""), english)
             ]

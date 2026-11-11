@@ -104,7 +104,7 @@ void LogbookSettingsDialog::refreshLabels()
 {
     setWindowTitle(L("Logbook file settings"));
     if (m_lblDescription != nullptr) {
-        m_lblDescription->setText(L("MultiModeModem keeps the internal logbook as one ADIF file. Choose where that file is stored. The default path is beside the application executable."));
+        m_lblDescription->setText(L("MultiModeModem keeps the internal logbook as one ADIF file. Choose where that file is stored."));
     }
     if (m_lblCurrentCaption != nullptr) {
         m_lblCurrentCaption->setText(L("Logbook file"));

@@ -1,8 +1,10 @@
-# MultiModeModem 0.6.5 translation maintenance
+# MultiModeModem 0.6.6 translation maintenance
 
 The six runtime dictionaries are English, Italian, French, German, Norwegian and Czech. Complete sentences are translated by stable key; protocol names and units remain shared where appropriate. Do not construct translated prose by replacing individual English words.
 
 `tools/update_ui_translations.py` harvests first-party UI strings and preserves reviewed translations. Add exact overrides there when wording or placeholders change. `tools/audit_localization.py` checks key parity/order, placeholders, duplicates and unintended language mixing.
+
+To find texts that are still English, start the program in that language with `MultiModeModem --i18n-report` (offscreen works: `QT_QPA_PLATFORM=offscreen`); it lists labels, buttons, tooltips, What's This help and placeholders of the main window and Settings. Reviewed German for such texts is in `tools/de_ui_completion_i18n.py`, keyed by the English source; help texts set with `setHelpText()` are registered from there.
 
 All twelve help topics in each language are maintained in `tools/update_help_pages.py`. Regenerate the 72 HTML pages after editing it. Qt Help namespaces, filters and footer versions follow the public application version. The embedded HTML remains available if Qt Help generation is unavailable.
 

@@ -1,4 +1,4 @@
-# GitHub distribution — MultiModeModem 0.6.5
+# GitHub distribution — MultiModeModem 0.6.6
 
 Copy the complete source directory contents into the repository root, including
 `.github`. To clean up documents left after overlaying an older source tree,
@@ -13,7 +13,7 @@ It builds Windows UCRT64, Ubuntu 24.04, Fedora 43 and both macOS architectures.
 After all jobs succeed, it publishes portable archives, EXE/RUN/DEB/RPM/PKG
 installers and SHA256SUMS. Native Linux packages are the same payloads wrapped by RUN.
 
-A branch build creates a numbered prerelease (`build-0.6.5-N`). Tag `v0.6.5` creates
+A branch build creates a numbered prerelease (`build-0.6.6-N`). Tag `v0.6.6` creates
 a version release. The tag must match all source metadata; the source-check job
 rejects mixed versions. Run the workflow on the new commit, not an older run.
 Only the publish job requests `contents: write`; the normal GitHub token is used.
@@ -49,6 +49,28 @@ through the updater.
 
 Versions built before this check do not verify the signature; the protection
 applies once a signing-aware m3 is installed.
+
+## Licenses of bundled libraries
+
+MultiModeModem is GPL-3.0-or-later (`LICENSE.md`). Every published package must
+let users obtain the corresponding source (GPLv3 section 6). The m³ source is
+the Git tag or commit embedded in the build (`--build-info`); the GitHub
+release links it. The packages also bundle libraries built by others:
+
+| Package | Bundled libraries | Source of the exact versions |
+|---|---|---|
+| Windows (MSYS2 UCRT64) | Qt 5 (LGPL-3.0), FFTW3 (GPL-2.0+), OpenSSL 3 (Apache-2.0), libusb (LGPL-2.1+), zlib, ANGLE (BSD-3), GCC runtime (GPL-3.0 with runtime exception), winpthreads (MIT) | MSYS2 package sources: https://github.com/msys2/MINGW-packages and the source tarballs at https://repo.msys2.org/mingw/sources/ |
+| Windows, Linux | Hamlib (LGPL-2.1+), linked statically | built from `third_party/hamlib_lgpl/source` in this repository |
+| macOS (Homebrew) | Qt 6 (LGPL-3.0), Hamlib (LGPL-2.1+), FFTW3 (GPL-2.0+) | Homebrew formulae name the upstream source URL and checksum: https://github.com/Homebrew/homebrew-core |
+| Linux portable / RUN | Qt 5, FFTW3 and their dependencies from Ubuntu 24.04 or Fedora 43 | `apt-get source` / `dnf download --source` for the versions of that distribution |
+
+Qt is linked dynamically, so users can replace it (LGPL). Hamlib is linked
+statically on Windows and Linux; its complete source and build script are in
+this repository, so the program can be rebuilt against a changed Hamlib. The
+libraries' license files stay next to them where the deployment tools copy
+them; keep them when repackaging. When publishing a release, note the MSYS2,
+Homebrew and distribution snapshot (date) in the release text, so the exact
+versions can be found later. This section is a summary, not legal advice.
 
 ## Distribution repositories
 

@@ -18,6 +18,8 @@
 #include <QSplitter>
 #include <QStandardPaths>
 #include <QTextBrowser>
+#include <QPalette>
+#include <QTextDocument>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
@@ -57,6 +59,23 @@ const FallbackTopic kFallbackTopics[] = {
 
 class HelpBrowser final : public QTextBrowser
 {
+    // The help pages are designed for a dark page (docs/help/style.css).  Qt's
+    // rich text ignores the page background and takes background, text and
+    // link colours from the widget and the application theme, which gave blue
+    // links on a grey page.  Use the colours of the help design instead.
+    void applyHelpColours()
+    {
+        setStyleSheet(QStringLiteral("QTextBrowser { background:#101817; color:#e8f5ef; "
+                                     "selection-background-color:#2f6b4c; selection-color:#ffffff; }"));
+        QPalette pal = palette();
+        pal.setColor(QPalette::Base, QColor(0x10, 0x18, 0x17));
+        pal.setColor(QPalette::Text, QColor(0xe8, 0xf5, 0xef));
+        pal.setColor(QPalette::Link, QColor(0x8e, 0xe6, 0xb0));
+        pal.setColor(QPalette::LinkVisited, QColor(0x8e, 0xe6, 0xb0));
+        setPalette(pal);
+        document()->setDefaultStyleSheet(QStringLiteral("a { color:#8ee6b0; }"));
+    }
+
 public:
 #ifdef M3_WITH_QT_HELP
     explicit HelpBrowser(QHelpEngine *engine, QWidget *parent = nullptr)
@@ -65,6 +84,7 @@ public:
     {
         setOpenExternalLinks(false);
         setOpenLinks(false);
+        applyHelpColours();
     }
 #else
     explicit HelpBrowser(QWidget *parent = nullptr)
@@ -72,6 +92,7 @@ public:
     {
         setOpenExternalLinks(false);
         setOpenLinks(false);
+        applyHelpColours();
     }
 #endif
 

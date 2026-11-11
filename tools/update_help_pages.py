@@ -1611,7 +1611,7 @@ def main() -> int:
                 f"<!DOCTYPE html><html lang='{lang}'><head><meta charset='utf-8'>"
                 f"<title>{brand(title)}</title><link rel='stylesheet' href='../style.css'></head><body>\n"
                 f"{brand(nav)}\n{brand(body)}\n"
-                f"<div class='footer'>MultiModeModem {VERSION} — based on MadModem {VERSION} — Qt Help — {LANGUAGE_NAMES[lang]}</div>\n"
+                f"<div class='footer'>MultiModeModem {VERSION} — based on MadModem 0.6.5 — Qt Help — {LANGUAGE_NAMES[lang]}</div>\n"
                 "</body></html>\n"
             )
             path.write_text(page, encoding="utf-8", newline="\n")

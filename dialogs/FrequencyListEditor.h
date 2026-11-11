@@ -17,7 +17,8 @@ class QTableWidget;
  *
  * One row per entry (mode, band, dial frequency in MHz, IARU region,
  * preferred flag, description), as the Frequencies tab of WSJT-X/JTDX.
- * "Restore defaults" reloads the WSJT-X 3.0 / JS8Call 2.2.0 list.
+ * "Restore defaults" reloads the default list; "Add missing defaults"
+ * adds the default entries the list lacks and keeps the operator's own.
  */
 class FrequencyListEditor final : public QWidget
 {

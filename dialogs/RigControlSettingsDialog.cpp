@@ -1,5 +1,6 @@
 #include "../runtime/SessionDiagnostics.h"
 #include "RigControlSettingsDialog.h"
+#include "../utils/RuntimeI18n.h"
 #include "../utils/CockpitTheme.h"
 #include "../utils/UiScale.h"
 
@@ -1465,5 +1466,7 @@ QString RigControlSettingsDialog::L(const QString &source) const
             return translated;
         }
     }
-    return source;
+    // Embedded in the Settings dialog without its own translator: use the
+    // application translation.
+    return M3I18n::text(source);
 }

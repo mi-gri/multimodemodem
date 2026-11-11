@@ -1,6 +1,7 @@
 #include "utils/AppIcon.h"
 #include "utils/ApplicationIdentity.h"
 #include "utils/InstallationPaths.h"
+#include "utils/InstanceLock.h"
 #include "utils/ProductName.h"
 #include "runtime/SessionDiagnosticsUiTap.h"
 #include "runtime/SessionDiagnostics.h"
@@ -19,6 +20,7 @@
 #include "utils/CockpitTheme.h"
 #include "utils/RuntimeI18n.h"
 #include "dialogs/AppSettingsDialog.h"
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTabWidget>
 #include <QScreen>
@@ -106,6 +108,7 @@ public:
 #include "tests/ArchitectureRegression.h"
 #include "tests/WindowRotatorRegression.h"
 #include "tests/LinuxPortableRuntimeRegression.h"
+#include "tests/I18nCoverageReport.h"
 
 int main(int argc, char *argv[])
 {
@@ -201,6 +204,9 @@ int main(int argc, char *argv[])
     const QCommandLineOption windowRegressionOption(QStringLiteral("window-rotator-regression"),QStringLiteral("Check main-window popups and manual rotator controls without radio hardware."));
     const QCommandLineOption portableRuntimeOption(QStringLiteral("portable-runtime-regression"), QStringLiteral("Verify bundled Linux plugins, QML and TLS without radio hardware."));
     commandLine.addOption(portableRuntimeOption);
+    const QCommandLineOption i18nReportOption(QStringLiteral("i18n-report"),
+        QStringLiteral("List visible texts of the main window and Settings that are still English in the configured language."));
+    commandLine.addOption(i18nReportOption);
     commandLine.addOption(windowRegressionOption);
     commandLine.addOption(runtimeRegressionOption);
     commandLine.addOption(uiRegressionOption);
@@ -322,6 +328,32 @@ int main(int argc, char *argv[])
     if (commandLine.isSet(runtimeRegressionOption)) return runRuntimeWorkersRegression(app);
     if (commandLine.isSet(uiRegressionOption)) return runSettingsUiRegression(app);
 
+    // One instance per configuration: a second one on the same settings file
+    // would overwrite its settings and logbook.  Other --config values work.
+    std::unique_ptr<QLockFile> instanceLock;
+    {
+        const QString settingsFile = AppSettings::settingsFilePath();
+        QString owner;
+        if (M3InstanceLock::acquire(settingsFile, instanceLock, &owner) == M3InstanceLock::Result::AlreadyRunning) {
+            const QString language = QSettings(settingsFile, QSettings::IniFormat).value(QStringLiteral("UI/language"), QStringLiteral("en")).toString();
+            M3I18n::setLanguageCode(language);
+            const auto uiText = [](const char *key, const char *fallback) {
+                return M3I18n::translate(QString::fromLatin1(key), QString::fromUtf8(fallback));
+            };
+            const QString config = M3Installation::activeConfig().isEmpty() ? uiText("instance_default_configuration", "default configuration")
+                                                                              : M3Installation::activeConfig();
+            const QString message = uiText("instance_already_running",
+                "MultiModeModem is already running with this configuration (%1, process %2). A second instance would overwrite its settings and logbook.\n\nClose the running instance first, or start another one with its own configuration: --config NAME.")
+                .arg(config, owner);
+            std::fprintf(stderr, "%s\nSettings: %s\n", qPrintable(message), qPrintable(QDir::toNativeSeparators(settingsFile)));
+            // Without a visible screen (tests, offscreen) there is nobody to click the dialog.
+            const QString platform = QGuiApplication::platformName();
+            if (platform != QStringLiteral("offscreen") && platform != QStringLiteral("minimal"))
+                QMessageBox::warning(nullptr, ProductName::longName(), message);
+            return 4;
+        }
+    }
+
     AppSettings bootSettings;
     bootSettings.load();
     SessionDiagnostics::installQtCapture();
@@ -359,5 +391,6 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (commandLine.isSet(i18nReportOption)) return M3I18nReport::run(app, window);
     return app.exec();
 }

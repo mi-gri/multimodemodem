@@ -901,6 +901,15 @@ QList<RttyPreset> rttyPresets()
             "50 baud, 425 Hz shift. Wider-shift utility-style RTTY."
         },
         {
+            "DWD_50_450_HIGH",
+            "DWD weather 50 / 450 / high",
+            50.0,
+            450,
+            2125,
+            false,
+            "Deutscher Wetterdienst maritime weather RTTY: 50 baud, 450 Hz shift, tones 2125/2575 Hz. Frequencies in Settings → Frequencies (RTTY, outside the amateur bands)."
+        },
+        {
             "WIDE_75_425_HIGH",
             "75 baud / 425 / high",
             75.0,
@@ -971,10 +980,15 @@ void setHelpText(QWidget *widget, const QString &text)
         return;
     }
 
-    const QString hint = compactHelpHint(text);
+    // Help texts are looked up by their English source (text.<source> keys);
+    // the hint is shortened after translation.  The source stays on the
+    // widget, so a language change translates it again (translateObjectTree).
+    widget->setProperty("i18nHelpSource", text);
+    const QString translated = M3I18n::text(text);
+    const QString hint = compactHelpHint(translated);
     widget->setToolTip(hint);
     widget->setStatusTip(hint);
-    widget->setWhatsThis(text);
+    widget->setWhatsThis(translated);
 }
 
 /**
@@ -6161,10 +6175,16 @@ void MainWindow::setupRttyPage()
         return;
     }
 
+    // Frequency groups of all modes live in the Frequency tab (see
+    // ModeFrequencyUi.cpp); SSTV and weather fax pages come from the .ui file.
+    installModeFrequencyGroup(QStringLiteral("SSTV"));
+    installModeFrequencyGroup(QStringLiteral("WEFAX"));
+
     m_pageRttySettings = new QWidget(ui->stkModeSettings);
     QVBoxLayout *outerLayout = new QVBoxLayout(m_pageRttySettings);
     outerLayout->setContentsMargins(0, 0, 0, 0);
     outerLayout->setSpacing(8);
+    installModeFrequencyGroup(QStringLiteral("RTTY"));
 
     QGroupBox *settingsGroup = new QGroupBox("RTTY settings", m_pageRttySettings);
     settingsGroup->setStyleSheet(QString());
@@ -6593,6 +6613,7 @@ void MainWindow::setupBpsk31Page()
     QVBoxLayout *outerLayout = new QVBoxLayout(m_pageBpsk31Settings);
     outerLayout->setContentsMargins(0, 0, 0, 0);
     outerLayout->setSpacing(8);
+    installModeFrequencyGroup(QStringLiteral("PSK"));
 
     QGroupBox *settingsGroup = new QGroupBox("PSK settings", m_pageBpsk31Settings);
     QGridLayout *grid = new QGridLayout(settingsGroup);
@@ -6684,6 +6705,7 @@ void MainWindow::setupMfskPage()
     QVBoxLayout *outerLayout = new QVBoxLayout(m_pageMfskSettings);
     outerLayout->setContentsMargins(0, 0, 0, 0);
     outerLayout->setSpacing(8);
+    installModeFrequencyGroup(QStringLiteral("MFSK"));
 
     QGroupBox *settingsGroup = new QGroupBox("MFSK settings", m_pageMfskSettings);
     QGridLayout *grid = new QGridLayout(settingsGroup);
@@ -6760,6 +6782,7 @@ void MainWindow::setupCwPage()
     QVBoxLayout *outerLayout = new QVBoxLayout(m_pageCwSettings);
     outerLayout->setContentsMargins(0, 0, 1, 0);
     outerLayout->setSpacing(8);
+    installModeFrequencyGroup(QStringLiteral("CW"));
 
     QGroupBox *settingsGroup = new QGroupBox(uiText("cw_settings_group", "CW Morse RX/TX settings"), m_pageCwSettings);
     QGridLayout *grid = new QGridLayout(settingsGroup);
@@ -7013,6 +7036,7 @@ void MainWindow::setupHellPage()
     QVBoxLayout *outerLayout = new QVBoxLayout(m_pageHellSettings);
     outerLayout->setContentsMargins(0, 0, 0, 0);
     outerLayout->setSpacing(8);
+    installModeFrequencyGroup(QStringLiteral("HELL"));
 
     QGroupBox *settingsGroup = new QGroupBox("Hellschreiber settings", m_pageHellSettings);
     QGridLayout *grid = new QGridLayout(settingsGroup);
@@ -7127,6 +7151,7 @@ void MainWindow::setupRadioTelescopePage()
     QVBoxLayout *outer = new QVBoxLayout(m_pageRadioTelescopeSettings);
     outer->setContentsMargins(6, 6, 6, 6);
     outer->setSpacing(6);
+    installModeFrequencyGroup(QString());
 
     QGroupBox *cfgGroup = new QGroupBox(uiText("radio_telescope_settings", "Radio telescope scan settings"), m_pageRadioTelescopeSettings);
     QGridLayout *grid = new QGridLayout(cfgGroup);
@@ -8365,7 +8390,7 @@ void MainWindow::setupMsk144Page()
     QVBoxLayout *outer = new QVBoxLayout(m_pageMsk144Settings);
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(8);
-    outer->addWidget(createModeBandGroup(m_pageMsk144Settings, QStringLiteral("MSK144")));
+    installModeFrequencyGroup(QStringLiteral("MSK144"));
 
     QGroupBox *rxGroup = new QGroupBox(uiText("msk144_rx_tx_settings", "MSK144 RX/TX settings"), m_pageMsk144Settings);
     QGridLayout *grid = new QGridLayout(rxGroup);
@@ -8628,7 +8653,7 @@ void MainWindow::setupQ65Page()
     QVBoxLayout *outer = new QVBoxLayout(m_pageQ65Settings);
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(8);
-    outer->addWidget(createModeBandGroup(m_pageQ65Settings, QStringLiteral("Q65")));
+    installModeFrequencyGroup(QStringLiteral("Q65"));
 
     QGroupBox *rxGroup = new QGroupBox(uiText("q65_rx_tx_settings", "Q65 RX/TX settings"), m_pageQ65Settings);
     QGridLayout *grid = new QGridLayout(rxGroup);
@@ -9153,6 +9178,22 @@ void MainWindow::setupFt8Page()
     qsoGrid->addWidget(m_ftFrequencySlot, 0, 1);
     qsoGrid->addWidget(new QLabel(uiText("band", "Band"), qsoGroup), 1, 0);
     qsoGrid->addWidget(m_cmbFt8Band, 1, 1);
+    {
+        // Stored FT frequencies of the band and the free entry: Frequency tab.
+        QWidget *page = frequencyTabPage(QStringLiteral("FT"));
+        auto *group = new QGroupBox(uiText("frequency", "Frequency"), page);
+        auto *grid = new QGridLayout(group);
+        grid->setContentsMargins(8, 8, 8, 8);
+        addFrequencyPickerRows(grid, 0, group,
+            [this]() {
+                const QString mode = ui != nullptr && ui->cmbMode != nullptr ? M3StandardFrequencies::listModeForName(ui->cmbMode->currentText()) : QString();
+                return mode == QStringLiteral("FT4") ? mode : QStringLiteral("FT8");
+            },
+            [this]() { return m_cmbFt8Band != nullptr ? m_cmbFt8Band->currentText() : QString(); });
+        grid->setColumnStretch(1, 1);
+        static_cast<QVBoxLayout *>(page->layout())->insertWidget(0, group);
+        connect(m_cmbFt8Band, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() { refreshFrequencyPickers(); });
+    }
     qsoGrid->addWidget(new QLabel(uiText("dx_call", "DX Call"), qsoGroup), 2, 0);
     qsoGrid->addWidget(m_editFt8DxCall, 2, 1);
     qsoGrid->addWidget(new QLabel(uiText("dx_grid", "DX Grid"), qsoGroup), 3, 0);
@@ -10678,6 +10719,14 @@ void MainWindow::translateObjectTree(QObject *object)
             }
         }
 
+        const QString helpSource = widget->property("i18nHelpSource").toString();
+        if (!helpSource.isEmpty()) {
+            // setHelpText(): tooltip and status are the shortened help.
+            const QString translated = M3I18n::text(helpSource);
+            widget->setToolTip(compactHelpHint(translated));
+            widget->setStatusTip(compactHelpHint(translated));
+            widget->setWhatsThis(translated);
+        } else {
         const QString toolSource = widget->property("i18nSourceToolTip").toString().isEmpty()
                                       ? widget->toolTip()
                                       : widget->property("i18nSourceToolTip").toString();
@@ -10692,6 +10741,7 @@ void MainWindow::translateObjectTree(QObject *object)
         if (!statusSource.trimmed().isEmpty()) {
             widget->setProperty("i18nSourceStatusTip", statusSource);
             widget->setStatusTip(uiTextFromSource("text", statusSource));
+        }
         }
     }
 
@@ -10934,6 +10984,10 @@ void MainWindow::applyUiLanguage()
         if (m_tabQrz != nullptr) {
             const int i = ui->sideTabWidget->indexOf(m_tabQrz);
             if (i >= 0) ui->sideTabWidget->setTabText(i, uiText("tab_qrz", "QRZ"));
+        }
+        if (m_tabFrequency != nullptr) {
+            const int i = ui->sideTabWidget->indexOf(m_tabFrequency);
+            if (i >= 0) ui->sideTabWidget->setTabText(i, uiText("frequency", "Frequency"));
         }
         if (m_tabCatRotator != nullptr) {
             const int i = ui->sideTabWidget->indexOf(m_tabCatRotator);
@@ -12210,8 +12264,11 @@ void MainWindow::applyUiAppearanceSettings()
         }
         font.setPointSize(qBound(8, m_settings.uiFontPointSize, 24));
     }
-    M3Ui::applyUiTheme(*app, theme);
-    app->setFont(font);
+    // Applying the theme or the font re-polishes every widget (about a second
+    // with the full window); do it only when it changes.  Widgets created
+    // since then still get the cockpit roles from polishCockpitWidgetTree().
+    if (!M3Ui::isUiThemeApplied(theme)) M3Ui::applyUiTheme(*app, theme);
+    if (app->font() != font) app->setFont(font);
     M3Ui::polishCockpitWidgetTree(this);
     for (QPlainTextEdit *terminal : {m_txtRttyRx, m_txtBpsk31Rx, m_txtMfskRx,
                                      m_txtCwRx, m_txtCwRxB}) {
@@ -12285,11 +12342,11 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
     const bool rotatorChanged = fullApply || rotatorSettingsKey(*previousSettings) != rotatorSettingsKey(m_settings);
 
     if (fullApply || previousSettings->frequencyListJson != m_settings.frequencyListJson ||
+        previousSettings->frequencyListModes != m_settings.frequencyListModes ||
         previousSettings->frequencyRegion != m_settings.frequencyRegion) {
         bool listOk = true;
-        QVector<M3StandardFrequencies::Entry> frequencies;
-        if (!m_settings.frequencyListJson.trimmed().isEmpty())
-            frequencies = M3StandardFrequencies::fromJson(m_settings.frequencyListJson, &listOk);
+        const QVector<M3StandardFrequencies::Entry> frequencies =
+            M3StandardFrequencies::fromSettings(m_settings.frequencyListJson, m_settings.frequencyListModes, &listOk);
         if (!listOk) appendLog(QStringLiteral("Frequency list in the settings is unreadable; the default list is used."));
         M3StandardFrequencies::setCurrent(frequencies, m_settings.frequencyRegion);
         js8RefreshBandList();
@@ -12592,24 +12649,11 @@ void MainWindow::promptRigFrequency()
                                                 uiText("rig_set_frequency_label", "Dial frequency (e.g. 14.078 MHz, 14078 kHz or 14078000 Hz):"),
                                                 QLineEdit::Normal, QString::number(current / 1000000.0, 'f', 6), &ok);
     if (!ok) return;
-    QString text = input.trimmed().toLower().remove(QLatin1Char(' '));
-    double scale = 0.0;
-    if (text.endsWith(QStringLiteral("mhz"))) { scale = 1e6; text.chop(3); }
-    else if (text.endsWith(QStringLiteral("khz"))) { scale = 1e3; text.chop(3); }
-    else if (text.endsWith(QStringLiteral("hz"))) { scale = 1.0; text.chop(2); }
-    text.replace(QLatin1Char(','), QLatin1Char('.'));
-    if (text.count(QLatin1Char('.')) > 1) {   // 14.078.000: grouped Hz
-        text.remove(QLatin1Char('.'));
-        if (scale == 0.0) scale = 1.0;
-    }
-    bool number = false;
-    const double value = text.toDouble(&number);
-    if (!number || value <= 0.0) {
+    const double hz = M3StandardFrequencies::parseFrequency(input);
+    if (hz <= 0.0) {
         appendLog(QStringLiteral("Invalid frequency: %1").arg(input));
         return;
     }
-    if (scale == 0.0) scale = value < 1000.0 ? 1e6 : (value < 1e7 ? 1e3 : 1.0);
-    const double hz = std::round(value * scale);
     if (tuneRigTo(hz, QStringLiteral("entered"))) {
         m_rigTuneTargetHz = hz;
         m_rigTuneHoldUntilMs = QDateTime::currentMSecsSinceEpoch() + 1500;
@@ -14073,6 +14117,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
     }
 
     qsyForModeChange(modeName);
+    updateSideTabsForMode(modeName);
 
     if (m_btnShowRuntimeLog != nullptr) {
         m_btnShowRuntimeLog->setVisible(Ft8Mode::isFamilyMode(modeName) || Msk144Mode::isMode(modeName) ||
@@ -21428,7 +21473,7 @@ void MainWindow::refreshTextMacroButtons()
             const QString label = m_settings.textMacroLabels.value(i, QString("Macro %1").arg(i + 1));
             const QString text = m_settings.textMacroTexts.value(i);
             button->setText(label);
-            button->setToolTip(QString("Transmit macro: %1\n\n%2").arg(label, text));
+            button->setToolTip(M3I18n::text(QStringLiteral("Transmit macro: %1\n\n%2")).arg(label, text));
             button->setStatusTip(button->toolTip());
         }
     };
@@ -24289,7 +24334,7 @@ void MainWindow::showAboutM3()
 {
     QDialog dialog(this);
     dialog.setWindowTitle(uiText("action.about", "About MM"));
-    dialog.resize(560, 360);
+    dialog.resize(580, 400);
     dialog.setMinimumSize(520, 320);
 
     QVBoxLayout *outer = new QVBoxLayout(&dialog);
@@ -24304,12 +24349,13 @@ void MainWindow::showAboutM3()
     icon->setFixedSize(54, 54);
     header->addWidget(icon, 0, Qt::AlignTop);
 
-    QLabel *title = new QLabel(QStringLiteral(
-        "<b>%1 (%2) %3</b><br>"
-        "Amateur radio digital modem and station hub.<br>"
-        "Based on MadModem %3.")
-        .arg(ProductName::longName(), ProductName::shortName(),
-             QStringLiteral(M3_VERSION_STRING)), &dialog);
+    const auto line = [](const QString &label, const QString &text) {
+        return QStringLiteral("<b>%1</b> %2").arg(label.toHtmlEscaped(), text.toHtmlEscaped());
+    };
+    QLabel *title = new QLabel(QStringLiteral("<b>%1 (%2) %3</b><br>%4<br>%5")
+        .arg(ProductName::longName(), ProductName::shortName(), QStringLiteral(M3_VERSION_STRING),
+             uiText("about_subtitle", "Amateur radio digital modem and station hub.").toHtmlEscaped(),
+             uiText("about_based_on", "Based on %1 %2.").arg(ProductName::upstreamName(), QStringLiteral("0.6.5")).toHtmlEscaped()), &dialog);
     title->setTextFormat(Qt::RichText);
     title->setWordWrap(true);
     header->addWidget(title, 1);
@@ -24318,22 +24364,29 @@ void MainWindow::showAboutM3()
     QLabel *body = new QLabel(&dialog);
     body->setTextFormat(Qt::RichText);
     body->setWordWrap(true);
-    body->setText(QStringLiteral(
-        "<p><b>MadModem author:</b> Papadopol Lucian-Ioan, IZ6NNH<br>"
-        "<b>Website:</b> www.madexp.it<br>"
-        "<b>License:</b> GPLv3</p>"
-        "<p><b>MultiModeModem:</b> fork by DO3BOX, "
-        "github.com/mi-gri/MultiModeModem. Decode display and filters "
-        "follow JTDX; FT protocols by the WSJT-X authors.</p>"
-        "<p><b>Principal tester:</b> IK7IMK Nick<br>"
-        "Testing, valuable advice and new ideas.</p>"
-        "<p><b>Modes:</b> FT8/FT4, CW, RTTY, BPSK/QPSK, MFSK, "
-        "SSTV, WEFAX, Feld Hell / FSK-105, MSK144 and Q65.</p>"
-        "<p><b>Includes:</b> CAT/PTT via Hamlib/HRD, rotator control, "
-        "Radio Telescope, ADIF logbook, QSO map and bundled third-party "
-        "open-source components.</p>"
-        "<p>See <tt>LICENSE</tt> and "
-        "<tt>THIRD_PARTY_NOTICES.md</tt> for full legal notices.</p>"));
+    body->setOpenExternalLinks(true);
+    const QString bodyHtml =
+        QStringLiteral("<p>") +
+        line(uiText("about_fork_label", "MultiModeModem:"),
+             uiText("about_fork_text", "fork of %1 maintained by Michael Grigutsch, DO3BOX, github.com/mi-gri/MultiModeModem.").arg(ProductName::upstreamName())) +
+        QStringLiteral("<br>") +
+        line(ProductName::upstreamName() + QLatin1Char(':'),
+             uiText("about_madmodem_text", "Papadopol Lucian-Ioan, IZ6NNH, www.madexp.it")) +
+        QStringLiteral("<br>") +
+        line(uiText("about_license_label", "License:"), QStringLiteral("GNU GPL 3.0 or later")) +
+        QStringLiteral("</p><p>") +
+        line(uiText("about_credits_label", "Thanks to:"),
+             uiText("about_credits_text", "WSJT-X authors (FT8/FT4, MSK144, Q65), JTDX team (decode display, PSK Reporter client), JS8Call (JS8), principal %1 tester IK7IMK Nick.").arg(ProductName::upstreamName())) +
+        QStringLiteral("</p><p>") +
+        line(uiText("about_modes_label", "Modes:"),
+             QStringLiteral("FT8/FT4, JS8, MSK144, Q65, CW, RTTY, BPSK/QPSK, MFSK, SSTV, WEFAX, Feld Hell / FSK-105")) +
+        QStringLiteral("</p><p>") +
+        line(uiText("about_includes_label", "Includes:"),
+             uiText("about_includes_text", "CAT/PTT via Hamlib/HRD, rotator control, radio telescope, ADIF logbook, QSO map, PSK Reporter and Wavelog.")) +
+        QStringLiteral("</p><p>") +
+        uiText("about_legal", "Full legal notices: LICENSE.md and THIRD_PARTY_NOTICES.md.").toHtmlEscaped() +
+        QStringLiteral("</p>");
+    body->setText(bodyHtml);
     outer->addWidget(body, 1);
 
     QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok, &dialog);
@@ -25730,32 +25783,32 @@ void MainWindow::updateTxControlState()
 
     if (m_btnRttySend != nullptr) {
         m_btnRttySend->setText(txBusy && rttyMode ? QString::fromUtf8("■") : QString::fromUtf8("➤"));
-        m_btnRttySend->setToolTip(txBusy && rttyMode ? "Stop the current RTTY transmission." : "Transmit the text typed in the input box.");
+        m_btnRttySend->setToolTip(M3I18n::text(txBusy && rttyMode ? QStringLiteral("Stop the current RTTY transmission.") : QStringLiteral("Transmit the text typed in the input box.")));
         m_btnRttySend->setEnabled(rttyMode && (txBusy || (hasRttyText && !m_offlineAnalysisActive)));
     }
 
     if (m_btnBpsk31Send != nullptr) {
         m_btnBpsk31Send->setText(txBusy && bpskMode ? QString::fromUtf8("■") : QString::fromUtf8("➤"));
-        m_btnBpsk31Send->setToolTip(txBusy && bpskMode ? "Stop the current PSK transmission." : "Transmit the text typed in the input box.");
+        m_btnBpsk31Send->setToolTip(M3I18n::text(txBusy && bpskMode ? QStringLiteral("Stop the current PSK transmission.") : QStringLiteral("Transmit the text typed in the input box.")));
         m_btnBpsk31Send->setEnabled(bpskMode && (txBusy || (hasBpskText && !m_offlineAnalysisActive)));
     }
 
     if (m_btnMfskSend != nullptr) {
         m_btnMfskSend->setText(txBusy && mfskMode ? QString::fromUtf8("■") : QString::fromUtf8("➤"));
-        m_btnMfskSend->setToolTip(txBusy && mfskMode ? "Stop the current MFSK transmission." : "Transmit the MFSK text typed in the input box.");
+        m_btnMfskSend->setToolTip(M3I18n::text(txBusy && mfskMode ? QStringLiteral("Stop the current MFSK transmission.") : QStringLiteral("Transmit the MFSK text typed in the input box.")));
         m_btnMfskSend->setEnabled(mfskMode && (txBusy || (hasMfskText && !m_offlineAnalysisActive)));
     }
 
     if (m_btnCwTxSettings) m_btnCwTxSettings->setEnabled(!txBusy && !m_cwKeyReleaseFailed && !m_offlineAnalysisActive);
     if (m_btnCwSend != nullptr) {
         m_btnCwSend->setText(txBusy && cwMode ? QString::fromUtf8("■") : QString::fromUtf8("➤"));
-        m_btnCwSend->setToolTip(txBusy && cwMode ? "Stop the current CW transmission." : "Transmit the CW text typed in the input box.");
+        m_btnCwSend->setToolTip(M3I18n::text(txBusy && cwMode ? QStringLiteral("Stop the current CW transmission.") : QStringLiteral("Transmit the CW text typed in the input box.")));
         m_btnCwSend->setEnabled(cwMode && (txBusy || (hasCwText && !m_offlineAnalysisActive)));
     }
 
     if (m_btnHellSend != nullptr) {
         m_btnHellSend->setText(txBusy && hellMode ? QString::fromUtf8("■") : QString::fromUtf8("➤"));
-        m_btnHellSend->setToolTip(txBusy && hellMode ? "Stop the current Hellschreiber transmission." : "Transmit the Hellschreiber text typed in the input box.");
+        m_btnHellSend->setToolTip(M3I18n::text(txBusy && hellMode ? QStringLiteral("Stop the current Hellschreiber transmission.") : QStringLiteral("Transmit the Hellschreiber text typed in the input box.")));
         m_btnHellSend->setEnabled(hellMode && (txBusy || (hasHellText && !m_offlineAnalysisActive)));
     }
 

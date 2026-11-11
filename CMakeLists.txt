@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(MultiModeModem
-    VERSION 0.6.5
+    VERSION 0.6.6
     LANGUAGES CXX
 )
 
@@ -1310,6 +1310,8 @@ if(BUILD_TESTING)
             add_test(NAME m3_linux_installer_preflight COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_linux_installer_preflight.py")
             add_test(NAME m3_update_publication COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_update_publication.py")
             set_tests_properties(m3_linux_update_helpers m3_linux_installer_preflight m3_update_publication PROPERTIES TIMEOUT 30)
+            add_test(NAME m3_instance_lock COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_instance_lock.py" $<TARGET_FILE:MultiModeModem>)
+            set_tests_properties(m3_instance_lock PROPERTIES TIMEOUT 180)
         endif()
 
         add_test(NAME m3_architecture_guard

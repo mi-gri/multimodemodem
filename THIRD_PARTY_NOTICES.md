@@ -1,6 +1,17 @@
 # Third-party notices and credits
 
-MadModem is a GPLv3 combined work. This file summarizes the upstream material currently present in the tree. The individual upstream license files under `third_party/` remain authoritative.
+MultiModeModem (m³) is a GPL-3.0-or-later combined work based on MadModem 0.6.5
+(see `LICENSE.md`). This file summarizes the upstream material currently present
+in the tree. The individual upstream license files under `third_party/` remain
+authoritative. Sections that name a MadModem version describe material taken
+over from MadModem.
+
+## MultiModeModem (m³)
+
+Modifications and additions since the fork (JTDX-style FT operation, JS8,
+frequency list, Wavelog, PSK Reporter spots, signed updates and others):
+**Michael Grigutsch / DO3BOX**, GPL-3.0-or-later. Third-party material added
+by m³ is listed below (JS8Call, JTDX PSK Reporter client, TweetNaCl).
 
 ## Original MadModem project material
 
@@ -92,12 +103,6 @@ The following projects influenced MadModem design, but their source code is not 
 - Meeus/NOAA-style formulae: Moon / EME local ephemeris calculation.
 
 
-### Eigen
-
-Location: `third_party/eigen/`
-
-Eigen is bundled as header-only source for legacy matrix algebra. License files from the supplied Eigen source archive are preserved in the same directory.
-
 ## gMFSK MFSK16 reference material
 
 MadModem's standard MFSK16 Varicode/FEC implementation was written for MadModem using the public gMFSK source as protocol reference for the IZ8BLY MFSK Varicode table, R=1/2 K=7 convolutional FEC polynomials, and the 10-stage diagonal interleaver/deinterleaver behaviour. gMFSK is GPL-2.0-or-later; MadModem is GPL-3.0, which is compatible with GPL-2.0-or-later code and protocol-table reuse.
@@ -182,6 +187,14 @@ GPL-3.0-or-later); the other modes use public band-plan and activity
 frequencies (IARU Region 1, Feld Hell Club, DWD radiofax schedule).  JS8Call is
 based on WSJT-X (Joe Taylor K1JT and the WSJT development group).  CRC++ by
 Daniel Bahr is BSD 3-clause.  Details: `third_party/js8call_gpl/NOTICE.md`.
+
+## JTDX — PSK Reporter client and FT display
+
+`network/PskReporter.*` is a C++/Qt port of the PSK Reporter client of JTDX
+(Edson Pereira PY2SDR and the JTDX team, GPL-3.0), with the 1200-byte datagram
+and 5-byte frequency fixes from jtdx_contest (CE3TSK). The FT decode colours,
+waterfall and decode filters follow JTDX's behaviour; that code is written for
+m³. Upstream: https://sourceforge.net/projects/jtdx/
 
 ## zlib — compressed session logs
 

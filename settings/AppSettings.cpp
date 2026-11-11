@@ -566,6 +566,7 @@ void AppSettings::load()
     ftDriftRxEnabled = settings.value("FT/driftRxEnabled", false).toBool();
     ftDriftMaxHzPerSec = qBound(0.25, settings.value("FT/driftMaxHzPerSec", 2.0).toDouble(), 20.0);
     frequencyListJson = settings.value("Frequencies/list").toString();
+    frequencyListModes = settings.value("Frequencies/listModes").toStringList();
     frequencyRegion = settings.value("Frequencies/region", QStringLiteral("ALL")).toString().trimmed().toUpper();
     if (frequencyRegion != "R1" && frequencyRegion != "R2" && frequencyRegion != "R3") frequencyRegion = "ALL";
     frequencyQsyOnModeChange = settings.value("Frequencies/qsyOnModeChange", true).toBool();
@@ -1042,8 +1043,13 @@ bool AppSettings::save() const
     settings.setValue("FT/gpuDecodeEnabled", ftGpuDecodeEnabled);
     settings.setValue("FT/driftRxEnabled", ftDriftRxEnabled);
     settings.setValue("FT/driftMaxHzPerSec", qBound(0.25, ftDriftMaxHzPerSec, 20.0));
-    if (frequencyListJson.trimmed().isEmpty()) settings.remove("Frequencies/list");
-    else settings.setValue("Frequencies/list", frequencyListJson);
+    if (frequencyListJson.trimmed().isEmpty()) {
+        settings.remove("Frequencies/list");
+        settings.remove("Frequencies/listModes");
+    } else {
+        settings.setValue("Frequencies/list", frequencyListJson);
+        settings.setValue("Frequencies/listModes", frequencyListModes);
+    }
     settings.setValue("Frequencies/region", frequencyRegion);
     settings.setValue("Frequencies/qsyOnModeChange", frequencyQsyOnModeChange);
     settings.setValue("FT8/rxFrequencyHz", ft8RxFrequencyHz);

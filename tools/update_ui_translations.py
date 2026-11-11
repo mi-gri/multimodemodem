@@ -185,6 +185,20 @@ def harvest_keys() -> OrderedDict[str, str]:
                         out.setdefault(prefix + "." + norm_key(value), value)
 
 
+    # Help texts and long tooltips (setHelpText(), variables) are not caught
+    # by the patterns above; the reviewed German table names them by their
+    # English source.  Register text.<source> keys for those used in the code.
+    from de_ui_completion_i18n import DE as _DE_COMPLETION
+    code = "\n".join(p.read_text(encoding="utf-8", errors="replace")
+                     for p in sorted(list(ROOT.rglob("*.cpp")) + list(ROOT.rglob("*.h")))
+                     if "/build" not in str(p) and "/third_party/" not in str(p) and "/tests/" not in str(p))
+    for _source in _DE_COMPLETION:
+        literal = _source.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+        if literal in code:
+            out.setdefault("text." + norm_key(_source), _source)
+            if re.search(r'(?:setPlaceholderText|makeLineEdit)\s*\([^;]*"' + re.escape(literal) + '"', code):
+                out.setdefault("placeholder." + norm_key(_source), _source)
+
     # Visible strings from Qt Designer forms.  These are translated through
     # MainWindow::translateObjectTree() using text.<normalized-source> keys.
     for ui in sorted(ROOT.rglob("*.ui")):
@@ -511,7 +525,7 @@ COMMON_EXACT = {
         "Save logbook PDF": "Salva PDF del registro QSO",
         "No QSO records to save.": "Nessun record QSO da salvare.",
         "Logbook file settings": "Impostazioni file registro QSO",
-        "MultiModeModem keeps the internal logbook as one ADIF file. Choose where that file is stored. The default path is beside the application executable.": "MultiModeModem conserva il registro interno in un unico file ADIF. Scegli dove salvarlo. Il percorso predefinito è accanto all'eseguibile dell'applicazione.",
+        "MultiModeModem keeps the internal logbook as one ADIF file. Choose where that file is stored.": "MultiModeModem conserva il registro interno in un unico file ADIF. Scegli dove salvarlo. Il percorso predefinito è accanto all'eseguibile dell'applicazione.",
         "Logbook file": "File registro QSO",
         "Default path": "Percorso predefinito",
         "Browse...": "Sfoglia...",
@@ -2292,7 +2306,22 @@ def main() -> int:
                 source = canonical.get(reviewed_key)
                 if source and reviewed_value.strip():
                     reviewed_by_source.setdefault(source, reviewed_value)
+        from de_ui_completion_i18n import DE as _DE_COMPLETION
+        # Translations already stored for the same English text under another
+        # key (a uiText key and its generated text.<source> twin).
+        existing_by_english: dict[str, str] = {}
+        if lang != "en":
+            for other_key, other_english in canonical.items():
+                value = existing.get(other_key, "")
+                if (value.strip() and value != other_english and
+                        not looks_like_mixed_sentence(value, other_english)):
+                    existing_by_english.setdefault(other_english, value)
         for k, english in canonical.items():
+            if lang == "de" and english in _DE_COMPLETION:
+                # Reviewed German by English source: wins over generated or
+                # older English placeholder values of any key with this text.
+                data[k] = _DE_COMPLETION[english]
+                continue
             if lang == "en":
                 # English is the canonical source, never a stale cached value.
                 data[k] = english
@@ -2312,6 +2341,8 @@ def main() -> int:
                 # phrases as keys.  Migrate those curated values to the stable
                 # harvested key, then omit the obsolete duplicate key.
                 data[k] = existing[english]
+            elif english in existing_by_english:
+                data[k] = existing_by_english[english]
             else:
                 if k in existing and looks_like_mixed_sentence(existing[k], english):
                     discarded_mixed += 1

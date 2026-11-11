@@ -26,6 +26,8 @@ enum class ThemeColorRole {
 
 QString normalizedThemeKey(const QString &themeKey);
 QString activeThemeKey();
+/// True once applyUiTheme() applied @p themeKey; re-applying it would only re-polish every widget.
+bool isUiThemeApplied(const QString &themeKey);
 QColor themeColor(ThemeColorRole role);
 void applyUiTheme(QApplication &app, const QString &themeKey);
 void setSemanticRole(QWidget *widget, const QString &role);

@@ -303,6 +303,50 @@ static void testStandardFrequencies()
     setCurrent({}, "ALL");
     check(preferredAnyBandHz("WEFAX") == 7878100.0 && nearEntry("WEFAX", 3853000.0, 5000.0) &&
           !nearEntry("WEFAX", 14074000.0, 5000.0), "weather fax stations");
+    // Frequencies outside the amateur bands (weather RTTY, fax) form their own group.
+    check(groupOf(14080000.0) == "20m" && groupOf(4583000.0) == otherGroup(), "groupOf");
+    check(groups("RTTY").contains(otherGroup()) && groups("RTTY").first() == "80m" && !groups("FT8").contains(otherGroup()),
+          "RTTY lists the group outside the bands, FT8 does not");
+    check(dialHz("RTTY", otherGroup()) == 4580650.0, "preferred weather RTTY station");
+    const auto fax = entriesFor("WEFAX", QString());
+    check(fax.size() == 3 && fax[0].hz < fax[1].hz && fax[1].hz < fax[2].hz, "weather fax entries sorted");
+    check(entriesFor("WEFAX", otherGroup()).size() == 2 && groups("WEFAX") == QStringList({"80m", otherGroup()}),
+          "DDH3 (3855 kHz) lies in the 80 m range, the other fax stations outside");
+    check(entriesFor("FT8", "20m").size() == 2 && entriesFor("RTTY", QString()).size() == 11, "entries per band and per mode");
+    check(parseFrequency("14.078 MHz") == 14078000.0 && parseFrequency("4583") == 4583000.0 &&
+          parseFrequency("7,074") == 7074000.0 && parseFrequency("147.3 kHz") == 147300.0 &&
+          parseFrequency("14.078.000") == 14078000.0 && parseFrequency("10100.8") == 10100800.0 &&
+          parseFrequency("x") == 0.0 && parseFrequency("-5") == 0.0,
+          "frequency entry parsing");
+    // A list saved before RTTY/SSTV/WEFAX had defaults gets them; a list that
+    // knew all modes keeps an operator's deletion.
+    {
+        QVector<Entry> old;
+        for (const Entry &e : defaults())
+            if (e.mode == "FT8" || e.mode == "FT4" || e.mode == "JS8" || e.mode == "Q65" || e.mode == "MSK144") old.prepend(e);
+        const auto migrated = fromSettings(toJson(old), {});
+        check(sameEntries(migrated, defaults()), "old default subset (any order) becomes the full default list");
+        const QVector<Entry> all = defaults();
+        check(!sameEntries(old, all) && sameEntries(QVector<Entry>(all.crbegin(), all.crend()), all),
+              "entries compare regardless of order");
+        const auto kept = fromSettings(toJson(old), modes());
+        check(entriesFor("RTTY", QString()).size() > 0 && std::none_of(kept.cbegin(), kept.cend(), [](const Entry &e) { return e.mode == "RTTY"; }),
+              "deleted modes stay deleted when the list knew them");
+        bool readable = true;
+        check(sameEntries(fromSettings("garbage", {}, &readable), defaults()) && !readable, "unreadable list falls back to defaults");
+        check(sameEntries(fromSettings(QString(), {}), defaults()), "empty setting means defaults");
+        // "Add missing defaults": own entries and preferred marks stay.
+        QVector<Entry> own = old;
+        Entry mine{"RTTY", 14085000.0, "ALL", "my RTTY", true};
+        own << mine;
+        int added = 0;
+        const auto merged = withMissingDefaults(own, &added);
+        check(added == defaults().size() - old.size() && merged.size() == own.size() + added, "missing defaults added once");
+        check(std::count_if(merged.cbegin(), merged.cend(), [](const Entry &e) { return e.mode == "RTTY" && groupOf(e.hz) == "20m" && e.preferred; }) == 1 &&
+              merged.contains(mine), "own preferred entry keeps its mark");
+        withMissingDefaults(merged, &added);
+        check(added == 0, "nothing added the second time");
+    }
     // Every preferred entry is unique per mode, band and region.
     QSet<QString> seen;
     for (const Entry &e : defaults()) {

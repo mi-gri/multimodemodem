@@ -817,11 +817,8 @@ QWidget *AppSettingsDialog::buildSettingsPage(InitialPage page)
     case InitialPage::FtDecoder:
         return makeFtDecoderPage();
     case InitialPage::Frequencies: {
-        bool ok = false;
-        QVector<M3StandardFrequencies::Entry> entries;
-        if (!m_initialSettings.frequencyListJson.trimmed().isEmpty())
-            entries = M3StandardFrequencies::fromJson(m_initialSettings.frequencyListJson, &ok);
-        if (!ok || entries.isEmpty()) entries = M3StandardFrequencies::defaults();
+        const QVector<M3StandardFrequencies::Entry> entries =
+            M3StandardFrequencies::fromSettings(m_initialSettings.frequencyListJson, m_initialSettings.frequencyListModes);
         m_frequencyPage = new FrequencyListEditor(entries, m_initialSettings.frequencyRegion,
                                                   m_initialSettings.frequencyQsyOnModeChange, [this](const QString &source) { return L(source); }, this);
         return m_frequencyPage;
@@ -2682,8 +2679,9 @@ void AppSettingsDialog::collectSettings()
         const QVector<M3StandardFrequencies::Entry> entries = m_frequencyPage->entries();
         // The unchanged default list is stored as "defaults", so later
         // corrections of the built-in list reach the operator.
-        merged.frequencyListJson = entries == M3StandardFrequencies::defaults() ? QString()
-                                                                               : M3StandardFrequencies::toJson(entries);
+        const bool unchanged = M3StandardFrequencies::sameEntries(entries, M3StandardFrequencies::defaults());
+        merged.frequencyListJson = unchanged ? QString() : M3StandardFrequencies::toJson(entries);
+        merged.frequencyListModes = unchanged ? QStringList() : M3StandardFrequencies::modes();
         merged.frequencyRegion = m_frequencyPage->region();
         merged.frequencyQsyOnModeChange = m_frequencyPage->qsyOnModeChange();
     }

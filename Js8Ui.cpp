@@ -300,6 +300,18 @@ void MainWindow::setupJs8Page()
     m_cmbJs8Band->setToolTip(uiText("js8_band_tooltip", "Select a band to QSY the CAT-connected rig to the JS8 standard frequency (JS8Call list)."));
     grid->addWidget(new QLabel(uiText("band", "Band"), group), row, 0);
     grid->addWidget(m_cmbJs8Band, row++, 1, 1, 3);
+    {
+        // Stored JS8 frequencies of the band and the free entry: Frequency tab.
+        QWidget *page = frequencyTabPage(QStringLiteral("JS8"));
+        auto *pickerGroup = new QGroupBox(uiText("frequency", "Frequency"), page);
+        auto *pickerGrid = new QGridLayout(pickerGroup);
+        pickerGrid->setContentsMargins(8, 8, 8, 8);
+        addFrequencyPickerRows(pickerGrid, 0, pickerGroup, []() { return QStringLiteral("JS8"); },
+                               [this]() { return m_cmbJs8Band != nullptr ? m_cmbJs8Band->currentText() : QString(); });
+        pickerGrid->setColumnStretch(1, 1);
+        static_cast<QVBoxLayout *>(page->layout())->insertWidget(0, pickerGroup);
+        connect(m_cmbJs8Band, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() { refreshFrequencyPickers(); });
+    }
 
     m_cmbJs8Submode = new QComboBox(group);
     for (Js8Mode::Submode s : Js8Mode::allSubmodes()) {

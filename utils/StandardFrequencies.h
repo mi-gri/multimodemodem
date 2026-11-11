@@ -5,10 +5,12 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QVector>
 
+#include <algorithm>
 #include <cmath>
 
 /**
@@ -91,6 +93,17 @@ inline QString bandOf(double hz)
     for (const Range &r : ranges)
         if (hz >= r.low && hz <= r.high) return QString::fromLatin1(r.name);
     return QString();
+}
+
+/// Group of frequencies outside the amateur bands (weather RTTY and fax,
+/// utility stations, receive only).
+inline QString otherGroup() { return QStringLiteral("other"); }
+
+/// Band of @p hz, or otherGroup() outside the amateur bands.
+inline QString groupOf(double hz)
+{
+    const QString band = bandOf(hz);
+    return band.isEmpty() ? otherGroup() : band;
 }
 
 /// Bands in frequency order, for band selectors.
@@ -228,6 +241,16 @@ inline QVector<Entry> defaults()
         {24924000, "HELL", "ALL", "Feld Hell Club", true},
         {28063000, "HELL", "ALL", "Feld Hell Club", true},
         {50286000, "HELL", "ALL", "Feld Hell Club", true},
+        // DWD (Deutscher Wetterdienst) maritime weather RTTY, 50 Bd, 450 Hz
+        // shift, receive only.  Dial USB 2.35 kHz below the assigned
+        // frequency, so the signal centre is at 2350 Hz with the "DWD"
+        // preset (Mark 2125 Hz).
+        {144950, "RTTY", "ALL", "DWD DDH47 (147.3 kHz)", false},
+        {4580650, "RTTY", "ALL", "DWD DDK2 (4583.0 kHz)", true},
+        {7643650, "RTTY", "ALL", "DWD DDH7 (7646.0 kHz)", false},
+        {10098450, "RTTY", "ALL", "DWD DDK9 (10100.8 kHz)", false},
+        {11036650, "RTTY", "ALL", "DWD DDH9 (11039.0 kHz)", false},
+        {14464950, "RTTY", "ALL", "DWD DDH8 (14467.3 kHz)", false},
         // SSTV calling frequencies (80/40 m in LSB).
         {3735000, "SSTV", "R1", "LSB", true},
         {3845000, "SSTV", "R2", "LSB", true},
@@ -286,6 +309,69 @@ inline QVector<Entry> fromJson(const QString &json, bool *ok = nullptr)
     return out;
 }
 
+/// Same entries regardless of their order (the editor sorts its rows).
+inline bool sameEntries(QVector<Entry> a, QVector<Entry> b)
+{
+    if (a.size() != b.size()) return false;
+    const auto less = [](const Entry &x, const Entry &y) {
+        if (x.mode != y.mode) return x.mode < y.mode;
+        if (qRound64(x.hz) != qRound64(y.hz)) return qRound64(x.hz) < qRound64(y.hz);
+        if (x.region != y.region) return x.region < y.region;
+        if (x.description != y.description) return x.description < y.description;
+        return x.preferred < y.preferred;
+    };
+    std::sort(a.begin(), a.end(), less);
+    std::sort(b.begin(), b.end(), less);
+    return a == b;
+}
+
+/// @p entries plus every default entry they lack (same mode, frequency and
+/// region).  An added entry is not preferred where the operator already has
+/// a preferred entry for that mode, band and region.  @p added receives the
+/// number of entries added.
+inline QVector<Entry> withMissingDefaults(QVector<Entry> entries, int *added = nullptr)
+{
+    const auto key = [](const Entry &e) { return e.mode + QLatin1Char('|') + QString::number(qRound64(e.hz)) + QLatin1Char('|') + e.region; };
+    const auto slot = [](const Entry &e) { return e.mode + QLatin1Char('|') + groupOf(e.hz) + QLatin1Char('|') + e.region; };
+    QSet<QString> present, preferredSlots;
+    for (const Entry &e : entries) {
+        present.insert(key(e));
+        if (e.preferred) preferredSlots.insert(slot(e));
+    }
+    int count = 0;
+    for (Entry e : defaults()) {
+        if (present.contains(key(e))) continue;
+        if (e.preferred && preferredSlots.contains(slot(e))) e.preferred = false;
+        entries << e;
+        ++count;
+    }
+    if (added) *added = count;
+    return entries;
+}
+
+/// The operator's list from the settings.  @p knownModes are the modes the
+/// list was saved with (empty for lists saved before that was recorded: the
+/// modes it contains).  Modes added to MultiModeModem since then get their
+/// default entries, so a saved list does not hide new modes.  An empty or
+/// unreadable @p json gives the defaults; @p ok is false if it was unreadable.
+inline QVector<Entry> fromSettings(const QString &json, QStringList knownModes, bool *ok = nullptr)
+{
+    if (ok) *ok = true;
+    if (json.trimmed().isEmpty()) return defaults();
+    bool readable = false;
+    QVector<Entry> entries = fromJson(json, &readable);
+    if (!readable || entries.isEmpty()) {
+        if (ok) *ok = readable;
+        return defaults();
+    }
+    if (knownModes.isEmpty())
+        for (const Entry &e : entries)
+            if (!knownModes.contains(e.mode)) knownModes << e.mode;
+    for (const Entry &e : defaults())
+        if (!knownModes.contains(e.mode)) entries << e;
+    return entries;
+}
+
 namespace detail {
 struct State
 {
@@ -322,7 +408,7 @@ inline double dialHz(const QVector<Entry> &entries, const QString &region, const
     const QString b = band.trimmed().toLower();
     double first = 0.0;
     for (const Entry &e : entries) {
-        if (e.mode != m || bandOf(e.hz).toLower() != b || !regionMatches(e.region, region)) continue;
+        if (e.mode != m || groupOf(e.hz).toLower() != b || !regionMatches(e.region, region)) continue;
         if (e.preferred) return e.hz;
         if (first <= 0.0) first = e.hz;
     }
@@ -373,6 +459,52 @@ inline QStringList bands(const QString &mode)
     for (const QString &band : allBands())
         if (dialHz(mode, band) > 0.0) out << band;
     return out;
+}
+
+/// bands() plus otherGroup() when @p mode has entries outside the bands.
+inline QStringList groups(const QString &mode)
+{
+    QStringList out = bands(mode);
+    if (dialHz(mode, otherGroup()) > 0.0) out << otherGroup();
+    return out;
+}
+
+/// Entries of @p mode in @p group (a band or otherGroup()) for the current
+/// region, low to high.  An empty @p group means all groups.
+inline QVector<Entry> entriesFor(const QString &mode, const QString &group)
+{
+    const QString m = mode.trimmed().toUpper();
+    const QString g = group.trimmed().toLower();
+    QVector<Entry> out;
+    for (const Entry &e : detail::state().entries)
+        if (e.mode == m && regionMatches(e.region, detail::state().region) && (g.isEmpty() || groupOf(e.hz).toLower() == g))
+            out << e;
+    std::sort(out.begin(), out.end(), [](const Entry &a, const Entry &b) { return a.hz < b.hz; });
+    return out;
+}
+
+/// Parses an entered dial frequency: "14.078 MHz", "14078 kHz", "14078000",
+/// "4583" (kHz), "7,074" (MHz).  Without a unit, values below 1000 are MHz,
+/// below 10^7 kHz, otherwise Hz.  Returns 0 if invalid.
+inline double parseFrequency(const QString &input)
+{
+    QString text = input.trimmed().toLower();
+    text.remove(QLatin1Char(' '));
+    double scale = 0.0;
+    if (text.endsWith(QLatin1String("mhz"))) { scale = 1e6; text.chop(3); }
+    else if (text.endsWith(QLatin1String("khz"))) { scale = 1e3; text.chop(3); }
+    else if (text.endsWith(QLatin1String("hz"))) { scale = 1.0; text.chop(2); }
+    text.replace(QLatin1Char(','), QLatin1Char('.'));
+    if (text.count(QLatin1Char('.')) > 1) {   // 14.078.000: grouped Hz
+        text.remove(QLatin1Char('.'));
+        if (scale == 0.0) scale = 1.0;
+    }
+    bool number = false;
+    const double value = text.toDouble(&number);
+    if (!number || value <= 0.0) return 0.0;
+    if (scale == 0.0) scale = value < 1000.0 ? 1e6 : (value < 1e7 ? 1e3 : 1.0);
+    const double hz = std::round(value * scale);
+    return hz >= 10000.0 && hz <= 11.0e9 ? hz : 0.0;
 }
 
 } // namespace M3StandardFrequencies

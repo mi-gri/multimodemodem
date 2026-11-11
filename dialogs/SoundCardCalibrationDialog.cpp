@@ -290,7 +290,7 @@ QString SoundCardCalibrationDialog::L(const QString &source) const
     if (m_textTranslator) {
         return m_textTranslator(source);
     }
-    return source;
+    return M3I18n::text(source);
 }
 
 void SoundCardCalibrationDialog::setStatusText(const QString &text)
@@ -335,7 +335,7 @@ void SoundCardCalibrationDialog::buildUi()
     mainLayout->setSpacing(6);
 
     QLabel *intro = new QLabel(
-        QStringLiteral("QSSTV-style SSTV clock calibration. It does not need an audio loopback: RX counts captured audio frames and TX counts frames accepted by the playback device, both against the PC monotonic clock. For a meaningful result, synchronize the system clock with NTP/timesyncd and let the measurement run for several minutes."),
+        L(QStringLiteral("QSSTV-style SSTV clock calibration. It does not need an audio loopback: RX counts captured audio frames and TX counts frames accepted by the playback device, both against the PC monotonic clock. For a meaningful result, synchronize the system clock with NTP/timesyncd and let the measurement run for several minutes.")),
         page);
     intro->setWordWrap(true);
     intro->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -450,7 +450,7 @@ void SoundCardCalibrationDialog::buildUi()
     m_spinDurationSec->setSingleStep(30);
     m_spinDurationSec->setValue(kDefaultDurationSec);
     m_spinDurationSec->setMinimumWidth(110);
-    QLabel *durationHint = new QLabel(QStringLiteral("Use 180 s or more for reliable SSTV calibration."), controlGroup);
+    QLabel *durationHint = new QLabel(L(QStringLiteral("Use 180 s or more for reliable SSTV calibration.")), controlGroup);
     durationHint->setWordWrap(true);
     controlLayout->addWidget(durationLabel, 0, 0);
     controlLayout->addWidget(m_spinDurationSec, 0, 1);

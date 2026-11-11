@@ -932,6 +932,26 @@ void WaterfallWidget::drawFrequencyScale(QPainter &painter)
     }
 }
 
+namespace {
+// Marker label: a tag in the marker's own colour with black or white text,
+// whichever contrasts more.  Coloured text on a light box was unreadable for
+// light colours (yellow Mark, cyan Space).
+void drawMarkerLabel(QPainter &painter, const QRect &labelRect, int paddingX, int paddingY,
+                     const QColor &color, const QString &text)
+{
+    QColor fill = color;
+    fill.setAlpha(235);
+    const double luminance = 0.2126 * color.redF() + 0.7152 * color.greenF() + 0.0722 * color.blueF();
+    const QColor textColor = luminance > 0.5 ? QColor(0, 0, 0) : QColor(255, 255, 255);
+    painter.fillRect(labelRect, fill);
+    painter.setPen(color.darker(170));
+    painter.drawRect(labelRect.adjusted(0, 0, -1, -1));
+    painter.setPen(textColor);
+    painter.drawText(labelRect.adjusted(paddingX, paddingY, -paddingX, -paddingY),
+                     Qt::AlignVCenter | Qt::AlignLeft, text);
+}
+} // namespace
+
 void WaterfallWidget::drawMarkers(QPainter &painter)
 {
     if (m_markers.isEmpty()) {
@@ -941,7 +961,7 @@ void WaterfallWidget::drawMarkers(QPainter &painter)
     if (m_scrollDirection == ScrollDirection::Right) {
         QFont markerFont = painter.font();
         markerFont.setBold(true);
-        markerFont.setPointSize(7);
+        markerFont.setPointSize(8);
         painter.setFont(markerFont);
         const QFontMetrics fm(markerFont);
         const int labelPaddingX = 4;
@@ -971,13 +991,7 @@ void WaterfallWidget::drawMarkers(QPainter &painter)
                                 qBound(2, y - labelHeight - 2, qMax(2, height() - labelHeight - 2)),
                                 textWidth + (labelPaddingX * 2),
                                 labelHeight);
-                painter.fillRect(labelRect, QColor(245, 245, 245, 235));
-                painter.setPen(QColor(130, 0, 0));
-                painter.drawRect(labelRect.adjusted(0, 0, -1, -1));
-                painter.setPen(marker.color);
-                painter.drawText(labelRect.adjusted(labelPaddingX, labelPaddingY, -labelPaddingX, -labelPaddingY),
-                                 Qt::AlignVCenter | Qt::AlignLeft,
-                                 marker.label);
+                drawMarkerLabel(painter, labelRect, labelPaddingX, labelPaddingY, marker.color, marker.label);
                 ++visibleLabelIndex;
             }
         }
@@ -986,7 +1000,7 @@ void WaterfallWidget::drawMarkers(QPainter &painter)
 
     QFont markerFont = painter.font();
     markerFont.setBold(true);
-    markerFont.setPointSize(7);
+    markerFont.setPointSize(8);
     painter.setFont(markerFont);
 
     const QFontMetrics fm(markerFont);
@@ -1062,16 +1076,7 @@ void WaterfallWidget::drawMarkers(QPainter &painter)
                 labelHeight
                 );
 
-            painter.fillRect(labelRect, QColor(245, 245, 245, 235));
-            painter.setPen(QColor(130, 0, 0));
-            painter.drawRect(labelRect.adjusted(0, 0, -1, -1));
-
-            painter.setPen(marker.color);
-            painter.drawText(
-                labelRect.adjusted(labelPaddingX, labelPaddingY, -labelPaddingX, -labelPaddingY),
-                Qt::AlignVCenter | Qt::AlignLeft,
-                marker.label
-                );
+            drawMarkerLabel(painter, labelRect, labelPaddingX, labelPaddingY, marker.color, marker.label);
 
             ++visibleLabelIndex;
         }
