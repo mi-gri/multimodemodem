@@ -9,6 +9,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   window appears after about 1.8 s instead of 3.5 s (same machine and load). The
   compatibility device lists fill in a moment later.
 - M3_STARTUP_TRACE=1 prints the startup stages with their times to stderr.
+- tools/ft8_sim_band.py builds a busy simulated FT8 band from WSJT-X ft8sim signals for
+  decoder speed and sensitivity measurements with the FT replay probe.
 - Security: JS8 text decompression read past a table for crafted data frames (a run of
   eight or more 4-bit groups); such frames are now refused. Found with UBSan.
 - Security: received JS8 text in the band-activity and inbox tooltips is shown as plain
