@@ -3,6 +3,7 @@
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QMutex>
 #include <QMutexLocker>
+#include <QThreadPool>
 
 namespace AudioDeviceCache {
 namespace {
@@ -58,6 +59,14 @@ bool find(QAudio::Mode mode, const QString &deviceName, QAudioDeviceInfo *device
         }
     }
     return false;
+}
+
+void prefetch()
+{
+    QThreadPool::globalInstance()->start([] {
+        devices(QAudio::AudioInput);
+        devices(QAudio::AudioOutput);
+    });
 }
 
 void invalidate()

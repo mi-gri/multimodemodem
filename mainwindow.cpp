@@ -13,6 +13,7 @@
 #include "logbook/CqWwRtty.h"
 #include "mainwindow.h"
 #include "audio/AudioDeviceCache.h"
+#include "utils/StartupTrace.h"
 #include "runtime/SstvImageArchive.h"
 #include "audio/RadioBandPower.h"
 #include "M3BuildInfo.h"
@@ -132,6 +133,7 @@
 #include <QProgressDialog>
 #include <QPixmap>
 #include <QPointer>
+#include <QThreadPool>
 #include <QPainter>
 #include <QPair>
 #include <QPen>
@@ -1628,7 +1630,7 @@ MainWindow::MainWindow(QWidget *parent)
     updateQsoUtcFields();
     updateFt8SlotStatus();
 
-    refreshDevices();
+    refreshDevicesWhenProbed();
     applyPersistentSettingsToRuntime();
     updateWaterfallMarkers();
     updateTxPreview();
@@ -24479,6 +24481,25 @@ void MainWindow::refreshDevices()
     selectComboByBackendName(ui->cmbPttPort, m_settings.pttPortName);
 
     appendLog("Device list refreshed.");
+    M3StartupTrace::mark("device lists filled");
+}
+
+void MainWindow::refreshDevicesWhenProbed()
+{
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    // The combos are compatibility mirrors; RX/TX use the saved device names
+    // (selectedAudioInputName), so they may stay empty for the first second.
+    populateSerialPorts();
+    selectComboByBackendName(ui->cmbPttPort, m_settings.pttPortName);
+    QPointer<MainWindow> self(this);
+    QThreadPool::globalInstance()->start([self] {
+        AudioDeviceCache::devices(QAudio::AudioInput);    // waits for the prefetch
+        AudioDeviceCache::devices(QAudio::AudioOutput);
+        QMetaObject::invokeMethod(qApp, [self] { if (self) self->refreshDevices(); }, Qt::QueuedConnection);
+    });
+#else
+    refreshDevices();
+#endif
 }
 
 void MainWindow::populateAudioInputs()

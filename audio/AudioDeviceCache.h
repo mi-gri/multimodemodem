@@ -28,5 +28,10 @@ bool find(QAudio::Mode mode, const QString &deviceName, QAudioDeviceInfo *device
 
 void invalidate();
 
+// Starts reading both device lists on a pool thread. Called at startup so the
+// probe (about 1.5 s with PulseAudio) runs while the main window is built;
+// devices() then waits for it under the cache mutex instead of probing again.
+void prefetch();
+
 } // namespace AudioDeviceCache
 #endif

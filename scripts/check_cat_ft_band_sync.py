@@ -30,7 +30,10 @@ all_relevant = "\n".join(
 
 checks = {
     "startup applies saved CAT settings": (
-        "refreshDevices();\n    applyPersistentSettingsToRuntime();" in main
+        # Serial ports are listed synchronously before the settings apply;
+        # only the audio lists wait for the background probe.
+        "refreshDevicesWhenProbed();\n    applyPersistentSettingsToRuntime();" in main
+        and "    populateSerialPorts();\n    selectComboByBackendName(ui->cmbPttPort, m_settings.pttPortName);\n    QPointer<MainWindow> self(this);" in main
         and "if (catChanged) {\n        invokeRigConfigureFromSettings();" in main
     ),
     "saved CAT settings auto-connect when enabled": (

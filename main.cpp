@@ -2,6 +2,7 @@
 #include "utils/ApplicationIdentity.h"
 #include "utils/InstallationPaths.h"
 #include "utils/InstanceLock.h"
+#include "utils/StartupTrace.h"
 #include "utils/ProductName.h"
 #include "runtime/SessionDiagnosticsUiTap.h"
 #include "runtime/SessionDiagnostics.h"
@@ -14,6 +15,8 @@
 
 #include "mainwindow.h"
 #include "audio/AudioBlock.h"
+#include "audio/AudioDeviceCache.h"
+#include "modems/js8/Js8Message.h"
 #include "settings/AppSettings.h"
 #include <QSettings>
 #include "modems/ft8/Ft8RxDecoder.h"
@@ -41,6 +44,7 @@
 #include <QSurfaceFormat>
 #include <QtGlobal>
 #include <QThread>
+#include <QThreadPool>
 #include <QTimer>
 #include <cstdio>
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
@@ -112,6 +116,7 @@ public:
 
 int main(int argc, char *argv[])
 {
+    M3StartupTrace::mark("main");
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
@@ -122,6 +127,7 @@ int main(int argc, char *argv[])
     QSurfaceFormat::setDefaultFormat(glFormat);
 
     QApplication app(argc, argv);
+    M3StartupTrace::mark("QApplication");
     qRegisterMetaType<AudioBlock>("AudioBlock");
     qRegisterMetaType<QVector<quint8>>("QVector<quint8>");
     qRegisterMetaType<QVector<QPointF>>("QVector<QPointF>");
@@ -354,8 +360,15 @@ int main(int argc, char *argv[])
         }
     }
 
+    // Slow one-time loads run on pool threads while the main window is built;
+    // the first real use waits for them instead of loading again.
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    if (!commandLine.isSet(i18nReportOption)) AudioDeviceCache::prefetch();   // ~1.5 s device probe
+#endif
+    QThreadPool::globalInstance()->start([] { Js8Message::dictionaryAvailable(); });   // JS8 word tables
     AppSettings bootSettings;
     bootSettings.load();
+    M3StartupTrace::mark("settings loaded");
     SessionDiagnostics::installQtCapture();
     SessionDiagnosticsUiTap diagnosticUiTap;app.installEventFilter(&diagnosticUiTap);
     struct DiagnosticShutdown { ~DiagnosticShutdown(){SessionDiagnostics::instance().stop();SessionDiagnostics::restoreQtCapture();} } diagnosticShutdown;
@@ -367,8 +380,10 @@ int main(int argc, char *argv[])
     HamlibController::initializeDiagnosticTrace();
     const QString bootTheme = bootSettings.uiTheme.trimmed().toLower();
     M3Ui::applyUiTheme(app, bootTheme);
+    M3StartupTrace::mark("theme applied");
 
     MainWindow window;
+    M3StartupTrace::mark("MainWindow constructed");
     // Use one stable window/chrome ownership path for every theme. The active
     // palette decides whether the rim is Avionica metal, a classic single line
     // or a high-contrast outline, so live theme changes cannot leave behind a
@@ -391,6 +406,19 @@ int main(int argc, char *argv[])
         }
     }
 
+    M3StartupTrace::mark("window shown");
+    if (M3StartupTrace::enabled()) {
+        // First paint of the main window and first idle event-loop turn.
+        struct FirstPaint : QObject {
+            bool eventFilter(QObject *o, QEvent *e) override {
+                if (e->type() == QEvent::Paint) { M3StartupTrace::mark("first paint"); o->removeEventFilter(this); }
+                return false;
+            }
+        };
+        window.installEventFilter(new FirstPaint);
+        QTimer::singleShot(0, &app, [] { M3StartupTrace::mark("event loop running"); });
+        QTimer::singleShot(3000, &app, [] { M3StartupTrace::mark("3 s after event loop start"); });
+    }
     if (commandLine.isSet(i18nReportOption)) return M3I18nReport::run(app, window);
     return app.exec();
 }

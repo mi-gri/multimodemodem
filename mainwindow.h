@@ -198,6 +198,13 @@ private slots:
     void refreshDevices();
 
     /**
+     * @brief Startup variant: fills the device lists once the background
+     *        device probe (AudioDeviceCache::prefetch) has finished, so the
+     *        window does not wait about 1.5 s for it.
+     */
+    void refreshDevicesWhenProbed();
+
+    /**
      * @brief Starts the selected RX audio input.
      */
     void startRx();

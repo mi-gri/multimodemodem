@@ -4,6 +4,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- Faster start (Qt 5): the audio device probe (about 1.5 s with ALSA and PulseAudio)
+  and the JS8 word tables load on background threads while the window is built; the
+  window appears after about 1.8 s instead of 3.5 s (same machine and load). The
+  compatibility device lists fill in a moment later.
+- M3_STARTUP_TRACE=1 prints the startup stages with their times to stderr.
 - Security: JS8 text decompression read past a table for crafted data frames (a run of
   eight or more 4-bit groups); such frames are now refused. Found with UBSan.
 - Security: received JS8 text in the band-activity and inbox tooltips is shown as plain
