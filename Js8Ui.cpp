@@ -35,6 +35,7 @@
 #include <QTableWidget>
 #include <QTextCharFormat>
 #include <QTextCursor>
+#include <QTextDocument>
 #include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -834,7 +835,8 @@ void MainWindow::js8RefreshActivity()
         speed->setToolTip(Js8Mode::submodeName(a.submode));
         auto *text = new QTableWidgetItem(a.text.trimmed() + (a.complete ? QStringLiteral(" ✓") : QString()));
         text->setData(Qt::UserRole, a.from);
-        text->setToolTip(a.text.trimmed());
+        // Received text: never let Qt detect it as rich text (HTML tags, images).
+        text->setToolTip(Qt::convertFromPlainText(a.text.trimmed()));
         const bool otherSpeed = a.submode != currentJs8Submode();
         if (!myCall.isEmpty() && a.text.contains(myCall)) {
             for (auto *item : {offset, utc, snr, speed, text}) item->setForeground(QColor(255, 120, 60));
@@ -1159,7 +1161,7 @@ void MainWindow::showJs8Inbox()
             auto *to = new QTableWidgetItem(m.to);
             auto *state = new QTableWidgetItem(stateText(m.type));
             auto *text = new QTableWidgetItem(m.text);
-            text->setToolTip(m.text);
+            text->setToolTip(Qt::convertFromPlainText(m.text));
             if (m.type == Js8StoredMessage::Type::Unread)
                 for (auto *item : {utc, from, to, state, text}) item->setForeground(QColor(255, 120, 60));
             table->setItem(r, 0, utc);

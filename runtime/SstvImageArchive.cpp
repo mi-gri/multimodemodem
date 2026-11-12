@@ -3,7 +3,8 @@
 #include <QFileInfo>
 #include <QFile>
 #include <QRegularExpression>
-#include <QTemporaryFile>
+#include <QBuffer>
+#include <QSaveFile>
 
 SstvImageArchive::SstvImageArchive(QObject *parent) : QObject(parent), m_thread([this]{run();}) {}
 SstvImageArchive::~SstvImageArchive() { finish(); }
@@ -72,12 +73,12 @@ SstvImageArchive::Result SstvImageArchive::write(const Job &job)
     if(!QDir().mkpath(job.folder))
         return {{},QStringLiteral("Cannot create SSTV folder: %1").arg(job.folder)};
     const QDir folder(job.folder);
-    QTemporaryFile temporary(folder.filePath(QStringLiteral(".sstv-XXXXXX.part")));
-    if(!temporary.open()) return {{},QStringLiteral("Cannot create SSTV image file in %1: %2").arg(job.folder,temporary.errorString())};
-    if(!job.image.save(&temporary,"PNG") || !temporary.flush())
-        return {{},QStringLiteral("Cannot write SSTV PNG in %1: %2").arg(job.folder,temporary.errorString())};
-    const QString temporaryPath=temporary.fileName();
-    temporary.close();
+    QByteArray png;
+    {
+        QBuffer buffer(&png);
+        if(!buffer.open(QIODevice::WriteOnly) || !job.image.save(&buffer,"PNG"))
+            return {{},QStringLiteral("Cannot encode SSTV PNG for %1").arg(job.folder)};
+    }
     QString mode=job.mode;
     mode.remove(QRegularExpression(QStringLiteral("[^A-Za-z0-9_-]")));
     mode=mode.left(40);
@@ -87,15 +88,22 @@ SstvImageArchive::Result SstvImageArchive::write(const Job &job)
     for(int sequence=0;sequence<10000;++sequence) {
         const QString extra=sequence?QStringLiteral("_%1").arg(sequence,3,10,QLatin1Char('0')):QString();
         const QString path=folder.filePath(stem+extra+QStringLiteral(".png"));
-        // QFile::rename refuses an existing destination. Publish only a fully
-        // encoded file in the same directory; never overwrite an earlier image.
-        QFile pending(temporaryPath);
-        if(pending.rename(path)) {
-            temporary.setAutoRemove(false);
-            return {path,{}};
+        // Reserve the name atomically (O_EXCL): QFile::rename checks for an
+        // existing destination and renames in two steps, so two writers could
+        // both pass the check and one image would replace the other.
+        QFile reservation(path);
+        if(!reservation.open(QIODevice::WriteOnly|QIODevice::NewOnly)) {
+            if(QFileInfo::exists(path)) continue;
+            return {{},QStringLiteral("Cannot create SSTV PNG %1: %2").arg(path,reservation.errorString())};
         }
-        if(!QFileInfo::exists(path))
-            return {{},QStringLiteral("Cannot finalize SSTV PNG %1: %2").arg(path,pending.errorString())};
+        reservation.close();
+        // Replace the own empty placeholder with the complete image in one step.
+        QSaveFile out(path);
+        if(out.open(QIODevice::WriteOnly) && out.write(png)==png.size() && out.commit())
+            return {path,{}};
+        const QString error=out.errorString();
+        QFile::remove(path);
+        return {{},QStringLiteral("Cannot write SSTV PNG %1: %2").arg(path,error)};
     }
     return {{},QStringLiteral("No free filename for SSTV image in %1").arg(job.folder)};
 }

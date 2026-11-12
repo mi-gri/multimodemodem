@@ -249,8 +249,11 @@ QString JSC::decompress(Codeword const& bitvec){
         while(start + k < (quint32)bytes.length() && bytes[start + k] >= s){
             j = j*c + (bytes[start + k] - s);
             k++;
+            // m3: base[] has 8 entries; a longer run (received data) would
+            // read past it and let j wrap around below JSC::size.
+            if(k >= 8) break;
         }
-        if(j >= JSC::size){
+        if(k >= 8 || j >= JSC::size){
             break;
         }
 

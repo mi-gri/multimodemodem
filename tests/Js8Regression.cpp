@@ -14,6 +14,7 @@
 #include "modems/js8/Js8Message.h"
 #include "modems/js8/Js8NativeEngine.h"
 #include "modems/js8/tx/Js8Transmitter.h"
+#include "third_party/js8call_gpl/Jsc.h"
 #include "settings/AppSettings.h"
 #include "utils/StandardFrequencies.h"
 
@@ -465,6 +466,22 @@ int main(int argc, char **argv)
                                                     Js8Mode::Submode::Fast, false);
         check(!frames.isEmpty() && (frames.last().bits & Js8Message::Data), "fast data flag");
         check(Js8Message::preview(frames, Js8Mode::Submode::Fast).contains("TESTING FAST DATA FRAMES"), "fast data round trip");
+    }
+
+    {
+        // Received data: eight or more 4-bit groups >= 7 in a row once made
+        // JSC::decompress read past its base[8] table (index k >= 8).
+        for (int run = 7; run <= 16; ++run) {
+            js8::Codeword bits;
+            for (int i = 0; i < run; ++i) bits << false << true << true << true;   // nibble 7
+            bits << false << false << false << true << false;                       // nibble 1, no separator
+            const QString out = js8::JSC::decompress(bits);
+            check(run < 8 || out.isEmpty(), "JSC run of " + std::to_string(run) + " must be refused: " + out.toStdString());
+        }
+        const auto round = js8::JSC::compress(QStringLiteral("HELLO WORLD"));
+        js8::Codeword all;
+        for (const auto &pair : round) all << pair.first;
+        check(js8::JSC::decompress(all).contains(QStringLiteral("HELLO")), "JSC round trip after the bound check");
     }
 
     // --- LDPC/CRC -----------------------------------------------------------

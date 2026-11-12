@@ -2,6 +2,19 @@
 
 MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow below.
 
+## Unreleased
+
+- Security: JS8 text decompression read past a table for crafted data frames (a run of
+  eight or more 4-bit groups); such frames are now refused. Found with UBSan.
+- Security: received JS8 text in the band-activity and inbox tooltips is shown as plain
+  text; a station could insert HTML (formatting, local images) before.
+- MSK40 short messages: the last tone read one byte past its bit array (Fortran wrap
+  ported off by one); it now wraps to the first bit as in WSJT-X.
+- New test m3_unpack_fuzz_regression: random payloads through the FT/MSK/Q65 and JS8
+  unpackers and the JS8 reply rules.
+- SSTV archive: the file name is reserved atomically, so two images saved in the same
+  second can no longer replace each other.
+
 ## m³ 0.6.6
 
 - JS8 (JS8Call 2.2 protocol) in all four speeds Normal, Fast, Turbo and Slow: native C++

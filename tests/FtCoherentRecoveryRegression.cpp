@@ -12,7 +12,7 @@
 static void check(bool ok,const char *why){if(!ok)throw std::runtime_error(why);}
 int main(int argc,char**argv){QCoreApplication app(argc,argv);
  Ft8RxDecoder fec;
- bool msg[77]={}, cw[174]={}; GenPomFt encoder; encoder.encode174_91(msg,cw);
+ bool msg[91]={}, cw[174]={}; GenPomFt encoder; encoder.encode174_91(msg,cw);   // encode174_91 uses 91 bits: 77 + CRC-14
  std::array<int,174> valid{}, invalid{}, decoded{}; std::array<double,174> llr{};
  for(int i=0;i<174;++i)valid[i]=cw[i];
  invalid[0]=1;

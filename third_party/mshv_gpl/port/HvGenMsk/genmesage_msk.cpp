@@ -907,6 +907,8 @@ void GenMsk::genmsk144(int *i4Msg6BitWords, unsigned char *i1Msg8BitBytes, int *
         //i4tone(2*i-1)=(bitseq(2*i)*bitseq(2*i-1)+1)/2; 2,4*1,3
         //i4tone(2*i)=-(bitseq(2*i)*bitseq(mod(2*i,144)+1)-1)/2; 2,4*2,4
         i4tone[2*i-0]=(bitseq[2*i+1]*bitseq[2*i-0]+1)/2; //1,3*0,2
+        // m3: Fortran bitseq(mod(2*i,144)+1) wraps to the first element for
+        // the last symbol; the old index read the zero padding bitseq[144].
         i4tone[2*i+1]=-(bitseq[2*i+1]*bitseq[(int)fmod(2*i+1,144)+1]-1)/2;//1,3*1,3
     }
     //! Flip polarity
@@ -1240,7 +1242,9 @@ c10:
     for (i = 0; i < 20; i++)
     {//do i=1, 16
         itone[2*i-0]=(bitseq[2*i+1]*bitseq[2*i-0]+1)/2;       //itone(2*i-1)=(bitseq(2*i)*bitseq(2*i-1)+1)/2;
-        itone[2*i+1]=-(bitseq[2*i+1]*bitseq[(int)fmod(2*i+1,40)+1]-1)/2;
+        // m3: wrap like Fortran mod(2*i,40)+1; the old index read bitseq[40],
+        // one past the end of the array, for the last symbol.
+        itone[2*i+1]=-(bitseq[2*i+1]*bitseq[(2*i+2)%40]-1)/2;
         //itone(2*i)=-(bitseq(2*i)*bitseq(mod(2*i,32)+1)-1)/2;
         //itone(2*i)=-(bitseq(2*i)*bitseq(mod(2*i,40)+1)-1)/2;
     }

@@ -1281,6 +1281,16 @@ if(BUILD_TESTING)
     add_test(NAME m3_js8_regression COMMAND m3_js8_regression)
     set_tests_properties(m3_js8_regression PROPERTIES TIMEOUT 300)
 
+    # Random over-the-air payloads through the FT8/FT4/MSK144/Q65 and JS8
+    # unpackers, the JS8 command buffer and the automatic-reply rules.
+    add_executable(m3_unpack_fuzz_regression
+        tests/UnpackFuzzRegression.cpp
+    )
+    target_include_directories(m3_unpack_fuzz_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_unpack_fuzz_regression PRIVATE m3_js8 m3_weak_signal_codec ${QT}::Core)
+    add_test(NAME m3_unpack_fuzz_regression COMMAND m3_unpack_fuzz_regression)
+    set_tests_properties(m3_unpack_fuzz_regression PROPERTIES TIMEOUT 120)
+
     add_executable(m3_msk144_native_regression
         tests/Msk144NativeRegression.cpp
     )
