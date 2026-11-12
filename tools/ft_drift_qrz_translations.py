@@ -39,3 +39,20 @@ PHRASES.extend([
  ("Try GPU FT8/FT4 decoding (experimental, all bands)", "Prova decodifica FT8/FT4 con GPU (sperimentale, tutte le bande)", "Essayer le décodage FT8/FT4 sur GPU (expérimental, toutes bandes)", "FT8/FT4-Dekodierung mit GPU testen (experimentell, alle Bänder)", "Prøv FT8/FT4-dekoding med GPU (eksperimentelt, alle bånd)", "Vyzkoušet dekódování FT8/FT4 na GPU (experimentální, všechna pásma)"),
  ("Offloads symbol tone energies to OpenCL FP64. Checks CPU parity and total time, with automatic CPU fallback. Independent of drift compensation.", "Calcola le energie dei toni dei simboli con OpenCL FP64. Confronta risultati e tempo totale con la CPU e torna automaticamente alla CPU se necessario. Indipendente dalla compensazione drift.", "Calcule les énergies des tons avec OpenCL FP64. Compare les résultats et le temps total au CPU, avec repli automatique. Indépendant de la compensation de dérive.", "Berechnet Symboltonenergien mit OpenCL FP64. Vergleicht Ergebnisse und Gesamtzeit mit der CPU, mit automatischem Rückfall. Unabhängig von der Driftkompensation.", "Beregner symboltonenes energi med OpenCL FP64. Sammenligner resultater og totaltid med CPU, med automatisk CPU-reserve. Uavhengig av driftkompensasjon.", "Počítá energie tónů symbolů pomocí OpenCL FP64. Porovnává výsledky a celkový čas s CPU, s automatickým návratem. Nezávislé na kompenzaci driftu.")
 ])
+
+# Late decodes after the reply deadline (FT8/FT4 decoder page).
+PHRASES.extend([
+ ("FT8 / FT4 late decodes", "Decodifiche tardive FT8 / FT4", "Décodages tardifs FT8 / FT4", "Späte Dekodierungen FT8 / FT4", "Sene dekodinger FT8 / FT4", "Pozdní dekódování FT8 / FT4"),
+ ("Keep searching after the reply deadline and show late decodes",
+  "Continua a cercare dopo il termine per la risposta e mostra le decodifiche tardive",
+  "Continuer la recherche après le délai de réponse et afficher les décodages tardifs",
+  "Nach der Antwortfrist weitersuchen und späte Dekodierungen anzeigen",
+  "Søk videre etter svarfristen og vis sene dekodinger",
+  "Hledat i po lhůtě pro odpověď a zobrazit pozdní dekódování"),
+ ("The deep search goes on for up to 9 s (FT4 4.5 s) into the next period. Late decodes are only shown: they never answer, call or start TX. Uses about two CPU cores during that time.",
+  "La ricerca approfondita continua fino a 9 s (FT4 4,5 s) nel periodo successivo. Le decodifiche tardive sono solo mostrate: non rispondono, non chiamano e non avviano la TX. In quel tempo usa circa due core della CPU.",
+  "La recherche approfondie continue jusqu’à 9 s (FT4 4,5 s) dans la période suivante. Les décodages tardifs sont seulement affichés : ils ne répondent pas, n’appellent pas et ne lancent pas l’émission. Utilise environ deux cœurs CPU pendant ce temps.",
+  "Die gründliche Suche läuft bis zu 9 s (FT4 4,5 s) in die nächste Periode weiter. Späte Dekodierungen werden nur angezeigt: Sie beantworten, rufen und senden nie. Belegt währenddessen etwa zwei CPU-Kerne.",
+  "Det grundige søket fortsetter opptil 9 s (FT4 4,5 s) inn i neste periode. Sene dekodinger vises bare: de svarer, kaller og sender aldri. Bruker omtrent to CPU-kjerner i den tiden.",
+  "Důkladné hledání pokračuje až 9 s (FT4 4,5 s) do další periody. Pozdní dekódování se jen zobrazí: nikdy neodpovídá, nevolá ani nespouští vysílání. Během té doby využívá asi dvě jádra CPU."),
+])

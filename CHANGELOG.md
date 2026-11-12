@@ -4,6 +4,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- FT8/FT4 late decodes: after the reply deadline the deep reference recovery (R30) goes
+  on for up to 9 s (FT4 4.5 s) and shows what it finds as display-only rows; they never
+  answer, call or arm TX. On 23 recorded 20 m periods: 348 instead of 317 decodes under
+  live deadlines (WSJT-X 351, JTDX 344). Settings → FT decoder, on by default.
 - Faster start (Qt 5): the audio device probe (about 1.5 s with ALSA and PulseAudio)
   and the JS8 word tables load on background threads while the window is built; the
   window appears after about 1.8 s instead of 3.5 s (same machine and load). The

@@ -12449,6 +12449,7 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setGpuSyncEnabled", Qt::QueuedConnection, Q_ARG(bool, m_settings.ftGpuSyncEnabled));
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setGpuDecodeEnabled", Qt::QueuedConnection, Q_ARG(bool, m_settings.ftGpuDecodeEnabled));
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setDriftRxOptions", Qt::QueuedConnection, Q_ARG(bool, m_settings.ftDriftRxEnabled), Q_ARG(double, m_settings.ftDriftMaxHzPerSec));
+        QMetaObject::invokeMethod(m_ft8RxDecoder, "setLateDecodeEnabled", Qt::QueuedConnection, Q_ARG(bool, m_settings.ftLateDecodeEnabled));
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setRxMarkerHz", Qt::QueuedConnection, Q_ARG(int, m_settings.ft8RxFrequencyHz));
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setMyCall", Qt::QueuedConnection, Q_ARG(QString, stationCallsign()));
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setDxCall", Qt::QueuedConnection, Q_ARG(QString, m_settings.ft8DxCallsign));
@@ -16447,6 +16448,7 @@ void MainWindow::applyFt8Settings()
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setGpuSyncEnabled", Qt::QueuedConnection, Q_ARG(bool, m_settings.ftGpuSyncEnabled));
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setGpuDecodeEnabled", Qt::QueuedConnection, Q_ARG(bool, m_settings.ftGpuDecodeEnabled));
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setDriftRxOptions", Qt::QueuedConnection, Q_ARG(bool, m_settings.ftDriftRxEnabled), Q_ARG(double, m_settings.ftDriftMaxHzPerSec));
+        QMetaObject::invokeMethod(m_ft8RxDecoder, "setLateDecodeEnabled", Qt::QueuedConnection, Q_ARG(bool, m_settings.ftLateDecodeEnabled));
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setRxMarkerHz", Qt::QueuedConnection, Q_ARG(int, m_settings.ft8RxFrequencyHz));
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setMyCall", Qt::QueuedConnection, Q_ARG(QString, stationCallsign()));
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setDxCall", Qt::QueuedConnection, Q_ARG(QString, m_settings.ft8DxCallsign));

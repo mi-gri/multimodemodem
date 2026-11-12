@@ -563,6 +563,7 @@ void AppSettings::load()
     qrzPassword = settings.value("QRZ/password", qrzPassword).toString();
     ftGpuDecodeEnabled = settings.value("FT/gpuDecodeEnabled", false).toBool();
     ftGpuSyncEnabled = settings.value("FT/gpuSyncEnabled", false).toBool();
+    ftLateDecodeEnabled = settings.value("FT/lateDecodeEnabled", true).toBool();
     ftDriftRxEnabled = settings.value("FT/driftRxEnabled", false).toBool();
     ftDriftMaxHzPerSec = qBound(0.25, settings.value("FT/driftMaxHzPerSec", 2.0).toDouble(), 20.0);
     frequencyListJson = settings.value("Frequencies/list").toString();
@@ -1041,6 +1042,7 @@ bool AppSettings::save() const
     else settings.setValue("QRZ/password", qrzPassword);
     settings.setValue("FT/gpuSyncEnabled", ftGpuSyncEnabled);
     settings.setValue("FT/gpuDecodeEnabled", ftGpuDecodeEnabled);
+    settings.setValue("FT/lateDecodeEnabled", ftLateDecodeEnabled);
     settings.setValue("FT/driftRxEnabled", ftDriftRxEnabled);
     settings.setValue("FT/driftMaxHzPerSec", qBound(0.25, ftDriftMaxHzPerSec, 20.0));
     if (frequencyListJson.trimmed().isEmpty()) {

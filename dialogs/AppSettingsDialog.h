@@ -153,6 +153,7 @@ private:
     QLineEdit *m_editQrzPassword = nullptr;
     QCheckBox *m_chkFtGpuSync = nullptr;
     QCheckBox *m_chkFtGpuDecode = nullptr;
+    QCheckBox *m_chkFtLateDecode = nullptr;
     QCheckBox *m_chkFtDriftRx = nullptr;
     QDoubleSpinBox *m_spinFtDriftMax = nullptr;
     QLineEdit *m_editMyName = nullptr;

@@ -900,6 +900,14 @@ QWidget *AppSettingsDialog::makeFtDecoderPage()
     m_chkFtGpuDecode->setToolTip(L(QStringLiteral("Offloads symbol tone energies to OpenCL FP64. Checks CPU parity and total time, with automatic CPU fallback. Independent of drift compensation.")));
     gpuForm->addRow(m_chkFtGpuDecode);
     layout->addWidget(gpuGroup);
+    auto *lateGroup = new QGroupBox(L(QStringLiteral("FT8 / FT4 late decodes")), page);
+    auto *lateForm = new QFormLayout(lateGroup);
+    m_chkFtLateDecode = new QCheckBox(L(QStringLiteral("Keep searching after the reply deadline and show late decodes")), lateGroup);
+    m_chkFtLateDecode->setObjectName(QStringLiteral("ftLateDecodeEnabled"));
+    m_chkFtLateDecode->setChecked(m_initialSettings.ftLateDecodeEnabled);
+    m_chkFtLateDecode->setToolTip(L(QStringLiteral("The deep search goes on for up to 9 s (FT4 4.5 s) into the next period. Late decodes are only shown: they never answer, call or start TX. Uses about two CPU cores during that time.")));
+    lateForm->addRow(m_chkFtLateDecode);
+    layout->addWidget(lateGroup);
     auto *group = new QGroupBox(L(QStringLiteral("RX drift compensation")), page);
     auto *form = new QFormLayout(group);
     m_chkFtGpuSync = new QCheckBox(L(QStringLiteral("Try GPU drift sync (experimental, automatic CPU fallback)")), group);
@@ -2670,6 +2678,7 @@ void AppSettingsDialog::collectSettings()
     if(m_editDiagnosticsFolder)merged.sessionDiagnosticsFolder=m_editDiagnosticsFolder->text();
     if (m_editQrzUsername) merged.qrzUsername = m_editQrzUsername->text().trimmed();
     if (m_editQrzPassword) merged.qrzPassword = m_editQrzPassword->text();
+    if (m_chkFtLateDecode) merged.ftLateDecodeEnabled = m_chkFtLateDecode->isChecked();
     if (m_chkFtDriftRx) merged.ftDriftRxEnabled = m_chkFtDriftRx->isChecked();
     if (m_spinFtDriftMax) merged.ftDriftMaxHzPerSec = m_spinFtDriftMax->value();
     if (m_chkFtGpuSync) merged.ftGpuSyncEnabled = m_chkFtGpuSync->isChecked();

@@ -6,6 +6,7 @@
 #include "../../third_party/mshv_gpl/port/HvGenFt8/gen_ft8.h"
 
 #include <QObject>
+#include <QThreadPool>
 #include "dsp/common/TimestampResampler.h"
 #include <QDateTime>
 #include <QString>
@@ -235,6 +236,11 @@ public slots:
     void setDecodeEngine(const QString &engineName);
     void setDeepDecodeEnabled(bool enabled);
     void setDspPlusDecodeEnabled(bool enabled);
+    // Late recovery: after the live reply deadline, the supplementary
+    // reference recovery (R30) continues on its own thread and publishes what
+    // it finds as display-only rows ("... late presentation"), which never
+    // choose a caller or arm TX.
+    void setLateDecodeEnabled(bool enabled);
     void setDriftRxOptions(bool enabled, double maxHzPerSec);
     // Atomic RF context: callable from the GUI without waiting for a decode.
     void setRadioFrequencyHz(double hz);
@@ -243,6 +249,15 @@ public slots:
     void analyzeAudioFile(const QString &filePath);
 
 public:
+    bool lateDecodeEnabled() const { return m_lateDecodeEnabled.load(std::memory_order_acquire); }
+    // Runs the reference recovery until deadlineUtcMs and returns the rows
+    // not in known.  Used by the late job and by the replay probe.
+    QVector<Decode> lateReferenceRecovery(const QVector<double> &samples, const QDateTime &slot,
+                                          const QVector<Decode> &known, qint64 deadlineUtcMs,
+                                          const std::function<bool()> &cancelled, double *elapsedMs = nullptr);
+    // Time after the slot end that the late recovery may use (FT8 9 s,
+    // FT4 4.5 s): it ends before the next slot's early decode.
+    static qint64 lateDecodeWindowMs(int slotMs) { return qint64(slotMs) * 3 / 5; }
     bool liveInputEnabled() const { return m_liveInputEnabled; }
     QString modeName() const;
     QString decodeEngine() const;
@@ -266,6 +281,11 @@ signals:
 
 private:
     std::unique_ptr<FtReferenceRecovery> m_referenceRecovery;
+    std::atomic<bool> m_lateDecodeEnabled {true};
+    std::atomic<bool> m_lateDecodeStop {false};
+    std::unique_ptr<QThreadPool> m_latePool;   // one thread; late jobs never block the slot decoder
+    void startLateReferenceRecovery(const QVector<double> &samples, const QDateTime &slot,
+                                    const QVector<Decode> &known, int generation, int slotMs, const QString &phase);
     void appendReferenceRecovery(const QVector<double>&,const QDateTime&,QVector<Decode>&,PerfStats*,const std::function<void(const QVector<Decode>&)>&);
 
     // Capture/profile access must not wait for the coordinator's whole-decode lock.

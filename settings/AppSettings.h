@@ -240,6 +240,7 @@ public:
     QString ft8LiveDecodeDepth = "adaptive";
     bool ftGpuSyncEnabled = false;
     bool ftGpuDecodeEnabled = false;
+    bool ftLateDecodeEnabled = true;   // continue the R30 recovery after the reply deadline, display only
     bool ftDriftRxEnabled = false;
     double ftDriftMaxHzPerSec = 2.0;
     // Working-frequency list (Settings -> Frequencies) as JSON; empty = the

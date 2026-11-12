@@ -1171,6 +1171,8 @@ Ft8RxDecoder::Ft8RxDecoder(QObject *parent)
 Ft8RxDecoder::~Ft8RxDecoder()
 {
     requestShutdown();
+    m_lateDecodeStop.store(true, std::memory_order_release);
+    if (m_latePool) { m_latePool->clear(); m_latePool->waitForDone(); }
     if (m_incrementalAnalysis) m_incrementalAnalysis->stop();
     if (m_decodeCoordinator) {
         m_decodeCoordinator->stopAndJoin();
@@ -1455,6 +1457,11 @@ bool Ft8RxDecoder::dspPlusDecodeEnabled() const
 {
     std::lock_guard<std::recursive_mutex> configLock(m_decodeConfigMutex);
     return m_dspPlusDecodeEnabled;
+}
+
+void Ft8RxDecoder::setLateDecodeEnabled(bool enabled)
+{
+    m_lateDecodeEnabled.store(enabled, std::memory_order_release);
 }
 
 void Ft8RxDecoder::setDeepDecodeEnabled(bool enabled)
@@ -2594,6 +2601,9 @@ void Ft8RxDecoder::startAsyncDecodeSlot(const QVector<double> &samples,
                 if (!decodeCancellationRequested() &&
                     generation == m_decodeGeneration.load(std::memory_order_acquire)) {
                     publishBatch(decodes, phase);
+                    if (phase == QStringLiteral("boundary") && stats.referenceCutoff && !stats.offline &&
+                        m_lateDecodeEnabled.load(std::memory_order_acquire))
+                        startLateReferenceRecovery(samples, slotStartUtc, decodes, generation, jobSlotMs, phase);
                     stats.incrementalFftHits=analysisScope.context.fftHits.load();
                     stats.incrementalToneHits=analysisScope.context.toneHits.load();
                     stats.incrementalPreparedRows=prepared?int(prepared->rows.size()):0;
@@ -7735,6 +7745,78 @@ int Ft8RxDecoder::grayInverse(int tone)
         }
     }
     return 0;
+}
+
+QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::lateReferenceRecovery(const QVector<double> &samples, const QDateTime &slot,
+                                                                const QVector<Decode> &known, qint64 deadlineUtcMs,
+                                                                const std::function<bool()> &cancelled, double *elapsedMs)
+{
+    QVector<Decode> found;
+    FtReferenceRecovery::Request request;
+    {
+        // The GUI thread changes these under the config mutex.
+        std::lock_guard<std::recursive_mutex> configLock(m_decodeConfigMutex);
+        if (!m_referenceRecovery) return found;   // created by the boundary decode of this slot
+        request.mode = m_modeName; request.myCall = m_myCall; request.dxCall = m_dxCall;
+        request.lowHz = m_searchLowHz; request.highHz = m_searchHighHz; request.markerHz = m_rxMarkerHz;
+    }
+    const auto profile = Ft8Mode::profileForMode(request.mode);
+    request.radioHz = m_radioFrequencyHz.load(); request.epoch = m_decodeGeneration.load();
+    request.slotUtcMs = slot.toMSecsSinceEpoch(); request.phase = QStringLiteral("late");
+    request.deadlineUtcMs = deadlineUtcMs;
+    // Leave one core for audio, the GUI and the next slot's incremental analysis.
+    request.workers = qMax(1, FtDecodeWorkerPool::instance().recommendedWorkerCount(M3Runtime::WorkClass::FtBoundary, 4) - 1);
+    request.cancelled = cancelled;
+    auto take = [&](const FtReferenceRecovery::Row &r) {
+        auto same = [&](const Decode &d) { return d.message.trimmed().compare(r.message, Qt::CaseInsensitive) == 0; };
+        if (std::any_of(known.cbegin(), known.cend(), same) || std::any_of(found.cbegin(), found.cend(), same)) return;
+        Decode d; d.message = r.message; d.frequencyHz = r.frequency; d.snrDb = r.snr; d.dt = r.dt; d.syncScore = r.quality;
+        d.utc = slot.time().toString(QStringLiteral("HHmmss")); d.slotStartUtcMs = request.slotUtcMs; d.slotPeriodMs = profile.slotMs;
+        found.append(d);
+    };
+    try {
+        const auto recovered = m_referenceRecovery->decode(samples, request, {});
+        for (const auto &r : recovered.rows) take(r);
+        if (elapsedMs) *elapsedMs = recovered.elapsedMs;
+    } catch (const std::exception &e) {
+        SessionDiagnostics::instance().record("ft.reference.error", {{"mode", request.mode}, {"phase", "late"}, {"error", QString::fromUtf8(e.what())}});
+    }
+    return found;
+}
+
+void Ft8RxDecoder::startLateReferenceRecovery(const QVector<double> &samples, const QDateTime &slot,
+                                              const QVector<Decode> &known, int generation, int slotMs, const QString &phase)
+{
+    if (!m_latePool) {   // created on the first live boundary decode only
+        m_latePool.reset(new QThreadPool);
+        m_latePool->setMaxThreadCount(1);
+    }
+    if (m_latePool->activeThreadCount() > 0) return;   // never queue behind a running late job
+    const qint64 deadline = slot.toMSecsSinceEpoch() + slotMs + lateDecodeWindowMs(slotMs);
+    m_latePool->start([this, samples, slot, known, generation, deadline, phase] {
+        auto cancelled = [this, generation] {
+            return m_lateDecodeStop.load(std::memory_order_acquire) || decodeCancellationRequested() ||
+                   !m_lateDecodeEnabled.load(std::memory_order_acquire) ||
+                   generation != m_decodeGeneration.load(std::memory_order_acquire);
+        };
+        if (cancelled() || QDateTime::currentMSecsSinceEpoch() >= deadline) return;
+        double elapsed = 0.0;
+        const QVector<Decode> found = lateReferenceRecovery(samples, slot, known, deadline, cancelled, &elapsed);
+        SessionDiagnostics::instance().record("ft.late.finished", {{"slot_utc_ms", QString::number(slot.toMSecsSinceEpoch())},
+                                                                   {"decoded", found.size()}, {"elapsed_ms", elapsed}});
+        // The window ends 4.5 s (FT4 2.25 s) before the next slot's early
+        // decode, so this batch never interleaves with that slot's batches.
+        if (found.isEmpty() || cancelled() || QDateTime::currentMSecsSinceEpoch() > deadline) return;
+        QVector<Decode> fresh;
+        for (const Decode &d : found) if (markDecodeEmitted(d, slot)) fresh.append(d);
+        if (fresh.isEmpty()) return;
+        // Display only: MainWindow ignores " presentation" batches for the
+        // sequencer, Auto CQ, caller queue and TX arming.
+        const QString displayPhase = phase + QStringLiteral(" late presentation");
+        emit decodeBatchStarted(slot.toMSecsSinceEpoch(), displayPhase);
+        for (const Decode &d : fresh) emit decodeReady(d);
+        emit decodeBatchFinished(slot.toMSecsSinceEpoch(), displayPhase);
+    });
 }
 
 void Ft8RxDecoder::appendReferenceRecovery(const QVector<double>&samples,const QDateTime&slot,QVector<Decode>&out,PerfStats*stats,const std::function<void(const QVector<Decode>&)>&publish)
