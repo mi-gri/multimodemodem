@@ -4,6 +4,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- FT callsign recognition accepts special event calls with several digits (DL75WAU, SX602N,
+  TM100A), with or without hash brackets; "<SX602N> IW9HPG JM78" now fills the locator column.
+  The pattern came from MadModem. Decodes with an unresolved hash such as
+  "<...> DL7UKT JO62" fill the callsign and locator columns too and are never treated as
+  addressed to the own station.
 - FT8/FT4 late decodes: after the reply deadline the deep reference recovery (R30) goes
   on for up to 9 s (FT4 4.5 s) and shows what it finds as display-only rows; they never
   answer, call or arm TX. On 23 recorded 20 m periods: 348 instead of 317 decodes under

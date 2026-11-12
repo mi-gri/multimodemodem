@@ -1,5 +1,7 @@
 #include "FtDecodedText.h"
 
+#include <QSet>
+
 #include <QRegularExpression>
 #include <QtGlobal>
 
@@ -181,6 +183,20 @@ FtDecodedText::ParsedMessage FtDecodedText::parse(const QString &message, const 
         parsed.word5 = parsed.parts.value(4);
     }
 
+    // Calls in angle brackets came through the decoder's hash table, so they
+    // are callsigns even when the plain pattern rejects them (special calls
+    // such as SX602N or long compound calls).  The brackets are removed by
+    // normalizeMessage(), so collect them from the original text.
+    QSet<QString> hashedCalls;
+    {
+        thread_local const QRegularExpression bracketed(QStringLiteral("<([A-Z0-9/]+)>"));
+        for (auto it = bracketed.globalMatch(message.toUpper()); it.hasNext();)
+            hashedCalls.insert(it.next().captured(1));
+    }
+    auto callToken = [&hashedCalls](const QString &token) {
+        return isCallsign(token) || hashedCalls.contains(token.trimmed().toUpper());
+    };
+
     parsed.qrz = (parsed.word1 == QStringLiteral("QRZ"));
     parsed.de = (parsed.word1 == QStringLiteral("DE"));
     parsed.cq = parsed.word1.startsWith(QStringLiteral("CQ")) || parsed.qrz;
@@ -201,7 +217,7 @@ FtDecodedText::ParsedMessage FtDecodedText::parse(const QString &message, const 
     if (parsed.cq) {
         parsed.kind = Kind::Cq;
         parsed.firstCall = parsed.word2;
-        if (isCallsign(parsed.firstCall)) {
+        if (callToken(parsed.firstCall)) {
             parsed.senderCall = parsed.firstCall;
             parsed.fromCall = parsed.senderCall;
             parsed.payload = parsed.word3;
@@ -212,7 +228,7 @@ FtDecodedText::ParsedMessage FtDecodedText::parse(const QString &message, const 
             // Directed CQ forms are captured in word1 (CQ DX, CQ EU, CQ 001).
             // The first real callsign following the CQ token is the caller.
             for (int i = 1; i < parsed.parts.size(); ++i) {
-                if (isCallsign(parsed.parts.at(i))) {
+                if (callToken(parsed.parts.at(i))) {
                     parsed.firstCall = parsed.parts.at(i);
                     parsed.senderCall = parsed.firstCall;
                     parsed.fromCall = parsed.senderCall;
@@ -229,9 +245,13 @@ FtDecodedText::ParsedMessage FtDecodedText::parse(const QString &message, const 
     parsed.firstCall = parsed.word1;
     parsed.secondCall = parsed.word2;
 
-    if (isCallsign(parsed.firstCall) && isCallsign(parsed.secondCall)) {
+    // "<...>" (hash not resolved; brackets removed above) is an unknown
+    // receiver: the sender and its grid/report are still valid, but the
+    // message is never addressed to us.
+    const bool unknownReceiver = parsed.firstCall == QStringLiteral("...");
+    if ((unknownReceiver || callToken(parsed.firstCall)) && callToken(parsed.secondCall)) {
         parsed.directed = true;
-        parsed.receiverCall = parsed.firstCall;
+        parsed.receiverCall = unknownReceiver ? QString() : parsed.firstCall;
         parsed.toCall = parsed.receiverCall;
         parsed.senderCall = parsed.secondCall;
         parsed.fromCall = parsed.senderCall;
@@ -241,7 +261,7 @@ FtDecodedText::ParsedMessage FtDecodedText::parse(const QString &message, const 
             // Standard FT messages are ordered TO FROM PAYLOAD.  Only word1 is
             // addressed to us.  If our call is word2, it is most likely our own
             // transmitted message/echo and must not drive auto-sequence.
-            parsed.addressedToMe = callMatches(parsed.receiverCall, my);
+            parsed.addressedToMe = !unknownReceiver && callMatches(parsed.receiverCall, my);
         }
 
         if (isFinalToken(parsed.payload)) {
@@ -382,6 +402,14 @@ bool FtDecodedText::isCallsign(const QString &token)
 
     thread_local const QRegularExpression normal(QStringLiteral("^(?:[A-Z0-9]{1,4}/)?[A-Z0-9]{1,3}[0-9][A-Z]{1,4}(?:/[A-Z0-9]{1,4})?$"));
     if (normal.match(t).hasMatch()) {
+        return true;
+    }
+    // Special event and anniversary calls carry several digits between
+    // prefix and suffix (DL75WAU, SX602N, TM100A, GB250RN).  Here the part
+    // before the digits must end in a letter, so purely numeric starts such
+    // as 123A are not taken as calls.
+    thread_local const QRegularExpression special(QStringLiteral("^(?:[A-Z0-9]{1,4}/)?[A-Z0-9]{0,2}[A-Z][0-9]{1,4}[A-Z]{1,5}(?:/[A-Z0-9]{1,4})?$"));
+    if (t.size() <= 13 && special.match(t).hasMatch()) {
         return true;
     }
 

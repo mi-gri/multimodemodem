@@ -92,6 +92,65 @@ bool runParserTrapChecks()
         ok = false;
     }
 
+    // Unresolved hash call as receiver: sender and grid/report still count,
+    // never addressed to us.
+    const auto unknownGrid = FtDecodedText::parse(QStringLiteral("<...> DL7UKT JO62"), QStringLiteral("IZ6NNH"));
+    if (!unknownGrid.directed || unknownGrid.addressedToMe || unknownGrid.senderCall != QStringLiteral("DL7UKT") ||
+        unknownGrid.grid != QStringLiteral("JO62") || !unknownGrid.receiverCall.isEmpty()) {
+        qWarning().noquote() << "FAIL parser: <...> receiver with grid" << unknownGrid.text << unknownGrid.senderCall << unknownGrid.grid;
+        ok = false;
+    }
+    const auto unknownReport = FtDecodedText::parse(QStringLiteral("<...> DJ1KW R-07"), QStringLiteral("DJ1KW"));
+    if (unknownReport.addressedToMe || unknownReport.senderCall != QStringLiteral("DJ1KW") || unknownReport.report != QStringLiteral("-07")) {
+        qWarning().noquote() << "FAIL parser: <...> receiver with report" << unknownReport.text << unknownReport.addressedToMe << unknownReport.report;
+        ok = false;
+    }
+
+    // Callsign recognition: special event calls with several digits, and
+    // tokens that must stay non-calls.
+    for (const QString &call : {QStringLiteral("DL75WAU"), QStringLiteral("SX602N"), QStringLiteral("TM100A"),
+                                QStringLiteral("GB250RN"), QStringLiteral("K1ABC"), QStringLiteral("2E0ABC"),
+                                QStringLiteral("3DA0RS"), QStringLiteral("E51ABC"), QStringLiteral("DL75WAU/P"),
+                                // special calls whose prefix starts with a digit
+                                QStringLiteral("9A100ZG"), QStringLiteral("4X75IDF"), QStringLiteral("4Z70ISR"),
+                                QStringLiteral("9A2025TS"), QStringLiteral("3Z100PL"), QStringLiteral("2E25JUB"),
+                                QStringLiteral("E750A"), QStringLiteral("5B60CY"), QStringLiteral("9H50VE")}) {
+        if (!FtDecodedText::isCallsign(call)) { qWarning().noquote() << "FAIL callsign rejected:" << call; ok = false; }
+    }
+    for (const QString &token : {QStringLiteral("1A"), QStringLiteral("599"), QStringLiteral("JO62"),
+                                 QStringLiteral("RR73"), QStringLiteral("-10"), QStringLiteral("R-07"), QStringLiteral("FT8"),
+                                 QStringLiteral("73"), QStringLiteral("CQ")}) {
+        if (FtDecodedText::isCallsign(token)) { qWarning().noquote() << "FAIL not a callsign accepted:" << token; ok = false; }
+    }
+    const auto plainSpecial = FtDecodedText::parse(QStringLiteral("SX602N IW9HPG JM78"), QStringLiteral("IZ6NNH"));
+    if (!plainSpecial.directed || plainSpecial.senderCall != QStringLiteral("IW9HPG") || plainSpecial.grid != QStringLiteral("JM78")) {
+        qWarning().noquote() << "FAIL parser: special call without brackets" << plainSpecial.text << plainSpecial.senderCall << plainSpecial.grid;
+        ok = false;
+    }
+    const auto cqSpecial = FtDecodedText::parse(QStringLiteral("CQ DL75WAU JO62"), QStringLiteral("IZ6NNH"));
+    if (!cqSpecial.cq || cqSpecial.senderCall != QStringLiteral("DL75WAU") || cqSpecial.grid != QStringLiteral("JO62")) {
+        qWarning().noquote() << "FAIL parser: CQ from special call" << cqSpecial.text << cqSpecial.senderCall << cqSpecial.grid;
+        ok = false;
+    }
+
+    // Resolved hash call in brackets.
+    const auto special = FtDecodedText::parse(QStringLiteral("<SX602N> IW9HPG JM78"), QStringLiteral("IZ6NNH"));
+    if (!special.directed || special.receiverCall != QStringLiteral("SX602N") || special.senderCall != QStringLiteral("IW9HPG") ||
+        special.grid != QStringLiteral("JM78")) {
+        qWarning().noquote() << "FAIL parser: special hashed receiver" << special.text << special.receiverCall << special.senderCall << special.grid;
+        ok = false;
+    }
+    const auto specialSender = FtDecodedText::parse(QStringLiteral("IZ6NNH <SX602N> -10"), QStringLiteral("IZ6NNH"));
+    if (!specialSender.addressedToMe || specialSender.senderCall != QStringLiteral("SX602N") || specialSender.report != QStringLiteral("-10")) {
+        qWarning().noquote() << "FAIL parser: special hashed sender" << specialSender.text << specialSender.senderCall << specialSender.report;
+        ok = false;
+    }
+    const auto specialCq = FtDecodedText::parse(QStringLiteral("CQ <SX602N> KM18"), QStringLiteral("IZ6NNH"));
+    if (!specialCq.cq || specialCq.senderCall != QStringLiteral("SX602N") || specialCq.grid != QStringLiteral("KM18")) {
+        qWarning().noquote() << "FAIL parser: special hashed CQ" << specialCq.text << specialCq.senderCall << specialCq.grid;
+        ok = false;
+    }
+
     const auto directedCq = FtDecodedText::parse(QStringLiteral("CQ DX K1ABC FN42"), QStringLiteral("IZ6NNH"));
     if (!directedCq.cq || directedCq.senderCall != QStringLiteral("K1ABC") || directedCq.grid != QStringLiteral("FN42")) {
         qWarning().noquote() << "FAIL parser: directed CQ" << directedCq.text << directedCq.senderCall << directedCq.grid;
