@@ -39,7 +39,7 @@ def main():
     parser.add_argument('--output', type=Path, default=ROOT / 'dist/packages')
     args = parser.parse_args()
     version = (ROOT / 'M3_VERSION.txt').read_text().strip()
-    revision = re.search(r'-r(\d+)-', (ROOT / 'M3_SOURCE_REVISION.txt').read_text())
+    revision = re.search(r'-r(\d+)(?:-|$)', (ROOT / 'M3_SOURCE_REVISION.txt').read_text())
     if not re.fullmatch(r'\d+\.\d+\.\d+', version) or not revision:
         raise SystemExit('Native installer requires a numeric release and source revision.')
     release = distribution_release(args.build_dir.resolve(), revision.group(1), os.environ.get("M3_BUILD_NUMBER", ""))

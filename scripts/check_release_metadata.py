@@ -42,6 +42,11 @@ def check(root: Path, env: dict[str, str]) -> list[str]:
     numbers = version.split(".")
     if not revision.startswith(version + "-") or "\n" in revision:
         errors.append(f"M3_SOURCE_REVISION.txt: revision does not belong to {version}")
+    # The Linux packages take their release number from "-rN" (see
+    # scripts/package_linux_installer.py); fail here instead of at packaging.
+    if not re.search(r"-r(\d+)(?:-|$)", revision):
+        errors.append("M3_SOURCE_REVISION.txt: expected a source revision number such as "
+                      f"{version}-source-r1")
     if env.get("GITHUB_REF_TYPE") == "tag":
         tag = env.get("GITHUB_REF_NAME", "")
         if tag.removeprefix("v") != version:

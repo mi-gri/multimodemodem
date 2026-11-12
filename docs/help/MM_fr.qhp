@@ -7,7 +7,7 @@
         <filterAttribute>0.6.6</filterAttribute>
         <filterAttribute>fr</filterAttribute>
         <toc>
-            <section title="Aide MM" ref="fr/index.html">
+            <section title="Aide m³" ref="fr/index.html">
                 <section title="Démarrage rapide" ref="fr/quickstart.html" />
                 <section title="Audio, CAT et PTT" ref="fr/audio_cat_ptt.html" />
                 <section title="Waterfall et marqueurs" ref="fr/waterfall.html" />

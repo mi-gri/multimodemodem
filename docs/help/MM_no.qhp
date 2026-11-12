@@ -7,7 +7,7 @@
         <filterAttribute>0.6.6</filterAttribute>
         <filterAttribute>no</filterAttribute>
         <toc>
-            <section title="MM-hjelp" ref="no/index.html">
+            <section title="m³-hjelp" ref="no/index.html">
                 <section title="Hurtigstart" ref="no/quickstart.html" />
                 <section title="Audio, CAT og PTT" ref="no/audio_cat_ptt.html" />
                 <section title="Waterfall og markører" ref="no/waterfall.html" />

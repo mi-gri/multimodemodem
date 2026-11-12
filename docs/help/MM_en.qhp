@@ -7,7 +7,7 @@
         <filterAttribute>0.6.6</filterAttribute>
         <filterAttribute>en</filterAttribute>
         <toc>
-            <section title="MM Help" ref="en/index.html">
+            <section title="m³ Help" ref="en/index.html">
                 <section title="Quick start" ref="en/quickstart.html" />
                 <section title="Audio, CAT and PTT" ref="en/audio_cat_ptt.html" />
                 <section title="Waterfall and markers" ref="en/waterfall.html" />

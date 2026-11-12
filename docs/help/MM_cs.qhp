@@ -7,7 +7,7 @@
         <filterAttribute>0.6.6</filterAttribute>
         <filterAttribute>cs</filterAttribute>
         <toc>
-            <section title="Nápověda MM" ref="cs/index.html">
+            <section title="Nápověda m³" ref="cs/index.html">
                 <section title="Rychlý start" ref="cs/quickstart.html" />
                 <section title="Audio, CAT a PTT" ref="cs/audio_cat_ptt.html" />
                 <section title="Waterfall a značky" ref="cs/waterfall.html" />

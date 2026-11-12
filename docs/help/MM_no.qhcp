@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <QHelpCollectionProject version="1.0">
     <assistant>
-        <title>MM-hjelp - Norsk 0.6.6</title>
+        <title>m³-hjelp - Norsk 0.6.6</title>
         <startPage>qthelp://org.m3.mm.066.no/doc/no/index.html</startPage>
         <applicationIcon>../../icons/multimodemodem_32.png</applicationIcon>
     </assistant>

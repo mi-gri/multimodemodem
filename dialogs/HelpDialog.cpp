@@ -476,7 +476,7 @@ QString HelpDialog::localizedTopicTitle(const QString &topicKey) const
     const QString lang = normalizedLanguageCode(m_effectiveHelpLanguage);
     static const QMap<QString, QMap<QString, QString>> titles = {
         {QStringLiteral("en"), {
-            {QStringLiteral("index"), QStringLiteral("MM Help")},
+            {QStringLiteral("index"), QStringLiteral("m³ Help")},
             {QStringLiteral("quickstart"), QStringLiteral("Quick start")},
             {QStringLiteral("audio_cat_ptt"), QStringLiteral("Audio, CAT and PTT")},
             {QStringLiteral("waterfall"), QStringLiteral("Waterfall and markers")},
@@ -490,7 +490,7 @@ QString HelpDialog::localizedTopicTitle(const QString &topicKey) const
             {QStringLiteral("troubleshooting"), QStringLiteral("Troubleshooting")}
         }},
         {QStringLiteral("it"), {
-            {QStringLiteral("index"), QStringLiteral("Guida MM")},
+            {QStringLiteral("index"), QStringLiteral("Guida m³")},
             {QStringLiteral("quickstart"), QStringLiteral("Avvio rapido")},
             {QStringLiteral("audio_cat_ptt"), QStringLiteral("Audio, CAT e PTT")},
             {QStringLiteral("waterfall"), QStringLiteral("Waterfall e marker")},
@@ -504,7 +504,7 @@ QString HelpDialog::localizedTopicTitle(const QString &topicKey) const
             {QStringLiteral("troubleshooting"), QStringLiteral("Risoluzione problemi")}
         }},
         {QStringLiteral("fr"), {
-            {QStringLiteral("index"), QStringLiteral("Aide MM")},
+            {QStringLiteral("index"), QStringLiteral("Aide m³")},
             {QStringLiteral("quickstart"), QStringLiteral("Démarrage rapide")},
             {QStringLiteral("audio_cat_ptt"), QStringLiteral("Audio, CAT et PTT")},
             {QStringLiteral("waterfall"), QStringLiteral("Waterfall et marqueurs")},
@@ -518,7 +518,7 @@ QString HelpDialog::localizedTopicTitle(const QString &topicKey) const
             {QStringLiteral("troubleshooting"), QStringLiteral("Dépannage")}
         }},
         {QStringLiteral("de"), {
-            {QStringLiteral("index"), QStringLiteral("MM-Hilfe")},
+            {QStringLiteral("index"), QStringLiteral("m³-Hilfe")},
             {QStringLiteral("quickstart"), QStringLiteral("Schnellstart")},
             {QStringLiteral("audio_cat_ptt"), QStringLiteral("Audio, CAT und PTT")},
             {QStringLiteral("waterfall"), QStringLiteral("Wasserfall und Marker")},
@@ -532,7 +532,7 @@ QString HelpDialog::localizedTopicTitle(const QString &topicKey) const
             {QStringLiteral("troubleshooting"), QStringLiteral("Fehlersuche")}
         }},
         {QStringLiteral("no"), {
-            {QStringLiteral("index"), QStringLiteral("MM-hjelp")},
+            {QStringLiteral("index"), QStringLiteral("m³-hjelp")},
             {QStringLiteral("quickstart"), QStringLiteral("Hurtigstart")},
             {QStringLiteral("audio_cat_ptt"), QStringLiteral("Lyd, CAT og PTT")},
             {QStringLiteral("waterfall"), QStringLiteral("Waterfall og markører")},
@@ -546,7 +546,7 @@ QString HelpDialog::localizedTopicTitle(const QString &topicKey) const
             {QStringLiteral("troubleshooting"), QStringLiteral("Feilsøking")}
         }},
         {QStringLiteral("cs"), {
-            {QStringLiteral("index"), QStringLiteral("Nápověda MM")},
+            {QStringLiteral("index"), QStringLiteral("Nápověda m³")},
             {QStringLiteral("quickstart"), QStringLiteral("Rychlý start")},
             {QStringLiteral("audio_cat_ptt"), QStringLiteral("Audio, CAT a PTT")},
             {QStringLiteral("waterfall"), QStringLiteral("Waterfall a značky")},

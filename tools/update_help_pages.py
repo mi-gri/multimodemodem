@@ -259,7 +259,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'reconnect the interface and press Stop to retry OFF only. A timing overrun stops the message '
                     'instead of sending catch-up bursts. Test wiring and timing on the actual radio before contest '
                     'use.</p>'),
-        'index.html': ('MM Help',
+        'index.html': ('m³ Help',
                        '<h1>MultiModeModem help</h1><p>MultiModeModem combines digital modes, audio/CAT/PTT, FT4/FT8, rotator '
                        'control, Radio Telescope, scheduler, logbook and QSO mapping in one Qt '
                        "interface.</p><ul><li><a href='quickstart.html'>Quick start</a></li><li><a "
@@ -521,7 +521,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'premi Stop per ritentare soltanto OFF. Un ritardo eccessivo interrompe il messaggio invece di '
                     'produrre raffiche di recupero. Verifica cablaggio e tempi sulla radio effettiva prima dell’uso in '
                     'contest.</p>'),
-        'index.html': ('Guida MM',
+        'index.html': ('Guida m³',
                        '<h1>Guida MultiModeModem</h1><p>MultiModeModem riunisce modi digitali, audio/CAT/PTT, FT4/FT8, controllo '
                        'rotore, Radio Telescope, pianificatore, registro QSO e mappa in un’unica interfaccia '
                        "Qt.</p><ul><li><a href='quickstart.html'>Avvio rapido</a></li><li><a "
@@ -781,7 +781,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'rebranchez l’interface et appuyez sur Stop pour réessayer uniquement OFF. Un retard excessif '
                     'arrête le message au lieu de produire une rafale de rattrapage. Vérifiez câblage et temporisation '
                     'sur la radio avant un contest.</p>'),
-        'index.html': ('Aide MM',
+        'index.html': ('Aide m³',
                        '<h1>Aide MultiModeModem</h1><p>MultiModeModem réunit les modes numériques, audio/CAT/PTT, FT4/FT8, la '
                        'commande du rotateur, le radiotélescope, le planificateur, le journal et la carte QSO dans une '
                        "seule interface Qt.</p><ul><li><a href='quickstart.html'>Démarrage rapide</a></li><li><a "
@@ -1041,7 +1041,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'Schnittstelle erneut anschließen und mit Stop nur OFF wiederholen. Übermäßige Verspätung beendet '
                     'die Nachricht statt Aufholbursts zu senden. Verkabelung und Zeitverhalten vor Contestbetrieb am '
                     'tatsächlichen Funkgerät prüfen.</p>'),
-        'index.html': ('MM-Hilfe',
+        'index.html': ('m³-Hilfe',
                        '<h1>MultiModeModem-Hilfe</h1><p>MultiModeModem vereint Digitalmodi, Audio/CAT/PTT, FT4/FT8, '
                        'Rotorsteuerung, Radioteleskop, Planer, Logbuch und QSO-Karte in einer '
                        "Qt-Oberfläche.</p><ul><li><a href='quickstart.html'>Schnellstart</a></li><li><a "
@@ -1276,7 +1276,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'frigi KEY/PTT. Uten bekreftelse blokkeres videre TX: koble til grensesnittet igjen og trykk Stop '
                     'for bare å prøve OFF. For store forsinkelser stopper meldingen fremfor å sende '
                     'innhentingsutbrudd. Kontroller kabling og tider på den faktiske radioen før konkurransebruk.</p>'),
-        'index.html': ('MM-hjelp',
+        'index.html': ('m³-hjelp',
                        '<h1>MultiModeModem-hjelp</h1><p>MultiModeModem samler digitale moduser, lyd/CAT/PTT, FT4/FT8, '
                        'rotorstyring, radioteleskop, planlegger, loggbok og QSO-kart i ett '
                        "Qt-grensesnitt.</p><ul><li><a href='quickstart.html'>Hurtigstart</a></li><li><a "
@@ -1507,7 +1507,7 @@ PAGES: dict[str, dict[str, tuple[str, str]]] = {'en': {'waterfall.html': ('Water
                     'KEY. Stop přeruší čekání tečky/čárky a zkusí uvolnit KEY/PTT. Bez potvrzení se další TX blokuje: '
                     'připojte rozhraní znovu a stiskněte Stop pro opakování pouze OFF. Nadměrné zpoždění zastaví '
                     'zprávu místo doháněcích dávek. Před soutěží ověřte zapojení a časování na skutečném rádiu.</p>'),
-        'index.html': ('Nápověda MM',
+        'index.html': ('Nápověda m³',
                        '<h1>Nápověda MultiModeModem</h1><p>MultiModeModem spojuje digitální režimy, audio/CAT/PTT, FT4/FT8, '
                        'ovládání rotátoru, radioteleskop, plánovač, deník a mapu QSO v jediném rozhraní '
                        "Qt.</p><ul><li><a href='quickstart.html'>Rychlý start</a></li><li><a "
