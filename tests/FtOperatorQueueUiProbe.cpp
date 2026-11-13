@@ -95,6 +95,11 @@ int main(int argc,char **argv){
   a=cq("M0ABC","IO91",-23,true,boundary);
   require(w.queueFt8FullAutoCqCandidate(a.first,a.second),"fresh weaker CQ did not refresh queued target");
   w.processFt8FullAutoCqCandidates();require(w.m_ftSession.dxCall=="M0ABC"&&w.m_ft8PendingTxArmed,"fresh CQ did not release waiting target");
+  // Switching Auto QSO off only stops answering new CQs: the running QSO
+  // and its armed reply stay.
+  w.m_chkFt8FullAutoQso->setChecked(false);
+  require(w.m_ftSession.qsoActive&&w.m_ftSession.dxCall=="M0ABC"&&w.m_ft8PendingTxArmed,"Auto QSO off aborted the running QSO");
+  {QSignalBlocker b(w.m_chkFt8FullAutoQso);w.m_chkFt8FullAutoQso->setChecked(true);}
   w.setReceiverRunning(w.m_rxRunning);
   require(w.m_cmbFt8Band==nullptr||!w.m_cmbFt8Band->isEnabled(),"band selector enabled while a TX is armed");
   w.m_ft8OperatorStopLatched=true;w.stopFt8Sequencer("STOP test");
