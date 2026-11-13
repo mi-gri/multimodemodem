@@ -24,6 +24,9 @@ namespace {
 
 constexpr int kNfft2 = 46080;              // downsampled points (375 Hz)
 constexpr int kNfft1 = kNfft2 * 32;        // input FFT at 12 kHz
+// wsprd keeps the 375 Hz record in 65536-point zeroed buffers: the last
+// 2-symbol FFTs read up to 46335, past the 46080 samples.
+constexpr int kDataBuffer = 65536;
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kDt = 1.0f / 375.0f;
 constexpr float kDf = 375.0f / 256.0f;     // tone spacing
@@ -285,7 +288,7 @@ struct Engine::Plans {
 };
 
 Engine::Engine()
-    : m_plans(new Plans), m_idat(kNfft2, 0.0f), m_qdat(kNfft2, 0.0f), m_mettab(makeMetricTable())
+    : m_plans(new Plans), m_idat(kDataBuffer, 0.0f), m_qdat(kDataBuffer, 0.0f), m_mettab(makeMetricTable())
 {
     Plans &p = *m_plans;
     p.realIn = fftw_alloc_real(kNfft1);
@@ -343,6 +346,8 @@ bool Engine::downconvert(const float *samples, size_t count)
         m_idat[static_cast<size_t>(i)] = static_cast<float>(p.narrowOut[i][0] / 1000.0);
         m_qdat[static_cast<size_t>(i)] = static_cast<float>(p.narrowOut[i][1] / 1000.0);
     }
+    std::fill(m_idat.begin() + kNfft2, m_idat.end(), 0.0f);
+    std::fill(m_qdat.begin() + kNfft2, m_qdat.end(), 0.0f);
     return true;
 }
 
@@ -380,6 +385,7 @@ std::vector<Decode> Engine::decode(const float *samples, size_t count, const Dec
         }
         ndecodesPass = 0;
 
+        static_assert((4 * (kNfft2 / 512) - 2) * 128 + 511 < kDataBuffer, "2-symbol FFTs stay inside the buffer");
         for (int i = 0; i < nffts; ++i) {
             for (int j = 0; j < 512; ++j) {
                 const int k = i * 128 + j;
