@@ -15,8 +15,9 @@ int main(int argc, char **argv) {
                       M3I18n::sourceText(QStringLiteral("DO3BOX")) == QStringLiteral("DO3BOX");
     std::cout << (back ? "PASS" : "FAIL") << " source text of a translated caption\n";
     // ... and an English source known only as a keyed value finds its way back.
-    const bool forth = M3I18n::fromEnglish(QStringLiteral("Decode")) == QStringLiteral("Dekodieren") &&
-                       M3I18n::text(QStringLiteral("Decode")) == QStringLiteral("Dekodieren");
+    // (An English text used by one key only, so the mapping is unambiguous.)
+    const bool forth = M3I18n::fromEnglish(QStringLiteral("JS8 automatic operation")) == QStringLiteral("JS8-Automatik") &&
+                       M3I18n::text(QStringLiteral("JS8 automatic operation")) == QStringLiteral("JS8-Automatik");
     std::cout << (forth ? "PASS" : "FAIL") << " keyed caption from its English source\n";
     ok &= forth;
     ok &= back;

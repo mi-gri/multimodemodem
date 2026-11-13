@@ -662,13 +662,6 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 
 # One toggle button for the FT TX period (replaces the TX I / TX II radios).
 KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
- 'ft_tx_period_toggle_tooltip':(
-  'Transmit in the first (I) or second (II) period. Click to switch.',
-  'Trasmetti nel primo (I) o nel secondo (II) periodo. Fai clic per cambiare.',
-  'Émettre dans la première (I) ou la seconde (II) période. Cliquer pour changer.',
-  'Senden in der ersten (I) oder zweiten (II) Periode. Klick schaltet um.',
-  'Send i første (I) eller andre (II) periode. Klikk for å bytte.',
-  'Vysílat v první (I) nebo druhé (II) periodě. Kliknutím přepnete.'),
 }.items()})
 
 # JS8 automation group while Auto mode is off.
@@ -693,4 +686,19 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Avslutter gjeldende QSO (en pågående sending for det stopper), tømmer DX-kallesignal og lokator, tilbakestiller Tx1–Tx6 og svarer deretter neste stasjon i anropskøen. Automatikken forblir på; den slettede stasjonen besvares ikke automatisk i 15 minutter.',
   'Ukončí aktuální spojení (probíhající vysílání pro něj se zastaví), vymaže DX značku a lokátor, obnoví Tx1–Tx6 a poté odpoví další stanici ve frontě volajících. Automatika zůstává zapnutá; smazané stanici se 15 minut automaticky neodpovídá.'),
  'ft_clear_dx_log':('Clear DX: QSO ended, messages reset.','Cancella DX: QSO terminato, messaggi ripristinati.','Effacer DX : QSO terminé, messages réinitialisés.','DX löschen: QSO beendet, Nachrichten zurückgesetzt.','Slett DX: QSO avsluttet, meldinger tilbakestilt.','Smazat DX: spojení ukončeno, zprávy obnoveny.'),
+}.items()})
+
+# FT TX slot toggle and the Tune button (German: Tune, an established term).
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft_tx_slot_button':('TX slot %1 · %2','Slot TX %1 · %2','Créneau TX %1 · %2','TX-Slot %1 · %2','TX-slot %1 · %2','TX slot %1 · %2'),
+ 'ft_slot_even':('even','pari','pair','gerade','partall','sudý'),
+ 'ft_slot_odd':('odd','dispari','impair','ungerade','oddetall','lichý'),
+ 'ft_tx_slot_tooltip':(
+  'Selects the slot you transmit in. FT8: slot 1 starts at :00 and :30, slot 2 at :15 and :45. FT4: slot 1 is the even, slot 2 the odd 7.5-s period. Click to switch. When you answer a station, MM switches to the slot opposite to it.',
+  'Sceglie lo slot in cui trasmetti. FT8: lo slot 1 inizia a :00 e :30, lo slot 2 a :15 e :45. FT4: lo slot 1 è il periodo pari, lo slot 2 quello dispari da 7,5 s. Fai clic per cambiare. Quando rispondi a una stazione, MM passa allo slot opposto al suo.',
+  'Choisit le créneau dans lequel vous émettez. FT8 : le créneau 1 commence à :00 et :30, le créneau 2 à :15 et :45. FT4 : le créneau 1 est la période paire, le 2 la période impaire de 7,5 s. Cliquer pour changer. Quand vous répondez à une station, MM passe au créneau opposé au sien.',
+  'Wählt den Slot, in dem du sendest. FT8: Slot 1 beginnt bei :00 und :30, Slot 2 bei :15 und :45. FT4: Slot 1 ist die gerade, Slot 2 die ungerade 7,5-s-Periode. Klick schaltet um. Beim Antworten auf eine Station wechselt MM automatisch in den Slot gegenüber ihrem.',
+  'Velger slotten du sender i. FT8: slot 1 starter ved :00 og :30, slot 2 ved :15 og :45. FT4: slot 1 er den partalls-, slot 2 den oddetalls-perioden på 7,5 s. Klikk for å bytte. Når du svarer en stasjon, bytter MM til slotten motsatt av dens.',
+  'Volí slot, ve kterém vysíláte. FT8: slot 1 začíná v :00 a :30, slot 2 v :15 a :45. FT4: slot 1 je sudá, slot 2 lichá perioda 7,5 s. Kliknutím přepnete. Když odpovíte stanici, MM přepne do slotu opačného k jejímu.'),
+ 'tune':('Tune','Sintonia','Tune','Tune','Tune','Ladění'),
 }.items()})

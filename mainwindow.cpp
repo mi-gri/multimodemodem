@@ -2404,6 +2404,21 @@ void MainWindow::setupCustomWidgets()
             sideLayout->addWidget(ui->sideTabWidget, 1);
 
             ui->mainHorizontalSplitter->insertWidget(sideIndex, sideContainer);
+
+            // Hidden side tabs (Contest, Status, Frequency ...) stay reachable
+            // by Ctrl+Tab / Ctrl+PgDn in Qt; their page then showed without a
+            // tab.  Move on to the next visible tab in the same direction.
+            connect(ui->sideTabWidget, &QTabWidget::currentChanged, this, [this](int index) {
+                QTabWidget *tabs = ui->sideTabWidget;
+                QTabBar *bar = tabs->tabBar();
+                const int n = tabs->count();
+                if (index < 0 || n <= 0 || bar->isTabVisible(index)) { m_lastSideTabIndex = index; return; }
+                const int step = (m_lastSideTabIndex >= 0 && ((index - m_lastSideTabIndex + n) % n) > n / 2) ? -1 : 1;
+                for (int k = 1; k < n; ++k) {
+                    const int next = ((index + step * k) % n + n) % n;
+                    if (bar->isTabVisible(next)) { tabs->setCurrentIndex(next); return; }
+                }
+            });
         }
     }
 
@@ -9264,7 +9279,6 @@ void MainWindow::setupFt8Page()
     // state for the sequencer and settings code and are not shown.
     m_btnFt8TxPeriod = new QPushButton(controlGroup);
     m_btnFt8TxPeriod->setObjectName(QStringLiteral("ftTxPeriodToggle"));
-    m_btnFt8TxPeriod->setToolTip(uiText("ft_tx_period_toggle_tooltip", "Transmit in the first (I) or second (II) period. Click to switch."));
     m_radioFt8TxFirst->hide();
     m_radioFt8TxSecond->hide();
     connect(m_btnFt8TxPeriod, &QPushButton::clicked, this, [this]() {
@@ -17929,10 +17943,16 @@ void MainWindow::scheduleFt8SequencerMessage(const QString &message,
 void MainWindow::updateFt8TxPeriodButton()
 {
     if (m_btnFt8TxPeriod == nullptr || m_radioFt8TxSecond == nullptr) return;
+    // Name the slot and when it starts, so the button reads as a slot switch:
+    // FT8 slot 1 at :00/:30, slot 2 at :15/:45; FT4 even/odd 7.5-s periods.
     const bool second = m_radioFt8TxSecond->isChecked();
-    m_btnFt8TxPeriod->setText(second ? uiText("ft_tx_second_short", "TX II")
-                                     : uiText("ft_tx_first_short", "TX I"));
-    m_btnFt8TxPeriod->setToolTip(uiText("ft_tx_period_toggle_tooltip", "Transmit in the first (I) or second (II) period. Click to switch."));
+    const bool ft4 = ui != nullptr && ui->cmbMode != nullptr &&
+                     Ft8Mode::profileForMode(ui->cmbMode->currentText()).slotMs < 15000;
+    const QString when = ft4 ? (second ? uiText("ft_slot_odd", "odd") : uiText("ft_slot_even", "even"))
+                             : (second ? QStringLiteral(":15/:45") : QStringLiteral(":00/:30"));
+    m_btnFt8TxPeriod->setText(uiText("ft_tx_slot_button", "TX slot %1 · %2").arg(second ? 2 : 1).arg(when));
+    m_btnFt8TxPeriod->setToolTip(uiText("ft_tx_slot_tooltip",
+        "Selects the slot you transmit in. FT8: slot 1 starts at :00 and :30, slot 2 at :15 and :45. FT4: slot 1 is the even, slot 2 the odd 7.5-s period. Click to switch. When you answer a station, MM switches to the slot opposite to it."));
 }
 
 void MainWindow::updateFt8AutoModeVisibility()

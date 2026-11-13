@@ -4,6 +4,16 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- Translations: old word-by-word artefacts such as "+ Add bis log" or "wartet for CQ"
+  are recognised in all languages (English function words in a translated text) and
+  replaced by reviewed text or the English source. German keeps amateur-radio terms:
+  "Slot" instead of "Periode/Zeitschlitz", "Tune" instead of "Abst."; French and
+  Norwegian use "Tune" as WSJT-X and JTDX do.
+- FT TX slot button names the slot and its start: "TX slot 1 · :00/:30" / "TX slot 2 ·
+  :15/:45" (FT8), "even"/"odd" (FT4); the tooltip explains the switch. German "Tune"
+  instead of "Abst." on the Tune button and the TX level prefix.
+- Hidden side tabs (Status, Contest) could be reached with Ctrl+Tab and then showed
+  their page without a tab; keyboard navigation now skips them.
 - One Frequency area above the side tabs for every mode: CAT readout (frequency, PWR,
   SWR, ALC), band, stored frequencies, free entry and the band status. The separate
   Frequency tab and the frequency/band rows in the FT and JS8 Mode tabs are gone.

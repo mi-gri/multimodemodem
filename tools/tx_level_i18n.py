@@ -7,6 +7,6 @@ VALUES={
   'TX-Pegel: digitale Verstärkung des Sende-Audios, 0,0 dB = Vollaussteuerung. Bestimmt die Ansteuerung und damit die HF-Leistung. Wird je Band und Modus gemerkt; während Abstimmen stellt er den Abstimmpegel des Bandes ein.',
   'TX-nivå: digital forsterkning av sendt lyd, 0,0 dB = full skala. Bestemmer utstyringen og dermed RF-effekten. Huskes for hvert bånd og modus; under avstemming stiller den båndets avstemmingsnivå.',
   'Úroveň TX: digitální zesílení vysílaného zvuku, 0,0 dB = plné vybuzení. Určuje buzení a tím výkon VF. Pamatuje se pro každé pásmo a druh provozu; během ladění nastavuje úroveň ladění pásma.'),
- 'tune_level_prefix':('Tune','Sintonia','Accord','Abst.','Avst.','Ladění'),
+ 'tune_level_prefix':('Tune','Sintonia','Tune','Tune','Tune','Ladění'),
 }
 KEYS={key:dict(zip(LANGS,values)) for key,values in VALUES.items()}

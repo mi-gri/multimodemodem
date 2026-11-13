@@ -695,14 +695,73 @@ MIXED_ENGLISH_WORD_RE = re.compile(
 )
 
 
-def looks_like_mixed_sentence(value: str, english: str) -> bool:
+# English function words and verbs left behind by the old word-by-word
+# translation ("+ Add bis log", "Auto QSO: wartet for CQ").  Words that are
+# also ordinary words of the target language are exempt for that language.
+ENGLISH_GLUE = {
+    "to", "the", "of", "and", "for", "with", "add", "send", "selection", "received", "sent",
+    "your", "you", "this", "that", "when", "only", "from", "into", "after", "before", "will",
+    "would", "should", "can", "cannot", "not", "are", "is", "be", "been", "has", "have", "was",
+    "were", "by", "at", "here", "there", "which", "what", "still", "used", "please", "include",
+    "example", "hidden", "default", "usually", "retrying", "synced", "cleared", "changed",
+    "file", "reset", "name", "on", "no", "off", "disabled", "kept", "screen", "pending",
+    "isolated", "worker", "queued", "started", "prepared", "armed", "waiting",
+}
+NATIVE_WORDS = {
+    "de": {"an", "in", "am", "so", "was", "will", "hat", "name"},
+    "it": {"a", "no", "file"},
+    "fr": {"on", "a", "plus", "file"},
+    "no": {"to", "for", "i", "send", "at", "by", "fra"},
+    "cs": {"to", "a"},
+}
+_CURRENT_LANG = ""
+_WORD_RE = re.compile(r"[A-Za-zÀ-ÿĀ-ž]+")
+
+
+DE_TERMS = [
+    (r"\bTX in erster Periode\b", "TX im ersten Slot"),
+    (r"\bTX in der ersten Periode\b", "TX im ersten Slot"),
+    (r"\bTX zweite Periode\b", "TX im zweiten Slot"),
+    (r"\berste Periode\b", "erster Slot"),
+    (r"\bzweite Periode\b", "zweiter Slot"),
+    (r"\bab der nächsten Periode\b", "ab dem nächsten Slot"),
+    (r"\bin der nächsten Periode\b", "im nächsten Slot"),
+    (r"\bin die nächste Periode\b", "in den nächsten Slot"),
+    (r"\bin der letzten Periode\b", "im letzten Slot"),
+    (r"\bpro Periode\b", "pro Slot"),
+    (r"\bdie gerade, Slot 2 die ungerade 7,5-s-Periode\b", "der gerade, Slot 2 der ungerade 7,5-s-Slot"),
+    (r"\bFT-Perioden\b", "FT-Slots"),
+    (r"\bLetzte (MSK144|Q65)-Periode\b", r"Letzter \1-Slot"),
+    (r"\bPeriode %", "Slot %"),
+    (r"\bnächsten ausgewählten UTC-TX-Zeitschlitz\b", "nächsten ausgewählten UTC-TX-Slot"),
+    (r"\bDer aktuelle Zeitschlitz\b", "Der aktuelle Slot"),
+    (r"\bnächsten FT8-Zeitschlitz\b", "nächsten FT8-Slot"),
+    (r"\bZeitschlitz\b", "Slot"),
+    (r"^Abst\.$", "Tune"),
+]
+
+
+def apply_de_terms(value: str) -> str:
+    for pattern, replacement in DE_TERMS:
+        value = re.sub(pattern, replacement, value)
+    return value
+
+
+def looks_like_mixed_sentence(value: str, english: str, lang: str | None = None) -> bool:
     """Recognize old word-substitution artefacts without rejecting radio terms."""
     if value == english:
         return False
-    # A reviewed translation should not retain English grammatical glue. One
-    # such word in a value that otherwise differs from the source is enough to
-    # classify the old value as mixed; protocol names and abbreviations are not
-    # part of this expression.
+    lang = lang or _CURRENT_LANG
+    # Protocol words in capitals (MSG TO:, SNR?, CQ) and {MACROS} are not prose.
+    plain = re.sub(r"\{[^}]*\}", " ", value)
+    source_words = {w.lower() for w in _WORD_RE.findall(english)}
+    glue = ENGLISH_GLUE - NATIVE_WORDS.get(lang, set())
+    for word in _WORD_RE.findall(plain):
+        if len(word) > 1 and word.isupper():
+            continue
+        low = word.lower()
+        if low in glue and low in source_words:
+            return True
     return bool(MIXED_ENGLISH_WORD_RE.search(value))
 
 
@@ -2300,6 +2359,8 @@ def main() -> int:
         # and a generated text./placeholder. key.  When one of those keys has
         # an exact reviewed translation, reuse it for every identical source
         # sentence instead of leaving a duplicate control in English.
+        global _CURRENT_LANG
+        _CURRENT_LANG = lang
         reviewed_by_source: dict[str, str] = {}
         if lang != "en":
             for reviewed_key, reviewed_value in KEY_EXACT.get(lang, {}).items():
@@ -2347,6 +2408,11 @@ def main() -> int:
                 if k in existing and looks_like_mixed_sentence(existing[k], english):
                     discarded_mixed += 1
                 data[k] = translate_value(lang, english)
+        if lang == "de":
+            # Amateur-radio terms as German operators use them (WSJT-X/JTDX
+            # practice): the FT/JS8/MSK/Q65 transmit period is a "Slot".
+            for key, value in list(data.items()):
+                data[key] = apply_de_terms(value)
         write_ini(TRANS_DIR / f"ui_{lang}.ini", lang, data)
         suffix = f"; removed {discarded_mixed} mixed-language artefact(s)" if discarded_mixed else ""
         print(f"{lang}: {len(data)} keys{suffix}")

@@ -123,7 +123,7 @@ def main() -> int:
                 and english not in reviewed_sources
                 and (english, data.get(key)) not in reviewed_pairs
                 and data.get(key) != english
-                and looks_like_mixed_sentence(data.get(key, ""), english)
+                and looks_like_mixed_sentence(data.get(key, ""), english, lang)
             ]
             if mixed:
                 errors.append(

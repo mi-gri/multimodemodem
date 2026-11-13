@@ -2634,6 +2634,7 @@ private:
     quint64 m_audioInputRequest = 0;
     std::function<void()> m_audioStopCompletion;
     QWidget *m_tabQrz = nullptr;
+    int m_lastSideTabIndex = -1;                // for skipping hidden side tabs
     QGroupBox *m_grpFrequencyHeader = nullptr;  // Frequency area above the side tabs (all modes)
     QWidget *m_frequencyReadoutSlot = nullptr;  // CAT readout inside it
     QStackedWidget *m_stkFrequency = nullptr;
