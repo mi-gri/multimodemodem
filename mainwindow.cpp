@@ -10775,6 +10775,10 @@ QString MainWindow::uiText(const QString &key, const QString &fallback) const
 
 QString MainWindow::uiTextFromSource(const QString &prefix, const QString &source) const
 {
+    // Symbols only ("-", "+", "→"): nothing to translate.  Their normalized
+    // key would be "empty", whose catalogue value is "...".
+    if (std::none_of(source.cbegin(), source.cend(), [](QChar c) { return c.isLetterOrNumber(); }))
+        return source;
     QString normalized;
     normalized.reserve(source.size());
 

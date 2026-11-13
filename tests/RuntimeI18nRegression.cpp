@@ -20,6 +20,10 @@ int main(int argc, char **argv) {
                        M3I18n::text(QStringLiteral("JS8 automatic operation")) == QStringLiteral("JS8-Automatik");
     std::cout << (forth ? "PASS" : "FAIL") << " keyed caption from its English source\n";
     ok &= forth;
+    const bool symbols = M3I18n::text(QStringLiteral("-")) == QStringLiteral("-") &&
+                         M3I18n::text(QStringLiteral("+")) == QStringLiteral("+");
+    std::cout << (symbols ? "PASS" : "FAIL") << " symbol-only captions stay unchanged\n";
+    ok &= symbols;
     ok &= back;
     return ok ? 0 : 1;
 }

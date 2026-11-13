@@ -2,6 +2,7 @@
 #include "ProductName.h"
 
 #include <QFile>
+#include <algorithm>
 #include <QHash>
 #include <QTextStream>
 #include <QtGlobal>
@@ -141,6 +142,9 @@ QString translateSource(const QString &prefix, const QString &source)
 QString translateSourceUnbranded(const QString &prefix, const QString &source)
 {
     const QString trimmed = source.trimmed();
+    // Symbols only ("-", "+"): nothing to translate (key would be "empty").
+    if (std::none_of(trimmed.cbegin(), trimmed.cend(), [](QChar c) { return c.isLetterOrNumber(); }))
+        return source;
 
     const QString normalized = normalizeSourceKey(source);
     if (g_translations.contains(trimmed)) {

@@ -323,3 +323,6 @@ DE.update({
     "Send selection to log: Grid square": "Auswahl ins Log: Locator",
     "Tune": "Tune",
 })
+DE.update({
+    "Force WEFAX RX now": "WEFAX-RX jetzt erzwingen",
+})

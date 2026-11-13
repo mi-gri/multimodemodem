@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- WEFAX zoom buttons show "-" and "+" again: captions made only of symbols are never
+  translated (their key was "empty", shown as "..."). German "WEFAX-RX jetzt erzwingen".
 - Right-hand panel reorganised for a 1000 px window without scrolling (all 13 modes,
   measured): fixed header with the Frequency area and RX · TX · TX level; tabs
   Operating (controls used during a QSO) and Parameters (mode settings set once), QRZ,
