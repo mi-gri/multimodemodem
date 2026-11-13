@@ -737,6 +737,13 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Moduswechsel blockiert: Radioteleskop braucht einen aktivierten Rotor.',
   'Modusbytte blokkert: radioteleskop krever en aktivert rotor.',
   'Změna režimu zablokována: radioteleskop vyžaduje povolený rotátor.'),
+ 'log.radio_telescope_bench_test_without_rotator_enabled':(
+  'Radio Telescope: bench test without rotator enabled.',
+  'Radiotelescopio: test al banco senza rotore abilitato.',
+  'Radiotélescope : test sur table sans rotateur activé.',
+  'Radioteleskop: Prüfstandtest ohne Rotor eingeschaltet.',
+  'Radioteleskop: benktest uten rotor aktivert.',
+  'Radioteleskop: zkušební provoz bez rotátoru zapnut.'),
  'log.last_mode_radio_telescope_not_restored_no_rotator_enabled':(
   'Last mode Radio Telescope not restored: no rotator enabled.',
   'Ultima modalità radiotelescopio non ripristinata: nessun rotore abilitato.',
