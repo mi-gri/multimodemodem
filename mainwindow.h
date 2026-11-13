@@ -913,6 +913,7 @@ private slots:
      * @brief Updates the visible FT8 sequencer status label.
      */
     void updateFt8SequencerUi();
+    void updateFt8ControlStates();
 
     /**
      * @brief Moves the FT standard-message arrow to the row currently armed by the sequencer.

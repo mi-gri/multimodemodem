@@ -95,7 +95,11 @@ int main(int argc,char **argv){
   a=cq("M0ABC","IO91",-23,true,boundary);
   require(w.queueFt8FullAutoCqCandidate(a.first,a.second),"fresh weaker CQ did not refresh queued target");
   w.processFt8FullAutoCqCandidates();require(w.m_ftSession.dxCall=="M0ABC"&&w.m_ft8PendingTxArmed,"fresh CQ did not release waiting target");
+  w.setReceiverRunning(w.m_rxRunning);
+  require(w.m_cmbFt8Band==nullptr||!w.m_cmbFt8Band->isEnabled(),"band selector enabled while a TX is armed");
   w.m_ft8OperatorStopLatched=true;w.stopFt8Sequencer("STOP test");
+  // Stopping the sequencer (also CQ retry off) releases the controls at once.
+  require(w.m_cmbFt8Band==nullptr||w.m_cmbFt8Band->isEnabled(),"band selector stayed disabled after the armed TX was stopped");
   require(w.m_ft8FullAutoCqCandidates.isEmpty()&&!w.queueFt8FullAutoCqCandidate(b.first,b.second),"STOP allowed Auto QSO queue to restart");
   w.m_ft8OperatorStopLatched=false;
   // The automatic duplicate-slot guard must not suppress explicit operator TX.

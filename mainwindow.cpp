@@ -14009,7 +14009,45 @@ void MainWindow::setReceiverRunning(bool running)
 
 
 
-    if (m_spinFt8RxFreq != nullptr) {
+    updateFt8ControlStates();
+
+    ui->btnFaxResetImage->setEnabled(configurable);
+    ui->btnFaxSaveImage->setEnabled(configurable);
+    ui->btnFaxZoomFit->setEnabled(true);
+    ui->btnFaxZoom100->setEnabled(true);
+    ui->btnFaxZoomOut->setEnabled(true);
+    ui->btnFaxZoomIn->setEnabled(true);
+
+    if (m_txRunning) {
+        ui->lblAppStatus->setText(uiText("status_tx_active", "TX active"));
+        updateMainStateButton();
+        updateTxControlState();
+        return;
+    }
+
+    if (m_offlineAnalysisActive) {
+        ui->lblAppStatus->setText(uiText("status_wav_analysis", "WAV analysis"));
+        updateMainStateButton();
+        updateTxControlState();
+        return;
+    }
+
+    ui->lblAppStatus->setText(m_rxRunning
+        ? uiText("status_rx_running", "RX running")
+        : uiText("ready", "Ready"));
+    updateMainStateButton();
+    updateTxControlState();
+}
+
+// Enable state of the FT controls.  It depends on the armed TX as well as
+// on RX/TX, so the sequencer refreshes it too: otherwise controls disabled
+// while a CQ was armed (band, TX slot, frequencies) stayed disabled after
+// the operator stopped CQ retry until the next RX/TX change.
+void MainWindow::updateFt8ControlStates()
+{
+    if (m_spinFt8RxFreq == nullptr) return;
+    const bool configurable = !m_txRunning && !m_offlineAnalysisActive;
+    {
         const bool ft8Pending = m_ft8PendingTxArmed;
         const bool ft8TuneActive = m_pendingFt8TxPlan.tune ||
                                    (m_ftSession.lastTxPlan.tune && (m_txRunning || m_ftTxWorkerRunning)) ||
@@ -14043,33 +14081,6 @@ void MainWindow::setReceiverRunning(bool running)
         if (m_btnFt8AnalyzeWav != nullptr) m_btnFt8AnalyzeWav->setEnabled(!m_txRunning && !m_offlineAnalysisActive);
         if (m_btnFtDecodeAnalyzeWav != nullptr) m_btnFtDecodeAnalyzeWav->setEnabled(!m_txRunning && !m_offlineAnalysisActive);
     }
-
-    ui->btnFaxResetImage->setEnabled(configurable);
-    ui->btnFaxSaveImage->setEnabled(configurable);
-    ui->btnFaxZoomFit->setEnabled(true);
-    ui->btnFaxZoom100->setEnabled(true);
-    ui->btnFaxZoomOut->setEnabled(true);
-    ui->btnFaxZoomIn->setEnabled(true);
-
-    if (m_txRunning) {
-        ui->lblAppStatus->setText(uiText("status_tx_active", "TX active"));
-        updateMainStateButton();
-        updateTxControlState();
-        return;
-    }
-
-    if (m_offlineAnalysisActive) {
-        ui->lblAppStatus->setText(uiText("status_wav_analysis", "WAV analysis"));
-        updateMainStateButton();
-        updateTxControlState();
-        return;
-    }
-
-    ui->lblAppStatus->setText(m_rxRunning
-        ? uiText("status_rx_running", "RX running")
-        : uiText("ready", "Ready"));
-    updateMainStateButton();
-    updateTxControlState();
 }
 
 void MainWindow::updateMainStateButton()
@@ -17232,6 +17243,7 @@ void MainWindow::refreshQrzStationPanel()
 
 void MainWindow::updateFt8SequencerUi()
 {
+    updateFt8ControlStates();
     refreshQrzStationPanel();
     if(m_chkFt8CqRepeat){
         const int done=qMax(0,m_ftSession.cqRepeatTotal-m_ftSession.cqRepeatRemaining);
