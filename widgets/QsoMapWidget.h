@@ -14,6 +14,7 @@
 #include <QVector>
 #include <functional>
 #include <QWidget>
+#include <memory>
 
 class QHideEvent;
 class QNetworkAccessManager;
@@ -35,6 +36,8 @@ class QQuickView;
  * It supports mouse drag, wheel zoom, marker tooltips, optional home-to-QSO
  * lines, and print/export helpers.
  */
+struct MapLocatorIndex;
+
 class QsoMapWidget : public QWidget
 {
     Q_OBJECT
@@ -153,6 +156,18 @@ private:
     static bool modeMatches(const QString &entryMode, const QString &filterMode);
 
     QVector<LogbookEntry> m_records;
+    // Caches for painting: rebuilt when the records (generation) or a filter change.
+    quint64 m_recordsGeneration = 0;
+    mutable std::shared_ptr<MapLocatorIndex> m_locatorIndex;
+    mutable quint64 m_locatorIndexGeneration = 0;
+    mutable int m_locatorIndexBehavior = -1;
+    mutable QString m_filteredCacheKey;
+    mutable QVector<LogbookEntry> m_filteredCache;
+    const MapLocatorIndex &cachedLocatorIndex() const;
+    QVector<LogbookEntry> filteredMapRecordsUncached() const;
+    mutable QString m_geoCacheKey;
+    mutable QVector<MapPoint> m_geoCache;
+    const QVector<MapPoint> &cachedGeoPoints() const;
     QVector<LogbookEntry> m_heardRecords;
     QString m_modeFilter;
     QString m_homeGrid;

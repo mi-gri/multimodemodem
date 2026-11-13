@@ -4,6 +4,12 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- QSO map: every repaint and every mouse move (tooltip) searched the whole logbook once
+  per marker for the best known locator; with 13,500 QSOs and 1,000 markers the GUI froze
+  for about 30 s per map setting change, and clicks made meanwhile toggled options back
+  ("Current mode only" seemed impossible to switch off). A callsign->locator index and
+  caches for the filtered markers make a filter change take about 0.6 s, a repaint 0.2 s
+  and a hover lookup 0.3 ms.
 - JS8: the RX button in "JS8 RX/TX settings" is gone (the RX button in the fixed header
   does the same); STOP spans the row and explains that it also cancels queued and
   automatic JS8 transmissions.

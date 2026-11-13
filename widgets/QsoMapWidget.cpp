@@ -63,6 +63,13 @@
 #include <QQuickView>
 #endif
 
+// Latest exact and coarse locator per normalized callsign (see
+// buildMapLocatorIndex); global so QsoMapWidget can keep one per record set.
+struct MapLocatorIndex {
+    struct Known { QString grid; QDateTime utc; };
+    QHash<QString, Known> full, coarse;
+};
+
 namespace {
 
 constexpr double kEarthRadiusKm = 6371.0;
@@ -301,6 +308,51 @@ QString bestKnownLocatorForCallsign(const QString &callsign,
     return bestCoarse;
 }
 
+// Latest exact and coarse locator per normalized callsign, built once per
+// record set.  bestKnownLocatorForCallsign() scanned the whole log for every
+// marker: 1000 markers x 13,500 QSOs took over a minute per repaint.
+MapLocatorIndex buildMapLocatorIndex(const QVector<LogbookEntry> &records)
+{
+    MapLocatorIndex index;
+    auto keep = [](QHash<QString, MapLocatorIndex::Known> &map, const QString &call, const QString &grid, const QDateTime &utc) {
+        auto it = map.find(call);
+        if (it == map.end()) { map.insert(call, {grid, utc}); return; }
+        if (utc.isValid() && (!it->utc.isValid() || utc.toUTC() > it->utc.toUTC())) *it = {grid, utc};
+    };
+    for (const LogbookEntry &rec : records) {
+        const QString call = normalizedMapCallsign(rec.callsign);
+        if (call.isEmpty()) continue;
+        const QString full = fullLocatorIfValid(rec.grid);
+        if (!full.isEmpty()) keep(index.full, call, full, rec.utc);
+        const QString coarse = coarseLocatorIfValid(rec.grid);
+        if (!coarse.isEmpty()) keep(index.coarse, call, coarse, rec.utc);
+    }
+    return index;
+}
+
+// Same policy as bestKnownLocatorForCallsign(), with the index.
+QString bestKnownLocatorIndexed(const QString &callsign, const QString &currentGrid, const MapLocatorIndex &index)
+{
+    const QString currentFull = fullLocatorIfValid(currentGrid);
+    if (!currentFull.isEmpty()) return currentFull;
+    const QString call = normalizedMapCallsign(callsign);
+    if (!call.isEmpty()) {
+        const auto full = index.full.constFind(call);
+        if (full != index.full.constEnd()) return full->grid;
+    }
+    const QString currentCoarse = coarseLocatorIfValid(currentGrid);
+    if (!currentCoarse.isEmpty()) {
+        const QString refined = CtyCountryFile::instance().refinedGridForCallsign(callsign, currentCoarse, 6);
+        if (isMapMaidenheadLocator(refined, 6) && refined.left(4) == currentCoarse) return refined.left(6);
+        return currentCoarse;
+    }
+    if (!call.isEmpty()) {
+        const auto coarse = index.coarse.constFind(call);
+        if (coarse != index.coarse.constEnd()) return coarse->grid;
+    }
+    return QString();
+}
+
 QString osmTileKey(int z, int x, int y)
 {
     return QStringLiteral("%1/%2/%3").arg(z).arg(x).arg(y);
@@ -451,6 +503,7 @@ QsoMapWidget::~QsoMapWidget()
 void QsoMapWidget::setRecords(const QVector<LogbookEntry> &records)
 {
     m_records = records;
+    ++m_recordsGeneration;
     updateQuickMapModel();
     update();
 }
@@ -490,6 +543,7 @@ void QsoMapWidget::addHeardStation(const LogbookEntry &entry)
         kept.resize(5000);
     }
     m_heardRecords = kept;
+    ++m_recordsGeneration;
     updateQuickMapModel();
     update();
 }
@@ -500,6 +554,7 @@ void QsoMapWidget::clearHeardStations()
         return;
     }
     m_heardRecords.clear();
+    ++m_recordsGeneration;
     updateQuickMapModel();
     update();
 }
@@ -1494,7 +1549,34 @@ QVector<LogbookEntry> QsoMapWidget::sourceRecordsForBehavior() const
     return m_records;
 }
 
+const MapLocatorIndex &QsoMapWidget::cachedLocatorIndex() const
+{
+    const int behavior = static_cast<int>(m_displayBehavior);
+    if (!m_locatorIndex || m_locatorIndexGeneration != m_recordsGeneration || m_locatorIndexBehavior != behavior) {
+        m_locatorIndex = std::make_shared<MapLocatorIndex>(buildMapLocatorIndex(sourceRecordsForBehavior()));
+        m_locatorIndexGeneration = m_recordsGeneration;
+        m_locatorIndexBehavior = behavior;
+    }
+    return *m_locatorIndex;
+}
+
 QVector<LogbookEntry> QsoMapWidget::filteredMapRecords() const
+{
+    // Painting, hover tooltips and the marker list ask for this many times;
+    // recompute only when the records or a filter changed.
+    const QString key = QStringLiteral("%1|%2|%3|%4|%5|%6|%7|%8|%9")
+        .arg(m_recordsGeneration).arg(static_cast<int>(m_displayBehavior)).arg(m_mapDateScope)
+        .arg(m_mapFromDate.toString(Qt::ISODate) + m_mapUntilDate.toString(Qt::ISODate))
+        .arg(m_mapUseModeFilter ? m_modeFilter : QString()).arg(m_mapBandFilter.trimmed())
+        .arg(m_mapLatestPerGrid).arg(m_mapMaxMarkers)
+        .arg(m_displayBehavior == DisplayBehavior::HeardToday ? QDateTime::currentDateTimeUtc().date().toString(Qt::ISODate) : QString());
+    if (key == m_filteredCacheKey) return m_filteredCache;
+    m_filteredCache = filteredMapRecordsUncached();
+    m_filteredCacheKey = key;
+    return m_filteredCache;
+}
+
+QVector<LogbookEntry> QsoMapWidget::filteredMapRecordsUncached() const
 {
     QVector<LogbookEntry> filtered;
     filtered.reserve(qMin(sourceRecordsForBehavior().size(), qMax(32, m_mapMaxMarkers)));
@@ -1595,16 +1677,28 @@ QVector<LogbookEntry> QsoMapWidget::filteredMapRecords() const
 
 QVector<QsoMapWidget::MapPoint> QsoMapWidget::visiblePoints(const QRect &targetRect) const
 {
+    // Geographic part cached per filter/record state; only the screen
+    // position depends on the current view (zoom, pan, widget size).
     const QRect mapRect = mapRectForTarget(targetRect);
+    QVector<MapPoint> points = cachedGeoPoints();
+    for (MapPoint &p : points) p.screen = lonLatToScreen(p.lonLat, mapRect).toPoint();
+    return points;
+}
+
+const QVector<QsoMapWidget::MapPoint> &QsoMapWidget::cachedGeoPoints() const
+{
+    const QVector<LogbookEntry> entries = filteredMapRecords();   // refreshes m_filteredCacheKey
+    const QString key = m_filteredCacheKey + QLatin1Char('|') + m_homeGrid;
+    if (key == m_geoCacheKey) return m_geoCache;
+
     QPointF homeLonLat;
     const bool haveHome = maidenheadToLonLat(m_homeGrid, &homeLonLat);
-
     QVector<MapPoint> points;
-    const QVector<LogbookEntry> entries = filteredMapRecords();
+    const MapLocatorIndex &locatorIndex = cachedLocatorIndex();
     points.reserve(entries.size());
     for (const LogbookEntry &entry : entries) {
         QPointF lonLat;
-        QString mapGrid = bestKnownLocatorForCallsign(entry.callsign, entry.grid, sourceRecordsForBehavior());
+        QString mapGrid = bestKnownLocatorIndexed(entry.callsign, entry.grid, locatorIndex);
         if (!maidenheadToLonLat(mapGrid, &lonLat)) {
             bool haveCtyPoint = false;
             if (m_displayBehavior == DisplayBehavior::WorkedDxcc) {
@@ -1627,14 +1721,15 @@ QVector<QsoMapWidget::MapPoint> QsoMapWidget::visiblePoints(const QRect &targetR
             p.entry.grid = mapGrid;
         }
         p.lonLat = lonLat;
-        p.screen = lonLatToScreen(lonLat, mapRect).toPoint();
         if (haveHome) {
             p.distanceKm = distanceKm(homeLonLat, lonLat);
             p.bearingDeg = bearingDeg(homeLonLat, lonLat);
         }
         points.append(p);
     }
-    return points;
+    m_geoCache = points;
+    m_geoCacheKey = key;
+    return m_geoCache;
 }
 
 void QsoMapWidget::drawOverlays(QPainter *painter, const QRect &targetRect) const
@@ -1860,9 +1955,10 @@ QVariantList QsoMapWidget::qmlMarkerList() const
 
     QVariantList list;
     const QVector<LogbookEntry> entries = filteredMapRecords();
+    const MapLocatorIndex &locatorIndex = cachedLocatorIndex();
     for (const LogbookEntry &entry : entries) {
         QPointF lonLat;
-        QString mapGrid = bestKnownLocatorForCallsign(entry.callsign, entry.grid, sourceRecordsForBehavior());
+        QString mapGrid = bestKnownLocatorIndexed(entry.callsign, entry.grid, locatorIndex);
         if (!maidenheadToLonLat(mapGrid, &lonLat)) {
             continue;
         }
