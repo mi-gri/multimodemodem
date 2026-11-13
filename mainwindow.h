@@ -2280,6 +2280,8 @@ private:
     QLabel *m_lblJs8BandStatus = nullptr;
     QWidget *m_js8FrequencySlot = nullptr;
     QCheckBox *m_chkJs8MultiDecode = nullptr;
+    QGroupBox *m_grpJs8Auto = nullptr;       // disabled while Auto mode is off in Settings
+    QLabel *m_lblJs8AutoModeOff = nullptr;
     QCheckBox *m_chkJs8Auto = nullptr;
     QCheckBox *m_chkJs8HbAck = nullptr;
     QCheckBox *m_chkJs8Relay = nullptr;

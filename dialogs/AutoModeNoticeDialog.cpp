@@ -33,7 +33,7 @@ bool confirm(QWidget *parent, const std::function<QString(const QString &)> &tra
     text->setWordWrap(true);
     text->setTextFormat(Qt::PlainText);
     text->setMinimumWidth(460);
-    text->setText(L(QStringLiteral("Auto mode answers CQ calls and completes QSOs without your intervention."))
+    text->setText(L(QStringLiteral("Auto mode answers CQ calls and completes QSOs (FT8/FT4), answers queries, relays messages and sends heartbeats or CQ by timer (JS8) without your intervention."))
                   + QStringLiteral("\n\n• ")
                   + L(QStringLiteral("Automatic operation may not be permitted in every country. Check the rules of your licence."))
                   + QStringLiteral("\n• ")

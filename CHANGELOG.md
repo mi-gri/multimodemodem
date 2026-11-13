@@ -4,11 +4,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
-- FT8/FT4: the two radio buttons TX I / TX II are one toggle button "TX period I/II";
-  a click switches the period. It follows automatic period changes when answering a
+- FT8/FT4: the two radio buttons TX I / TX II are one toggle button "TX I" / "TX II" as
+  wide as RX and TX (STOP is wider); a click switches the period. It follows automatic period changes when answering a
   station and is disabled while transmitting, as the radio buttons were.
-- Auto mode (Auto QSO for FT8/FT4) is a setting again (Settings -> FT decoder, off by
-  default). Switching it on shows a notice: automatic operation may not be permitted in
+- Auto mode (FT8/FT4 Auto QSO and JS8 automatic operation: AUTO replies, relays,
+  heartbeat/CQ timers) is a setting again (Settings -> FT8 / FT4, off by default). Switching it on shows a notice: automatic operation may not be permitted in
   every country, can disqualify a contest entry, the station must not run unattended for
   long, and the operator is responsible for any damage. It is enabled only after "I have
   read and understood your notice and want to continue" is ticked and confirmed.
@@ -36,7 +36,7 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 - FT8/FT4 late decodes: after the reply deadline the deep reference recovery (R30) goes
   on for up to 9 s (FT4 4.5 s) and shows what it finds as display-only rows; they never
   answer, call or arm TX. On 23 recorded 20 m periods: 348 instead of 317 decodes under
-  live deadlines (WSJT-X 351, JTDX 344). Settings → FT decoder, on by default.
+  live deadlines (WSJT-X 351, JTDX 344). Settings → FT8 / FT4, on by default.
 - Faster start (Qt 5): the audio device probe (about 1.5 s with ALSA and PulseAudio)
   and the JS8 word tables load on background threads while the window is built; the
   window appears after about 1.8 s instead of 3.5 s (same machine and load). The

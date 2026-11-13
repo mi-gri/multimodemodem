@@ -372,9 +372,15 @@ void MainWindow::setupJs8Page()
 
     // Automatic operation: replies, heartbeat/CQ repeats, relay.
     auto *autoGroup = new QGroupBox(uiText("js8_auto_group", "JS8 automatic operation"), m_pageJs8Settings);
+    m_grpJs8Auto = autoGroup;
     auto *autoGrid = new QGridLayout(autoGroup);
     autoGrid->setContentsMargins(8, 8, 8, 8);
     int arow = 0;
+    // Replies, heartbeat/CQ timers and relays only with Auto mode (Settings).
+    m_lblJs8AutoModeOff = new QLabel(uiText("js8_auto_mode_off", "Auto mode is off: enable it in Settings → FT8 / FT4 → Auto mode."), autoGroup);
+    m_lblJs8AutoModeOff->setWordWrap(true);
+    M3Ui::setSemanticRole(m_lblJs8AutoModeOff, QStringLiteral("negative"));
+    autoGrid->addWidget(m_lblJs8AutoModeOff, arow++, 0, 1, 4);
     m_chkJs8Auto = new QCheckBox(uiText("js8_auto_short", "AUTO: answer queries"), autoGroup);
     m_chkJs8Auto->setToolTip(uiText("js8_auto_tooltip", "Answers SNR?, GRID?, INFO?, STATUS?, HEARING?, AGN?, QUERY MSGS and acknowledges MSG without asking, as JS8Call's AUTO. Off: a reply is only prepared in the message field."));
     m_chkJs8Auto->setChecked(settings.value(QStringLiteral("JS8/auto"), false).toBool());
@@ -759,7 +765,7 @@ void MainWindow::js8ProcessCommand(const Js8Command &command)
     ctx.myGrid = stationLocator().trimmed().toUpper();
     ctx.info = m_editJs8Info != nullptr ? Js8Message::normalizeText(m_editJs8Info->text()) : QString();
     ctx.status = m_editJs8StatusText != nullptr ? Js8Message::normalizeText(m_editJs8StatusText->text()) : QString();
-    ctx.autoReply = m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked() && !m_js8WatchdogTripped;
+    ctx.autoReply = m_ft8AutoModeEnabled && m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked() && !m_js8WatchdogTripped;
     ctx.heartbeatAck = m_chkJs8HbAck != nullptr && m_chkJs8HbAck->isChecked();
     ctx.relay = m_chkJs8Relay != nullptr && m_chkJs8Relay->isChecked();
     ctx.heardRecentFirst = js8RecentCalls();
@@ -787,7 +793,7 @@ void MainWindow::js8ProcessCommand(const Js8Command &command)
     if (action.storedId > 0) js8UpdateInboxButton();
     if (action.reply.isEmpty()) return;
 
-    const bool automatic = m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked();
+    const bool automatic = m_ft8AutoModeEnabled && m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked();
     if (automatic && !m_js8WatchdogTripped) {
         const bool broadcast = action.allCall || action.lowPriority;
         const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
@@ -1014,9 +1020,11 @@ void MainWindow::js8Tick()
     if (ui == nullptr || ui->cmbMode == nullptr || !Js8Mode::isMode(ui->cmbMode->currentText())) return;
 
     const qint64 now = nowUtc.toMSecsSinceEpoch();
-    const int hbMinutes = m_cmbJs8HbInterval != nullptr ? m_cmbJs8HbInterval->currentData().toInt() : 0;
-    const int cqMinutes = m_cmbJs8CqInterval != nullptr ? m_cmbJs8CqInterval->currentData().toInt() : 0;
-    const bool autoReply = m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked();
+    // Without Auto mode (Settings) no automatic JS8 transmission at all.
+    const bool autoMode = m_ft8AutoModeEnabled;
+    const int hbMinutes = autoMode && m_cmbJs8HbInterval != nullptr ? m_cmbJs8HbInterval->currentData().toInt() : 0;
+    const int cqMinutes = autoMode && m_cmbJs8CqInterval != nullptr ? m_cmbJs8CqInterval->currentData().toInt() : 0;
+    const bool autoReply = autoMode && m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked();
 
     // Idle watchdog: no unattended transmissions for ever.
     const int watchdogMin = m_spinJs8Watchdog != nullptr ? m_spinJs8Watchdog->value() : 0;
@@ -1049,7 +1057,7 @@ void MainWindow::js8Tick()
     if (m_js8TxQueue.isEmpty() || m_txRunning || m_nativeWeakSignalTxPending || m_txPreparationPending) return;
     const Js8QueuedTx next = m_js8TxQueue.first();
     // Replies need AUTO; repeats were enabled explicitly by the operator.
-    if (!next.lowPriority && !autoReply) {
+    if (!autoMode || (!next.lowPriority && !autoReply)) {
         m_js8TxQueue.removeFirst();
         return;
     }

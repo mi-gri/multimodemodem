@@ -9276,10 +9276,11 @@ void MainWindow::setupFt8Page()
     connect(m_radioFt8TxFirst, &QRadioButton::toggled, this, [this](bool) { updateFt8TxPeriodButton(); });
     connect(m_radioFt8TxSecond, &QRadioButton::toggled, this, [this](bool) { updateFt8TxPeriodButton(); });
     updateFt8TxPeriodButton();
-    controlGrid->addWidget(m_btnFt8TxPeriod, 0, 0, 1, 2);
-    controlGrid->addWidget(m_btnFt8Rx, 0, 2);
-    controlGrid->addWidget(m_btnFt8Tx, 0, 3);
-    controlGrid->addWidget(m_btnFt8Stop, 0, 4);
+    // Period toggle as wide as RX/TX; STOP takes the freed column.
+    controlGrid->addWidget(m_btnFt8TxPeriod, 0, 0);
+    controlGrid->addWidget(m_btnFt8Rx, 0, 1);
+    controlGrid->addWidget(m_btnFt8Tx, 0, 2);
+    controlGrid->addWidget(m_btnFt8Stop, 0, 3, 1, 2);
     controlGrid->addWidget(m_btnFt8Tune, 0, 5);
     m_chkFt8AutoSeq->setChecked(true);
     m_chkFt8AutoSeq->hide();
@@ -17932,14 +17933,23 @@ void MainWindow::updateFt8TxPeriodButton()
 {
     if (m_btnFt8TxPeriod == nullptr || m_radioFt8TxSecond == nullptr) return;
     const bool second = m_radioFt8TxSecond->isChecked();
-    m_btnFt8TxPeriod->setText(second ? uiText("ft_tx_period_second", "TX period II")
-                                     : uiText("ft_tx_period_first", "TX period I"));
+    m_btnFt8TxPeriod->setText(second ? uiText("ft_tx_second_short", "TX II")
+                                     : uiText("ft_tx_first_short", "TX I"));
     m_btnFt8TxPeriod->setToolTip(uiText("ft_tx_period_toggle_tooltip", "Transmit in the first (I) or second (II) period. Click to switch."));
 }
 
 void MainWindow::updateFt8AutoModeVisibility()
 {
     const bool visible = m_ft8AutoModeEnabled;
+
+    // JS8: the automation group is usable only with Auto mode; the operator's
+    // choices inside stay saved and apply again when Auto mode is enabled.
+    if (m_grpJs8Auto != nullptr) {
+        for (QWidget *child : m_grpJs8Auto->findChildren<QWidget *>(QString(), Qt::FindDirectChildrenOnly))
+            if (child != m_lblJs8AutoModeOff) child->setEnabled(visible);
+    }
+    if (m_lblJs8AutoModeOff != nullptr) m_lblJs8AutoModeOff->setVisible(!visible);
+    if (!visible) m_js8TxQueue.clear();
 
     if (m_chkFt8CqRepeat != nullptr) {
         m_chkFt8CqRepeat->setVisible(true);

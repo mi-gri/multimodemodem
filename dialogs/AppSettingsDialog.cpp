@@ -904,10 +904,10 @@ QWidget *AppSettingsDialog::makeFtDecoderPage()
     // Auto mode (Auto QSO): off by default; switching it on needs the notice.
     auto *autoGroup = new QGroupBox(L(QStringLiteral("Auto mode")), page);
     auto *autoForm = new QFormLayout(autoGroup);
-    m_chkFtAutoMode = new QCheckBox(L(QStringLiteral("Enable Auto mode (Auto QSO for FT8/FT4)")), autoGroup);
+    m_chkFtAutoMode = new QCheckBox(L(QStringLiteral("Enable Auto mode (FT8/FT4 Auto QSO, JS8 automatic operation)")), autoGroup);
     m_chkFtAutoMode->setObjectName(QStringLiteral("ftAutoModeEnabled"));
     m_chkFtAutoMode->setChecked(m_initialSettings.ftAutoModeEnabled);
-    m_chkFtAutoMode->setToolTip(L(QStringLiteral("Lets Auto QSO answer CQ calls and complete QSOs automatically. Switching it on shows a legal and safety notice that must be confirmed.")));
+    m_chkFtAutoMode->setToolTip(L(QStringLiteral("Lets Auto QSO answer CQ calls and complete QSOs, and JS8 answer queries, relay messages and send heartbeats or CQ by timer. Switching it on shows a legal and safety notice that must be confirmed.")));
     connect(m_chkFtAutoMode, &QCheckBox::toggled, this, [this](bool checked) {
         if (!checked) return;
         if (!AutoModeNotice::confirm(this, [this](const QString &source) { return L(source); })) {

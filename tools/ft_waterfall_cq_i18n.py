@@ -662,8 +662,6 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 
 # One toggle button for the FT TX period (replaces the TX I / TX II radios).
 KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
- 'ft_tx_period_first':('TX period I','Periodo TX I','Période TX I','TX-Periode I','TX-periode I','Perioda TX I'),
- 'ft_tx_period_second':('TX period II','Periodo TX II','Période TX II','TX-Periode II','TX-periode II','Perioda TX II'),
  'ft_tx_period_toggle_tooltip':(
   'Transmit in the first (I) or second (II) period. Click to switch.',
   'Trasmetti nel primo (I) o nel secondo (II) periodo. Fai clic per cambiare.',
@@ -671,4 +669,15 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Senden in der ersten (I) oder zweiten (II) Periode. Klick schaltet um.',
   'Send i første (I) eller andre (II) periode. Klikk for å bytte.',
   'Vysílat v první (I) nebo druhé (II) periodě. Kliknutím přepnete.'),
+}.items()})
+
+# JS8 automation group while Auto mode is off.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'js8_auto_mode_off':(
+  'Auto mode is off: enable it in Settings → FT8 / FT4 → Auto mode.',
+  'La modalità automatica è disattivata: attivala in Impostazioni → FT8 / FT4 → Modalità automatica.',
+  'Le mode automatique est désactivé : activez-le dans Paramètres → FT8 / FT4 → Mode automatique.',
+  'Der Auto-Modus ist aus: unter Einstellungen → FT8 / FT4 → Auto-Modus einschalten.',
+  'Automatisk modus er av: slå den på i Innstillinger → FT8 / FT4 → Automatisk modus.',
+  'Automatický režim je vypnutý: zapněte jej v Nastavení → FT8 / FT4 → Automatický režim.'),
 }.items()})
