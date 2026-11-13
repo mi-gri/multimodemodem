@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- FT8/FT4: the two radio buttons TX I / TX II are one toggle button "TX period I/II";
+  a click switches the period. It follows automatic period changes when answering a
+  station and is disabled while transmitting, as the radio buttons were.
 - Auto mode (Auto QSO for FT8/FT4) is a setting again (Settings -> FT decoder, off by
   default). Switching it on shows a notice: automatic operation may not be permitted in
   every country, can disqualify a contest entry, the station must not run unattended for

@@ -887,6 +887,11 @@ private slots:
     void updateFt8AutoModeVisibility();
 
     /**
+     * @brief Shows the selected FT TX period (I or II) on the toggle button.
+     */
+    void updateFt8TxPeriodButton();
+
+    /**
      * @brief Starts/stops WSJT-Z-style Auto CQ when the gated checkbox is toggled.
      */
     void handleFt8AutoCqToggled(bool enabled);
@@ -2333,6 +2338,7 @@ private:
     QLabel *m_lblFt8DecodeEngine = nullptr;
     QRadioButton *m_radioFt8TxFirst = nullptr;
     QRadioButton *m_radioFt8TxSecond = nullptr;
+    QPushButton *m_btnFt8TxPeriod = nullptr;   // toggles TX I / TX II (the radios stay as hidden state)
     QWidget *m_grpFt8UtcClock = nullptr;
     Ft8SlotClockWidget *m_ft8SlotClock = nullptr;
     QLCDNumber *m_lcdFt8UtcClock = nullptr;

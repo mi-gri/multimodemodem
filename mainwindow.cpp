@@ -9262,8 +9262,21 @@ void MainWindow::setupFt8Page()
     m_spinFt8NoResponseLimit->setSuffix(QStringLiteral(" x"));
     m_spinFt8NoResponseLimit->setToolTip(uiText("ft8_no_response_limit_tooltip", "Maximum number of unanswered transmissions for a started FT QSO, including the first call. If the DX does not reply, MM cancels the action and returns to RX standby."));
 
-    controlGrid->addWidget(m_radioFt8TxFirst, 0, 0);
-    controlGrid->addWidget(m_radioFt8TxSecond, 0, 1);
+    // One toggle button instead of two radio buttons; the radios keep the
+    // state for the sequencer and settings code and are not shown.
+    m_btnFt8TxPeriod = new QPushButton(controlGroup);
+    m_btnFt8TxPeriod->setObjectName(QStringLiteral("ftTxPeriodToggle"));
+    m_btnFt8TxPeriod->setToolTip(uiText("ft_tx_period_toggle_tooltip", "Transmit in the first (I) or second (II) period. Click to switch."));
+    m_radioFt8TxFirst->hide();
+    m_radioFt8TxSecond->hide();
+    connect(m_btnFt8TxPeriod, &QPushButton::clicked, this, [this]() {
+        if (m_radioFt8TxSecond->isChecked()) m_radioFt8TxFirst->setChecked(true);
+        else m_radioFt8TxSecond->setChecked(true);
+    });
+    connect(m_radioFt8TxFirst, &QRadioButton::toggled, this, [this](bool) { updateFt8TxPeriodButton(); });
+    connect(m_radioFt8TxSecond, &QRadioButton::toggled, this, [this](bool) { updateFt8TxPeriodButton(); });
+    updateFt8TxPeriodButton();
+    controlGrid->addWidget(m_btnFt8TxPeriod, 0, 0, 1, 2);
     controlGrid->addWidget(m_btnFt8Rx, 0, 2);
     controlGrid->addWidget(m_btnFt8Tx, 0, 3);
     controlGrid->addWidget(m_btnFt8Stop, 0, 4);
@@ -9564,6 +9577,7 @@ void MainWindow::loadFt8SettingsToUi()
     m_lblFt8DecodeEngine->setText(uiText("ft_engine_unified_native", "FT unified adaptive decoder"));
     m_radioFt8TxFirst->setChecked(m_settings.ft8TxFirstPeriod);
     m_radioFt8TxSecond->setChecked(!m_settings.ft8TxFirstPeriod);
+    updateFt8TxPeriodButton();
     m_settings.ft8AutoSequence = true;
     m_chkFt8AutoSeq->setChecked(true);
     m_chkFt8AutoSeq->hide();
@@ -10947,6 +10961,7 @@ void MainWindow::applyUiLanguage()
     updateModeBandUis();
     js8RefreshMacroButtons();
     refreshTextMacroButtons();
+    updateFt8TxPeriodButton();
     updateCwDualRxStatusLabel();
     refreshFt8StandardMessages();   // also updates the sequencer status
     if (m_lcdRigReadoutFrequency != nullptr) {
@@ -13793,6 +13808,7 @@ void MainWindow::setReceiverRunning(bool running)
         if (m_cmbFt8TxStrategy != nullptr) m_cmbFt8TxStrategy->setEnabled(!m_offlineAnalysisActive && !ft8Pending);
         if (m_radioFt8TxFirst != nullptr) m_radioFt8TxFirst->setEnabled(!m_txRunning && !m_offlineAnalysisActive && !ft8Pending);
         if (m_radioFt8TxSecond != nullptr) m_radioFt8TxSecond->setEnabled(!m_txRunning && !m_offlineAnalysisActive && !ft8Pending);
+        if (m_btnFt8TxPeriod != nullptr) m_btnFt8TxPeriod->setEnabled(!m_txRunning && !m_offlineAnalysisActive && !ft8Pending);
         if (m_btnFt8GenerateStd != nullptr) m_btnFt8GenerateStd->setEnabled(!m_offlineAnalysisActive && !ft8Pending);
         if (m_cmbFtCqTarget != nullptr) m_cmbFtCqTarget->setEnabled(!m_offlineAnalysisActive && !ft8Pending && !m_txRunning);
         if (m_btnFt8Rx != nullptr) m_btnFt8Rx->setEnabled(!m_txRunning && !m_offlineAnalysisActive && !ft8Pending);
@@ -17912,6 +17928,15 @@ void MainWindow::scheduleFt8SequencerMessage(const QString &message,
     updateFt8SequencerUi();
 }
 
+void MainWindow::updateFt8TxPeriodButton()
+{
+    if (m_btnFt8TxPeriod == nullptr || m_radioFt8TxSecond == nullptr) return;
+    const bool second = m_radioFt8TxSecond->isChecked();
+    m_btnFt8TxPeriod->setText(second ? uiText("ft_tx_period_second", "TX period II")
+                                     : uiText("ft_tx_period_first", "TX period I"));
+    m_btnFt8TxPeriod->setToolTip(uiText("ft_tx_period_toggle_tooltip", "Transmit in the first (I) or second (II) period. Click to switch."));
+}
+
 void MainWindow::updateFt8AutoModeVisibility()
 {
     const bool visible = m_ft8AutoModeEnabled;
@@ -18084,6 +18109,7 @@ void MainWindow::selectFt8OppositePeriodFromDecode(const Ft8RxDecoder::Decode &d
     m_radioFt8TxFirst->setChecked(!decodedWasFirstPeriod);
     m_radioFt8TxSecond->setChecked(decodedWasFirstPeriod);
     m_settings.ft8TxFirstPeriod = m_radioFt8TxFirst->isChecked();
+    updateFt8TxPeriodButton();   // signals of the radios are blocked here
 
     if (m_ftSlotScheduler != nullptr) {
         QMetaObject::invokeMethod(m_ftSlotScheduler,
@@ -19580,6 +19606,7 @@ void MainWindow::handleFt8DecodeDoubleClicked(QTableWidgetItem *item)
             m_radioFt8TxFirst->setChecked(!decodedWasFirstPeriod);
             m_radioFt8TxSecond->setChecked(decodedWasFirstPeriod);
             m_settings.ft8TxFirstPeriod = m_radioFt8TxFirst->isChecked();
+            updateFt8TxPeriodButton();   // signals of the radios are blocked here
             txPeriodNote = decodedWasFirstPeriod
                 ? QStringLiteral("; correspondent first/even period -> TX second/odd")
                 : QStringLiteral("; correspondent second/odd period -> TX first/even");

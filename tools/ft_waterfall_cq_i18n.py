@@ -659,3 +659,16 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'ADVARSEL: FT-sanntidsdekodingen tok %1 ms, så et svar i neste periode kan starte for sent. Sjekk CPU-belastningen (vises høyst hvert 10. minutt).',
   'VAROVÁNÍ: živé dekódování FT trvalo %1 ms, odpověď v další periodě proto může začít pozdě. Zkontrolujte zatížení CPU (zobrazí se nejvýše každých 10 minut).'),
 }.items()})
+
+# One toggle button for the FT TX period (replaces the TX I / TX II radios).
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft_tx_period_first':('TX period I','Periodo TX I','Période TX I','TX-Periode I','TX-periode I','Perioda TX I'),
+ 'ft_tx_period_second':('TX period II','Periodo TX II','Période TX II','TX-Periode II','TX-periode II','Perioda TX II'),
+ 'ft_tx_period_toggle_tooltip':(
+  'Transmit in the first (I) or second (II) period. Click to switch.',
+  'Trasmetti nel primo (I) o nel secondo (II) periodo. Fai clic per cambiare.',
+  'Émettre dans la première (I) ou la seconde (II) période. Cliquer pour changer.',
+  'Senden in der ersten (I) oder zweiten (II) Periode. Klick schaltet um.',
+  'Send i første (I) eller andre (II) periode. Klikk for å bytte.',
+  'Vysílat v první (I) nebo druhé (II) periodě. Kliknutím přepnete.'),
+}.items()})
