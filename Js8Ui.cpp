@@ -355,10 +355,11 @@ void MainWindow::setupJs8Page()
     m_chkJs8TxFollowsRx->setChecked(settings.value(QStringLiteral("JS8/txFollowsRx"), true).toBool());
     setupGrid->addWidget(m_chkJs8TxFollowsRx, srow++, 0, 1, 4);
 
-    m_btnJs8Rx = new QPushButton(QStringLiteral("RX"), group);
+    // RX is the button in the fixed header; STOP here also ends JS8's own
+    // queued and automatic transmissions.
     m_btnJs8Stop = new QPushButton(QStringLiteral("STOP"), group);
-    grid->addWidget(m_btnJs8Rx, row, 0, 1, 2);
-    grid->addWidget(m_btnJs8Stop, row++, 2, 1, 2);
+    m_btnJs8Stop->setToolTip(uiText("js8_stop_tooltip", "Cancels the running and waiting JS8 transmissions, also automatic ones, and then stops RX."));
+    grid->addWidget(m_btnJs8Stop, row++, 0, 1, 4);
     auto *clear = new QPushButton(uiText("clear_messages", "Clear messages"), group);
     grid->addWidget(clear, row++, 0, 1, 4);
 
@@ -512,7 +513,6 @@ void MainWindow::setupJs8Page()
     connect(m_editJs8StatusText, &QLineEdit::editingFinished, this, [this]() {
         js8Settings().setValue(QStringLiteral("JS8/status"), Js8Message::normalizeText(m_editJs8StatusText->text()));
     });
-    connect(m_btnJs8Rx, &QPushButton::clicked, this, &MainWindow::startJs8RxShell);
     connect(m_btnJs8Stop, &QPushButton::clicked, this, &MainWindow::stopJs8Shell);
     connect(clear, &QPushButton::clicked, this, &MainWindow::clearJs8Activity);
 
@@ -584,14 +584,6 @@ void MainWindow::applyJs8Settings()
         decoder->setTxFrequencyHz(tx);
     }, Qt::QueuedConnection);
     updateWaterfallMarkers();
-}
-
-void MainWindow::startJs8RxShell()
-{
-    if (ui != nullptr && ui->cmbMode != nullptr && !Js8Mode::isMode(ui->cmbMode->currentText()))
-        ui->cmbMode->setCurrentText(Js8Mode::familyName());
-    applyJs8Settings();
-    startRx();
 }
 
 void MainWindow::stopJs8Shell()

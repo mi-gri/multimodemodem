@@ -705,7 +705,6 @@ private slots:
     void js8RefreshCalls();
     void js8AppendRx(const QString &line, const QColor &colour = QColor());
     void clearJs8Activity();
-    void startJs8RxShell();
     void stopJs8Shell();
     void js8SetOffset(int hz, bool rx, bool tx);
     void updateJs8WaterfallMarkers();
@@ -2248,7 +2247,6 @@ private:
     QPushButton *m_btnJs8Cq = nullptr;
     QPushButton *m_btnJs8Hb = nullptr;
     QPushButton *m_btnJs8Snr = nullptr;
-    QPushButton *m_btnJs8Rx = nullptr;
     QPushButton *m_btnJs8Stop = nullptr;
     QPushButton *m_btnJs8ClearTo = nullptr;
     QComboBox *m_cmbJs8Submode = nullptr;

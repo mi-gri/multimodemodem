@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- JS8: the RX button in "JS8 RX/TX settings" is gone (the RX button in the fixed header
+  does the same); STOP spans the row and explains that it also cancels queued and
+  automatic JS8 transmissions.
 - WEFAX zoom buttons show "-" and "+" again: captions made only of symbols are never
   translated (their key was "empty", shown as "..."). German "WEFAX-RX jetzt erzwingen".
 - Right-hand panel reorganised for a 1000 px window without scrolling (all 13 modes,

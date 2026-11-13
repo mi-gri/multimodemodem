@@ -709,3 +709,13 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'tab_parameters':('Parameters','Parametri','Paramètres','Parameter','Parametere','Parametry'),
  'js8_decoder_group':('JS8 decoder','Decodificatore JS8','Décodeur JS8','JS8-Decoder','JS8-dekoder','Dekodér JS8'),
 }.items()})
+
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'js8_stop_tooltip':(
+  'Cancels the running and waiting JS8 transmissions, also automatic ones, and then stops RX.',
+  'Annulla le trasmissioni JS8 in corso e in attesa, anche quelle automatiche, poi ferma la RX.',
+  'Annule les émissions JS8 en cours et en attente, y compris automatiques, puis arrête la RX.',
+  'Bricht laufende und wartende JS8-Aussendungen ab, auch automatische, und stoppt dann RX.',
+  'Avbryter pågående og ventende JS8-sendinger, også automatiske, og stopper deretter RX.',
+  'Zruší probíhající a čekající vysílání JS8, i automatická, a poté zastaví RX.'),
+}.items()})
