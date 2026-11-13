@@ -373,6 +373,21 @@ else()
 endif()
 
 # -------------------------------------------------------------------------
+# WSPR-2 decoder: C++ port of WSJT-X wsprd (third_party/wsjtx_gpl).
+# -------------------------------------------------------------------------
+add_library(m3_wspr STATIC
+    modems/wspr/WsprEngine.h
+    modems/wspr/WsprEngine.cpp
+    third_party/wsjtx_gpl/wspr/WsprCodec.h
+    third_party/wsjtx_gpl/wspr/WsprCodec.cpp
+)
+target_include_directories(m3_wspr PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/modems/wspr")
+target_link_libraries(m3_wspr PUBLIC m3_weak_signal_codec Threads::Threads "${M3_FFTW3_LIBRARY}")
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(m3_wspr PRIVATE -Wall -Wextra)
+endif()
+
+# -------------------------------------------------------------------------
 # MSK144 native RX/TX engine, including full 144-bit frames and MSK40 hashed
 # short messages. Mode-specific coding is bundled here; shared 77-bit
 # message/hash code belongs to m3_weak_signal_codec.
@@ -1292,6 +1307,15 @@ if(BUILD_TESTING)
     target_link_libraries(m3_unpack_fuzz_regression PRIVATE m3_js8 m3_weak_signal_codec ${QT}::Core)
     add_test(NAME m3_unpack_fuzz_regression COMMAND m3_unpack_fuzz_regression)
     set_tests_properties(m3_unpack_fuzz_regression PROPERTIES TIMEOUT 120)
+
+    add_executable(m3_wspr_wav_probe tests/WsprWavProbe.cpp audio/WavFileReader.cpp)
+    target_include_directories(m3_wspr_wav_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_wspr_wav_probe PRIVATE m3_wspr ${QT}::Core)
+
+    add_executable(m3_wspr_regression tests/WsprRegression.cpp)
+    target_include_directories(m3_wspr_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_wspr_regression PRIVATE m3_wspr)
+    add_test(NAME m3_wspr_regression COMMAND m3_wspr_regression)
 
     add_executable(m3_msk144_native_regression
         tests/Msk144NativeRegression.cpp
