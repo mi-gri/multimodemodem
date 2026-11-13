@@ -2445,6 +2445,7 @@ private:
     Ft8RxDecoder::PerfStats m_lastFt8PerfStats;
     bool m_haveFt8PerfStats = false;
     QVector<double> m_ft8RecentLiveDecodeMs;
+    qint64 m_ftSlowDecodeWarnedMs = 0;   // last "live decode slow" warning
     QVector<QString> m_ft8RecentLiveDecodeSlots;
     QString m_ft8RecentLiveDecodeModeName;
 

@@ -4,6 +4,21 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- Live language change: captions set from translation keys (for example the Decode menu)
+  stayed in the old language until a restart. The generic translator now leads a shown
+  text back to its English source; help tooltips, tooltips of fixed protocol buttons
+  (SNR?, HB ...), the frequency-list status, JS8 macro tooltips, CW status, FT sequencer
+  hints and the continent filter are updated too. --i18n-report with M3_I18N_SWITCH=en
+  lists texts that are still German after a live change.
+- FT deep decodes (OSD repair and the R30 reference recovery) are shown only as standard
+  messages whose callsigns belong to a known DXCC entity; plain decodes are not filtered.
+  Overnight 40 m log: 24 of 25 noise decodes and two false calls to the own station
+  removed, no real decode lost on 23 recorded 20 m periods.
+- FT messages with an unresolved hash as sender ("RA6ABC <...> -08") and DXpedition double
+  messages ("<...> RR73; KN5XZO <NA2J> -02") are read as directed messages.
+- The "FT live decode exceeded 1 second" log line appeared every period; the log now warns
+  only when a live decode takes a fifth of the period (FT8 3 s, FT4 1.5 s), at most every
+  10 minutes.
 - FT callsign recognition accepts special event calls with several digits (DL75WAU, SX602N,
   TM100A), with or without hash brackets; "<SX602N> IW9HPG JM78" now fills the locator column.
   The pattern came from MadModem. Decodes with an unresolved hash such as

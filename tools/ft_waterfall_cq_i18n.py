@@ -648,3 +648,14 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Fullstendige juridiske merknader: LICENSE.md og THIRD_PARTY_NOTICES.md.',
   'Úplné právní informace: LICENSE.md a THIRD_PARTY_NOTICES.md.'),
 }.items()})
+
+# FT live decode slower than a fifth of the period (replaces the 1 s warning).
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft_decode_warning_reply_risk':(
+  'WARNING: the FT live decode took %1 ms, so a reply in the next period may start late. Check the CPU load (shown at most every 10 minutes).',
+  'ATTENZIONE: la decodifica FT in tempo reale ha richiesto %1 ms, quindi una risposta nel periodo successivo potrebbe partire in ritardo. Controlla il carico della CPU (mostrato al massimo ogni 10 minuti).',
+  'ATTENTION : le décodage FT en direct a pris %1 ms ; une réponse dans la période suivante peut démarrer en retard. Vérifiez la charge du processeur (affiché au plus toutes les 10 minutes).',
+  'WARNUNG: Die FT-Live-Dekodierung dauerte %1 ms; eine Antwort in der nächsten Periode kann verspätet starten. Bitte die CPU-Last prüfen (höchstens alle 10 Minuten angezeigt).',
+  'ADVARSEL: FT-sanntidsdekodingen tok %1 ms, så et svar i neste periode kan starte for sent. Sjekk CPU-belastningen (vises høyst hvert 10. minutt).',
+  'VAROVÁNÍ: živé dekódování FT trvalo %1 ms, odpověď v další periodě proto může začít pozdě. Zkontrolujte zatížení CPU (zobrazí se nejvýše každých 10 minut).'),
+}.items()})

@@ -11,6 +11,9 @@
 #include "utils/RuntimeI18n.h"
 
 #include <QAbstractButton>
+#include <QAction>
+#include <QActionGroup>
+#include <QMenu>
 #include <QApplication>
 #include <QComboBox>
 #include <QGroupBox>
@@ -73,8 +76,52 @@ inline void collect(QObject *root, QMap<QString, QSet<QString>> &found)
     }
 }
 
+// M3_I18N_SWITCH=en: switch the language live from the configured one (as
+// the Language menu does) and list texts that still look German.
+inline int runSwitch(QApplication &app, QWidget &mainWindow, const QString &code)
+{
+    app.processEvents();
+    QAction *target = nullptr;
+    for (QAction *action : mainWindow.findChildren<QAction *>())
+        if (action->isCheckable() && action->data().toString() == code && action->actionGroup()) target = action;
+    if (!target) { QTextStream(stderr) << "no language action for " << code << "\n"; return 2; }
+    target->trigger();
+    app.processEvents();
+    static const QRegularExpression german(QStringLiteral(
+        "[äöüßÄÖÜ]|\\b(der|die|das|und|nicht|mit|für|ist|wird|oder|eine|einen|beim|nur|auf|wählen|aus|zum|zur|Dekodieren|Einstellungen|Datei|Hilfe|Sprache|Beenden)\\b"));
+    QMap<QString, QSet<QString>> left;
+    // Into English: list German leftovers.  Into another language: list
+    // English-looking texts (compare with a fresh start in that language).
+    auto add = [&](const QString &kind, const QString &text) {
+        const QString plain = QString(text).remove(QRegularExpression(QStringLiteral("<[^>]*>"))).simplified();
+        if (plain.isEmpty()) return;
+        const bool leftover = code == QStringLiteral("en") ? german.match(plain).hasMatch() : looksEnglish(text);
+        if (leftover) left[plain].insert(kind);
+    };
+    QList<QObject *> objects = mainWindow.findChildren<QObject *>();
+    for (QObject *object : objects) {
+        if (auto *menu = qobject_cast<QMenu *>(object)) add(QStringLiteral("menu"), menu->title());
+        if (auto *action = qobject_cast<QAction *>(object)) add(QStringLiteral("action"), action->text());
+        if (auto *label = qobject_cast<QLabel *>(object)) add(QStringLiteral("label"), label->text());
+        if (auto *button = qobject_cast<QAbstractButton *>(object)) add(QStringLiteral("button"), button->text());
+        if (auto *group = qobject_cast<QGroupBox *>(object)) add(QStringLiteral("group"), group->title());
+        if (auto *tabs = qobject_cast<QTabBar *>(object))
+            for (int i = 0; i < tabs->count(); ++i) add(QStringLiteral("tab"), tabs->tabText(i));
+        if (auto *widget = qobject_cast<QWidget *>(object)) add(QStringLiteral("tooltip"), widget->toolTip());
+    }
+    QTextStream out(stdout);
+    out << "I18N-SWITCH to=" << code << " leftover=" << left.size() << "\n";
+    for (auto it = left.cbegin(); it != left.cend(); ++it) {
+        QStringList kinds = it.value().values(); kinds.sort();
+        out << kinds.join(QLatin1Char(',')) << "\t" << it.key() << "\n";
+    }
+    return 0;
+}
+
 inline int run(QApplication &app, QWidget &mainWindow)
 {
+    const QString switchTo = qEnvironmentVariable("M3_I18N_SWITCH");
+    if (!switchTo.isEmpty()) return runSwitch(app, mainWindow, switchTo);
     QMap<QString, QSet<QString>> found;
     app.processEvents();
     collect(&mainWindow, found);

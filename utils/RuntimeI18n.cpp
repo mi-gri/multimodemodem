@@ -10,6 +10,28 @@ namespace {
 
 QString g_languageCode = QStringLiteral("en");
 QHash<QString, QString> g_translations;
+QHash<QString, QString> g_reverse;   // current-language text -> key, built on demand
+
+QHash<QString, QString> loadCatalogue(const QString &code)
+{
+    QHash<QString, QString> out;
+    QFile file(QStringLiteral(":/translations/ui_%1.ini").arg(code));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return out;
+    QTextStream stream(&file);
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    stream.setCodec("UTF-8");
+#endif
+    while (!stream.atEnd()) {
+        const QString line = stream.readLine().trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')) || line.startsWith(QLatin1Char('['))) continue;
+        const int eq = line.indexOf(QLatin1Char('='));
+        if (eq <= 0) continue;
+        QString value = line.mid(eq + 1).trimmed();
+        value.replace(QStringLiteral("\\n"), QStringLiteral("\n"));
+        out.insert(line.left(eq).trimmed(), ProductName::brand(value));
+    }
+    return out;
+}
 
 QString normalizeSourceKey(const QString &source)
 {
@@ -68,6 +90,7 @@ void setLanguageCode(const QString &languageCode)
 
     g_languageCode = code;
     g_translations.clear();
+    g_reverse.clear();
 
     QFile file(QStringLiteral(":/translations/ui_%1.ini").arg(code));
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -143,6 +166,21 @@ QString text(const QString &source)
 QString placeholder(const QString &source)
 {
     return translateSource(QStringLiteral("placeholder"), source);
+}
+
+QString sourceText(const QString &displayed)
+{
+    const QString trimmed = displayed.trimmed();
+    if (trimmed.isEmpty() || g_languageCode == QStringLiteral("en")) return displayed;
+    static const QHash<QString, QString> english = loadCatalogue(QStringLiteral("en"));
+    if (g_reverse.isEmpty()) {
+        for (auto it = g_translations.cbegin(); it != g_translations.cend(); ++it)
+            if (!g_reverse.contains(it.value().trimmed())) g_reverse.insert(it.value().trimmed(), it.key());
+    }
+    const auto key = g_reverse.constFind(trimmed);
+    if (key == g_reverse.constEnd()) return displayed;
+    const QString source = english.value(key.value());
+    return source.isEmpty() ? displayed : source;
 }
 
 } // namespace M3I18n

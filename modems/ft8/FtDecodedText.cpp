@@ -55,7 +55,7 @@ const QRegularExpression &tokensRe()
     // but the positional captures are the right basis for UI/sequencer logic.
     thread_local const QRegularExpression re(QStringLiteral(R"(
 ^
-  (?:(?<dual>[A-Z0-9/]+)\sRR73;\s)?
+  (?:(?<dual>[A-Z0-9/]+|\.{3})\sRR73;\s)?   # m3: "<...> RR73; ..." from a DXpedition
   (?:
     (?<word1>
       (?:CQ|DE|QRZ)
@@ -65,7 +65,7 @@ const QRegularExpression &tokensRe()
     )\s
   )
   (?:
-    (?<word2>[A-Z0-9/]+)
+    (?<word2>[A-Z0-9/]+|\.{3})   # m3: "..." = unresolved hash call as sender
     (?:\s
       (?<word3>[-+A-Z0-9]+)
       (?:\s
@@ -248,12 +248,17 @@ FtDecodedText::ParsedMessage FtDecodedText::parse(const QString &message, const 
     // "<...>" (hash not resolved; brackets removed above) is an unknown
     // receiver: the sender and its grid/report are still valid, but the
     // message is never addressed to us.
+    // "CALL <...> ..." is the same with an unknown sender: the receiver and
+    // payload are kept, the sender stays empty and nothing is addressed to us.
     const bool unknownReceiver = parsed.firstCall == QStringLiteral("...");
-    if ((unknownReceiver || callToken(parsed.firstCall)) && callToken(parsed.secondCall)) {
+    const bool unknownSender = parsed.secondCall == QStringLiteral("...");
+    if ((unknownReceiver && callToken(parsed.secondCall)) ||
+        (unknownSender && callToken(parsed.firstCall)) ||
+        (callToken(parsed.firstCall) && callToken(parsed.secondCall))) {
         parsed.directed = true;
         parsed.receiverCall = unknownReceiver ? QString() : parsed.firstCall;
         parsed.toCall = parsed.receiverCall;
-        parsed.senderCall = parsed.secondCall;
+        parsed.senderCall = unknownSender ? QString() : parsed.secondCall;
         parsed.fromCall = parsed.senderCall;
         parsed.payload = parsed.word3;
 
@@ -261,7 +266,7 @@ FtDecodedText::ParsedMessage FtDecodedText::parse(const QString &message, const 
             // Standard FT messages are ordered TO FROM PAYLOAD.  Only word1 is
             // addressed to us.  If our call is word2, it is most likely our own
             // transmitted message/echo and must not drive auto-sequence.
-            parsed.addressedToMe = !unknownReceiver && callMatches(parsed.receiverCall, my);
+            parsed.addressedToMe = !unknownReceiver && !unknownSender && callMatches(parsed.receiverCall, my);
         }
 
         if (isFinalToken(parsed.payload)) {

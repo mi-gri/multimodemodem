@@ -985,8 +985,10 @@ void setHelpText(QWidget *widget, const QString &text)
     // Help texts are looked up by their English source (text.<source> keys);
     // the hint is shortened after translation.  The source stays on the
     // widget, so a language change translates it again (translateObjectTree).
-    widget->setProperty("i18nHelpSource", text);
-    const QString translated = M3I18n::text(text);
+    // Callers often pass uiText(...) already translated; keep its English source.
+    const QString source = M3I18n::sourceText(text);
+    widget->setProperty("i18nHelpSource", source);
+    const QString translated = M3I18n::text(source);
     const QString hint = compactHelpHint(translated);
     widget->setToolTip(hint);
     widget->setStatusTip(hint);
@@ -10675,6 +10677,24 @@ void MainWindow::translateObjectTree(QObject *object)
     // Fixed protocol labels (dB, SNR?, CQ ...) keep their text; children
     // are still translated.
     if (object->property("i18nSkipSelf").toBool()) {
+        // The caption is protocol text, but its tooltip is ordinary UI copy.
+        if (QWidget *widget = qobject_cast<QWidget *>(object)) {
+            const QString helpSource = widget->property("i18nHelpSource").toString();
+            if (!helpSource.isEmpty()) {
+                const QString translated = M3I18n::text(helpSource);
+                widget->setToolTip(compactHelpHint(translated));
+                widget->setStatusTip(compactHelpHint(translated));
+                widget->setWhatsThis(translated);
+            } else {
+                const QString toolSource = widget->property("i18nSourceToolTip").toString().isEmpty()
+                                              ? M3I18n::sourceText(widget->toolTip())
+                                              : widget->property("i18nSourceToolTip").toString();
+                if (!toolSource.trimmed().isEmpty()) {
+                    widget->setProperty("i18nSourceToolTip", toolSource);
+                    widget->setToolTip(uiTextFromSource("text", toolSource));
+                }
+            }
+        }
         const QList<QObject *> children = object->children();
         for (QObject *child : children) translateObjectTree(child);
         return;
@@ -10682,7 +10702,7 @@ void MainWindow::translateObjectTree(QObject *object)
 
     if (QAction *action = qobject_cast<QAction *>(object)) {
         const QString source = action->property("i18nSourceText").toString().isEmpty()
-                                   ? action->text()
+                                   ? M3I18n::sourceText(action->text())
                                    : action->property("i18nSourceText").toString();
         if (!source.trimmed().isEmpty()) {
             action->setProperty("i18nSourceText", source);
@@ -10690,7 +10710,7 @@ void MainWindow::translateObjectTree(QObject *object)
         }
 
         const QString toolSource = action->property("i18nSourceToolTip").toString().isEmpty()
-                                      ? action->toolTip()
+                                      ? M3I18n::sourceText(action->toolTip())
                                       : action->property("i18nSourceToolTip").toString();
         if (!toolSource.trimmed().isEmpty()) {
             action->setProperty("i18nSourceToolTip", toolSource);
@@ -10698,7 +10718,7 @@ void MainWindow::translateObjectTree(QObject *object)
         }
 
         const QString statusSource = action->property("i18nSourceStatusTip").toString().isEmpty()
-                                        ? action->statusTip()
+                                        ? M3I18n::sourceText(action->statusTip())
                                         : action->property("i18nSourceStatusTip").toString();
         if (!statusSource.trimmed().isEmpty()) {
             action->setProperty("i18nSourceStatusTip", statusSource);
@@ -10713,7 +10733,7 @@ void MainWindow::translateObjectTree(QObject *object)
         // still translated below.
         if (widget != this) {
             const QString source = widget->property("i18nSourceWindowTitle").toString().isEmpty()
-                                       ? widget->windowTitle()
+                                       ? M3I18n::sourceText(widget->windowTitle())
                                        : widget->property("i18nSourceWindowTitle").toString();
             if (!source.trimmed().isEmpty()) {
                 widget->setProperty("i18nSourceWindowTitle", source);
@@ -10730,7 +10750,7 @@ void MainWindow::translateObjectTree(QObject *object)
             widget->setWhatsThis(translated);
         } else {
         const QString toolSource = widget->property("i18nSourceToolTip").toString().isEmpty()
-                                      ? widget->toolTip()
+                                      ? M3I18n::sourceText(widget->toolTip())
                                       : widget->property("i18nSourceToolTip").toString();
         if (!toolSource.trimmed().isEmpty()) {
             widget->setProperty("i18nSourceToolTip", toolSource);
@@ -10738,7 +10758,7 @@ void MainWindow::translateObjectTree(QObject *object)
         }
 
         const QString statusSource = widget->property("i18nSourceStatusTip").toString().isEmpty()
-                                        ? widget->statusTip()
+                                        ? M3I18n::sourceText(widget->statusTip())
                                         : widget->property("i18nSourceStatusTip").toString();
         if (!statusSource.trimmed().isEmpty()) {
             widget->setProperty("i18nSourceStatusTip", statusSource);
@@ -10749,7 +10769,7 @@ void MainWindow::translateObjectTree(QObject *object)
 
     if (QMenu *menu = qobject_cast<QMenu *>(object)) {
         const QString source = menu->property("i18nSourceTitle").toString().isEmpty()
-                                   ? menu->title()
+                                   ? M3I18n::sourceText(menu->title())
                                    : menu->property("i18nSourceTitle").toString();
         if (!source.trimmed().isEmpty()) {
             menu->setProperty("i18nSourceTitle", source);
@@ -10757,7 +10777,7 @@ void MainWindow::translateObjectTree(QObject *object)
         }
     } else if (QGroupBox *group = qobject_cast<QGroupBox *>(object)) {
         const QString source = group->property("i18nSourceTitle").toString().isEmpty()
-                                   ? group->title()
+                                   ? M3I18n::sourceText(group->title())
                                    : group->property("i18nSourceTitle").toString();
         if (!source.trimmed().isEmpty()) {
             group->setProperty("i18nSourceTitle", source);
@@ -10765,7 +10785,7 @@ void MainWindow::translateObjectTree(QObject *object)
         }
     } else if (QLabel *label = qobject_cast<QLabel *>(object)) {
         const QString source = label->property("i18nSourceText").toString().isEmpty()
-                                   ? label->text()
+                                   ? M3I18n::sourceText(label->text())
                                    : label->property("i18nSourceText").toString();
         if (!source.trimmed().isEmpty() && !source.startsWith("<")) {
             label->setProperty("i18nSourceText", source);
@@ -10773,7 +10793,7 @@ void MainWindow::translateObjectTree(QObject *object)
         }
     } else if (QAbstractButton *button = qobject_cast<QAbstractButton *>(object)) {
         const QString source = button->property("i18nSourceText").toString().isEmpty()
-                                   ? button->text()
+                                   ? M3I18n::sourceText(button->text())
                                    : button->property("i18nSourceText").toString();
         if (!source.trimmed().isEmpty()) {
             button->setProperty("i18nSourceText", source);
@@ -10781,7 +10801,7 @@ void MainWindow::translateObjectTree(QObject *object)
         }
     } else if (QLineEdit *edit = qobject_cast<QLineEdit *>(object)) {
         const QString source = edit->property("i18nSourcePlaceholder").toString().isEmpty()
-                                   ? edit->placeholderText()
+                                   ? M3I18n::sourceText(edit->placeholderText())
                                    : edit->property("i18nSourcePlaceholder").toString();
         if (!source.trimmed().isEmpty()) {
             edit->setProperty("i18nSourcePlaceholder", source);
@@ -10789,7 +10809,7 @@ void MainWindow::translateObjectTree(QObject *object)
         }
     } else if (QPlainTextEdit *edit = qobject_cast<QPlainTextEdit *>(object)) {
         const QString source = edit->property("i18nSourcePlaceholder").toString().isEmpty()
-                                   ? edit->placeholderText()
+                                   ? M3I18n::sourceText(edit->placeholderText())
                                    : edit->property("i18nSourcePlaceholder").toString();
         if (!source.trimmed().isEmpty()) {
             edit->setProperty("i18nSourcePlaceholder", source);
@@ -10801,7 +10821,7 @@ void MainWindow::translateObjectTree(QObject *object)
         for (int i = 0; i < tabs->count(); ++i) {
             const QString propertyName = QStringLiteral("i18nTab%1").arg(i);
             const QString source = tabs->property(propertyName.toUtf8().constData()).toString().isEmpty()
-                                       ? tabs->tabText(i)
+                                       ? M3I18n::sourceText(tabs->tabText(i))
                                        : tabs->property(propertyName.toUtf8().constData()).toString();
             if (!source.trimmed().isEmpty()) {
                 tabs->setProperty(propertyName.toUtf8().constData(), source);
@@ -10817,7 +10837,7 @@ void MainWindow::translateObjectTree(QObject *object)
         constexpr int SourceTextRole = Qt::UserRole + 913;
         for (int i = 0; i < combo->count(); ++i) {
             const QString source = combo->itemData(i, SourceTextRole).toString().isEmpty()
-                                       ? combo->itemText(i)
+                                       ? M3I18n::sourceText(combo->itemText(i))
                                        : combo->itemData(i, SourceTextRole).toString();
             if (!source.trimmed().isEmpty()) {
                 combo->setItemData(i, source, SourceTextRole);
@@ -10831,7 +10851,7 @@ void MainWindow::translateObjectTree(QObject *object)
         for (int c = 0; c < table->columnCount(); ++c) {
             if (QTableWidgetItem *item = table->horizontalHeaderItem(c)) {
                 const QString source = item->data(SourceTextRole).toString().isEmpty()
-                                           ? item->text()
+                                           ? M3I18n::sourceText(item->text())
                                            : item->data(SourceTextRole).toString();
                 if (!source.trimmed().isEmpty()) {
                     item->setData(SourceTextRole, source);
@@ -10842,7 +10862,7 @@ void MainWindow::translateObjectTree(QObject *object)
         for (int r = 0; r < table->rowCount(); ++r) {
             if (QTableWidgetItem *item = table->verticalHeaderItem(r)) {
                 const QString source = item->data(SourceTextRole).toString().isEmpty()
-                                           ? item->text()
+                                           ? M3I18n::sourceText(item->text())
                                            : item->data(SourceTextRole).toString();
                 if (!source.trimmed().isEmpty()) {
                     item->setData(SourceTextRole, source);
@@ -10922,6 +10942,21 @@ void MainWindow::applyUiLanguage()
     if (m_btnFaxForceRx != nullptr) m_btnFaxForceRx->setText(uiText("button.forceWefaxRx", "Force WEFAX RX now"));
     if (m_btnSstvForceRx != nullptr) m_btnSstvForceRx->setText(uiText("sstv_start_free_run", "Start RX without synchronization"));
     refreshSstvArchiveStatus();
+    // Texts assembled at run time (value + caption) are rebuilt, not looked up.
+    updateModeBandUis();
+    js8RefreshMacroButtons();
+    refreshTextMacroButtons();
+    updateCwDualRxStatusLabel();
+    refreshFt8StandardMessages();   // also updates the sequencer status
+    if (m_lcdRigReadoutFrequency != nullptr) {
+        m_lcdRigReadoutFrequency->setToolTip(uiText("rig_readout_tune_tooltip", "Dial frequency read by CAT. Mouse wheel over a digit tunes that digit; double-click enters a frequency (MHz, kHz or Hz). Not possible while transmitting."));
+        if (QWidget *readout = m_lcdRigReadoutFrequency->parentWidget())
+            readout->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power, SWR and ALC reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
+    }
+    for (QAction *action : m_actFt8FilterContinents) {
+        const QString code = action->data().toString();
+        action->setText(QStringLiteral("%1  %2").arg(code, uiText(QStringLiteral("continent_") + code.toLower(), code)));
+    }
     if(m_chkSstvAutoSave)m_chkSstvAutoSave->setText(uiText("sstv_auto_save", "Automatically save received images"));
     if(m_btnSstvBrowseFolder)m_btnSstvBrowseFolder->setToolTip(uiText("sstv_choose_folder", "Choose received-image folder"));
     if(m_btnSstvOpenFolder)m_btnSstvOpenFolder->setText(uiText("sstv_open_folder", "Open received-image folder"));
@@ -17403,9 +17438,17 @@ void MainWindow::handleFt8DecodePerformance(const Ft8RxDecoder::PerfStats &stats
                       .arg(liveMaxMs, 0, 'f', 0));
     }
 
-    if (!stats.offline && stats.passCount > 1 && stats.totalMs > 1000.0) {
-        appendLog(uiText("ft_decode_warning_adaptive_slow",
-                         "WARNING: FT unified live decode exceeded 1 second; this is diagnostic only and does not disable later slots. Reduce FT workload or check CPU load if the PC starts missing slots."));
+    // A live decode of 1-2 s is normal on a busy band.  Warn only when it
+    // takes a fifth of the period (FT8 3 s, FT4 1.5 s): then a reply in the
+    // next period may start late.  At most once in ten minutes.
+    const double slowLimitMs = qMax(1500.0, Ft8Mode::profileForMode(statsModeName).slotMs / 5.0);
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    if (!stats.offline && stats.totalMs > slowLimitMs &&
+        (m_ftSlowDecodeWarnedMs == 0 || nowMs - m_ftSlowDecodeWarnedMs >= 10 * 60 * 1000)) {
+        m_ftSlowDecodeWarnedMs = nowMs;
+        appendLog(uiText("ft_decode_warning_reply_risk",
+                         "WARNING: the FT live decode took %1 ms, so a reply in the next period may start late. Check the CPU load (shown at most every 10 minutes).")
+                      .arg(stats.totalMs, 0, 'f', 0));
     }
 
     if (stats.timeBudgetHit && !stats.earlyStopReason.trimmed().isEmpty()) {

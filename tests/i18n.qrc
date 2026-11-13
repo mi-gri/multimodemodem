@@ -1,1 +1,1 @@
-<RCC><qresource prefix="/translations"><file alias="ui_it.ini">../translations/ui_it.ini</file></qresource></RCC>
+<RCC><qresource prefix="/translations"><file alias="ui_it.ini">../translations/ui_it.ini</file><file alias="ui_de.ini">../translations/ui_de.ini</file><file alias="ui_en.ini">../translations/ui_en.ini</file></qresource></RCC>

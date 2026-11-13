@@ -16,6 +16,8 @@
 #include "../../dsp/cpu/CpuFeatures.h"
 #include "../../utils/SystemResourceManager.h"
 #include "../../runtime/FtDecodeWorkerPool.h"
+#include "../../dxcc/CtyCountryFile.h"
+#include "FtDecodedText.h"
 #include "../../audio/WavFileReader.h"
 #include "../weak_signal/WeakSignalCodecLock.h"
 
@@ -1022,6 +1024,27 @@ bool parseOfflineWavHeader(QFile &file, OfflineWavFormat &format, QString &error
 QVector<float> convertOfflineWavToMono(const QByteArray &raw, const OfflineWavFormat &format)
 {
     return M3Audio::convertWavBytesToMono(raw, format);
+}
+
+// Deep decodes (OSD repair, reference recovery) can turn noise into a
+// CRC-valid frame: "044YXM GI3ZWT GC91", hex telemetry, "O87 5T?38YYJJ".
+// Show them only as a standard message whose callsigns belong to a known
+// DXCC entity.  Plain BP decodes are not filtered.  Without cty.csv the
+// callsign check is skipped.
+bool plausibleDeepFtMessage(const QString &message)
+{
+    const FtDecodedText::ParsedMessage p = FtDecodedText::parse(message, QString());
+    using Kind = FtDecodedText::Kind;
+    if (p.kind == Kind::FreeText || p.kind == Kind::FreeText73 || p.kind == Kind::Unknown) return false;
+    QStringList calls;
+    if (!p.senderCall.isEmpty()) calls << p.senderCall;
+    if (!p.receiverCall.isEmpty()) calls << p.receiverCall;
+    if (calls.isEmpty()) return false;
+    const CtyCountryFile &cty = CtyCountryFile::instance();
+    if (!cty.isLoaded()) return true;
+    for (const QString &call : calls)
+        if (!cty.lookupCallsign(call).valid) return false;
+    return true;
 }
 
 bool looksLikeUsefulFt8Message(const QString &message)
@@ -5170,7 +5193,8 @@ bool Ft8RxDecoder::decodeCandidate(const QVector<double> &samples,
             rememberFailure(DecodeRejectReason::Unpack);
             return false;
         }
-        if (!looksLikeUsefulFt8Message(candidateMessage)) {
+        if (!looksLikeUsefulFt8Message(candidateMessage) ||
+            (decodedViaGf2Osd && !plausibleDeepFtMessage(candidateMessage))) {
             if (decodedViaGf2Osd && qualityOut != nullptr) {
                 ++qualityOut->osdGf2PostCrcRejects;
             }
@@ -6534,6 +6558,7 @@ bool Ft8RxDecoder::decodeFt4Candidate(const QVector<double> &samples,
         return false;
     };
 
+    bool fecViaOsd = false;   // deep repair: message must pass plausibleDeepFtMessage()
     bool fecDecoded = tryFt4Metric(llr, false);
 
     // Boundary/offline deep path: isolate the candidate as a complex 666.67 Hz
@@ -6744,7 +6769,7 @@ bool Ft8RxDecoder::decodeFt4Candidate(const QVector<double> &samples,
             if (qualityOut) ++qualityOut->osdGf2Tried;
             // Use channel LLRs, not FT8 scrambling or its packing rules.
             if (osdGf2Repair174_91(llr,trial,order,rankFail,skips,91,0) && crc14Ok(trial)) {
-                bits=trial; fecDecoded=true;
+                bits=trial; fecDecoded=true; fecViaOsd=true;
                 if (qualityOut) { ++qualityOut->osdGf2Recovered;
                     if(order==0) ++qualityOut->osdGf2Order0Hits;
                     if(order==1) ++qualityOut->osdGf2Order1Hits; }
@@ -6762,7 +6787,8 @@ bool Ft8RxDecoder::decodeFt4Candidate(const QVector<double> &samples,
         return reject(sawCrcFailure ? DecodeRejectReason::Crc : DecodeRejectReason::Ldpc);
     }
     const QString message = unpackFt4Message77(bits).trimmed().toUpper();
-    if (!looksLikeUsefulFt8Message(message)) {
+    if (!looksLikeUsefulFt8Message(message) || (fecViaOsd && !plausibleDeepFtMessage(message))) {
+        if (fecViaOsd && qualityOut) ++qualityOut->osdGf2PostCrcRejects;
         return reject(DecodeRejectReason::Message);
     }
     if (qualityOut != nullptr) {
@@ -7770,6 +7796,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::lateReferenceRecovery(const QVector<
     auto take = [&](const FtReferenceRecovery::Row &r) {
         auto same = [&](const Decode &d) { return d.message.trimmed().compare(r.message, Qt::CaseInsensitive) == 0; };
         if (std::any_of(known.cbegin(), known.cend(), same) || std::any_of(found.cbegin(), found.cend(), same)) return;
+        if (!plausibleDeepFtMessage(r.message)) return;
         Decode d; d.message = r.message; d.frequencyHz = r.frequency; d.snrDb = r.snr; d.dt = r.dt; d.syncScore = r.quality;
         d.utc = slot.time().toString(QStringLiteral("HHmmss")); d.slotStartUtcMs = request.slotUtcMs; d.slotPeriodMs = profile.slotMs;
         found.append(d);
@@ -7837,6 +7864,7 @@ void Ft8RxDecoder::appendReferenceRecovery(const QVector<double>&samples,const Q
         if (decodeCancellationRequested())return;
         const bool known=std::any_of(out.cbegin(),out.cend(),[&](const Decode&d){return d.message.trimmed().compare(r.message,Qt::CaseInsensitive)==0;});
         if(known)return;
+        if(!plausibleDeepFtMessage(r.message)){if(stats)++stats->referenceRejected;return;}
         Decode d;d.message=r.message;d.frequencyHz=r.frequency;d.snrDb=r.snr;d.dt=r.dt;d.syncScore=r.quality;d.utc=slot.time().toString(QStringLiteral("HHmmss"));d.slotStartUtcMs=request.slotUtcMs;d.slotPeriodMs=profile.slotMs;
         out.append(d);if(stats)++stats->referenceDecodes;if(publish)publish(QVector<Decode>{d});
     };
@@ -7845,7 +7873,7 @@ void Ft8RxDecoder::appendReferenceRecovery(const QVector<double>&samples,const Q
         // Retain earlier published gate recoveries even when a final job has
         // no time left. No stale/cancelled generation is republished.
         for(const auto&r:recovered.rows)append(r);
-        if(stats){stats->referenceMs=recovered.elapsedMs;stats->referenceWorkers=recovered.workers;stats->referenceRejected=recovered.rejected;stats->referenceCutoff=recovered.timedOut;}
+        if(stats){stats->referenceMs=recovered.elapsedMs;stats->referenceWorkers=recovered.workers;stats->referenceRejected+=recovered.rejected;stats->referenceCutoff=recovered.timedOut;}
     } catch(const std::exception&e) {
         SessionDiagnostics::instance().record("ft.reference.error",{{"mode",m_modeName},{"error",QString::fromUtf8(e.what())}});
     }

@@ -133,6 +133,32 @@ bool runParserTrapChecks()
         ok = false;
     }
 
+    // Unresolved hash call as sender: receiver and payload count, nothing is
+    // addressed to us (no sender to answer).
+    const auto unknownSender = FtDecodedText::parse(QStringLiteral("RA6ABC <...> -08"), QStringLiteral("IZ6NNH"));
+    if (!unknownSender.directed || unknownSender.receiverCall != QStringLiteral("RA6ABC") || !unknownSender.senderCall.isEmpty() ||
+        unknownSender.report != QStringLiteral("-08") || unknownSender.addressedToMe) {
+        qWarning().noquote() << "FAIL parser: <...> sender" << unknownSender.text << unknownSender.receiverCall << unknownSender.report;
+        ok = false;
+    }
+    const auto unknownSenderToMe = FtDecodedText::parse(QStringLiteral("IZ6NNH <...> RR73"), QStringLiteral("IZ6NNH"));
+    if (unknownSenderToMe.addressedToMe || !unknownSenderToMe.rr73 || !unknownSenderToMe.directed) {
+        qWarning().noquote() << "FAIL parser: <...> sender to me must not be addressed" << unknownSenderToMe.text;
+        ok = false;
+    }
+    const auto bothUnknown = FtDecodedText::parse(QStringLiteral("<...> <...> R 570400 IB88WR"), QStringLiteral("IZ6NNH"));
+    if (bothUnknown.directed || bothUnknown.addressedToMe) {
+        qWarning().noquote() << "FAIL parser: two unknown calls are not a directed message" << bothUnknown.text;
+        ok = false;
+    }
+
+    // DXpedition (Fox) double message whose first call is an unresolved hash.
+    const auto fox = FtDecodedText::parse(QStringLiteral("<...> RR73; KN5XZO <NA2J> -02"), QStringLiteral("IZ6NNH"));
+    if (!fox.directed || fox.receiverCall != QStringLiteral("KN5XZO") || fox.senderCall != QStringLiteral("NA2J") || fox.report != QStringLiteral("-02")) {
+        qWarning().noquote() << "FAIL parser: Fox double message with <...>" << fox.text << fox.receiverCall << fox.senderCall << fox.report;
+        ok = false;
+    }
+
     // Resolved hash call in brackets.
     const auto special = FtDecodedText::parse(QStringLiteral("<SX602N> IW9HPG JM78"), QStringLiteral("IZ6NNH"));
     if (!special.directed || special.receiverCall != QStringLiteral("SX602N") || special.senderCall != QStringLiteral("IW9HPG") ||
