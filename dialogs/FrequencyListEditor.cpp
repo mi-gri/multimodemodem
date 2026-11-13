@@ -223,7 +223,8 @@ void FrequencyListEditor::updateRow(int row)
 {
     bool ok = false;
     const double hz = rowHz(row, &ok);
-    const QString band = ok ? M3StandardFrequencies::bandOf(hz) : QString();
+    // Service modes (weather fax) are not sorted into amateur bands.
+    const QString band = ok && !M3StandardFrequencies::isServiceMode(rowMode(row)) ? M3StandardFrequencies::bandOf(hz) : QString();
     const bool wasLoading = m_loading;
     m_loading = true;
     if (auto *item = m_table->item(row, ColBand)) item->setText(ok ? (band.isEmpty() ? QStringLiteral("–") : band) : QString());
@@ -239,12 +240,12 @@ void FrequencyListEditor::unpreferOthers(int row)
     auto *item = m_table->item(row, ColPreferred);
     if (item == nullptr || item->checkState() != Qt::Checked) return;
     const QString mode = rowMode(row);
-    const QString band = M3StandardFrequencies::bandOf(rowHz(row));
+    const QString band = M3StandardFrequencies::groupOf(mode, rowHz(row));
     const QString region = rowRegion(row);
     const bool wasLoading = m_loading;
     m_loading = true;
     for (int r = 0; r < m_table->rowCount(); ++r) {
-        if (r == row || rowMode(r) != mode || M3StandardFrequencies::bandOf(rowHz(r)) != band || rowRegion(r) != region) continue;
+        if (r == row || rowMode(r) != mode || M3StandardFrequencies::groupOf(mode, rowHz(r)) != band || rowRegion(r) != region) continue;
         if (auto *other = m_table->item(r, ColPreferred)) other->setCheckState(Qt::Unchecked);
     }
     m_loading = wasLoading;

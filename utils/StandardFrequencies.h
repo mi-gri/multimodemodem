@@ -106,6 +106,20 @@ inline QString groupOf(double hz)
     return band.isEmpty() ? otherGroup() : band;
 }
 
+/// Modes of other radio services (weather fax): their stations are not
+/// amateur radio, even where a frequency lies inside an amateur band in
+/// some region (DWD DDH3 3855 kHz is in the 80 m band of Region 2).
+inline bool isServiceMode(const QString &mode)
+{
+    return mode.trimmed().compare(QLatin1String("WEFAX"), Qt::CaseInsensitive) == 0;
+}
+
+/// Group of an entry of @p mode: otherGroup() for service modes, else groupOf(hz).
+inline QString groupOf(const QString &mode, double hz)
+{
+    return isServiceMode(mode) ? otherGroup() : groupOf(hz);
+}
+
 /// Bands in frequency order, for band selectors.
 inline QStringList allBands()
 {
@@ -332,7 +346,7 @@ inline bool sameEntries(QVector<Entry> a, QVector<Entry> b)
 inline QVector<Entry> withMissingDefaults(QVector<Entry> entries, int *added = nullptr)
 {
     const auto key = [](const Entry &e) { return e.mode + QLatin1Char('|') + QString::number(qRound64(e.hz)) + QLatin1Char('|') + e.region; };
-    const auto slot = [](const Entry &e) { return e.mode + QLatin1Char('|') + groupOf(e.hz) + QLatin1Char('|') + e.region; };
+    const auto slot = [](const Entry &e) { return e.mode + QLatin1Char('|') + groupOf(e.mode, e.hz) + QLatin1Char('|') + e.region; };
     QSet<QString> present, preferredSlots;
     for (const Entry &e : entries) {
         present.insert(key(e));
@@ -408,7 +422,7 @@ inline double dialHz(const QVector<Entry> &entries, const QString &region, const
     const QString b = band.trimmed().toLower();
     double first = 0.0;
     for (const Entry &e : entries) {
-        if (e.mode != m || groupOf(e.hz).toLower() != b || !regionMatches(e.region, region)) continue;
+        if (e.mode != m || groupOf(e.mode, e.hz).toLower() != b || !regionMatches(e.region, region)) continue;
         if (e.preferred) return e.hz;
         if (first <= 0.0) first = e.hz;
     }
@@ -477,7 +491,7 @@ inline QVector<Entry> entriesFor(const QString &mode, const QString &group)
     const QString g = group.trimmed().toLower();
     QVector<Entry> out;
     for (const Entry &e : detail::state().entries)
-        if (e.mode == m && regionMatches(e.region, detail::state().region) && (g.isEmpty() || groupOf(e.hz).toLower() == g))
+        if (e.mode == m && regionMatches(e.region, detail::state().region) && (g.isEmpty() || groupOf(e.mode, e.hz).toLower() == g))
             out << e;
     std::sort(out.begin(), out.end(), [](const Entry &a, const Entry &b) { return a.hz < b.hz; });
     return out;

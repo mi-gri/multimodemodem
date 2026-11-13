@@ -121,7 +121,9 @@ QWidget *MainWindow::createModeBandGroup(QWidget *parent, const QString &listMod
     grid->setVerticalSpacing(4);
     int row = 0;
     ModeBandWidgets w;
-    if (!listMode.isEmpty()) {
+    // Weather fax stations are no amateur radio: no band selector, the
+    // stored list shows all its stations.
+    if (!listMode.isEmpty() && !M3StandardFrequencies::isServiceMode(listMode)) {
         w.band = new QComboBox(group);
         w.band->setToolTip(uiText("mode_band_tooltip", "Select a band to tune the CAT-connected rig to the preferred frequency of this mode (Settings → Frequencies)."));
         for (const QString &g : M3StandardFrequencies::groups(listMode)) w.band->addItem(frequencyGroupLabel(g), g);
@@ -256,14 +258,15 @@ void MainWindow::updateModeBandUis()
 {
     const bool haveCat = m_lastRigFrequencyHz > 0.0;
     for (auto it = m_modeBandWidgets.cbegin(); it != m_modeBandWidgets.cend(); ++it) {
-        if (it->band == nullptr || it->status == nullptr) continue;
-        const QString group = it->band->currentData().toString();
-        const double standard = M3StandardFrequencies::dialHz(it.key(), group);
+        if (it->status == nullptr) continue;
+        const bool service = it->band == nullptr;   // weather fax: no bands
+        const double standard = service ? M3StandardFrequencies::preferredAnyBandHz(it.key())
+                                        : M3StandardFrequencies::dialHz(it.key(), it->band->currentData().toString());
         const bool onSlot = haveCat && (M3StandardFrequencies::nearEntry(it.key(), m_lastRigFrequencyHz, kOnEntryToleranceHz) ||
                                         (standard > 0.0 && std::fabs(m_lastRigFrequencyHz - standard) <= 1000.0));
         QString text = uiText("mode_standard_frequency", "Frequency from the list (%1)").arg(it.key()) + QStringLiteral(": ") +
                        (standard > 0.0 ? formatRigFrequency(standard) : QStringLiteral("--"));
-        if (it->band->count() == 0) text = uiText("mode_no_frequencies", "No frequencies for this mode in Settings → Frequencies.");
+        if ((service ? M3StandardFrequencies::entriesFor(it.key(), QString()).isEmpty() : it->band->count() == 0)) text = uiText("mode_no_frequencies", "No frequencies for this mode in Settings → Frequencies.");
         else if (haveCat && !onSlot) text += QStringLiteral(" — ") + uiText("mode_off_standard", "rig is elsewhere");
         it->status->setText(text);
         M3Ui::setSemanticRole(it->status, onSlot || !haveCat ? QStringLiteral("positive") : QStringLiteral("negative"));

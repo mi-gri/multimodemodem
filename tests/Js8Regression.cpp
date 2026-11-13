@@ -306,13 +306,16 @@ static void testStandardFrequencies()
           !nearEntry("WEFAX", 14074000.0, 5000.0), "weather fax stations");
     // Frequencies outside the amateur bands (weather RTTY, fax) form their own group.
     check(groupOf(14080000.0) == "20m" && groupOf(4583000.0) == otherGroup(), "groupOf");
+    // Weather fax is another radio service: never sorted into amateur bands,
+    // although DDH3 (3855 kHz) lies in the 80 m band of Region 2.
+    check(isServiceMode("WEFAX") && !isServiceMode("RTTY") && groupOf("WEFAX", 3853100.0) == otherGroup() &&
+          groups("WEFAX") == QStringList{otherGroup()} && entriesFor("WEFAX", otherGroup()).size() == 3 &&
+          entriesFor("WEFAX", "80m").isEmpty(), "weather fax has no amateur bands");
     check(groups("RTTY").contains(otherGroup()) && groups("RTTY").first() == "80m" && !groups("FT8").contains(otherGroup()),
           "RTTY lists the group outside the bands, FT8 does not");
     check(dialHz("RTTY", otherGroup()) == 4580650.0, "preferred weather RTTY station");
     const auto fax = entriesFor("WEFAX", QString());
     check(fax.size() == 3 && fax[0].hz < fax[1].hz && fax[1].hz < fax[2].hz, "weather fax entries sorted");
-    check(entriesFor("WEFAX", otherGroup()).size() == 2 && groups("WEFAX") == QStringList({"80m", otherGroup()}),
-          "DDH3 (3855 kHz) lies in the 80 m range, the other fax stations outside");
     check(entriesFor("FT8", "20m").size() == 2 && entriesFor("RTTY", QString()).size() == 11, "entries per band and per mode");
     check(parseFrequency("14.078 MHz") == 14078000.0 && parseFrequency("4583") == 4583000.0 &&
           parseFrequency("7,074") == 7074000.0 && parseFrequency("147.3 kHz") == 147300.0 &&
