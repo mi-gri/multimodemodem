@@ -109,7 +109,8 @@ void MainWindow::updateSideTabsForMode(const QString &modeName)
     if (m_stkFrequency != nullptr) m_stkFrequency->setVisible(page != nullptr);
     updateFt8TxPeriodButton();   // slot times differ between FT8 and FT4
     // Weather fax and the radio telescope (no list mode) have no QSO partner.
-    showTab(m_tabQrz, !listMode.isEmpty() && listMode != QStringLiteral("WEFAX"));
+    // WSPR beacons: spots, no QSO partner either.
+    showTab(m_tabQrz, !listMode.isEmpty() && listMode != QStringLiteral("WEFAX") && listMode != QStringLiteral("WSPR"));
 }
 
 QWidget *MainWindow::createModeBandGroup(QWidget *parent, const QString &listMode)

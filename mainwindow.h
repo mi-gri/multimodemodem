@@ -38,6 +38,7 @@
 #include "modems/msk144/Msk144Decoder.h"
 #include "modems/q65/Q65Mode.h"
 #include "modems/q65/Q65Decoder.h"
+#include "modems/wspr/WsprDecoder.h"
 #include "modems/js8/Js8Decoder.h"
 #include "dsp/text/TextCallSpotter.h"
 #include "modems/js8/Js8AutoReply.h"
@@ -698,6 +699,10 @@ private slots:
     // JS8 (Js8Ui.cpp)
     void setupJs8DisplayPage();
     void setupJs8Page();
+    void setupWsprDisplayPage();
+    void setupWsprPage();
+    void handleWsprDecoded(const QVector<WsprSpot> &spots, const QDateTime &periodUtc, int milliseconds);
+    void clearWsprTable();
     void applyJs8Settings();
     void handleJs8Decode(const Js8Decode &decode);
     void js8Send(const QString &text, const QString &to);
@@ -2217,6 +2222,12 @@ private:
     QLabel *m_lblQ65SequencerStatus = nullptr;
     Q65Decoder *m_q65Decoder = nullptr;
     QThread *m_q65Thread = nullptr;
+    WsprDecoder *m_wsprDecoder = nullptr;
+    QThread *m_wsprThread = nullptr;
+    QWidget *m_wsprDisplayPage = nullptr;
+    QWidget *m_pageWsprSettings = nullptr;
+    QTableWidget *m_tableWspr = nullptr;
+    QLabel *m_lblWsprStatus = nullptr;
 
     // JS8
     struct Js8Activity

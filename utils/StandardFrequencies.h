@@ -50,7 +50,8 @@ inline QStringList modes()
 {
     return {QStringLiteral("FT8"), QStringLiteral("FT4"), QStringLiteral("JS8"), QStringLiteral("MSK144"),
             QStringLiteral("Q65"), QStringLiteral("RTTY"), QStringLiteral("PSK"), QStringLiteral("MFSK"),
-            QStringLiteral("CW"), QStringLiteral("HELL"), QStringLiteral("SSTV"), QStringLiteral("WEFAX")};
+            QStringLiteral("CW"), QStringLiteral("HELL"), QStringLiteral("SSTV"), QStringLiteral("WEFAX"),
+            QStringLiteral("WSPR")};
 }
 
 /// List mode of a MultiModeModem mode name ("RTTY Text" -> "RTTY",
@@ -63,6 +64,7 @@ inline QString listModeForName(const QString &modeName)
     if (u.startsWith(QLatin1String("JS8"))) return QStringLiteral("JS8");
     if (u.startsWith(QLatin1String("MSK144"))) return QStringLiteral("MSK144");
     if (u.startsWith(QLatin1String("Q65"))) return QStringLiteral("Q65");
+    if (u.startsWith(QLatin1String("WSPR"))) return QStringLiteral("WSPR");
     if (u.startsWith(QLatin1String("RTTY"))) return QStringLiteral("RTTY");
     if (u.startsWith(QLatin1String("PSK"))) return QStringLiteral("PSK");
     if (u.startsWith(QLatin1String("MFSK"))) return QStringLiteral("MFSK");
@@ -83,6 +85,7 @@ inline QString bandOf(double hz)
 {
     struct Range { double low; double high; const char *name; };
     static const Range ranges[] = {
+        {135.7e3, 137.8e3, "2200m"}, {472.0e3, 479.0e3, "630m"},
         {1.8e6, 2.0e6, "160m"}, {3.5e6, 4.0e6, "80m"}, {5.0e6, 5.5e6, "60m"}, {7.0e6, 7.3e6, "40m"},
         {10.1e6, 10.15e6, "30m"}, {14.0e6, 14.35e6, "20m"}, {18.068e6, 18.168e6, "17m"},
         {21.0e6, 21.45e6, "15m"}, {24.89e6, 24.99e6, "12m"}, {28.0e6, 29.7e6, "10m"},
@@ -123,7 +126,7 @@ inline QString groupOf(const QString &mode, double hz)
 /// Bands in frequency order, for band selectors.
 inline QStringList allBands()
 {
-    return {QStringLiteral("160m"), QStringLiteral("80m"), QStringLiteral("60m"), QStringLiteral("40m"),
+    return {QStringLiteral("2200m"), QStringLiteral("630m"), QStringLiteral("160m"), QStringLiteral("80m"), QStringLiteral("60m"), QStringLiteral("40m"),
             QStringLiteral("30m"), QStringLiteral("20m"), QStringLiteral("17m"), QStringLiteral("15m"),
             QStringLiteral("12m"), QStringLiteral("10m"), QStringLiteral("6m"), QStringLiteral("4m"),
             QStringLiteral("2m"), QStringLiteral("1.25m"), QStringLiteral("70cm"), QStringLiteral("33cm"),
@@ -275,6 +278,22 @@ inline QVector<Entry> defaults()
         {21340000, "SSTV", "ALL", "", true},
         {28680000, "SSTV", "ALL", "", true},
         {50680000, "SSTV", "ALL", "", true},
+        // WSPR dial frequencies (USB), signals 1400-1600 Hz (WSJT-X list).
+        {136000, "WSPR", "ALL", "", true},
+        {474200, "WSPR", "ALL", "", true},
+        {1836600, "WSPR", "ALL", "", true},
+        {3568600, "WSPR", "ALL", "", true},
+        {5287200, "WSPR", "ALL", "", true},
+        {7038600, "WSPR", "ALL", "", true},
+        {10138700, "WSPR", "ALL", "", true},
+        {14095600, "WSPR", "ALL", "", true},
+        {18104600, "WSPR", "ALL", "", true},
+        {21094600, "WSPR", "ALL", "", true},
+        {24924600, "WSPR", "ALL", "", true},
+        {28124600, "WSPR", "ALL", "", true},
+        {50293000, "WSPR", "ALL", "", true},
+        {70091000, "WSPR", "ALL", "", true},
+        {144489000, "WSPR", "ALL", "", true},
         // Weather fax: DWD Hamburg/Pinneberg, dial USB 1.9 kHz below the centre.
         {3853100, "WEFAX", "ALL", "DWD DDH3 (3855.0 kHz)", false},
         {7878100, "WEFAX", "ALL", "DWD DDK3 (7880.0 kHz)", true},

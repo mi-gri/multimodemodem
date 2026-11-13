@@ -46,6 +46,7 @@
 #include "modems/js8/Js8Mode.h"
 #include "utils/StandardFrequencies.h"
 #include "modems/q65/tx/Q65Transmitter.h"
+#include "modems/wspr/WsprMode.h"
 #include "utils/UiScale.h"
 #include "utils/RuntimeI18n.h"
 #include "utils/CockpitTheme.h"
@@ -2064,6 +2065,7 @@ void MainWindow::shutdownRuntime(const char *reason)
     if (m_cwDecoder != nullptr) disconnect(m_cwDecoder, nullptr, this, nullptr);
     if (m_msk144Decoder != nullptr) disconnect(m_msk144Decoder, nullptr, this, nullptr);
     if (m_q65Decoder != nullptr) disconnect(m_q65Decoder, nullptr, this, nullptr);
+    if (m_wsprDecoder != nullptr) disconnect(m_wsprDecoder, nullptr, this, nullptr);
     if (m_js8Decoder != nullptr) disconnect(m_js8Decoder, nullptr, this, nullptr);
     if (m_textAssistWorker != nullptr) disconnect(m_textAssistWorker, nullptr, this, nullptr);
     if (m_logbookIndexWorker != nullptr) disconnect(m_logbookIndexWorker, nullptr, this, nullptr);
@@ -2129,6 +2131,7 @@ void MainWindow::shutdownRuntime(const char *reason)
         {m_ftSlotThread, QStringLiteral("FT slot scheduler")},
         {m_ft8RxThread, QStringLiteral("FT RX decoder")},
         {m_q65Thread, QStringLiteral("Q65 RX decoder")},
+        {m_wsprThread, QStringLiteral("WSPR RX decoder")},
         {m_js8Thread, QStringLiteral("JS8 RX decoder")},
         {m_textAssistThread, QStringLiteral("Text assistance")},
         {m_logbookIndexThread, QStringLiteral("Logbook index")},
@@ -2197,6 +2200,8 @@ void MainWindow::shutdownRuntime(const char *reason)
     m_ft8RxDecoder = nullptr;
     m_q65Thread = nullptr;
     m_q65Decoder = nullptr;
+    m_wsprThread = nullptr;
+    m_wsprDecoder = nullptr;
     m_js8Thread = nullptr;
     m_js8Decoder = nullptr;
     m_textAssistThread = nullptr;
@@ -2250,6 +2255,7 @@ void MainWindow::setupUiState()
     ui->cmbMode->addItem(Msk144Mode::modeName());
     ui->cmbMode->addItem(Q65Mode::familyName());
     ui->cmbMode->addItem(Js8Mode::familyName());
+    ui->cmbMode->addItem(WsprMode::modeName());
     for (const QString &ftModeName : Ft8Mode::allModeNames()) {
         ui->cmbMode->addItem(ftModeName);
     }
@@ -2537,6 +2543,7 @@ void MainWindow::setupCustomWidgets()
     setupMsk144Page();
     setupQ65Page();
     setupJs8Page();
+    setupWsprPage();
     // Useful per-mode conditioning lives inside the relevant Mode pages.
     setupFt8Page();
 
@@ -4771,6 +4778,7 @@ void MainWindow::setupTextTerminalPages()
     refreshQ65StandardMessages();
 
     setupJs8DisplayPage();
+    setupWsprDisplayPage();
 
     m_radioTelescopeDisplayPage = new QWidget(m_mainDisplayStack);
     QVBoxLayout *rtLayout = new QVBoxLayout(m_radioTelescopeDisplayPage);
@@ -4905,7 +4913,8 @@ void MainWindow::updateCentralDisplayForMode(const QString &modeName)
                            Ft8Mode::isFamilyMode(modeName) ||
                            Msk144Mode::isMode(modeName) ||
                            Q65Mode::isFamilyMode(modeName) ||
-                           Js8Mode::isMode(modeName));
+                           Js8Mode::isMode(modeName) ||
+                           WsprMode::isMode(modeName));
 
     if (ui->frameSstvImage != nullptr) {
         // Keep the surrounding SSTV/WEFAX page on the native Qt palette.
@@ -4965,6 +4974,11 @@ void MainWindow::updateCentralDisplayForMode(const QString &modeName)
 
     if (RadioTelescopeMode::isMode(modeName) && m_radioTelescopeDisplayPage != nullptr) {
         m_mainDisplayStack->setCurrentWidget(m_radioTelescopeDisplayPage);
+        return;
+    }
+
+    if (WsprMode::isMode(modeName) && m_wsprDisplayPage != nullptr) {
+        m_mainDisplayStack->setCurrentWidget(m_wsprDisplayPage);
         return;
     }
 
@@ -5041,6 +5055,10 @@ QString MainWindow::shortModeLabel(const QString &modeName) const
         return QStringLiteral("Radio Telescope");
     }
 
+    if (WsprMode::isMode(modeName)) {
+        return WsprMode::modeName();
+    }
+
     if (Msk144Mode::isMode(modeName)) {
         return QStringLiteral("MSK144");
     }
@@ -5097,6 +5115,7 @@ void MainWindow::setupModeMenu()
     addModeAction(Msk144Mode::modeName());
     addModeAction(Q65Mode::familyName());
     addModeAction(Js8Mode::familyName());
+    addModeAction(WsprMode::modeName());
     for (const QString &ftModeName : Ft8Mode::allModeNames()) {
         addModeAction(ftModeName);
     }
@@ -9326,7 +9345,7 @@ void MainWindow::setupFt8Page()
     qsoActivityLayout->addWidget(openLogbook, 0, Qt::AlignRight);
     m_tableFt8QsoHistory = new QTableWidget(0, 6, qsoActivityGroup);
     m_tableFt8QsoHistory->setHorizontalHeaderLabels(QStringList()
-        << "UTC" << uiText("direction", "Dir") << uiText("db", "dB/Tag")
+        << "UTC" << uiText("direction", "Dir") << uiText("db_tag", "dB/Tag")
         << uiText("dt", "DT") << uiText("frequency", "Freq") << uiText("message", "Message"));
     m_tableFt8QsoHistory->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_tableFt8QsoHistory->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -13859,6 +13878,7 @@ void MainWindow::setReceiverRunning(bool running)
     m_rxRunning = running;
     scheduleLiveRxConfig();
     if (m_q65Decoder) m_q65Decoder->setLiveInputEnabled(running && !m_offlineAnalysisActive && Q65Mode::isFamilyMode(ui->cmbMode->currentText()));
+    if (m_wsprDecoder) m_wsprDecoder->setLiveInputEnabled(running && !m_offlineAnalysisActive && WsprMode::isMode(ui->cmbMode->currentText()));
     if (m_js8Decoder) m_js8Decoder->setLiveInputEnabled(running && !m_offlineAnalysisActive && Js8Mode::isMode(ui->cmbMode->currentText()));
 
     if (!m_rxRunning && !m_txRunning && m_rttyScopeWidget != nullptr) {
@@ -14387,6 +14407,10 @@ void MainWindow::handleModeChanged(const QString &modeName)
             const QImage image = m_rxDecoderWorker->image(m_hellDecoder);
             updateHellRasterDisplay(image);
         }
+    } else if (WsprMode::isMode(modeName)) {
+        if (m_pageWsprSettings != nullptr) {
+            ui->stkModeSettings->setCurrentWidget(m_pageWsprSettings);
+        }
     } else if (RadioTelescopeMode::isMode(modeName)) {
         if (m_pageRadioTelescopeSettings != nullptr) {
             ui->stkModeSettings->setCurrentWidget(m_pageRadioTelescopeSettings);
@@ -14632,6 +14656,21 @@ void MainWindow::updateWaterfallMarkers()
         high.color = QColor(255, 170, 60);
         high.width = 2;
         markers.append(high);
+        m_waterfallWidget->setMarkers(markers);
+        return;
+    }
+
+    if (WsprMode::isMode(mode)) {
+        // WSPR signals sit in 1400-1600 Hz (wsprd searches 1500 +-110 Hz).
+        QVector<FrequencyMarker> markers;
+        for (int hz : {1400, 1600}) {
+            FrequencyMarker edge;
+            edge.frequencyHz = hz;
+            edge.label = QString::number(hz);
+            edge.color = QColor(120, 200, 255);
+            edge.width = 1;
+            markers.append(edge);
+        }
         m_waterfallWidget->setMarkers(markers);
         return;
     }
@@ -25214,6 +25253,8 @@ void MainWindow::startRx()
         }
     } else if (modeName == HellschreiberDecoder::modeName()) {
         invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::reset);
+    } else if (WsprMode::isMode(modeName)) {
+        if (m_wsprDecoder != nullptr) QMetaObject::invokeMethod(m_wsprDecoder, "reset", Qt::QueuedConnection);
     } else if (RadioTelescopeMode::isMode(modeName)) {
         clearRadioTelescopeHeatmap();
     } else if (Msk144Mode::isMode(modeName)) {
@@ -26109,7 +26150,7 @@ void MainWindow::updateTxControlState()
     const bool q65Mode = Q65Mode::isFamilyMode(modeName);
     const bool js8Mode = Js8Mode::isMode(modeName);
     const bool textMode = rttyMode || bpskMode || mfskMode || cwMode || hellMode || msk144Mode || q65Mode || js8Mode;
-    const bool rxOnlyTextMode = ft8Mode || radioTelescopeMode;
+    const bool rxOnlyTextMode = ft8Mode || radioTelescopeMode || WsprMode::isMode(modeName);
     const bool hasImage = !m_txSourceImage.isNull() && m_txImageOwnerMode == modeName;
     const bool hasRttyText = rttyMode && m_txtRttyTx != nullptr && !m_txtRttyTx->toPlainText().trimmed().isEmpty();
     const bool hasBpskText = bpskMode && m_txtBpsk31Tx != nullptr && !m_txtBpsk31Tx->toPlainText().trimmed().isEmpty();

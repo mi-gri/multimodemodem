@@ -376,13 +376,16 @@ endif()
 # WSPR-2 decoder: C++ port of WSJT-X wsprd (third_party/wsjtx_gpl).
 # -------------------------------------------------------------------------
 add_library(m3_wspr STATIC
+    modems/wspr/WsprMode.h
+    modems/wspr/WsprDecoder.h
+    modems/wspr/WsprDecoder.cpp
     modems/wspr/WsprEngine.h
     modems/wspr/WsprEngine.cpp
     third_party/wsjtx_gpl/wspr/WsprCodec.h
     third_party/wsjtx_gpl/wspr/WsprCodec.cpp
 )
 target_include_directories(m3_wspr PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/modems/wspr")
-target_link_libraries(m3_wspr PUBLIC m3_weak_signal_codec Threads::Threads "${M3_FFTW3_LIBRARY}")
+target_link_libraries(m3_wspr PUBLIC m3_weak_signal_codec m3_linear_resampler ${QT}::Core Threads::Threads "${M3_FFTW3_LIBRARY}")
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(m3_wspr PRIVATE -Wall -Wextra)
 endif()
@@ -490,6 +493,7 @@ add_executable(MultiModeModem
     main.cpp
     FtCqWorkListUi.cpp
     Js8Ui.cpp
+    WsprUi.cpp
     ModeFrequencyUi.cpp
     mainwindow.cpp
     FtAutomationLog.cpp
@@ -836,6 +840,7 @@ target_link_libraries(MultiModeModem PRIVATE
     m3_diagnostics
     m3_cwskimmer
     m3_msk144
+    m3_wspr
     m3_q65
     m3_weak_signal_codec
     m3_js8
