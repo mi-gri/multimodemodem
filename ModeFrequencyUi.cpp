@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Working-frequency list in the main window.  Every mode page gets a
-// Frequency group: band (or "outside amateur bands"), the stored frequencies
-// of that band and a free frequency entry.  FT and JS8 keep their own band
-// selector and only add the stored list and the entry.  Also the QSY on a
-// mode change.
+// Working frequency in the main window: one Frequency area above the side
+// tabs with the CAT readout and, per mode, band (or "outside amateur bands"),
+// the stored frequencies of that band, a free frequency entry and a status
+// line.  FT and JS8 bring their own band selector.  Also the QSY on a mode
+// change.
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
@@ -42,23 +42,41 @@ QString MainWindow::frequencyGroupLabel(const QString &group) const
 QWidget *MainWindow::frequencyTabPage(const QString &pageKey)
 {
     if (QWidget *page = m_frequencyPages.value(pageKey, nullptr)) return page;
-    if (m_tabFrequency == nullptr) {
-        // Own side tab beside Mode, so the Mode tab keeps its height.
-        m_tabFrequency = new QWidget(ui->sideTabWidget);
-        m_tabFrequency->setObjectName(QStringLiteral("tabFrequency"));
-        auto *layout = new QVBoxLayout(m_tabFrequency);
-        layout->setContentsMargins(6, 6, 6, 6);
-        m_stkFrequency = new QStackedWidget(m_tabFrequency);
-        layout->addWidget(m_stkFrequency, 1);
-        const int modeIndex = ui->sideTabWidget->indexOf(ui->tabModeSettings);
-        ui->sideTabWidget->insertTab(modeIndex >= 0 ? modeIndex + 1 : ui->sideTabWidget->count(),
-                                     m_tabFrequency, uiText("frequency", "Frequency"));
+    if (m_stkFrequency == nullptr) {
+        // One Frequency area above the side tabs, for every mode: the CAT
+        // readout (placed by updateRigReadout) and the band/stored/entry page
+        // of the current mode.  It stays visible whichever tab is open.
+        QWidget *side = ui->sideTabWidget->parentWidget();
+        auto *sideLayout = side != nullptr ? qobject_cast<QVBoxLayout *>(side->layout()) : nullptr;
+        m_grpFrequencyHeader = new QGroupBox(uiText("frequency", "Frequency"), side);
+        m_grpFrequencyHeader->setObjectName(QStringLiteral("frequencyHeader"));
+        m_grpFrequencyHeader->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        auto *layout = new QVBoxLayout(m_grpFrequencyHeader);
+        layout->setContentsMargins(8, 6, 8, 6);
+        layout->setSpacing(4);
+        m_frequencyReadoutSlot = new QWidget(m_grpFrequencyHeader);
+        auto *slotLayout = new QVBoxLayout(m_frequencyReadoutSlot);
+        slotLayout->setContentsMargins(0, 0, 0, 0);
+        layout->addWidget(m_frequencyReadoutSlot);
+        m_stkFrequency = new QStackedWidget(m_grpFrequencyHeader);
+        m_stkFrequency->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+        layout->addWidget(m_stkFrequency);
+        if (sideLayout != nullptr) sideLayout->insertWidget(0, m_grpFrequencyHeader);
+        else ui->modeTabLayout->insertWidget(0, m_grpFrequencyHeader);
+        // The stack takes the height of the current page, not of the largest.
+        connect(m_stkFrequency, &QStackedWidget::currentChanged, this, [this](int) {
+            for (int i = 0; i < m_stkFrequency->count(); ++i) {
+                QWidget *w = m_stkFrequency->widget(i);
+                w->setSizePolicy(QSizePolicy::Preferred, w == m_stkFrequency->currentWidget() ? QSizePolicy::Preferred : QSizePolicy::Ignored);
+            }
+            m_stkFrequency->adjustSize();
+        });
     }
     auto *page = new QWidget(m_stkFrequency);
     auto *layout = new QVBoxLayout(page);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(8);
-    layout->addStretch(1);
+    layout->setSpacing(4);
+    page->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Ignored);
     m_stkFrequency->addWidget(page);
     m_frequencyPages.insert(pageKey, page);
     return page;
@@ -88,16 +106,18 @@ void MainWindow::updateSideTabsForMode(const QString &modeName)
                                                         : listMode;
     QWidget *page = m_frequencyPages.value(key, nullptr);
     if (page != nullptr && m_stkFrequency != nullptr) m_stkFrequency->setCurrentWidget(page);
-    showTab(m_tabFrequency, page != nullptr);
+    if (m_stkFrequency != nullptr) m_stkFrequency->setVisible(page != nullptr);
     // Weather fax and the radio telescope (no list mode) have no QSO partner.
     showTab(m_tabQrz, !listMode.isEmpty() && listMode != QStringLiteral("WEFAX"));
 }
 
 QWidget *MainWindow::createModeBandGroup(QWidget *parent, const QString &listMode)
 {
-    auto *group = new QGroupBox(uiText("frequency", "Frequency"), parent);
+    // Untitled: the Frequency area above the tabs is the group.
+    auto *group = new QWidget(parent);
     auto *grid = new QGridLayout(group);
-    grid->setContentsMargins(8, 8, 8, 8);
+    grid->setContentsMargins(0, 0, 0, 0);
+    grid->setVerticalSpacing(4);
     int row = 0;
     ModeBandWidgets w;
     if (!listMode.isEmpty()) {

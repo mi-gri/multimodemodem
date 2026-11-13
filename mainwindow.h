@@ -2634,7 +2634,8 @@ private:
     quint64 m_audioInputRequest = 0;
     std::function<void()> m_audioStopCompletion;
     QWidget *m_tabQrz = nullptr;
-    QWidget *m_tabFrequency = nullptr;          // Frequency group of the current mode
+    QGroupBox *m_grpFrequencyHeader = nullptr;  // Frequency area above the side tabs (all modes)
+    QWidget *m_frequencyReadoutSlot = nullptr;  // CAT readout inside it
     QStackedWidget *m_stkFrequency = nullptr;
     QHash<QString, QWidget *> m_frequencyPages; // "FT", "JS8", list mode, "" (Radio Telescope)
     QrzLookupPanel *m_qrzLookupPanel = nullptr;

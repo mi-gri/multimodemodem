@@ -17,6 +17,11 @@ QString placeholder(const QString &source);
 /// language would otherwise be kept as their own "source" and never change.
 /// Returns the text unchanged when it is not a known translation.
 QString sourceText(const QString &displayed);
+/// Current-language text for an English source that is only known as the
+/// value of a translation key (uiText("key", "English")): English catalogue
+/// value -> key -> current translation.  Returns the source unchanged when
+/// nothing matches.  The counterpart of sourceText().
+QString fromEnglish(const QString &source);
 
 } // namespace M3I18n
 

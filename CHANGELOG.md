@@ -4,6 +4,13 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- One Frequency area above the side tabs for every mode: CAT readout (frequency, PWR,
+  SWR, ALC), band, stored frequencies, free entry and the band status. The separate
+  Frequency tab and the frequency/band rows in the FT and JS8 Mode tabs are gone.
+- Fix: since the live-language fix, captions set from translation keys (JS8 group,
+  frequency fields and others) appeared in English on a non-English start. An English
+  source now finds its translation through its key; a fresh German start shows 10
+  English-looking texts instead of 102 (mostly user macro text and status values).
 - FT8/FT4 "Clear DX" button between TX and STOP: ends the current QSO (a running
   transmission for it stops), clears DX call and grid, resets Tx1-Tx6 and answers the
   next station in the caller queue. Auto QSO and CQ repeat stay on; the cleared station

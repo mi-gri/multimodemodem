@@ -74,6 +74,7 @@ bool looksLikeBadGeneratedValue(const QString &value, const QString &normalized,
 namespace M3I18n {
 
 QString translateSourceUnbranded(const QString &prefix, const QString &source);
+QString fromEnglish(const QString &source);
 
 void setLanguageCode(const QString &languageCode)
 {
@@ -155,7 +156,7 @@ QString translateSourceUnbranded(const QString &prefix, const QString &source)
         return translated;
     }
 
-    return source;
+    return fromEnglish(source);
 }
 
 QString text(const QString &source)
@@ -166,6 +167,23 @@ QString text(const QString &source)
 QString placeholder(const QString &source)
 {
     return translateSource(QStringLiteral("placeholder"), source);
+}
+
+QString fromEnglish(const QString &source)
+{
+    const QString trimmed = source.trimmed();
+    if (trimmed.isEmpty() || g_languageCode == QStringLiteral("en")) return source;
+    static const QHash<QString, QString> englishReverse = [] {
+        QHash<QString, QString> reverse;
+        const QHash<QString, QString> english = loadCatalogue(QStringLiteral("en"));
+        for (auto it = english.cbegin(); it != english.cend(); ++it)
+            if (!reverse.contains(it.value().trimmed())) reverse.insert(it.value().trimmed(), it.key());
+        return reverse;
+    }();
+    const auto key = englishReverse.constFind(trimmed);
+    if (key == englishReverse.constEnd()) return source;
+    const auto value = g_translations.constFind(key.value());
+    return value == g_translations.constEnd() || value.value().trimmed().isEmpty() ? source : value.value();
 }
 
 QString sourceText(const QString &displayed)

@@ -14,6 +14,11 @@ int main(int argc, char **argv) {
     const bool back = M3I18n::sourceText(QStringLiteral("Dekodieren")) == QStringLiteral("Decode") &&
                       M3I18n::sourceText(QStringLiteral("DO3BOX")) == QStringLiteral("DO3BOX");
     std::cout << (back ? "PASS" : "FAIL") << " source text of a translated caption\n";
+    // ... and an English source known only as a keyed value finds its way back.
+    const bool forth = M3I18n::fromEnglish(QStringLiteral("Decode")) == QStringLiteral("Dekodieren") &&
+                       M3I18n::text(QStringLiteral("Decode")) == QStringLiteral("Dekodieren");
+    std::cout << (forth ? "PASS" : "FAIL") << " keyed caption from its English source\n";
+    ok &= forth;
     ok &= back;
     return ok ? 0 : 1;
 }

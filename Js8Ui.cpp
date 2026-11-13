@@ -284,33 +284,27 @@ void MainWindow::setupJs8Page()
     grid->setContentsMargins(8, 8, 8, 8);
     int row = 0;
 
-    // Dial frequency: CAT readout (moved here by updateRigReadout), band and standard frequency.
-    m_js8FrequencySlot = new QWidget(group);
-    auto *slotLayout = new QVBoxLayout(m_js8FrequencySlot);
-    slotLayout->setContentsMargins(0, 0, 0, 0);
-    slotLayout->setSpacing(2);
-    m_lblJs8BandStatus = new QLabel(m_js8FrequencySlot);
-    m_lblJs8BandStatus->setWordWrap(true);
-    slotLayout->addWidget(m_lblJs8BandStatus);
-    grid->addWidget(new QLabel(uiText("frequency", "Frequency"), group), row, 0, Qt::AlignLeft | Qt::AlignTop);
-    grid->addWidget(m_js8FrequencySlot, row++, 1, 1, 3);
-
-    m_cmbJs8Band = new QComboBox(group);
-    m_cmbJs8Band->addItems(M3StandardFrequencies::bands(QStringLiteral("JS8")));
-    m_cmbJs8Band->setCurrentIndex(qMax(0, m_cmbJs8Band->findText(settings.value(QStringLiteral("JS8/band"), QStringLiteral("20m")).toString())));
-    m_cmbJs8Band->setToolTip(uiText("js8_band_tooltip", "Select a band to QSY the CAT-connected rig to the JS8 standard frequency (JS8Call list)."));
-    grid->addWidget(new QLabel(uiText("band", "Band"), group), row, 0);
-    grid->addWidget(m_cmbJs8Band, row++, 1, 1, 3);
     {
-        // Stored JS8 frequencies of the band and the free entry: Frequency tab.
+        // Band, stored JS8 frequencies, free entry and band status: Frequency
+        // area above the side tabs (with the CAT readout).
         QWidget *page = frequencyTabPage(QStringLiteral("JS8"));
-        auto *pickerGroup = new QGroupBox(uiText("frequency", "Frequency"), page);
-        auto *pickerGrid = new QGridLayout(pickerGroup);
-        pickerGrid->setContentsMargins(8, 8, 8, 8);
-        addFrequencyPickerRows(pickerGrid, 0, pickerGroup, []() { return QStringLiteral("JS8"); },
+        auto *pane = new QWidget(page);
+        auto *pgrid = new QGridLayout(pane);
+        pgrid->setContentsMargins(0, 0, 0, 0);
+        pgrid->setVerticalSpacing(4);
+        m_cmbJs8Band = new QComboBox(pane);
+        m_cmbJs8Band->addItems(M3StandardFrequencies::bands(QStringLiteral("JS8")));
+        m_cmbJs8Band->setCurrentIndex(qMax(0, m_cmbJs8Band->findText(settings.value(QStringLiteral("JS8/band"), QStringLiteral("20m")).toString())));
+        m_cmbJs8Band->setToolTip(uiText("js8_band_tooltip", "Select a band to QSY the CAT-connected rig to the JS8 standard frequency (JS8Call list)."));
+        pgrid->addWidget(new QLabel(uiText("band", "Band"), pane), 0, 0);
+        pgrid->addWidget(m_cmbJs8Band, 0, 1);
+        const int prow = addFrequencyPickerRows(pgrid, 1, pane, []() { return QStringLiteral("JS8"); },
                                [this]() { return m_cmbJs8Band != nullptr ? m_cmbJs8Band->currentText() : QString(); });
-        pickerGrid->setColumnStretch(1, 1);
-        static_cast<QVBoxLayout *>(page->layout())->insertWidget(0, pickerGroup);
+        m_lblJs8BandStatus = new QLabel(pane);
+        m_lblJs8BandStatus->setWordWrap(true);
+        pgrid->addWidget(m_lblJs8BandStatus, prow, 0, 1, 2);
+        pgrid->setColumnStretch(1, 1);
+        static_cast<QVBoxLayout *>(page->layout())->insertWidget(0, pane);
         connect(m_cmbJs8Band, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() { refreshFrequencyPickers(); });
     }
 

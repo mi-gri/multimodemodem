@@ -9170,41 +9170,36 @@ void MainWindow::setupFt8Page()
     m_cmbFt8Band->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_cmbFt8Band->setMinimumWidth(150);
 
-    // The CAT readout (frequency, TX power, SWR) is placed above the status
-    // line in FT modes; see updateRigReadout().
-    m_ftFrequencySlot = new QWidget(qsoGroup);
-    m_ftFrequencySlot->setObjectName(QStringLiteral("ftFrequencySlot"));
-    auto *frequencySlotLayout = new QVBoxLayout(m_ftFrequencySlot);
-    frequencySlotLayout->setContentsMargins(0, 0, 0, 0);
-    frequencySlotLayout->setSpacing(2);
-    frequencySlotLayout->addWidget(m_lblFt8BandStatus);
-    qsoGrid->addWidget(new QLabel(uiText("frequency", "Frequency"), qsoGroup), 0, 0, Qt::AlignLeft | Qt::AlignTop);
-    qsoGrid->addWidget(m_ftFrequencySlot, 0, 1);
-    qsoGrid->addWidget(new QLabel(uiText("band", "Band"), qsoGroup), 1, 0);
-    qsoGrid->addWidget(m_cmbFt8Band, 1, 1);
     {
-        // Stored FT frequencies of the band and the free entry: Frequency tab.
+        // Band, stored FT frequencies, free entry and the band status live in
+        // the Frequency area above the side tabs (with the CAT readout).
         QWidget *page = frequencyTabPage(QStringLiteral("FT"));
-        auto *group = new QGroupBox(uiText("frequency", "Frequency"), page);
-        auto *grid = new QGridLayout(group);
-        grid->setContentsMargins(8, 8, 8, 8);
-        addFrequencyPickerRows(grid, 0, group,
+        auto *pane = new QWidget(page);
+        auto *grid = new QGridLayout(pane);
+        grid->setContentsMargins(0, 0, 0, 0);
+        grid->setVerticalSpacing(4);
+        m_cmbFt8Band->setParent(pane);
+        m_lblFt8BandStatus->setParent(pane);
+        grid->addWidget(new QLabel(uiText("band", "Band"), pane), 0, 0);
+        grid->addWidget(m_cmbFt8Band, 0, 1);
+        int frow = addFrequencyPickerRows(grid, 1, pane,
             [this]() {
                 const QString mode = ui != nullptr && ui->cmbMode != nullptr ? M3StandardFrequencies::listModeForName(ui->cmbMode->currentText()) : QString();
                 return mode == QStringLiteral("FT4") ? mode : QStringLiteral("FT8");
             },
             [this]() { return m_cmbFt8Band != nullptr ? m_cmbFt8Band->currentText() : QString(); });
+        grid->addWidget(m_lblFt8BandStatus, frow, 0, 1, 2);
         grid->setColumnStretch(1, 1);
-        static_cast<QVBoxLayout *>(page->layout())->insertWidget(0, group);
+        static_cast<QVBoxLayout *>(page->layout())->insertWidget(0, pane);
         connect(m_cmbFt8Band, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() { refreshFrequencyPickers(); });
     }
-    qsoGrid->addWidget(new QLabel(uiText("dx_call", "DX Call"), qsoGroup), 2, 0);
-    qsoGrid->addWidget(m_editFt8DxCall, 2, 1);
-    qsoGrid->addWidget(new QLabel(uiText("dx_grid", "DX Grid"), qsoGroup), 3, 0);
-    qsoGrid->addWidget(m_editFt8DxGrid, 3, 1);
+    qsoGrid->addWidget(new QLabel(uiText("dx_call", "DX Call"), qsoGroup), 0, 0);
+    qsoGrid->addWidget(m_editFt8DxCall, 0, 1);
+    qsoGrid->addWidget(new QLabel(uiText("dx_grid", "DX Grid"), qsoGroup), 1, 0);
+    qsoGrid->addWidget(m_editFt8DxGrid, 1, 1);
     m_btnFt8GenerateStd = new QPushButton(uiText("ft_reset_messages", "Reset Tx1–Tx6"), qsoGroup);
     m_btnFt8GenerateStd->setToolTip(uiText("ft_reset_messages_help", "Rebuild the six standard messages using your callsign, locator, CQ target and current QSO. Replaces manual message edits; does not start transmission."));
-    qsoGrid->addWidget(m_btnFt8GenerateStd, 4, 0, 1, 2);
+    qsoGrid->addWidget(m_btnFt8GenerateStd, 2, 0, 1, 2);
     qsoGrid->setColumnStretch(1, 1);
 
     // The FT QSO fields belong in the right-side Mode tab, not in the central
@@ -10635,7 +10630,9 @@ QString MainWindow::uiTextFromSource(const QString &prefix, const QString &sourc
         }
     }
 
-    return ProductName::brand(source);
+    // Captions set with uiText("key", "English") have no text.* entry; their
+    // English source leads to the key's translation.
+    return ProductName::brand(M3I18n::fromEnglish(source));
 }
 
 QString MainWindow::localizedRuntimeText(const QString &prefix, const QString &message) const
@@ -11043,10 +11040,7 @@ void MainWindow::applyUiLanguage()
             const int i = ui->sideTabWidget->indexOf(m_tabQrz);
             if (i >= 0) ui->sideTabWidget->setTabText(i, uiText("tab_qrz", "QRZ"));
         }
-        if (m_tabFrequency != nullptr) {
-            const int i = ui->sideTabWidget->indexOf(m_tabFrequency);
-            if (i >= 0) ui->sideTabWidget->setTabText(i, uiText("frequency", "Frequency"));
-        }
+        if (m_grpFrequencyHeader != nullptr) m_grpFrequencyHeader->setTitle(uiText("frequency", "Frequency"));
         if (m_tabCatRotator != nullptr) {
             const int i = ui->sideTabWidget->indexOf(m_tabCatRotator);
             if (i >= 0) ui->sideTabWidget->setTabText(i, uiText("tab_rotator", "Rotator"));
@@ -12737,19 +12731,14 @@ void MainWindow::promptRigFrequency()
 void MainWindow::updateRigReadout()
 {
     if (m_grpRigReadout == nullptr || m_rigReadoutWidget == nullptr) return;
-    // FT modes show the readout in the "Frequency" row above the band; the
-    // other modes in its own group at the bottom of the Mode tab.
-    const bool ftMode = m_ftFrequencySlot != nullptr && ui != nullptr && ui->cmbMode != nullptr &&
-                        Ft8Mode::isFamilyMode(ui->cmbMode->currentText());
-    const bool js8Mode = m_js8FrequencySlot != nullptr && ui != nullptr && ui->cmbMode != nullptr &&
-                         Js8Mode::isMode(ui->cmbMode->currentText());
-    QWidget *host = ftMode ? m_ftFrequencySlot : (js8Mode ? m_js8FrequencySlot : m_grpRigReadout);
+    // The readout sits in the Frequency area above the side tabs (all modes).
+    QWidget *host = m_frequencyReadoutSlot != nullptr ? m_frequencyReadoutSlot : m_grpRigReadout;
     if (m_rigReadoutWidget->parentWidget() != host) {
         auto *hostLayout = qobject_cast<QBoxLayout *>(host->layout());
         if (hostLayout != nullptr) hostLayout->insertWidget(0, m_rigReadoutWidget);
     }
     m_rigReadoutWidget->setVisible(m_settings.hamlibCatEnabled);
-    m_grpRigReadout->setVisible(m_settings.hamlibCatEnabled && !ftMode && !js8Mode);
+    m_grpRigReadout->setVisible(m_settings.hamlibCatEnabled && host == m_grpRigReadout);
 
     if (m_lcdRigReadoutFrequency != nullptr) {
         // While a QSY from the readout is on its way, show its target.
