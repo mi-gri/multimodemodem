@@ -104,6 +104,112 @@ QVector<float> reference(const QString &text,
     return out;
 }
 
+// Independent slow fading of Mark and Space (selective fading on wide
+// shifts): each gain is the magnitude of a sum of random-phase sinusoids
+// with Doppler up to fadeHz, normalised to unit mean power.
+QVector<float> fadedReference(const QString &text,
+                              int rate,
+                              double baud,
+                              double markHz,
+                              double shiftHz,
+                              double snrDb,
+                              double fadeHz,
+                              unsigned seed)
+{
+    const QString letters = QString::fromLatin1("\0E\nA SIU\rDRJNFCKTZLWHYPQOBG\0MXV\0", 32);
+    const QString figures = QString::fromLatin1("\0003\n- '\0707\r$4\a,!:(5\")2#6019?&\0./;\0", 32);
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<double> uniform(0.0, 1.0);
+    std::normal_distribution<double> gaussian;
+    struct Path { double frequency[8]; double phase[8]; };
+    auto makePath = [&]() {
+        Path path{};
+        for (int k = 0; k < 8; ++k) {
+            path.frequency[k] = fadeHz * std::cos(2.0 * kPi * uniform(rng));
+            path.phase[k] = 2.0 * kPi * uniform(rng);
+        }
+        return path;
+    };
+    const Path markPath = makePath();
+    const Path spacePath = makePath();
+    auto gain = [&](const Path &path, double t) {
+        if (fadeHz <= 0.0) {
+            return 1.0;
+        }
+        double re = 0.0, im = 0.0;
+        for (int k = 0; k < 8; ++k) {
+            const double angle = 2.0 * kPi * path.frequency[k] * t + path.phase[k];
+            re += std::cos(angle);
+            im += std::sin(angle);
+        }
+        return std::sqrt((re * re + im * im) / 8.0);
+    };
+    QVector<float> out;
+    double bitPosition = 0.0;
+    double phase = 0.0;
+    auto appendBit = [&](bool mark, double bitLength) {
+        bitPosition += bitLength;
+        const int end = std::lround(bitPosition * rate / baud);
+        const double increment = 2.0 * kPi * (mark ? markHz : markHz + shiftHz) / rate;
+        while (out.size() < end) {
+            const double t = static_cast<double>(out.size()) / rate;
+            double sample = 0.20 * gain(mark ? markPath : spacePath, t) * std::sin(phase);
+            sample += (0.20 / std::sqrt(2.0)) * std::pow(10.0, -snrDb / 20.0) * gaussian(rng);
+            out.append(static_cast<float>(sample));
+            phase = std::fmod(phase + increment, 2.0 * kPi);
+        }
+    };
+    auto appendCode = [&](int code) {
+        appendBit(false, 1.0);
+        for (int bit = 0; bit < 5; ++bit) {
+            appendBit((code & (1 << bit)) != 0, 1.0);
+        }
+        appendBit(true, 1.5);
+    };
+    appendBit(true, 20.0);
+    appendCode(31);
+    bool figuresMode = false;
+    for (QChar ch : text.toUpper()) {
+        int code = letters.indexOf(ch);
+        bool needsFigures = false;
+        if (code < 0) {
+            code = figures.indexOf(ch);
+            needsFigures = true;
+        }
+        if (code < 0) {
+            continue;
+        }
+        if (needsFigures != figuresMode) {
+            appendCode(needsFigures ? 27 : 31);
+            figuresMode = needsFigures;
+        }
+        appendCode(code);
+    }
+    appendBit(true, 20.0);
+    return out;
+}
+
+QString decodeTones(const QVector<float> &samples, int rate, double baud,
+                    double markHz, double shiftHz, bool narrow)
+{
+    RttyDecoder decoder;
+    decoder.setVisualizationEnabled(false);
+    decoder.setBaudRate(baud);
+    decoder.setTones(markHz, markHz + shiftHz);
+    decoder.setNarrowFilterEnabled(narrow);
+    QString text;
+    QObject::connect(&decoder, &RttyDecoder::characterReceived,
+                     [&](const QString &piece) { text += piece; });
+    for (int pos = 0; pos < samples.size(); pos += 4800) {
+        AudioBlock block;
+        block.sampleRate = rate;
+        block.firstSampleIndex = pos;
+        block.samples = samples.mid(pos, 4800);
+        decoder.processAudioBlock(block);
+    }
+    return text;
+}
+
 QVector<float> addCw(const QVector<float> &input,
                      int rate,
                      double frequencyHz,
@@ -243,6 +349,31 @@ int main(int argc, char **argv)
     out = decode(mistuned, rate, false, 15.0);
     report(QStringLiteral("afc_retuned_plus15_hz"), message, out, false);
     require(cer(message, out) <= 0.02, "retuned channels follow +15 Hz offset");
+
+    // Weather-service style 50 Bd / 450 Hz with independent Mark/Space
+    // fading and noise, plus the amateur 45.45 Bd / 170 Hz at low SNR.
+    const QString weather = QStringLiteral(
+        "SA 14. 12Z: SW-W     5   6-7   2  M //\nSU 15. 00Z: W-NW   2-3        2.5 M //\n").repeated(3);
+    double weatherCer = 0.0;
+    for (unsigned seed = 1; seed <= 6; ++seed) {
+        auto faded = fadedReference(weather, rate, 50.0, 2125.0, 450.0, -8.0, 1.5, seed);
+        for (bool narrow : {false, true}) {
+            out = decodeTones(faded, rate, 50.0, 2125.0, 450.0, narrow);
+            report(QStringLiteral("dwd_50_450_fading_seed%1").arg(seed), weather, out, narrow);
+            weatherCer += cer(weather, out) / 12.0;
+        }
+    }
+    std::cout << "mean fading CER " << weatherCer << '\n';
+    require(weatherCer <= 0.20, "50 Bd / 450 Hz selective fading mean CER <= 20% (was 23%)");
+    double awgnCer = 0.0;
+    for (unsigned seed = 1; seed <= 4; ++seed) {
+        auto noisy = fadedReference(message, rate, 45.45, 2125.0, 170.0, -18.0, 0.0, seed);
+        out = decodeTones(noisy, rate, 45.45, 2125.0, 170.0, false);
+        report(QStringLiteral("awgn_-18_db_seed%1").arg(seed), message, out, false);
+        awgnCer += cer(message, out) / 4.0;
+    }
+    std::cout << "mean awgn -18 dB CER " << awgnCer << '\n';
+    require(awgnCer <= 0.50, "45.45 Bd / 170 Hz AWGN -18 dB mean CER <= 50% (was 64%)");
 
     const auto pureNoise = noiseOnly(clean.size(), 0.05);
     out = decode(pureNoise, rate);

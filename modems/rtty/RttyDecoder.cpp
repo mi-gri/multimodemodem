@@ -400,6 +400,10 @@ void RttyDecoder::processAudioBlock(const AudioBlock &block)
         updateCarrierGate(sumEnergy, bitQuality);
 
         const bool rawBitIsMark = diffNorm >= 0.0;
+        if (!m_softPrefix.isEmpty()) {
+            m_softRunning += m_reverse ? -diffNorm : diffNorm;
+            m_softPrefix[static_cast<int>(m_samplesProcessed % m_softPrefix.size())] = m_softRunning;
+        }
 
         bool bitIsMark = rawBitIsMark;
         if (m_reverse) {
@@ -414,7 +418,12 @@ void RttyDecoder::processAudioBlock(const AudioBlock &block)
             continue;
         }
 
-        advanceSymbolClock(bitIsMark, bitQuality);
+        // The slicer gates on the larger of raw tone separation and the
+        // ATC-corrected decision.  During a selective fade one tone sits in
+        // the noise, so a bit of the faded tone shows almost no raw
+        // separation (both channels near the floor) although ATC still
+        // decides it reliably against the other tone's envelope.
+        advanceSymbolClock(bitIsMark, qMax(bitQuality, qAbs(diffNorm)));
         ++m_samplesProcessed;
     }
 
@@ -425,6 +434,12 @@ void RttyDecoder::updateOscillators(int sampleRate)
 {
     m_sampleRate = sampleRate;
     m_symbolSamples = static_cast<double>(sampleRate) / qMax(1.0, m_baudRate);
+    // Ten symbols of soft history cover start, data and stop bits plus the
+    // timing search; never shrink below that.
+    const int historySize = static_cast<int>(m_symbolSamples * 10.0) + 64;
+    if (m_softPrefix.size() != historySize) {
+        m_softPrefix = QVector<double>(historySize, m_softRunning);
+    }
     m_markInc = kTwoPi * m_markHz / static_cast<double>(sampleRate);
     m_spaceInc = kTwoPi * m_spaceHz / static_cast<double>(sampleRate);
 
@@ -519,6 +534,7 @@ void RttyDecoder::advanceSymbolClock(bool bitIsMark, double bitQuality)
                                         m_carrierOpen &&
                                         m_startSpaceSamples <= static_cast<int>(m_symbolSamples * 0.80);
             if (plausibleStart) {
+                m_frameStartSample = m_samplesProcessed - m_startSpaceSamples + 1;
                 m_state = RxState::ValidateStart;
                 m_samplesToNextDecision = qMax(1.0,
                                                (m_symbolSamples * 0.50) - static_cast<double>(m_startSpaceSamples));
@@ -533,8 +549,12 @@ void RttyDecoder::advanceSymbolClock(bool bitIsMark, double bitQuality)
     case RxState::ValidateStart:
         m_samplesToNextDecision -= 1.0;
         if (m_samplesToNextDecision <= 0.0) {
-            const bool sampledBitIsMark = bitIsMark;
-            if (!sampledBitIsMark && bitQuality >= kMinStartQuality && m_carrierOpen) {
+            // Start bit: Space either in the single sample at mid-bit or in
+            // the mean soft value over its first half (noise or a fade can
+            // flip one of them).
+            const bool sampledBitIsMark = frameSoftMean(0.1, 0.5) >= 0.0 &&
+                                          (bitIsMark || bitQuality < kMinStartQuality);
+            if (!sampledBitIsMark && m_carrierOpen) {
                 m_state = RxState::DataBits;
                 m_samplesToNextDecision = m_symbolSamples;
                 m_dataBitIndex = 0;
@@ -549,12 +569,8 @@ void RttyDecoder::advanceSymbolClock(bool bitIsMark, double bitQuality)
     case RxState::DataBits:
         m_samplesToNextDecision -= 1.0;
         if (m_samplesToNextDecision <= 0.0) {
-            if (bitQuality < kMinDataQuality) {
-                ++m_badFrames;
-                resetFrame();
-                break;
-            }
-
+            // No single-sample quality abort here: the bits are decided
+            // afterwards by integrating the soft history (refinedFrameCode).
             const bool sampledBitIsMark = bitIsMark;
             if (sampledBitIsMark) {
                 m_currentCode |= (1 << m_dataBitIndex);
@@ -575,7 +591,8 @@ void RttyDecoder::advanceSymbolClock(bool bitIsMark, double bitQuality)
             const bool sampledBitIsMark = bitIsMark;
             if (sampledBitIsMark && bitQuality >= kMinStopQuality && m_carrierOpen) {
                 ++m_goodFrames;
-                handleCode(m_currentCode);
+                const int refined = refinedFrameCode();
+                handleCode(refined >= 0 ? refined : m_currentCode);
                 resetFrame();
                 m_idleMarkSamples = static_cast<int>(m_symbolSamples);
                 m_startSpaceSamples = 0;
@@ -590,6 +607,71 @@ void RttyDecoder::advanceSymbolClock(bool bitIsMark, double bitQuality)
         break;
     }
 
+}
+
+double RttyDecoder::softSum(qint64 from, qint64 to) const
+{
+    const int size = m_softPrefix.size();
+    const auto at = [&](qint64 index) { return m_softPrefix[static_cast<int>(index % size)]; };
+    return at(to - 1) - at(from - 1);
+}
+
+double RttyDecoder::frameSoftMean(double fromSymbols, double toSymbols) const
+{
+    if (m_softPrefix.isEmpty()) {
+        return 0.0;
+    }
+    const qint64 from = m_frameStartSample + static_cast<qint64>(fromSymbols * m_symbolSamples);
+    const qint64 to = qMin(m_samplesProcessed + 1,
+                           m_frameStartSample + static_cast<qint64>(toSymbols * m_symbolSamples));
+    if (from < 1 || to <= from || from <= m_samplesProcessed - m_softPrefix.size() + 2) {
+        return 0.0;
+    }
+    return softSum(from, to) / static_cast<double>(to - from);
+}
+
+int RttyDecoder::refinedFrameCode() const
+{
+    if (m_softPrefix.isEmpty()) {
+        return -1;
+    }
+    // Called at the stop-bit decision, 6.5 symbols after the detected edge.
+    const double symbol = m_symbolSamples;
+    const qint64 newest = m_samplesProcessed;              // last stored sample
+    const qint64 oldest = newest - m_softPrefix.size() + 2;
+    const double maxShift = 0.30 * symbol;
+    const double step = qMax(1.0, symbol / 40.0);
+    double bestMetric = -1.0e300;
+    int bestCode = -1;
+    for (double shift = -maxShift; shift <= maxShift + 1.0e-9; shift += step) {
+        const double edge = static_cast<double>(m_frameStartSample) + shift;
+        double metric = 0.0;
+        int code = 0;
+        bool covered = true;
+        for (int bit = 0; bit <= 5 && covered; ++bit) {
+            // Integrate the central 60 % of the bit.
+            const qint64 from = static_cast<qint64>(edge + (bit + 0.2) * symbol);
+            const qint64 to = static_cast<qint64>(edge + (bit + 0.8) * symbol);
+            if (from < 1 || from <= oldest || to > newest + 1 || to <= from) {
+                covered = false;
+                break;
+            }
+            const double value = softSum(from, to);
+            if (bit == 0) {
+                metric -= value;                            // start bit is Space
+            } else {
+                metric += qAbs(value);
+                if (value >= 0.0) {
+                    code |= 1 << (bit - 1);
+                }
+            }
+        }
+        if (covered && metric > bestMetric) {
+            bestMetric = metric;
+            bestCode = code;
+        }
+    }
+    return bestCode;
 }
 
 void RttyDecoder::handleCode(int code)

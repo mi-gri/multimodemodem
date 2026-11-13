@@ -211,6 +211,26 @@ private:
     void advanceSymbolClock(bool bitIsMark, double bitQuality);
 
     /**
+     * @brief Re-decides the five data bits from the soft history.
+     *
+     * The start edge found by the slicer jitters by a fraction of a bit on
+     * noisy or fading signals.  Search the bit timing around that edge and
+     * integrate the soft Mark/Space value over the centre of every bit.
+     * Returns -1 while the history does not cover the frame.
+     */
+    int refinedFrameCode() const;
+
+    /**
+     * @brief Sum of the soft history over absolute samples [from, to).
+     */
+    double softSum(qint64 from, qint64 to) const;
+
+    /**
+     * @brief Mean soft value between two offsets (in symbols) from the start edge.
+     */
+    double frameSoftMean(double fromSymbols, double toSymbols) const;
+
+    /**
      * @brief Handles one complete 5-bit ITA2 character code.
      */
     void handleCode(int code);
@@ -268,6 +288,9 @@ private:
     int m_startSpaceSamples = 0;
     int m_dataBitIndex = 0;
     int m_currentCode = 0;
+    qint64 m_frameStartSample = 0;
+    QVector<double> m_softPrefix;   // ring of running sums of the soft decision
+    double m_softRunning = 0.0;
     bool m_lettersShift = true;
 
     qint64 m_samplesProcessed = 0;
