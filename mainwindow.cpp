@@ -1878,7 +1878,11 @@ void MainWindow::restoreLastSession()
     if (!sessionMemoryEnabled() || ui == nullptr || ui->cmbMode == nullptr) return;
     QSettings settings(AppSettings::settingsFilePath(), QSettings::IniFormat);
     const QString mode = settings.value(QStringLiteral("Session/lastMode")).toString();
-    if (!mode.isEmpty() && ui->cmbMode->findText(mode) >= 0 && ui->cmbMode->currentText() != mode) {
+    const bool modeAllowed = !RadioTelescopeMode::isMode(mode) || radioTelescopeModeAvailable();
+    if (!modeAllowed) {
+        appendLog(QStringLiteral("Last mode Radio Telescope not restored: no rotator enabled."));
+    }
+    if (modeAllowed && !mode.isEmpty() && ui->cmbMode->findText(mode) >= 0 && ui->cmbMode->currentText() != mode) {
         ui->cmbMode->setCurrentText(mode);
     }
     if (settings.value(QStringLiteral("Session/rxRunning"), false).toBool()) {
@@ -8017,6 +8021,17 @@ void MainWindow::updateRadioTelescopeHeatmapWidget()
     m_radioTelescopeHeatmapWidget->setOverlayText(QString());
 }
 
+// The radio telescope mode needs a rotator: without one the antenna never
+// moves and the heatmap is no sky map.  Selecting the mode is refused unless
+// a rotator is enabled in the profile or the bench test was chosen before.
+bool MainWindow::radioTelescopeModeAvailable() const
+{
+    if (m_chkRadioTelescopeAllowNoRotator != nullptr && m_chkRadioTelescopeAllowNoRotator->isChecked()) {
+        return true;
+    }
+    return m_catRotatorController != nullptr && m_catRotatorController->config().enabled;
+}
+
 bool MainWindow::radioTelescopeRotatorReadyForScan(QString *reason) const
 {
     const bool benchNoRotator = m_chkRadioTelescopeAllowNoRotator != nullptr && m_chkRadioTelescopeAllowNoRotator->isChecked();
@@ -14117,6 +14132,23 @@ void MainWindow::requestModeChange(const QString &modeName)
     }
 
     const QString currentMode = ui->cmbMode->currentText();
+    if (RadioTelescopeMode::isMode(modeName) && !RadioTelescopeMode::isMode(currentMode) &&
+        !radioTelescopeModeAvailable()) {
+        appendLog(QStringLiteral("Mode change blocked: Radio Telescope needs an enabled rotator."));
+        // The Mode menu already checked the refused action; move the check back.
+        for (QAction *action : findChildren<QAction *>()) {
+            if (action->actionGroup() != nullptr && action->isCheckable() &&
+                action->data().toString() == currentMode) {
+                action->setChecked(true);
+                break;
+            }
+        }
+        QMessageBox::information(
+            this,
+            uiText("radio_telescope_mode_title", "Radio Telescope"),
+            uiText("radio_telescope_mode_needs_rotator", "The Radio Telescope mode only works with a rotator: the antenna is moved across the sky and the received level is drawn as a sky map.\n\nEnable and configure a rotator under Settings > Rotator first."));
+        return;
+    }
     const bool txActive = m_txPreparationPending || m_txRunning ||
                           (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning());
     const bool rxActive = m_rxStartPending || m_rxStopPending || m_rxRunning ||

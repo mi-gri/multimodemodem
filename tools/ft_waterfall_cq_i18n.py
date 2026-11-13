@@ -719,3 +719,29 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Avbryter pågående og ventende JS8-sendinger, også automatiske, og stopper deretter RX.',
   'Zruší probíhající a čekající vysílání JS8, i automatická, a poté zastaví RX.'),
 }.items()})
+
+# Radio Telescope needs a rotator: the mode is refused without one.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'radio_telescope_mode_title':('Radio Telescope','Radiotelescopio','Radiotélescope','Radioteleskop','Radioteleskop','Radioteleskop'),
+ 'radio_telescope_mode_needs_rotator':(
+  'The Radio Telescope mode only works with a rotator: the antenna is moved across the sky and the received level is drawn as a sky map.\\n\\nEnable and configure a rotator under Settings > Rotator first.',
+  "La modalità radiotelescopio funziona solo con un rotore: l'antenna viene spostata nel cielo e il livello ricevuto viene disegnato come mappa del cielo.\\n\\nAbilita e configura prima un rotore in Impostazioni > Rotore.",
+  "Le mode radiotélescope ne fonctionne qu'avec un rotateur : l'antenne balaie le ciel et le niveau reçu est tracé sous forme de carte du ciel.\\n\\nActivez et configurez d'abord un rotateur dans Paramètres > Rotateur.",
+  'Der Radioteleskop-Modus funktioniert nur mit einem Rotor: Die Antenne wird über den Himmel bewegt und der Empfangspegel als Himmelskarte gezeichnet.\\n\\nZuerst unter Einstellungen > Rotor einen Rotor aktivieren und einrichten.',
+  'Radioteleskop-modus fungerer bare med en rotor: antennen beveges over himmelen og mottatt nivå tegnes som et himmelkart.\\n\\nAktiver og konfigurer først en rotor under Innstillinger > Rotor.',
+  'Režim radioteleskopu funguje pouze s rotátorem: anténa se pohybuje po obloze a přijímaná úroveň se vykresluje jako mapa oblohy.\\n\\nNejprve povolte a nastavte rotátor v Nastavení > Rotátor.'),
+ 'log.mode_change_blocked_radio_telescope_needs_an_enabled_rotator':(
+  'Mode change blocked: Radio Telescope needs an enabled rotator.',
+  'Cambio modalità bloccato: il radiotelescopio richiede un rotore abilitato.',
+  'Changement de mode bloqué : le radiotélescope nécessite un rotateur activé.',
+  'Moduswechsel blockiert: Radioteleskop braucht einen aktivierten Rotor.',
+  'Modusbytte blokkert: radioteleskop krever en aktivert rotor.',
+  'Změna režimu zablokována: radioteleskop vyžaduje povolený rotátor.'),
+ 'log.last_mode_radio_telescope_not_restored_no_rotator_enabled':(
+  'Last mode Radio Telescope not restored: no rotator enabled.',
+  'Ultima modalità radiotelescopio non ripristinata: nessun rotore abilitato.',
+  'Dernier mode radiotélescope non restauré : aucun rotateur activé.',
+  'Letzter Modus Radioteleskop nicht wiederhergestellt: kein Rotor aktiviert.',
+  'Siste modus radioteleskop ikke gjenopprettet: ingen rotor aktivert.',
+  'Poslední režim radioteleskop nebyl obnoven: žádný rotátor není povolen.'),
+}.items()})

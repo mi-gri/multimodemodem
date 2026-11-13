@@ -672,6 +672,7 @@ private slots:
     void advanceRadioTelescopeScan();
     void updateRadioTelescopeHeatmapWidget();
     bool radioTelescopeRotatorReadyForScan(QString *reason = nullptr) const;
+    bool radioTelescopeModeAvailable() const;
     bool radioTelescopeTileWithinRotatorLimits(double azimuthDeg, double elevationDeg, bool useElevation) const;
     void exportRadioTelescopeCsv();
     void pointRadioTelescopeMaxNoise();
