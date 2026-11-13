@@ -702,3 +702,10 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Volí slot, ve kterém vysíláte. FT8: slot 1 začíná v :00 a :30, slot 2 v :15 a :45. FT4: slot 1 je sudá, slot 2 lichá perioda 7,5 s. Kliknutím přepnete. Když odpovíte stanici, MM přepne do slotu opačného k jejímu.'),
  'tune':('Tune','Sintonia','Tune','Tune','Tune','Ladění'),
 }.items()})
+
+# Side panel: Operating / Parameters tabs, JS8 decoder group.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'tab_operating':('Operating','Operatività','Trafic','Betrieb','Drift','Provoz'),
+ 'tab_parameters':('Parameters','Parametri','Paramètres','Parameter','Parametere','Parametry'),
+ 'js8_decoder_group':('JS8 decoder','Decodificatore JS8','Décodeur JS8','JS8-Decoder','JS8-dekoder','Dekodér JS8'),
+}.items()})

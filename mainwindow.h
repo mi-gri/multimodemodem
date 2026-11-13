@@ -945,6 +945,7 @@ private slots:
      *        next caller of the FIFO through the normal sequencer.
      */
     void clearFt8Dx();
+    void organizeSidePanel();
     void stopFt8ShellImpl(bool keepAutomation);   // STOP (false) or Clear DX TX cancel (true)
 
     /**
@@ -2634,7 +2635,11 @@ private:
     quint64 m_audioInputRequest = 0;
     std::function<void()> m_audioStopCompletion;
     QWidget *m_tabQrz = nullptr;
-    int m_lastSideTabIndex = -1;                // for skipping hidden side tabs
+    int m_lastSideTabIndex = -1;
+    QWidget *m_sideTransportBar = nullptr;       // RX/TX/level bar in the fixed side header
+    QWidget *m_tabModeSetup = nullptr;           // "Parameters" side tab
+    QStackedWidget *m_stkModeSetup = nullptr;    // one page per mode page
+    QHash<QWidget *, QWidget *> m_modeSetupPages; // mode page -> parameters page (nullptr: none)                // for skipping hidden side tabs
     QGroupBox *m_grpFrequencyHeader = nullptr;  // Frequency area above the side tabs (all modes)
     QWidget *m_frequencyReadoutSlot = nullptr;  // CAT readout inside it
     QStackedWidget *m_stkFrequency = nullptr;

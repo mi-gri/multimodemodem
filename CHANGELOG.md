@@ -4,6 +4,13 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- Right-hand panel reorganised for a 1000 px window without scrolling (all 13 modes,
+  measured): fixed header with the Frequency area and RX · TX · TX level; tabs
+  Operating (controls used during a QSO) and Parameters (mode settings set once), QRZ,
+  Rotor; fixed footer with the FT slot clock, band scheduler and runtime log. Operating
+  and parameter controls were split for FT8/FT4, JS8, Q65, MSK144, RTTY, CW, WEFAX and
+  the radio telescope; PSK, MFSK, Hell and SSTV fit on one tab. Q65/MSK144 message
+  tables are as high as their rows; the sequencer line moved into the mode group.
 - Translations: old word-by-word artefacts such as "+ Add bis log" or "wartet for CQ"
   are recognised in all languages (English function words in a translated text) and
   replaced by reviewed text or the English source. German keeps amateur-radio terms:

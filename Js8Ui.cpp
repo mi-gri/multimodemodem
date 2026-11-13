@@ -280,6 +280,12 @@ void MainWindow::setupJs8Page()
     outer->setSpacing(8);
 
     auto *group = new QGroupBox(uiText("js8_rx_tx_settings", "JS8 RX/TX settings"), m_pageJs8Settings);
+    // Decoder options set once go to the Parameters tab with the automation.
+    auto *setupGroup = new QGroupBox(uiText("js8_decoder_group", "JS8 decoder"), m_pageJs8Settings);
+    setupGroup->setProperty("modeSetup", true);
+    auto *setupGrid = new QGridLayout(setupGroup);
+    setupGrid->setContentsMargins(8, 8, 8, 8);
+    int srow = 0;
     auto *grid = new QGridLayout(group);
     grid->setContentsMargins(8, 8, 8, 8);
     int row = 0;
@@ -321,7 +327,7 @@ void MainWindow::setupJs8Page()
     m_chkJs8MultiDecode = new QCheckBox(uiText("js8_multi_decode", "Decode all speeds"), group);
     m_chkJs8MultiDecode->setToolTip(uiText("js8_multi_decode_tooltip", "Also decode the other JS8 speeds (Normal, Fast, Turbo, Slow) at the same time. Needs more CPU. Transmission uses the selected speed."));
     m_chkJs8MultiDecode->setChecked(settings.value(QStringLiteral("JS8/multiDecode"), false).toBool());
-    grid->addWidget(m_chkJs8MultiDecode, row++, 1, 1, 3);
+    setupGrid->addWidget(m_chkJs8MultiDecode, srow++, 0, 1, 4);
 
     m_cmbJs8Depth = new QComboBox(group);
     m_cmbJs8Depth->addItem(QStringLiteral("Fast"), 1);
@@ -329,8 +335,8 @@ void MainWindow::setupJs8Page()
     m_cmbJs8Depth->addItem(QStringLiteral("Deep"), 3);
     m_cmbJs8Depth->setCurrentIndex(qMax(0, m_cmbJs8Depth->findData(settings.value(QStringLiteral("JS8/decodeDepth"), 3).toInt())));
     m_cmbJs8Depth->setToolTip(uiText("js8_depth_tooltip", "Fast: one pass. Normal: subtracts decoded signals and decodes again. Deep: also ordered-statistics decoding (more CPU)."));
-    grid->addWidget(new QLabel(uiText("decode_depth", "Decode depth"), group), row, 0);
-    grid->addWidget(m_cmbJs8Depth, row++, 1, 1, 3);
+    setupGrid->addWidget(new QLabel(uiText("decode_depth", "Decode depth"), setupGroup), srow, 0);
+    setupGrid->addWidget(m_cmbJs8Depth, srow++, 1, 1, 3);
 
     m_spinJs8RxFreq = new QSpinBox(group);
     m_spinJs8RxFreq->setRange(Js8Mode::minimumFrequencyHz(), 2900);
@@ -347,7 +353,7 @@ void MainWindow::setupJs8Page()
 
     m_chkJs8TxFollowsRx = new QCheckBox(uiText("js8_tx_follows_rx", "TX offset follows RX offset"), group);
     m_chkJs8TxFollowsRx->setChecked(settings.value(QStringLiteral("JS8/txFollowsRx"), true).toBool());
-    grid->addWidget(m_chkJs8TxFollowsRx, row++, 0, 1, 4);
+    setupGrid->addWidget(m_chkJs8TxFollowsRx, srow++, 0, 1, 4);
 
     m_btnJs8Rx = new QPushButton(QStringLiteral("RX"), group);
     m_btnJs8Stop = new QPushButton(QStringLiteral("STOP"), group);
@@ -425,9 +431,12 @@ void MainWindow::setupJs8Page()
 
     QWidget *qsoPanel = createQsoFormPanel(m_pageJs8Settings, QStringLiteral("JS8"), &m_js8QsoForm);
 
+    setupGrid->setColumnStretch(1, 1);
+    autoGroup->setProperty("modeSetup", true);   // -> Parameters tab
     outer->addWidget(group);
-    outer->addWidget(autoGroup);
     outer->addWidget(qsoPanel);
+    outer->addWidget(setupGroup);
+    outer->addWidget(autoGroup);
     outer->addStretch(1);
     ui->stkModeSettings->addWidget(m_pageJs8Settings);
 

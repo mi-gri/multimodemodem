@@ -139,6 +139,7 @@
 #include <QPen>
 #include <QPushButton>
 #include <QScrollArea>
+#include "widgets/CurrentPageStack.h"
 #include <QScrollBar>
 #include <QScreen>
 #include <QSerialPortInfo>
@@ -1697,9 +1698,107 @@ MainWindow::MainWindow(QWidget *parent)
     appendLog("MM started.");
     appendLog(QStringLiteral("%1 %2 | %3 | source %4 | commit %5").arg(ProductName::longName(), QStringLiteral(M3_VERSION_STRING), M3Identity::buildLabel(), QStringLiteral(M3_SOURCE_REVISION), QStringLiteral(M3_BUILD_COMMIT)));
     appendLog("Settings file: " + AppSettings::settingsFilePath());
+    organizeSidePanel();
     appendLog("Receiver is ready. Use Status → ▶ RX to start live decoding, or analyze a WAV test file from the mode panel.");
     updateMainStateButton();
     restoreLastSession();
+}
+
+// Right-hand panel, the same for every mode (1000 px window without
+// scrolling): fixed header (Frequency area with CAT readout, RX/TX/level
+// bar), the tabs Operating (controls used during a QSO), Parameters (mode
+// settings set once; widgets tagged "modeSetup" by the page builders), QRZ,
+// Rotor, and a fixed footer (FT slot clock, band scheduler, runtime log).
+void MainWindow::organizeSidePanel()
+{
+    if (ui == nullptr || ui->sideTabWidget == nullptr || ui->stkModeSettings == nullptr) return;
+    QWidget *side = ui->sideTabWidget->parentWidget();
+    auto *sideLayout = side != nullptr ? qobject_cast<QVBoxLayout *>(side->layout()) : nullptr;
+    if (sideLayout == nullptr) return;
+
+    // Header: RX/TX/level right below the Frequency area.
+    if (m_sideTransportBar != nullptr) {
+        ui->modeTabLayout->removeWidget(m_sideTransportBar);
+        m_sideTransportBar->setParent(side);
+        const int at = m_grpFrequencyHeader != nullptr ? sideLayout->indexOf(m_grpFrequencyHeader) + 1 : 0;
+        sideLayout->insertWidget(at, m_sideTransportBar, 0);
+    }
+
+    // Footer below the tabs.
+    auto *footer = new QWidget(side);
+    footer->setObjectName(QStringLiteral("sideFooter"));
+    auto *footerLayout = new QVBoxLayout(footer);
+    footerLayout->setContentsMargins(0, 2, 0, 0);
+    footerLayout->setSpacing(3);
+    for (QWidget *w : {static_cast<QWidget *>(m_grpFt8UtcClock), m_tabBandScheduler,
+                       static_cast<QWidget *>(m_btnShowRuntimeLog)}) {
+        if (w == nullptr) continue;
+        const bool visible = !w->isHidden();
+        ui->modeTabLayout->removeWidget(w);
+        w->setParent(footer);
+        footerLayout->addWidget(w);
+        w->setVisible(visible);
+    }
+    sideLayout->addWidget(footer, 0);
+
+    // Parameters tab with its own stack, one page per mode page.
+    m_tabModeSetup = new QWidget(ui->sideTabWidget);
+    m_tabModeSetup->setObjectName(QStringLiteral("tabModeSetup"));
+    auto *setupLayout = new QVBoxLayout(m_tabModeSetup);
+    setupLayout->setContentsMargins(6, 6, 6, 6);
+    auto *setupScroll = new QScrollArea(m_tabModeSetup);
+    setupScroll->setObjectName(QStringLiteral("modeSetupScroll"));
+    setupScroll->setFrameShape(QFrame::NoFrame);
+    setupScroll->setWidgetResizable(true);
+    m_stkModeSetup = new CurrentPageStack(setupScroll);
+    setupScroll->setWidget(m_stkModeSetup);
+    setupLayout->addWidget(setupScroll, 1);
+    const int operatingIndex = ui->sideTabWidget->indexOf(ui->tabModeSettings);
+    ui->sideTabWidget->insertTab(operatingIndex + 1, m_tabModeSetup, uiText("tab_parameters", "Parameters"));
+
+    for (int i = 0; i < ui->stkModeSettings->count(); ++i) {
+        QWidget *page = ui->stkModeSettings->widget(i);
+        auto *setupPage = new QWidget(m_stkModeSetup);
+        auto *pageLayout = new QVBoxLayout(setupPage);
+        pageLayout->setContentsMargins(0, 0, 0, 0);
+        pageLayout->setSpacing(8);
+        // Direct children in their layout order.
+        QList<QWidget *> tagged;
+        if (page->layout() != nullptr) {
+            for (int item = 0; item < page->layout()->count(); ++item) {
+                QWidget *w = page->layout()->itemAt(item)->widget();
+                if (w != nullptr && w->property("modeSetup").toBool()) tagged << w;
+            }
+        }
+        for (QWidget *w : tagged) {
+            const bool visible = !w->isHidden();
+            page->layout()->removeWidget(w);
+            w->setParent(setupPage);
+            pageLayout->addWidget(w);
+            w->setVisible(visible);
+        }
+        pageLayout->addStretch(1);
+        m_stkModeSetup->addWidget(setupPage);
+        m_modeSetupPages.insert(page, tagged.isEmpty() ? nullptr : setupPage);
+    }
+    auto follow = [this]() {
+        QWidget *setupPage = m_modeSetupPages.value(ui->stkModeSettings->currentWidget(), nullptr);
+        if (setupPage != nullptr) m_stkModeSetup->setCurrentWidget(setupPage);
+        const int index = ui->sideTabWidget->indexOf(m_tabModeSetup);
+        if (index >= 0) {
+            ui->sideTabWidget->tabBar()->setTabVisible(index, setupPage != nullptr);
+            if (setupPage == nullptr && ui->sideTabWidget->currentIndex() == index)
+                ui->sideTabWidget->setCurrentWidget(ui->tabModeSettings);
+        }
+    };
+    connect(ui->stkModeSettings, &QStackedWidget::currentChanged, this, follow);
+    follow();
+    // The Frequency area (and QRZ tab) follow the mode only on a change;
+    // set them for the mode active at start as well.
+    if (ui->cmbMode != nullptr) updateSideTabsForMode(ui->cmbMode->currentText());
+
+    const int modeTab = ui->sideTabWidget->indexOf(ui->tabModeSettings);
+    if (modeTab >= 0) ui->sideTabWidget->setTabText(modeTab, uiText("tab_operating", "Operating"));
 }
 
 // PSK Reporter (taken over from JTDX, see network/PskReporter.h): a station
@@ -2336,6 +2435,8 @@ void MainWindow::setupCustomWidgets()
         ui->btnStartRx != nullptr &&
         ui->btnTxTone != nullptr) {
         QWidget *transportBar = new QWidget(ui->tabModeSettings);
+        transportBar->setObjectName(QStringLiteral("transportBar"));
+        m_sideTransportBar = transportBar;
         QHBoxLayout *transportLayout = new QHBoxLayout(transportBar);
         transportLayout->setContentsMargins(4, 4, 4, 4);
         transportLayout->setSpacing(6);
@@ -2509,6 +2610,29 @@ void MainWindow::setupCustomWidgets()
     m_btnFaxForceRx->setToolTip(uiText("tooltip.forceWefaxRx", "Start live RX and force MeteoFax to receive immediately, bypassing APT start/phasing wait."));
     if (ui->faxSettingsGridLayout != nullptr) {
         ui->faxSettingsGridLayout->addWidget(m_btnFaxForceRx, 24, 0, 1, 2);
+    }
+
+    // Operating: image actions (analyse, zoom, reset, save, force RX).  The
+    // receiver parameters stay in grpFaxSettings -> Parameters tab.
+    if (ui->pageFaxSettings != nullptr && ui->pageFaxSettings->layout() != nullptr) {
+        auto *faxOpGroup = new QGroupBox(QStringLiteral("MeteoFax"), ui->pageFaxSettings);
+        auto *opLayout = new QVBoxLayout(faxOpGroup);
+        opLayout->setContentsMargins(8, 8, 8, 8);
+        opLayout->setSpacing(6);
+        auto *zoomRow = new QHBoxLayout();
+        for (QPushButton *b : {ui->btnFaxZoomFit, ui->btnFaxZoom100, ui->btnFaxZoomOut, ui->btnFaxZoomIn})
+            if (b != nullptr) zoomRow->addWidget(b);
+        for (QWidget *w : {static_cast<QWidget *>(ui->btnFaxAnalyzeWav), static_cast<QWidget *>(nullptr)})
+            if (w != nullptr) opLayout->addWidget(w);
+        opLayout->addLayout(zoomRow);
+        for (QWidget *w : {static_cast<QWidget *>(ui->lblFaxZoomStatus), static_cast<QWidget *>(ui->btnFaxResetImage),
+                           static_cast<QWidget *>(ui->btnFaxSaveImage), static_cast<QWidget *>(m_btnFaxForceRx)})
+            if (w != nullptr) opLayout->addWidget(w);
+        if (ui->lineFaxZoomSection != nullptr) ui->lineFaxZoomSection->hide();
+        if (ui->lineFaxFileSection != nullptr) ui->lineFaxFileSection->hide();
+        if (auto *pageLayout = qobject_cast<QBoxLayout *>(ui->pageFaxSettings->layout()))
+            pageLayout->insertWidget(0, faxOpGroup);
+        ui->grpFaxSettings->setProperty("modeSetup", true);
     }
 
     m_chkSstvAutoVis=new QCheckBox(uiText("text.auto_mode_vis", "Auto mode (VIS)"),ui->grpSstvSettings);
@@ -2734,7 +2858,7 @@ void MainWindow::setupCustomWidgets()
         if (ui->tabModeSettings != nullptr) {
             const int modeTabIndex = ui->sideTabWidget->indexOf(ui->tabModeSettings);
             if (modeTabIndex >= 0) {
-                ui->sideTabWidget->setTabText(modeTabIndex, uiText("tab_mode", "Mode"));
+                ui->sideTabWidget->setTabText(modeTabIndex, uiText("tab_operating", "Operating"));
                 ui->sideTabWidget->setCurrentIndex(modeTabIndex);
             }
         }
@@ -6206,6 +6330,7 @@ void MainWindow::setupRttyPage()
     installModeFrequencyGroup(QStringLiteral("RTTY"));
 
     QGroupBox *settingsGroup = new QGroupBox("RTTY settings", m_pageRttySettings);
+    settingsGroup->setProperty("modeSetup", true);   // -> Parameters tab (organizeSidePanel)
     settingsGroup->setStyleSheet(QString());
     QGridLayout *grid = new QGridLayout(settingsGroup);
     grid->setContentsMargins(8, 8, 8, 8);
@@ -6880,20 +7005,29 @@ void MainWindow::setupCwPage()
     M3Ui::setSemanticRole(rxBLabel, QStringLiteral("rxSecondary"));
     txLabel->setStyleSheet(QStringLiteral("font-weight:600;"));
 
-    grid->addWidget(new QLabel(uiText("cw_rx_a_tone", "RX A tone"), settingsGroup), 1, 0);
-    grid->addWidget(m_spinCwToneHz, 1, 1, 1, 3);
-    grid->addWidget(rxALabel, 2, 0);
-    grid->addWidget(m_chkCwAutoWpmA, 2, 1);
-    grid->addWidget(m_spinCwWpmA, 2, 2);
-    grid->addWidget(m_lblCwTrackedWpmA, 2, 3);
-    grid->addWidget(rxBLabel, 3, 0);
-    grid->addWidget(m_chkCwAutoWpmB, 3, 1);
-    grid->addWidget(m_spinCwWpmB, 3, 2);
-    grid->addWidget(m_lblCwTrackedWpmB, 3, 3);
-    grid->addWidget(txLabel, 4, 0);
-    grid->addWidget(m_spinCwTxToneHz, 4, 1, 1, 3);
-    grid->addWidget(new QLabel(uiText("cw_tx_speed", "TX speed"), settingsGroup), 5, 0);
-    grid->addWidget(m_spinCwTxWpm, 5, 1, 1, 3);
+    // Operating: receiver tones and speeds, TX tone/speed, dual-RX status.
+    // Engine, filter, AFC, skimmer and TX method stay in settingsGroup,
+    // which goes to the Parameters tab.
+    QGroupBox *cwOpGroup = new QGroupBox(QStringLiteral("CW"), m_pageCwSettings);
+    QGridLayout *opGrid = new QGridLayout(cwOpGroup);
+    opGrid->setContentsMargins(8, 8, 8, 8);
+    opGrid->setHorizontalSpacing(6);
+    opGrid->setVerticalSpacing(6);
+    opGrid->setColumnStretch(3, 1);
+    opGrid->addWidget(new QLabel(uiText("cw_rx_a_tone", "RX A tone"), cwOpGroup), 0, 0);
+    opGrid->addWidget(m_spinCwToneHz, 0, 1, 1, 3);
+    opGrid->addWidget(rxALabel, 1, 0);
+    opGrid->addWidget(m_chkCwAutoWpmA, 1, 1);
+    opGrid->addWidget(m_spinCwWpmA, 1, 2);
+    opGrid->addWidget(m_lblCwTrackedWpmA, 1, 3);
+    opGrid->addWidget(rxBLabel, 2, 0);
+    opGrid->addWidget(m_chkCwAutoWpmB, 2, 1);
+    opGrid->addWidget(m_spinCwWpmB, 2, 2);
+    opGrid->addWidget(m_lblCwTrackedWpmB, 2, 3);
+    opGrid->addWidget(txLabel, 3, 0);
+    opGrid->addWidget(m_spinCwTxToneHz, 3, 1, 1, 3);
+    opGrid->addWidget(new QLabel(uiText("cw_tx_speed", "TX speed"), cwOpGroup), 4, 0);
+    opGrid->addWidget(m_spinCwTxWpm, 4, 1, 1, 3);
     auto *filterLabel = new QLabel(uiText("cw_filter_short", "CW filter"), settingsGroup);
     filterLabel->setWordWrap(true);
     grid->addWidget(filterLabel, 6, 0);
@@ -6902,8 +7036,8 @@ void MainWindow::setupCwPage()
     grid->addWidget(m_chkCwAfc, 7, 0, 1, 2);
     m_spinCwAfcRangeHz->setToolTip(uiText("cw_afc_range", "AFC range"));
     grid->addWidget(m_spinCwAfcRangeHz, 7, 2, 1, 2);
-    grid->addWidget(m_lblCwDualRx, 8, 0, 1, 4);
-    grid->addWidget(m_btnCwDisableSecondary, 9, 0, 1, 4);
+    opGrid->addWidget(m_lblCwDualRx, 5, 0, 1, 4);
+    opGrid->addWidget(m_btnCwDisableSecondary, 6, 0, 1, 4);
     m_chkCwSkimmer = new QCheckBox(QStringLiteral("Skimmer"), settingsGroup);
     m_chkCwSkimmer->setObjectName(QStringLiteral("cwSkimmerEnabled"));
     m_cmbCwSkimmerDisplay = new QComboBox(settingsGroup);
@@ -6957,8 +7091,10 @@ void MainWindow::setupCwPage()
         spin->setMinimumWidth(spin->sizeHint().width());
     grid->setColumnStretch(2, 1);
 
-    outerLayout->addWidget(settingsGroup);
+    settingsGroup->setProperty("modeSetup", true);   // -> Parameters tab
+    outerLayout->addWidget(cwOpGroup);
     placeQsoFormInModePanel(outerLayout, m_cwQsoForm);
+    outerLayout->addWidget(settingsGroup);
     if (m_cwQsoForm != nullptr) {
         const QList<QLineEdit *> contestEdits = {m_cwQsoForm->callsign, m_cwQsoForm->band, m_cwQsoForm->rstSent, m_cwQsoForm->rstReceived, m_cwQsoForm->grid};
         for (QLineEdit *edit : contestEdits) {
@@ -7173,6 +7309,7 @@ void MainWindow::setupRadioTelescopePage()
     installModeFrequencyGroup(QString());
 
     QGroupBox *cfgGroup = new QGroupBox(uiText("radio_telescope_settings", "Radio telescope scan settings"), m_pageRadioTelescopeSettings);
+    cfgGroup->setProperty("modeSetup", true);   // -> Parameters tab (organizeSidePanel)
     QGridLayout *grid = new QGridLayout(cfgGroup);
     grid->setContentsMargins(8, 8, 8, 8);
     grid->setHorizontalSpacing(8);
@@ -8494,20 +8631,28 @@ void MainWindow::setupMsk144Page()
     ++row;
     grid->addWidget(new QLabel(uiText("msk144_f_tolerance", "F Tol"), rxGroup), row, 0);
     grid->addWidget(m_cmbMsk144FrequencyTolerance, row, 1);
-    grid->addWidget(m_chkMsk144TxFirst, row, 2, 1, 2);
     ++row;
     grid->addWidget(m_chkMsk144ShortMessages, row, 0);
     grid->addWidget(m_chkMsk144Swl, row, 1);
     grid->addWidget(m_chkMsk144Contest, row, 2, 1, 2);
-    ++row;
-    grid->addWidget(new QLabel(uiText("dx_callsign", "DX callsign"), rxGroup), row, 0);
-    grid->addWidget(m_editMsk144DxCall, row, 1);
-    grid->addWidget(new QLabel(uiText("dx_grid", "DX grid"), rxGroup), row, 2);
-    grid->addWidget(m_editMsk144DxGrid, row, 3);
-    ++row;
-    grid->addWidget(m_lblMsk144Status, row, 0, 1, 4);
-    ++row;
-    grid->addWidget(m_lblMsk144PeriodStatus, row, 0, 1, 4);
+    rxGroup->setProperty("modeSetup", true);   // -> Parameters tab
+
+    // Operating: TX slot, DX and the receive status.
+    QGroupBox *mskOpGroup = new QGroupBox(QStringLiteral("MSK144"), m_pageMsk144Settings);
+    QGridLayout *opGrid = new QGridLayout(mskOpGroup);
+    opGrid->setContentsMargins(8, 8, 8, 8);
+    opGrid->setHorizontalSpacing(6);
+    opGrid->setVerticalSpacing(6);
+    int orow = 0;
+    opGrid->addWidget(m_chkMsk144TxFirst, orow++, 0, 1, 4);
+    opGrid->addWidget(new QLabel(uiText("dx_callsign", "DX callsign"), mskOpGroup), orow, 0);
+    opGrid->addWidget(m_editMsk144DxCall, orow, 1);
+    opGrid->addWidget(new QLabel(uiText("dx_grid", "DX grid"), mskOpGroup), orow, 2);
+    opGrid->addWidget(m_editMsk144DxGrid, orow++, 3);
+    opGrid->addWidget(m_lblMsk144Status, orow++, 0, 1, 4);
+    opGrid->addWidget(m_lblMsk144PeriodStatus, orow++, 0, 1, 4);
+    opGrid->setColumnStretch(1, 1);
+    opGrid->setColumnStretch(3, 1);
 
     QGroupBox *mskSeqGroup = new QGroupBox(uiText("msk144_sequence_status", "MSK144 sequence status"), m_pageMsk144Settings);
     QVBoxLayout *mskSeqLayout = new QVBoxLayout(mskSeqGroup);
@@ -8526,15 +8671,28 @@ void MainWindow::setupMsk144Page()
     mskTxLayout->setSpacing(4);
     if (m_tableMsk144TxMessages != nullptr) {
         m_tableMsk144TxMessages->setParent(mskTxGroup);
-        m_tableMsk144TxMessages->setMinimumHeight(160);
-        m_tableMsk144TxMessages->setMaximumHeight(220);
+        // Exactly as high as its rows: no empty space below the last message.
+        {
+            QTableWidget *t = m_tableMsk144TxMessages;
+            const int h = t->horizontalHeader()->sizeHint().height() +
+                          t->rowCount() * t->verticalHeader()->defaultSectionSize() + 2 * t->frameWidth() + 2;
+            t->setMinimumHeight(h);
+            t->setMaximumHeight(h);
+            t->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        }
         mskTxLayout->addWidget(m_tableMsk144TxMessages);
     }
 
-    outer->addWidget(rxGroup);
-    outer->addWidget(mskSeqGroup);
-    outer->addWidget(mskQsoPanel);
+    outer->addWidget(mskOpGroup);
+    // The sequencer line sits in the operating group (one frame less).
+    if (m_lblMsk144SequencerStatus != nullptr) {
+        auto *opLayout = qobject_cast<QGridLayout *>(mskOpGroup->layout());
+        if (opLayout != nullptr) opLayout->addWidget(m_lblMsk144SequencerStatus, opLayout->rowCount(), 0, 1, 4);
+    }
+    mskSeqGroup->hide();
     outer->addWidget(mskTxGroup);
+    outer->addWidget(mskQsoPanel);
+    outer->addWidget(rxGroup);
     outer->addStretch(1);
     ui->stkModeSettings->addWidget(m_pageMsk144Settings);
 
@@ -8810,18 +8968,27 @@ void MainWindow::setupQ65Page()
     grid->addWidget(m_chkQ65MaxDrift, row, 0, 1, 2);
     grid->addWidget(m_chkQ65EmeDelay, row, 2, 1, 2);
     ++row;
-    grid->addWidget(m_chkQ65TxFirst, row, 0, 1, 4);
-    ++row;
-    grid->addWidget(compactLabel(uiText("dx_callsign", "DX")), row, 0);
-    grid->addWidget(m_editQ65DxCall, row, 1);
-    grid->addWidget(compactLabel(uiText("dx_grid", "Grid")), row, 2);
-    grid->addWidget(m_editQ65DxGrid, row, 3);
-    ++row;
-    grid->addWidget(m_btnQ65ClearAvg, row++, 0, 1, 2);
-    grid->addWidget(m_lblQ65Status, row++, 0, 1, 4);
-    grid->addWidget(m_lblQ65AverageStatus, row++, 0, 1, 4);
     grid->setColumnStretch(1, 1);
     grid->setColumnStretch(3, 1);
+    rxGroup->setProperty("modeSetup", true);   // -> Parameters tab
+
+    // Operating: TX slot, DX, averaging state.
+    QGroupBox *q65OpGroup = new QGroupBox(QStringLiteral("Q65"), m_pageQ65Settings);
+    QGridLayout *opGrid = new QGridLayout(q65OpGroup);
+    opGrid->setContentsMargins(8, 8, 8, 8);
+    opGrid->setHorizontalSpacing(8);
+    opGrid->setVerticalSpacing(6);
+    int orow = 0;
+    opGrid->addWidget(m_chkQ65TxFirst, orow++, 0, 1, 4);
+    opGrid->addWidget(compactLabel(uiText("dx_callsign", "DX")), orow, 0);
+    opGrid->addWidget(m_editQ65DxCall, orow, 1);
+    opGrid->addWidget(compactLabel(uiText("dx_grid", "Grid")), orow, 2);
+    opGrid->addWidget(m_editQ65DxGrid, orow++, 3);
+    opGrid->addWidget(m_btnQ65ClearAvg, orow++, 0, 1, 2);
+    opGrid->addWidget(m_lblQ65Status, orow++, 0, 1, 4);
+    opGrid->addWidget(m_lblQ65AverageStatus, orow++, 0, 1, 4);
+    opGrid->setColumnStretch(1, 1);
+    opGrid->setColumnStretch(3, 1);
 
     QGroupBox *q65SeqGroup = new QGroupBox(uiText("q65_sequence_status", "Q65 sequence status"), m_pageQ65Settings);
     QVBoxLayout *q65SeqLayout = new QVBoxLayout(q65SeqGroup);
@@ -8840,15 +9007,28 @@ void MainWindow::setupQ65Page()
     txLayout->setSpacing(4);
     if (m_tableQ65TxMessages != nullptr) {
         m_tableQ65TxMessages->setParent(txGroup);
-        m_tableQ65TxMessages->setMinimumHeight(160);
-        m_tableQ65TxMessages->setMaximumHeight(220);
+        // Exactly as high as its rows: no empty space below the last message.
+        {
+            QTableWidget *t = m_tableQ65TxMessages;
+            const int h = t->horizontalHeader()->sizeHint().height() +
+                          t->rowCount() * t->verticalHeader()->defaultSectionSize() + 2 * t->frameWidth() + 2;
+            t->setMinimumHeight(h);
+            t->setMaximumHeight(h);
+            t->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        }
         txLayout->addWidget(m_tableQ65TxMessages);
     }
 
-    outer->addWidget(rxGroup);
-    outer->addWidget(q65SeqGroup);
-    outer->addWidget(q65QsoPanel);
+    outer->addWidget(q65OpGroup);
+    // The sequencer line sits in the operating group (one frame less).
+    if (m_lblQ65SequencerStatus != nullptr) {
+        auto *opLayout = qobject_cast<QGridLayout *>(q65OpGroup->layout());
+        if (opLayout != nullptr) opLayout->addWidget(m_lblQ65SequencerStatus, opLayout->rowCount(), 0, 1, 4);
+    }
+    q65SeqGroup->hide();
     outer->addWidget(txGroup);
+    outer->addWidget(q65QsoPanel);
+    outer->addWidget(rxGroup);
     outer->addStretch(1);
     ui->stkModeSettings->addWidget(m_pageQ65Settings);
 
@@ -9425,6 +9605,7 @@ void MainWindow::setupFt8Page()
     updateFt8DecodePerformanceUi();
 
     QGroupBox *settingsGroup = new QGroupBox(m_pageFt8Settings);
+    settingsGroup->setProperty("modeSetup", true);   // -> Parameters tab (organizeSidePanel)
     QGridLayout *settingsGrid = new QGridLayout(settingsGroup);
     settingsGrid->setContentsMargins(8, 8, 8, 8);
     settingsGrid->setHorizontalSpacing(6);
@@ -11040,7 +11221,11 @@ void MainWindow::applyUiLanguage()
         }
         if (ui->tabModeSettings != nullptr) {
             const int i = ui->sideTabWidget->indexOf(ui->tabModeSettings);
-            if (i >= 0) ui->sideTabWidget->setTabText(i, uiText("tab_mode", "Mode"));
+            if (i >= 0) ui->sideTabWidget->setTabText(i, uiText("tab_operating", "Operating"));
+        }
+        if (m_tabModeSetup != nullptr) {
+            const int i = ui->sideTabWidget->indexOf(m_tabModeSetup);
+            if (i >= 0) ui->sideTabWidget->setTabText(i, uiText("tab_parameters", "Parameters"));
         }
         if (m_tabDspSettings != nullptr) {
             const int i = ui->sideTabWidget->indexOf(m_tabDspSettings);
