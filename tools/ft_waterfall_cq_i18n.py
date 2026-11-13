@@ -681,3 +681,16 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Automatisk modus er av: slå den på i Innstillinger → FT8 / FT4 → Automatisk modus.',
   'Automatický režim je vypnutý: zapněte jej v Nastavení → FT8 / FT4 → Automatický režim.'),
 }.items()})
+
+# FT "Clear DX" button.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft_clear_dx':('Clear DX','Cancella DX','Effacer DX','DX löschen','Slett DX','Smazat DX'),
+ 'ft_clear_dx_tooltip':(
+  'Ends the current QSO (a running transmission for it stops), clears the DX call and grid, resets Tx1–Tx6 and then answers the next station waiting in the caller queue. Automation stays on; the cleared station is not answered automatically for 15 minutes.',
+  'Termina il QSO corrente (una trasmissione in corso si interrompe), cancella nominativo e locatore DX, ripristina Tx1–Tx6 e poi risponde alla prossima stazione in coda. L’automazione resta attiva; la stazione cancellata non riceve risposte automatiche per 15 minuti.',
+  'Termine le QSO en cours (une émission en cours s’arrête), efface l’indicatif et le locator DX, réinitialise Tx1–Tx6 puis répond à la station suivante de la file d’attente. L’automatisation reste active ; la station effacée ne reçoit pas de réponse automatique pendant 15 minutes.',
+  'Beendet das laufende QSO (eine laufende Aussendung dafür stoppt), leert DX-Rufzeichen und -Locator, setzt Tx1–Tx6 zurück und beantwortet dann die nächste wartende Station aus der Anruferliste. Die Automatik bleibt an; die gelöschte Station wird 15 Minuten lang nicht automatisch beantwortet.',
+  'Avslutter gjeldende QSO (en pågående sending for det stopper), tømmer DX-kallesignal og lokator, tilbakestiller Tx1–Tx6 og svarer deretter neste stasjon i anropskøen. Automatikken forblir på; den slettede stasjonen besvares ikke automatisk i 15 minutter.',
+  'Ukončí aktuální spojení (probíhající vysílání pro něj se zastaví), vymaže DX značku a lokátor, obnoví Tx1–Tx6 a poté odpoví další stanici ve frontě volajících. Automatika zůstává zapnutá; smazané stanici se 15 minut automaticky neodpovídá.'),
+ 'ft_clear_dx_log':('Clear DX: QSO ended, messages reset.','Cancella DX: QSO terminato, messaggi ripristinati.','Effacer DX : QSO terminé, messages réinitialisés.','DX löschen: QSO beendet, Nachrichten zurückgesetzt.','Slett DX: QSO avsluttet, meldinger tilbakestilt.','Smazat DX: spojení ukončeno, zprávy obnoveny.'),
+}.items()})

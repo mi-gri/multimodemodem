@@ -133,6 +133,29 @@ int main(int argc,char **argv){
   w.completeFt8Qso("audit fixture 73");
   QElapsedTimer saved;saved.start();while(!w.m_pendingFtLogKeys.isEmpty()&&saved.elapsed()<3000)pump();
   require(w.m_pendingFtLogKeys.isEmpty(),"audit ADIF append did not finish");
+  // Clear DX: ends the QSO with OK1CLR, keeps Auto QSO on, blocks OK1CLR for
+  // automatic answers and serves the next queued caller (DL2NXT).
+  {
+   w.m_ft8OperatorStopLatched=false;w.stopFt8Sequencer("clear dx setup");
+   {QSignalBlocker b(w.m_chkFt8FullAutoQso);w.m_chkFt8FullAutoQso->setChecked(true);}
+   {QSignalBlocker b(w.m_chkFt8CallerQueue);w.m_chkFt8CallerQueue->setChecked(true);}
+   w.m_ftSession.startQso("OK1CLR","JO70",1300);w.m_ftSession.state=FtQsoSequencer::State::WaitingReport;
+   w.m_editFt8DxCall->setText("OK1CLR");w.m_editFt8DxGrid->setText("JO70");
+   const qint64 slot=QDateTime::currentMSecsSinceEpoch()/profile.slotMs*profile.slotMs-profile.slotMs;
+   Ft8RxDecoder::Decode call;call.message="IZ6NNH DL2NXT JO62";call.snrDb=-8;call.frequencyHz=1500;
+   call.slotStartUtcMs=slot;call.slotPeriodMs=profile.slotMs;call.utc=QDateTime::fromMSecsSinceEpoch(slot,Qt::UTC).toString("HHmmss");
+   MainWindow::Ft8QueuedCaller queued;queued.latestDecode=call;queued.call="DL2NXT";queued.grid="JO62";
+   queued.firstSeenUtc=queued.lastSeenUtc=QDateTime::currentDateTimeUtc();
+   w.m_ft8CallerQueue.clear();w.m_ft8CallerQueue.append(queued);
+   w.m_ft8AutoNoResponseCooldown.remove("OK1CLR");
+   w.clearFt8Dx();pump();pump();
+   require(w.m_ft8AutoNoResponseCooldown.contains("OK1CLR"),"Clear DX did not block the cleared station");
+   require(w.m_chkFt8FullAutoQso->isChecked()&&!w.m_ft8OperatorStopLatched,"Clear DX switched the automation off");
+   require(w.m_ft8CallerQueue.isEmpty(),"Clear DX did not take the next caller from the queue");
+   require(w.m_ftSession.dxCall.trimmed().toUpper()=="DL2NXT","Clear DX did not continue with the queued caller");
+   w.m_ft8OperatorStopLatched=true;w.stopFt8Sequencer("clear dx done");
+   {QSignalBlocker b(w.m_chkFt8CallerQueue);w.m_chkFt8CallerQueue->setChecked(false);}
+  }
   std::cout<<mode.toStdString()<<": busy/logbook CQ queue, priority, fresh/busy checks, STOP, manual takeover and old worker signals PASS\n";
  }
  w.m_audioEngine->m_running.store(false);w.m_rxRunning=false;

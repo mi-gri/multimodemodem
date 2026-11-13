@@ -939,6 +939,13 @@ private slots:
      * @brief Stops the FT8 automatic sequencer and CQ repeat state.
      */
     void stopFt8Sequencer(const QString &reason = QString());
+    /**
+     * @brief "Clear DX": ends the current QSO (and a running TX for it), clears
+     *        DX call/grid, rebuilds the standard messages and then serves the
+     *        next caller of the FIFO through the normal sequencer.
+     */
+    void clearFt8Dx();
+    void stopFt8ShellImpl(bool keepAutomation);   // STOP (false) or Clear DX TX cancel (true)
 
     /**
      * @brief Schedules one FT8 message for the next selected TX period.
@@ -2350,6 +2357,7 @@ private:
     QPushButton *m_btnFt8Rx = nullptr;
     QPushButton *m_btnFt8Tx = nullptr;
     QPushButton *m_btnFt8Stop = nullptr;
+    QPushButton *m_btnFt8ClearDx = nullptr;   // abort the QSO, reset messages, next queued caller
     QPushButton *m_btnFt8Tune = nullptr;
     QCheckBox *m_chkFt8AutoSeq = nullptr;
     QCheckBox *m_chkFt8CqRepeat = nullptr;

@@ -4,8 +4,12 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- FT8/FT4 "Clear DX" button between TX and STOP: ends the current QSO (a running
+  transmission for it stops), clears DX call and grid, resets Tx1-Tx6 and answers the
+  next station in the caller queue. Auto QSO and CQ repeat stay on; the cleared station
+  is not answered automatically for 15 minutes. STOP is unchanged.
 - FT8/FT4: the two radio buttons TX I / TX II are one toggle button "TX I" / "TX II" as
-  wide as RX and TX (STOP is wider); a click switches the period. It follows automatic period changes when answering a
+  wide as RX and TX; a click switches the period. It follows automatic period changes when answering a
   station and is disabled while transmitting, as the radio buttons were.
 - Auto mode (FT8/FT4 Auto QSO and JS8 automatic operation: AUTO replies, relays,
   heartbeat/CQ timers) is a setting again (Settings -> FT8 / FT4, off by default). Switching it on shows a notice: automatic operation may not be permitted in

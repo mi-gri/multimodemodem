@@ -9224,6 +9224,9 @@ void MainWindow::setupFt8Page()
     m_btnFt8Rx = new QPushButton(uiText("rx", "RX"), controlGroup);
     m_btnFt8Tx = new QPushButton(uiText("tx", "TX"), controlGroup);
     m_btnFt8Stop = new QPushButton(uiText("button.stop", "STOP"), controlGroup);
+    m_btnFt8ClearDx = new QPushButton(uiText("ft_clear_dx", "Clear DX"), controlGroup);
+    m_btnFt8ClearDx->setObjectName(QStringLiteral("ftClearDx"));
+    m_btnFt8ClearDx->setToolTip(uiText("ft_clear_dx_tooltip", "Ends the current QSO (a running transmission for it stops), clears the DX call and grid, resets Tx1–Tx6 and then answers the next station waiting in the caller queue. Automation stays on; the cleared station is not answered automatically for 15 minutes."));
     m_btnFt8Tune = new QPushButton(uiText("tune", "Tune"), controlGroup);
     m_chkFt8AutoSeq = new QCheckBox(uiText("ft8_auto_sequence", "Auto sequence"), controlGroup);
     // Auto-sequence is the normal FT4/FT8 operating model.  Keep the widget as
@@ -9276,11 +9279,12 @@ void MainWindow::setupFt8Page()
     connect(m_radioFt8TxFirst, &QRadioButton::toggled, this, [this](bool) { updateFt8TxPeriodButton(); });
     connect(m_radioFt8TxSecond, &QRadioButton::toggled, this, [this](bool) { updateFt8TxPeriodButton(); });
     updateFt8TxPeriodButton();
-    // Period toggle as wide as RX/TX; STOP takes the freed column.
+    // Period toggle as wide as RX/TX; the freed column holds Clear DX.
     controlGrid->addWidget(m_btnFt8TxPeriod, 0, 0);
     controlGrid->addWidget(m_btnFt8Rx, 0, 1);
     controlGrid->addWidget(m_btnFt8Tx, 0, 2);
-    controlGrid->addWidget(m_btnFt8Stop, 0, 3, 1, 2);
+    controlGrid->addWidget(m_btnFt8ClearDx, 0, 3);
+    controlGrid->addWidget(m_btnFt8Stop, 0, 4);
     controlGrid->addWidget(m_btnFt8Tune, 0, 5);
     m_chkFt8AutoSeq->setChecked(true);
     m_chkFt8AutoSeq->hide();
@@ -11859,6 +11863,9 @@ void MainWindow::setupUiConnections()
         connect(m_btnFt8Stop, &QPushButton::clicked,
                 this, &MainWindow::stopFt8Shell);
     }
+    if (m_btnFt8ClearDx != nullptr) {
+        connect(m_btnFt8ClearDx, &QPushButton::clicked, this, &MainWindow::clearFt8Dx);
+    }
     if (m_btnFt8Tune != nullptr) {
         connect(m_btnFt8Tune, &QPushButton::clicked,
                 this, &MainWindow::tuneFt8Shell);
@@ -13810,6 +13817,7 @@ void MainWindow::setReceiverRunning(bool running)
         if (m_radioFt8TxFirst != nullptr) m_radioFt8TxFirst->setEnabled(!m_txRunning && !m_offlineAnalysisActive && !ft8Pending);
         if (m_radioFt8TxSecond != nullptr) m_radioFt8TxSecond->setEnabled(!m_txRunning && !m_offlineAnalysisActive && !ft8Pending);
         if (m_btnFt8TxPeriod != nullptr) m_btnFt8TxPeriod->setEnabled(!m_txRunning && !m_offlineAnalysisActive && !ft8Pending);
+        if (m_btnFt8ClearDx != nullptr) m_btnFt8ClearDx->setEnabled(!m_offlineAnalysisActive);
         if (m_btnFt8GenerateStd != nullptr) m_btnFt8GenerateStd->setEnabled(!m_offlineAnalysisActive && !ft8Pending);
         if (m_cmbFtCqTarget != nullptr) m_cmbFtCqTarget->setEnabled(!m_offlineAnalysisActive && !ft8Pending && !m_txRunning);
         if (m_btnFt8Rx != nullptr) m_btnFt8Rx->setEnabled(!m_txRunning && !m_offlineAnalysisActive && !ft8Pending);
@@ -18652,6 +18660,45 @@ void MainWindow::stopFt8Sequencer(const QString &reason)
 }
 
 
+void MainWindow::clearFt8Dx()
+{
+    const QString dx = m_ftSession.dxCall.trimmed().toUpper().isEmpty() && m_editFt8DxCall != nullptr
+        ? m_editFt8DxCall->text().trimmed().toUpper()
+        : m_ftSession.dxCall.trimmed().toUpper();
+    const bool txActive = m_txRunning || m_ftTxWorkerRunning ||
+                          (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning());
+    traceFtAutomation("operator.clear_dx", dx.isEmpty() ? QStringLiteral("no DX") : dx, {{"tx_active", txActive}});
+
+    if (txActive) {
+        // Same TX cancel path as STOP, but Auto QSO, CQ repeat and the queue
+        // stay on and continue after the cleared QSO.
+        stopFt8ShellImpl(true);
+    } else {
+        stopFt8Sequencer(QStringLiteral("Clear DX") + (dx.isEmpty() ? QString() : QStringLiteral(" (%1)").arg(dx)));
+    }
+    if (!dx.isEmpty()) {
+        // Like a given-up QSO: no automatic answer to this station for 15 minutes.
+        m_ft8AutoNoResponseCooldown.insert(dx, QDateTime::currentDateTimeUtc().addSecs(15 * 60));
+        removeFt8QueuedCaller(dx);
+    }
+    if (m_editFt8DxCall != nullptr) m_editFt8DxCall->clear();
+    if (m_editFt8DxGrid != nullptr) m_editFt8DxGrid->clear();
+    applyFt8Settings();
+    refreshFt8StandardMessages();
+    appendLog(uiText("ft_clear_dx_log", "Clear DX: QSO ended, messages reset."));
+
+    // Serve the next caller once the transmitter is really free (a stopped
+    // TX unwinds asynchronously); give up quietly after about 3 s.
+    auto attempt = std::make_shared<std::function<void(int)>>();
+    *attempt = [this, attempt](int left) {
+        const bool busy = m_txRunning || m_ftTxWorkerRunning ||
+                          (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning());
+        if (!busy) { activateNextFt8QueuedCaller(); return; }
+        if (left > 0) QTimer::singleShot(250, this, [attempt, left]() { (*attempt)(left - 1); });
+    };
+    QTimer::singleShot(0, this, [attempt]() { (*attempt)(12); });
+}
+
 void MainWindow::updateFt8SessionQueueUi()
 {
     refreshFt8CallerQueueUi();
@@ -21301,10 +21348,16 @@ void MainWindow::beginScheduledFt8Transmit()
 
 void MainWindow::stopFt8Shell()
 {
+    stopFt8ShellImpl(false);
+}
+
+void MainWindow::stopFt8ShellImpl(bool keepAutomation)
+{
     setTxLevelTune(false);
     if (m_txWaveformPreparer) m_txWaveformPreparer->cancel();
     if(m_ftTxWorker)m_ftTxWorker->cancelPendingStart();
-    m_ft8OperatorStopLatched = true;
+    // STOP latches the automation off; Clear DX (keepAutomation) does not.
+    m_ft8OperatorStopLatched = !keepAutomation;
     m_ft8TxStartFailureCount = 0;
     const bool txWasActive = (m_txRunning ||
                               m_ftTxWorkerRunning ||
@@ -21383,14 +21436,14 @@ void MainWindow::stopFt8Shell()
         });
     }
 
-    if (m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked()) {
+    if (!keepAutomation && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked()) {
         m_chkFt8FullAutoQso->setChecked(false);
     }
-    if (m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked()) {
+    if (!keepAutomation && m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked()) {
         m_chkFt8CqRepeat->setChecked(false);
     }
 
-    stopFt8Sequencer(QStringLiteral("STOP requested"));
+    stopFt8Sequencer(keepAutomation ? QStringLiteral("Clear DX") : QStringLiteral("STOP requested"));
     setReceiverRunning(m_rxRunning && !m_txRunning);
     updateTxControlState();
     updateFt8TxBannerUi();
