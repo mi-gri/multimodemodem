@@ -240,6 +240,7 @@ public:
     QString ft8LiveDecodeDepth = "adaptive";
     bool ftGpuSyncEnabled = false;
     bool ftGpuDecodeEnabled = false;
+    bool ftAutoModeEnabled = false;    // Auto QSO allowed; enabled only after the legal/safety notice
     bool ftLateDecodeEnabled = true;   // continue the R30 recovery after the reply deadline, display only
     bool ftDriftRxEnabled = false;
     double ftDriftMaxHzPerSec = 2.0;

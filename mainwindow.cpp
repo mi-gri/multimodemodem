@@ -9576,7 +9576,8 @@ void MainWindow::loadFt8SettingsToUi()
     if (m_chkFt8FullAutoQso != nullptr) {
         m_chkFt8FullAutoQso->setChecked(false);
     }
-    m_ft8AutoModeEnabled = true;   // Auto mode is always on (Auto QSO control always available)
+    // Auto mode (Auto QSO) only after it was enabled in Settings with the notice.
+    m_ft8AutoModeEnabled = m_settings.ftAutoModeEnabled;
     updateFt8AutoModeVisibility();
     m_chkFt8HoldTxFreq->setChecked(m_settings.ft8TxFrequencyStrategy == QStringLiteral("fixed") || m_settings.ft8HoldTxFrequency);
     const int strategyIndex = m_cmbFt8TxStrategy->findData(m_settings.ft8TxFrequencyStrategy);
@@ -12377,6 +12378,17 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
     const bool decodeVisualChanged = fullApply || decodeTableSettingsChanged(*previousSettings, m_settings);
     const bool catChanged = fullApply || catSettingsKey(*previousSettings) != catSettingsKey(m_settings);
     const bool rotatorChanged = fullApply || rotatorSettingsKey(*previousSettings) != rotatorSettingsKey(m_settings);
+
+    // Auto mode switched off in Settings: stop a running Auto QSO the normal
+    // way (the toggle handler ends the automation), then hide the control.
+    if (m_ft8AutoModeEnabled != m_settings.ftAutoModeEnabled) {
+        m_ft8AutoModeEnabled = m_settings.ftAutoModeEnabled;
+        if (!m_ft8AutoModeEnabled && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked())
+            m_chkFt8FullAutoQso->setChecked(false);
+        updateFt8AutoModeVisibility();
+        appendLog(m_ft8AutoModeEnabled ? QStringLiteral("Auto mode enabled in Settings (notice confirmed).")
+                                       : QStringLiteral("Auto mode disabled in Settings; Auto QSO is off."));
+    }
 
     if (fullApply || previousSettings->frequencyListJson != m_settings.frequencyListJson ||
         previousSettings->frequencyListModes != m_settings.frequencyListModes ||

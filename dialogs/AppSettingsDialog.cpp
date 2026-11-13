@@ -4,6 +4,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include "AppSettingsDialog.h"
+#include "AutoModeNoticeDialog.h"
 #include "FrequencyListEditor.h"
 #include "../network/WavelogClient.h"
 #include <QFormLayout>
@@ -900,6 +901,22 @@ QWidget *AppSettingsDialog::makeFtDecoderPage()
     m_chkFtGpuDecode->setToolTip(L(QStringLiteral("Offloads symbol tone energies to OpenCL FP64. Checks CPU parity and total time, with automatic CPU fallback. Independent of drift compensation.")));
     gpuForm->addRow(m_chkFtGpuDecode);
     layout->addWidget(gpuGroup);
+    // Auto mode (Auto QSO): off by default; switching it on needs the notice.
+    auto *autoGroup = new QGroupBox(L(QStringLiteral("Auto mode")), page);
+    auto *autoForm = new QFormLayout(autoGroup);
+    m_chkFtAutoMode = new QCheckBox(L(QStringLiteral("Enable Auto mode (Auto QSO for FT8/FT4)")), autoGroup);
+    m_chkFtAutoMode->setObjectName(QStringLiteral("ftAutoModeEnabled"));
+    m_chkFtAutoMode->setChecked(m_initialSettings.ftAutoModeEnabled);
+    m_chkFtAutoMode->setToolTip(L(QStringLiteral("Lets Auto QSO answer CQ calls and complete QSOs automatically. Switching it on shows a legal and safety notice that must be confirmed.")));
+    connect(m_chkFtAutoMode, &QCheckBox::toggled, this, [this](bool checked) {
+        if (!checked) return;
+        if (!AutoModeNotice::confirm(this, [this](const QString &source) { return L(source); })) {
+            const QSignalBlocker block(m_chkFtAutoMode);
+            m_chkFtAutoMode->setChecked(false);
+        }
+    });
+    autoForm->addRow(m_chkFtAutoMode);
+    layout->addWidget(autoGroup);
     auto *lateGroup = new QGroupBox(L(QStringLiteral("FT8 / FT4 late decodes")), page);
     auto *lateForm = new QFormLayout(lateGroup);
     m_chkFtLateDecode = new QCheckBox(L(QStringLiteral("Keep searching after the reply deadline and show late decodes")), lateGroup);
@@ -2679,6 +2696,7 @@ void AppSettingsDialog::collectSettings()
     if (m_editQrzUsername) merged.qrzUsername = m_editQrzUsername->text().trimmed();
     if (m_editQrzPassword) merged.qrzPassword = m_editQrzPassword->text();
     if (m_chkFtLateDecode) merged.ftLateDecodeEnabled = m_chkFtLateDecode->isChecked();
+    if (m_chkFtAutoMode) merged.ftAutoModeEnabled = m_chkFtAutoMode->isChecked();
     if (m_chkFtDriftRx) merged.ftDriftRxEnabled = m_chkFtDriftRx->isChecked();
     if (m_spinFtDriftMax) merged.ftDriftMaxHzPerSec = m_spinFtDriftMax->value();
     if (m_chkFtGpuSync) merged.ftGpuSyncEnabled = m_chkFtGpuSync->isChecked();

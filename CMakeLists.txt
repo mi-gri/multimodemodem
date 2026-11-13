@@ -648,6 +648,8 @@ add_executable(MultiModeModem
     dialogs/FrequencyListEditor.cpp
     dialogs/AppSettingsDialog.h
     dialogs/AppSettingsDialog.cpp
+    dialogs/AutoModeNoticeDialog.cpp
+    dialogs/AutoModeNoticeDialog.h
     dialogs/AudioSettingsDialog.ui
     dialogs/AudioSettingsDialog.h
     dialogs/AudioSettingsDialog.cpp

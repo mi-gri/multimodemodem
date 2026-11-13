@@ -4,6 +4,12 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## Unreleased
 
+- Auto mode (Auto QSO for FT8/FT4) is a setting again (Settings -> FT decoder, off by
+  default). Switching it on shows a notice: automatic operation may not be permitted in
+  every country, can disqualify a contest entry, the station must not run unattended for
+  long, and the operator is responsible for any damage. It is enabled only after "I have
+  read and understood your notice and want to continue" is ticked and confirmed.
+  Switching it off ends a running Auto QSO.
 - Live language change: captions set from translation keys (for example the Decode menu)
   stayed in the old language until a restart. The generic translator now leads a shown
   text back to its English source; help tooltips, tooltips of fixed protocol buttons

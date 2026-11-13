@@ -2350,7 +2350,7 @@ private:
     QCheckBox *m_chkFt8FullAutoQso = nullptr;
     QCheckBox *m_chkFt8CallerQueue = nullptr;
     QLabel *m_lblFt8SessionQueue = nullptr;
-    bool m_ft8AutoModeEnabled = true;   // always on; kept as the automation gate
+    bool m_ft8AutoModeEnabled = false;  // Settings: Auto mode (Auto QSO) after the legal notice
     QString m_ftAutomationTraceId;
     QHash<QString, QPair<QByteArray, qint64>> m_ftAutomationLastTrace;
     bool m_ft8OperatorStopLatched = false;
