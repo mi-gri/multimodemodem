@@ -25,7 +25,7 @@ WsprTransmitter::WsprTransmitter(const QString &message, int sampleRate, double 
 }
 
 int WsprTransmitter::sampleRate() const { return m_sampleRate; }
-bool WsprTransmitter::isFinished() const { return m_position >= m_samples.size(); }
+bool WsprTransmitter::isFinished() const { return m_extraLeadSamples <= 0 && m_position >= m_samples.size(); }
 bool WsprTransmitter::lowLatencyTx() const { return true; }
 int WsprTransmitter::trailingSilenceSamples() const { return 0; }
 bool WsprTransmitter::generationSucceeded() const { return m_ok; }
@@ -42,13 +42,34 @@ QString WsprTransmitter::description() const
     return QStringLiteral("WSPR TX: %1, %2 Hz").arg(m_message).arg(m_audioHz, 0, 'f', 0);
 }
 
+bool WsprTransmitter::prepareForPlayback(qint64 utcMs)
+{
+    constexpr qint64 periodMs = 120000;
+    const qint64 boundary = (utcMs + periodMs / 2) / periodMs * periodMs;
+    const qint64 offsetMs = utcMs - boundary;
+    const qint64 leadMs = static_cast<qint64>(kLeadSeconds * 1000.0);
+    if (offsetMs > 0) {
+        m_position = static_cast<int>(qMin(offsetMs, leadMs) * m_sampleRate / 1000);
+    } else if (offsetMs < 0) {
+        m_extraLeadSamples = static_cast<int>(qMin(-offsetMs, qint64{2000}) * m_sampleRate / 1000);
+    }
+    return true;
+}
+
 int WsprTransmitter::generate(float *output, int sampleCount)
 {
     if (output == nullptr || sampleCount <= 0 || isFinished()) return 0;
-    const int n = qBound(0, sampleCount, m_samples.size() - m_position);
-    std::copy(m_samples.constData() + m_position, m_samples.constData() + m_position + n, output);
+    int written = 0;
+    if (m_extraLeadSamples > 0) {
+        const int z = qMin(sampleCount, m_extraLeadSamples);
+        std::fill(output, output + z, 0.0f);
+        m_extraLeadSamples -= z;
+        written = z;
+    }
+    const int n = qBound(0, sampleCount - written, m_samples.size() - m_position);
+    std::copy(m_samples.constData() + m_position, m_samples.constData() + m_position + n, output + written);
     m_position += n;
-    return n;
+    return written + n;
 }
 
 void WsprTransmitter::buildWaveform()

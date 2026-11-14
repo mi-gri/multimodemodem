@@ -21,6 +21,10 @@ public:
                     std::function<bool()> cancelled = {});
 
     int sampleRate() const override;
+    // Aligns the tone start to :01 after the even minute: the first pull
+    // comes later than the minute (CAT PTT, audio start), so that part of
+    // the 1 s lead is skipped; an early pull gets extra silence.
+    bool prepareForPlayback(qint64 utcMs) override;
     int generate(float *output, int sampleCount) override;
     bool isFinished() const override;
     double progress() const override;
@@ -46,6 +50,7 @@ private:
     double m_audioHz = 1500.0;
     QVector<float> m_samples;
     int m_position = 0;
+    int m_extraLeadSamples = 0;
     bool m_ok = false;
     std::function<bool()> m_cancelled;
 };

@@ -171,6 +171,26 @@ int main(int argc, char **argv)
             if (dd.message.text == "DO3BOX JO30 23" && std::fabs(dd.audioHz - 1530.0) < 0.5 &&
                 std::fabs(dd.dtSeconds) < 0.3) found = true;
         check(txOk && found, "transmitter waveform (1 s lead, 162 symbols) decodes at 1530 Hz, DT 0");
+        // First pull 280 ms after the even minute: the tone still starts at :01.
+        {
+            const qint64 minute = 1794600000000LL;   // an even UTC minute
+            auto toneStartMs = [](WsprTransmitter &t, qint64 pullUtcMs) {
+                t.prepareForPlayback(pullUtcMs);
+                std::vector<float> buf(48000 * 3);
+                const int got = t.generate(buf.data(), static_cast<int>(buf.size()));
+                int first = 0;
+                while (first < got && buf[static_cast<size_t>(first)] == 0.0f) ++first;
+                return pullUtcMs + first * 1000LL / 48000;
+            };
+            WsprTransmitter late(QStringLiteral("DO3BOX JO30 23"), 48000, 1500.0);
+            WsprTransmitter early(QStringLiteral("DO3BOX JO30 23"), 48000, 1500.0);
+            const qint64 lateStart = toneStartMs(late, minute + 280);
+            const qint64 earlyStart = toneStartMs(early, minute - 150);
+            std::printf("  tone start: pull +280 ms -> %+lld ms, pull -150 ms -> %+lld ms (target +1000)\n",
+                        static_cast<long long>(lateStart - minute), static_cast<long long>(earlyStart - minute));
+            check(std::llabs(lateStart - minute - 1000) <= 2 && std::llabs(earlyStart - minute - 1000) <= 2,
+                  "transmitter aligns the tone start to :01 whatever the first pull time");
+        }
         WsprTransmitter outside(QStringLiteral("DO3BOX JO30 23"), 48000, 1700.0);
         WsprTransmitter bad(QStringLiteral("DO3BOX JO30"), 48000, 1500.0);
         check(!outside.generationSucceeded() && !bad.generationSucceeded(),
