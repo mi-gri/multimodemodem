@@ -46,6 +46,8 @@ public:
     void rebuild(const Inputs &inputs);
 
     QString message(int row) const;
+    /// WSJT-X stdCall(): fits the 28-bit standard call field.
+    static bool isStandardCall(const QString &call);
     QStringList messages() const { return m_messages; }
     bool isValid() const { return m_valid; }
     int findRow(const QString &message) const;

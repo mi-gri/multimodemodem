@@ -1389,6 +1389,11 @@ if(BUILD_TESTING)
         target_compile_options(m3_receiver_filter_regression PRIVATE -fno-access-control)
     endif()
     add_test(NAME m3_receiver_filter_regression COMMAND m3_receiver_filter_regression)
+    add_executable(m3_ft_standard_message_set_regression
+        tests/FtStandardMessageSetRegression.cpp modems/ft8/FtStandardMessageSet.cpp modems/ft8/FtDecodedText.cpp)
+    target_include_directories(m3_ft_standard_message_set_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_ft_standard_message_set_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core)
+    add_test(NAME m3_ft_standard_message_set_regression COMMAND m3_ft_standard_message_set_regression)
     add_executable(m3_waterfall_cq_regression
         tests/WaterfallCqRegression.cpp dsp/WaterfallLeveler.cpp dsp/DspEngine.cpp widgets/CqSpots.h
         modems/ft8/FtDecodeFilter.h modems/ft8/FtDecodeColours.h)

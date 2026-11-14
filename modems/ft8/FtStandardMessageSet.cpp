@@ -12,6 +12,12 @@ const QRegularExpression kRegexCqTarget(QStringLiteral("^[A-Z]{1,4}$"));
 
 namespace {
 
+// WSJT-X MainWindow::stdCall(): calls that fit the 28-bit standard field.
+// Others (II4GCLB, DL/N0PNG) must be sent hashed as <CALL> or in a type 4
+// message; a plain "II4GCLB DO3BOX JO30" packs as truncated free text.
+const QRegularExpression kRegexStandardCall(
+    QStringLiteral("^([A-Z]{0,2}|[A-Z][0-9]|[0-9][A-Z])([0-9][A-Z]{0,3})(/R|/P)?$"));
+
 QString normCall(QString s)
 {
     return s.trimmed().toUpper();
@@ -66,12 +72,41 @@ void FtStandardMessageSet::rebuild(const Inputs &inputs)
     const QString target = inputs.cqTarget.trimmed().toUpper();
     const QString cq = kRegexCqTarget.match(target).hasMatch()
         ? QStringLiteral("CQ %1").arg(target) : QStringLiteral("CQ");
-    m_messages << QStringLiteral("%1 %2 %3").arg(cq, m_myCall, m_myGrid)
-               << QStringLiteral("%1 %2 %3").arg(dx, m_myCall, m_myGrid)
-               << QStringLiteral("%1 %2 %3").arg(dx, m_myCall, m_report)
-               << QStringLiteral("%1 %2 %3").arg(dx, m_myCall, m_rReport)
-               << QStringLiteral("%1 %2 RR73").arg(dx, m_myCall)
-               << QStringLiteral("%1 %2 73").arg(dx, m_myCall);
+    const bool hisStd = m_dxCall.isEmpty() || isStandardCall(m_dxCall);
+    const bool myStd = isStandardCall(m_myCall);
+    const QString hashedDx = QStringLiteral("<%1>").arg(dx);
+    const QString hashedMy = QStringLiteral("<%1>").arg(m_myCall);
+    if (hisStd && myStd) {
+        m_messages << QStringLiteral("%1 %2 %3").arg(cq, m_myCall, m_myGrid)
+                   << QStringLiteral("%1 %2 %3").arg(dx, m_myCall, m_myGrid)
+                   << QStringLiteral("%1 %2 %3").arg(dx, m_myCall, m_report)
+                   << QStringLiteral("%1 %2 %3").arg(dx, m_myCall, m_rReport)
+                   << QStringLiteral("%1 %2 RR73").arg(dx, m_myCall)
+                   << QStringLiteral("%1 %2 73").arg(dx, m_myCall);
+    } else if (myStd) {
+        // WSJT-X genStdMsgs, non-standard DX call: hash it where a grid or
+        // report is needed; RR73/73 go as type 4 with my call hashed.
+        m_messages << QStringLiteral("%1 %2 %3").arg(cq, m_myCall, m_myGrid)
+                   << QStringLiteral("%1 %2 %3").arg(hashedDx, m_myCall, m_myGrid)
+                   << QStringLiteral("%1 %2 %3").arg(hashedDx, m_myCall, m_report)
+                   << QStringLiteral("%1 %2 %3").arg(hashedDx, m_myCall, m_rReport)
+                   << QStringLiteral("%1 %2 RR73").arg(dx, hashedMy)
+                   << QStringLiteral("%1 %2 73").arg(dx, hashedMy);
+    } else {
+        // Non-standard own call (WSJT-X): CQ without grid, answer without
+        // grid, reports with my call hashed, RR73/73 with the DX hashed.
+        m_messages << QStringLiteral("%1 %2").arg(cq, m_myCall)
+                   << QStringLiteral("%1 %2").arg(hashedDx, m_myCall)
+                   << QStringLiteral("%1 %2 %3").arg(dx, hashedMy, m_report)
+                   << QStringLiteral("%1 %2 %3").arg(dx, hashedMy, m_rReport)
+                   << QStringLiteral("%1 %2 RR73").arg(hashedDx, m_myCall)
+                   << QStringLiteral("%1 %2 73").arg(hashedDx, m_myCall);
+    }
+}
+
+bool FtStandardMessageSet::isStandardCall(const QString &call)
+{
+    return kRegexStandardCall.match(call.trimmed().toUpper()).hasMatch();
 }
 
 QString FtStandardMessageSet::message(int row) const

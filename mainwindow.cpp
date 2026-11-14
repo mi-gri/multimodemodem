@@ -20138,13 +20138,14 @@ void MainWindow::handleFt8DecodeDoubleClicked(QTableWidgetItem *item)
     // A double-click on our own TX/history line ("DX MYCALL ..."): the
     // correspondent is the addressee, never our own call. Resume with the
     // message of that line (WSJT-X behaviour).
+    auto unhashed = [](QString word) { return word.remove(QLatin1Char('<')).remove(QLatin1Char('>')).trimmed().toUpper(); };
     const bool rawIsMyOwnTx = rawParts.size() >= 2 &&
-                              FtDecodedText::callMatches(rawParts.at(1), myCall) &&
-                              !FtDecodedText::callMatches(rawParts.at(0), myCall) &&
+                              FtDecodedText::callMatches(unhashed(rawParts.at(1)), myCall) &&
+                              !FtDecodedText::callMatches(unhashed(rawParts.at(0)), myCall) &&
                               rawParts.at(0) != QStringLiteral("CQ") &&
-                              isFt8CallsignToken(rawParts.at(0));
+                              isFt8CallsignToken(unhashed(rawParts.at(0)));
     if (rawIsMyOwnTx) {
-        call = rawParts.at(0).trimmed().toUpper();
+        call = unhashed(rawParts.at(0));
         const QString payload = rawParts.size() >= 3 ? rawParts.at(2).trimmed().toUpper() : QString();
         if (payload == QStringLiteral("73")) preferredTxRow = 5;
         else if (payload == QStringLiteral("RR73") || payload == QStringLiteral("RRR")) preferredTxRow = 4;
