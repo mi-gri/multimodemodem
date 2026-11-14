@@ -20135,6 +20135,31 @@ void MainWindow::handleFt8DecodeDoubleClicked(QTableWidgetItem *item)
         preferredTxRow = 4; // DX MY RR73
     }
 
+    // A double-click on our own TX/history line ("DX MYCALL ..."): the
+    // correspondent is the addressee, never our own call. Resume with the
+    // message of that line (WSJT-X behaviour).
+    const bool rawIsMyOwnTx = rawParts.size() >= 2 &&
+                              FtDecodedText::callMatches(rawParts.at(1), myCall) &&
+                              !FtDecodedText::callMatches(rawParts.at(0), myCall) &&
+                              rawParts.at(0) != QStringLiteral("CQ") &&
+                              isFt8CallsignToken(rawParts.at(0));
+    if (rawIsMyOwnTx) {
+        call = rawParts.at(0).trimmed().toUpper();
+        const QString payload = rawParts.size() >= 3 ? rawParts.at(2).trimmed().toUpper() : QString();
+        if (payload == QStringLiteral("73")) preferredTxRow = 5;
+        else if (payload == QStringLiteral("RR73") || payload == QStringLiteral("RRR")) preferredTxRow = 4;
+        else if (kRegexRReport.match(payload).hasMatch()) preferredTxRow = 3;
+        else if (!payload.isEmpty() && (payload.startsWith('+') || payload.startsWith('-'))) preferredTxRow = 2;
+        else preferredTxRow = 1;
+        grid = m_ftSession.knownGridFor(call).left(4);
+    }
+    if (!call.isEmpty() && FtDecodedText::callMatches(call, myCall)) {
+        appendLog(QStringLiteral("FT selection ignored: %1 would make my own call %2 the correspondent.")
+                      .arg(message, myCall));
+        traceFtAutomation("operator.select_rejected", "own_call", {{"rx_message", message}});
+        return;
+    }
+
     if (!m_ft8SelectionOnly && !call.isEmpty()) {
         const QString previousDx = m_ftSession.dxCall.trimmed().toUpper();
         const bool changingCorrespondent = !previousDx.isEmpty() &&
