@@ -454,6 +454,7 @@ constexpr int kFtWorkedRole = Qt::UserRole + 431;      // station already in the
 constexpr int kFtLastQsoUtcRole = Qt::UserRole + 432;  // its latest QSO (UTC)
 constexpr int kFtSlotSeparatorRole = Qt::UserRole + 433;  // "──── HHMMSS ────" row
 constexpr int kFtLogPendingSinceRole = Qt::UserRole + 434; // logbook status asked at (ms since epoch), 0 = known
+constexpr int kFtLogbookRecentHours = 24;            // logbook lookup "recent" window (diagnostics only)
 constexpr int kFtCountryPrefixRole = Qt::UserRole + 435;   // DXCC primary prefix of the station (cty.dat)
 constexpr int kFtWatchedRole = Qt::UserRole + 436;         // station is on the watch list
 constexpr int kFtContinentRole = Qt::UserRole + 437;       // cty.dat continent of the station
@@ -4319,7 +4320,7 @@ void MainWindow::queueFtLogbookQueriesForDecode(const Ft8RxDecoder::Decode &deco
     const QString band = (m_cmbFt8Band != nullptr) ? m_cmbFt8Band->currentText().trimmed().toLower()
                                                    : m_settings.ft8Band.trimmed().toLower();
     const QString mode = currentAdifMode().trimmed().toUpper();
-    const int recentHours = qBound(1, m_settings.ftAutoQsoRecentHours, 168);
+    const int recentHours = kFtLogbookRecentHours;
     QVariantList queries;
     QSet<QString> seen;
     for (const QString &rawCall : calls) {
@@ -9229,7 +9230,7 @@ void MainWindow::setupFt8Page()
     m_actFt8FilterWorked = filterMenu->addAction(uiText("ft_filter_worked", "Hide worked stations"));
     m_actFt8FilterWorked->setCheckable(true);
     m_actFt8FilterWorked->setChecked(m_settings.ftDecodeFilterWorked);
-    m_actFt8FilterWorked->setToolTip(uiText("ft_filter_worked_tooltip", "Hides stations that are already in the logbook (any band and mode)."));
+    m_actFt8FilterWorked->setToolTip(uiText("ft_filter_worked_tooltip", "Hides stations that are already in the logbook (any band and mode). Auto QSO does not call them either."));
     {
         QWidget *daysRow = new QWidget(filterMenu);
         QHBoxLayout *daysLayout = new QHBoxLayout(daysRow);
@@ -9255,7 +9256,7 @@ void MainWindow::setupFt8Page()
     m_actFt8FilterCountries = filterMenu->addAction(uiText("ft_filter_countries", "Hide countries"));
     m_actFt8FilterCountries->setCheckable(true);
     m_actFt8FilterCountries->setChecked(m_settings.ftDecodeFilterCountries);
-    m_actFt8FilterCountries->setToolTip(uiText("ft_filter_countries_tooltip", "Hides stations from the DXCC countries listed below. Stations on the watch list stay visible."));
+    m_actFt8FilterCountries->setToolTip(uiText("ft_filter_countries_tooltip", "Hides stations from the DXCC countries listed below; Auto QSO does not call them either. Stations on the watch list stay visible."));
     {
         QWidget *countriesRow = new QWidget(filterMenu);
         QHBoxLayout *countriesLayout = new QHBoxLayout(countriesRow);
@@ -9281,7 +9282,7 @@ void MainWindow::setupFt8Page()
     // JTDX "Hide messages from continents".
     m_menuFt8FilterContinents = filterMenu->addMenu(uiText("ft_filter_continents", "Hide continents"));
     m_menuFt8FilterContinents->setToolTipsVisible(true);
-    m_menuFt8FilterContinents->setToolTip(uiText("ft_filter_continents_tooltip", "Hides stations from the ticked continents (cty.dat). Stations on the watch list stay visible."));
+    m_menuFt8FilterContinents->setToolTip(uiText("ft_filter_continents_tooltip", "Hides stations from the ticked continents (cty.dat); Auto QSO does not call them either. Stations on the watch list stay visible."));
     {
         const QStringList hiddenContinents = FtDecodeFilter::continentList(m_settings.ftDecodeFilterContinentList);
         const QStringList continentNames = {
@@ -18504,7 +18505,7 @@ void MainWindow::handleFt8FullAutoQsoToggled(bool enabled)
     }
 
     traceFtAutomation("control", enabled ? "auto_qso_enabled" : "auto_qso_disabled",
-        {{"duplicate_policy",m_settings.ftAutoQsoDuplicatePolicy},{"recent_hours",m_settings.ftAutoQsoRecentHours},
+        {{"worked_filter",m_settings.ftDecodeFilterWorked},{"worked_filter_days",m_settings.ftDecodeFilterWorkedDays},
          {"no_response_limit",m_settings.ft8NoResponseRetryCount},{"auto_log",m_chkFt8AutoLog && m_chkFt8AutoLog->isChecked()}});
     refreshFtCqWorkListUi();
     updateFt8SequencerUi();
@@ -18704,13 +18705,15 @@ Ft8FullAutoCqCandidate MainWindow::buildFt8FullAutoCqCandidate(const Ft8RxDecode
     }
 
     candidate.workedCall = logbookStatus.value(QStringLiteral("worked")).toBool();
-    if (m_settings.ftAutoQsoDuplicatePolicy == QStringLiteral("never_worked") && candidate.workedCall) {
-        candidate.priorityText = QStringLiteral("already in log");
-        return candidate;
-    }
-    if (m_settings.ftAutoQsoDuplicatePolicy == QStringLiteral("recent") &&
-        logbookStatus.value(QStringLiteral("recentWorked")).toBool()) {
-        candidate.priorityText = QStringLiteral("recently worked");
+    // Duplicates follow the decode filter "hide worked stations (N days)":
+    // what the table hides is not called automatically either.
+    if (m_settings.ftDecodeFilterWorked &&
+        FtDecodeFilter::hiddenAsWorked(candidate.workedCall,
+                                       logbookStatus.value(QStringLiteral("latestCallUtc")).toDateTime(),
+                                       m_settings.ftDecodeFilterWorkedDays, QDateTime::currentDateTimeUtc())) {
+        candidate.priorityText = m_settings.ftDecodeFilterWorkedDays > 0
+            ? QStringLiteral("worked filter (%1 days)").arg(m_settings.ftDecodeFilterWorkedDays)
+            : QStringLiteral("worked filter");
         return candidate;
     }
 
@@ -18854,7 +18857,7 @@ void MainWindow::processFt8FullAutoCqCandidates()
             ++i;continue;
         }
         const auto query=makeFtLogbookQuery(candidate.call,candidate.band,candidate.mode,candidate.dxcc,candidate.grid,
-            qBound(1,m_settings.ftAutoQsoRecentHours,168),0);
+            kFtLogbookRecentHours,0);
         const auto status=cachedFtLogbookStatus(query);
         if (status.isEmpty()) {queueFtLogbookQueriesForDecode(candidate.decode,true);++i;continue;}
         candidate=buildFt8FullAutoCqCandidate(candidate.decode,status);
@@ -19816,7 +19819,7 @@ void MainWindow::completeFt8Qso(const QString &reason)
     m_ftSession.deferredState = Ft8SequencerState::Idle;
     const bool autoQsoArmed = m_ft8AutoModeEnabled && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked();
     if (autoQsoArmed) {
-        appendLog(currentAdifMode() + " QSO complete: Auto QSO remains armed and will answer the next decoded CQ subject to blacklist/duplicate policy.");
+        appendLog(currentAdifMode() + " QSO complete: Auto QSO remains armed and will answer the next decoded CQ subject to blacklist and decode filters.");
     } else {
         appendLog(currentAdifMode() + " QSO complete: CQ auto-resume disabled; staying in RX.");
     }
@@ -20565,7 +20568,7 @@ void MainWindow::styleFt8DecodeRow(int row, QVariantList *missingQueries, QSet<Q
                                                        : m_settings.ft8Band.trimmed().toLower();
         const QVariantMap query = makeFtLogbookQuery(station, band, currentAdifMode().trimmed().toUpper(),
                                                      cty.valid ? cty.entity.dxcc : QString(), grid,
-                                                     qBound(1, m_settings.ftAutoQsoRecentHours, 168), 0);
+                                                     kFtLogbookRecentHours, 0);
         const QVariantMap status = cachedFtLogbookStatus(query);
         if (status.isEmpty()) {
             const QString key = query.value(QStringLiteral("cacheKey")).toString();
@@ -21226,7 +21229,7 @@ void MainWindow::handleFt8DecodeReady(const Ft8RxDecoder::Decode &decode)
     const QString lookupBand = (m_cmbFt8Band != nullptr) ? m_cmbFt8Band->currentText().trimmed().toLower()
                                                          : m_settings.ft8Band.trimmed().toLower();
     const QString lookupMode = currentAdifMode().trimmed().toUpper();
-    const int lookupRecentHours = qBound(1, m_settings.ftAutoQsoRecentHours, 168);
+    const int lookupRecentHours = kFtLogbookRecentHours;
     const QString primaryCallForDisplay = ft8PrimaryCallsignForDisplay(parsed, myCall);
     const Ft8DecodeDisplayInfo displayInfo = makeFt8DecodeDisplayInfo(parsed, myCall,
                                                                        primaryCallForDisplay.isEmpty() ? QString() : m_ftSession.knownGridFor(primaryCallForDisplay));

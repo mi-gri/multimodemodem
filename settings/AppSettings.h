@@ -299,10 +299,8 @@ public:
     bool ftWatchListIconEnabled = true;
     QStringList ftBlacklistCalls;
     QStringList ftWatchListCalls;
-    // never_worked = skip CQs already present in the log; recent = skip calls
-    // worked within ftAutoQsoRecentHours; none = answer any CQ not blacklisted.
-    QString ftAutoQsoDuplicatePolicy = "never_worked";
-    int ftAutoQsoRecentHours = 24;
+    // Auto QSO duplicates follow ftDecodeFilterWorked/ftDecodeFilterWorkedDays
+    // (the former FT8/autoQsoDuplicatePolicy setting is no longer read).
     // Directed CQs: Auto QSO answers "CQ DX/NA/USA ..." only when my station
     // fits; "CQ DX" from my own continent (or country) is skipped.
     bool ftAutoQsoRespectCqDirective = true;

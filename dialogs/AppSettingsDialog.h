@@ -229,8 +229,6 @@ private:
     QSpinBox *m_spinFtWaterfallCqSeconds = nullptr;
     QPlainTextEdit *m_editFtBlacklist = nullptr;
     QPlainTextEdit *m_editFtWatchList = nullptr;
-    QComboBox *m_cmbAutoQsoDuplicatePolicy = nullptr;
-    QSpinBox *m_spinAutoQsoRecentHours = nullptr;
     QCheckBox *m_chkAutoQsoRespectCqDirective = nullptr;
     QComboBox *m_cmbAutoQsoCqDxRule = nullptr;
     QCheckBox *m_chkAutoQsoOnlyCqTarget = nullptr;

@@ -1886,20 +1886,6 @@ QWidget *AppSettingsDialog::makeFtColourEditor()
     grid->addWidget(watchLabel, 11, 0);
     grid->addWidget(m_editFtWatchList, 11, 1, 1, 4);
 
-    QLabel *autoPolicyLabel = new QLabel(L(QStringLiteral("Auto QSO duplicate policy")), group);
-    m_cmbAutoQsoDuplicatePolicy = new QComboBox(group);
-    m_cmbAutoQsoDuplicatePolicy->addItem(L(QStringLiteral("Answer all non-blacklisted CQs")), QStringLiteral("none"));
-    m_cmbAutoQsoDuplicatePolicy->addItem(L(QStringLiteral("Exclude calls already in log")), QStringLiteral("never_worked"));
-    m_cmbAutoQsoDuplicatePolicy->addItem(L(QStringLiteral("Exclude calls worked in the last period")), QStringLiteral("recent"));
-    int policyIndex = m_cmbAutoQsoDuplicatePolicy->findData(m_initialSettings.ftAutoQsoDuplicatePolicy);
-    m_cmbAutoQsoDuplicatePolicy->setCurrentIndex(policyIndex >= 0 ? policyIndex : 1);
-    m_spinAutoQsoRecentHours = new QSpinBox(group);
-    m_spinAutoQsoRecentHours->setRange(1, 168);
-    m_spinAutoQsoRecentHours->setSuffix(QStringLiteral(" h"));
-    m_spinAutoQsoRecentHours->setValue(qBound(1, m_initialSettings.ftAutoQsoRecentHours, 168));
-    grid->addWidget(autoPolicyLabel, 12, 0);
-    grid->addWidget(m_cmbAutoQsoDuplicatePolicy, 12, 1, 1, 3);
-    grid->addWidget(m_spinAutoQsoRecentHours, 12, 4);
 
     // Directed CQs (CQ DX, CQ NA, CQ USA ...) and the own CQ destination.
     m_chkAutoQsoRespectCqDirective = new QCheckBox(L(QStringLiteral("Answer directed CQs only if my station fits")), group);
@@ -2905,12 +2891,6 @@ void AppSettingsDialog::collectSettings()
     }
     if (m_editFtWatchList != nullptr) {
         merged.ftWatchListCalls = callsFromText(m_editFtWatchList->toPlainText());
-    }
-    if (m_cmbAutoQsoDuplicatePolicy != nullptr) {
-        merged.ftAutoQsoDuplicatePolicy = m_cmbAutoQsoDuplicatePolicy->currentData().toString();
-    }
-    if (m_spinAutoQsoRecentHours != nullptr) {
-        merged.ftAutoQsoRecentHours = m_spinAutoQsoRecentHours->value();
     }
     if (m_chkAutoQsoRespectCqDirective != nullptr) {
         merged.ftAutoQsoRespectCqDirective = m_chkAutoQsoRespectCqDirective->isChecked();

@@ -674,20 +674,12 @@ void AppSettings::load()
     ftWatchListIconEnabled = settings.value("FT8/watchListIconEnabled", ftWatchListIconEnabled).toBool();
     ftBlacklistCalls = settings.value("FT8/blacklistCalls", ftBlacklistCalls).toStringList();
     ftWatchListCalls = settings.value("FT8/watchListCalls", ftWatchListCalls).toStringList();
-    ftAutoQsoDuplicatePolicy = settings.value("FT8/autoQsoDuplicatePolicy", ftAutoQsoDuplicatePolicy).toString().trimmed().toLower();
-    if (ftAutoQsoDuplicatePolicy != "none" && ftAutoQsoDuplicatePolicy != "never_worked" && ftAutoQsoDuplicatePolicy != "recent") {
-        ftAutoQsoDuplicatePolicy = "never_worked";
-    }
     ftAutoQsoRespectCqDirective = settings.value("FT8/autoQsoRespectCqDirective", ftAutoQsoRespectCqDirective).toBool();
     ftAutoQsoCqDxRule = settings.value("FT8/autoQsoCqDxRule", ftAutoQsoCqDxRule).toString().trimmed().toLower();
     if (ftAutoQsoCqDxRule != "continent" && ftAutoQsoCqDxRule != "country") {
         ftAutoQsoCqDxRule = "continent";
     }
     ftAutoQsoOnlyCqTarget = settings.value("FT8/autoQsoOnlyCqTarget", ftAutoQsoOnlyCqTarget).toBool();
-    ftAutoQsoRecentHours = settings.value("FT8/autoQsoRecentHours", ftAutoQsoRecentHours).toInt();
-    if (ftAutoQsoRecentHours < 1 || ftAutoQsoRecentHours > 168) {
-        ftAutoQsoRecentHours = 24;
-    }
     ft8CqRepeatCount = settings.value("FT8/cqRepeatCount", ft8CqRepeatCount).toInt();
     if (ft8CqRepeatCount < 1 || ft8CqRepeatCount > 99) {
         ft8CqRepeatCount = 3;
@@ -1114,8 +1106,8 @@ bool AppSettings::save() const
     settings.setValue("FT8/watchListIconEnabled", ftWatchListIconEnabled);
     settings.setValue("FT8/blacklistCalls", ftBlacklistCalls);
     settings.setValue("FT8/watchListCalls", ftWatchListCalls);
-    settings.setValue("FT8/autoQsoDuplicatePolicy", ftAutoQsoDuplicatePolicy);
-    settings.setValue("FT8/autoQsoRecentHours", ftAutoQsoRecentHours);
+    settings.remove("FT8/autoQsoDuplicatePolicy");
+    settings.remove("FT8/autoQsoRecentHours");
     settings.setValue("FT8/autoQsoRespectCqDirective", ftAutoQsoRespectCqDirective);
     settings.setValue("FT8/autoQsoCqDxRule", ftAutoQsoCqDxRule);
     settings.setValue("FT8/autoQsoOnlyCqTarget", ftAutoQsoOnlyCqTarget);

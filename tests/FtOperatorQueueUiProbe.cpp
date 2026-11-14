@@ -46,7 +46,7 @@ int main(int argc,char **argv){
  for(const QString mode:{QString("FT8"),QString("FT4")}){
   w.ui->cmbMode->setCurrentText(mode);w.m_settings.textMyCallsign="IZ6NNH";w.m_settings.textMyLocator="JN63";
   w.m_ft8OperatorStopLatched=true;w.stopFt8Sequencer("operator queue test setup");w.m_ft8OperatorStopLatched=false;
-  w.m_ft8AutoModeEnabled=true;w.m_settings.ftAutoQsoDuplicatePolicy="none";
+  w.m_ft8AutoModeEnabled=true;w.m_settings.ftDecodeFilterWorked=false;
   {QSignalBlocker b(w.m_chkFt8FullAutoQso);w.m_chkFt8FullAutoQso->setChecked(true);}
   w.handleFt8FullAutoQsoToggled(true);
   {QSignalBlocker b(w.m_chkFt8CallerQueue);w.m_chkFt8CallerQueue->setChecked(false);}
@@ -59,16 +59,17 @@ int main(int argc,char **argv){
    QVariantMap status{{"worked",false},{"gridWorkedAny",workedGrid},{"gridWorkedBand",workedGrid},{"gridWorkedMode",workedGrid},
     {"countryWorkedAny",true},{"countryWorkedBand",true},{"countryWorkedMode",true},{"generation",QVariant::fromValue<qulonglong>(w.m_ftLogbookCacheGeneration)}};
    auto c=w.buildFt8FullAutoCqCandidate(d,status);
-   const auto q=w.makeFtLogbookQuery(c.call,c.band,c.mode,c.dxcc,c.grid,qBound(1,w.m_settings.ftAutoQsoRecentHours,168),0);
+   const auto q=w.makeFtLogbookQuery(c.call,c.band,c.mode,c.dxcc,c.grid,24,0);
    status.insert("cacheKey",q.value("cacheKey"));w.m_ftLogbookStatusCache.insert(q.value("cacheKey").toString(),status);
    return qMakePair(d,status);
   };
   auto a=cq("M0ABC","IO91",5,true,boundary-profile.slotMs);
   auto b=cq("JA1ABC","PM95",-20,false,boundary-profile.slotMs);
   auto rejected=cq("F1ABC","JN18",-5,false,boundary-profile.slotMs);
-  rejected.second.insert("worked",true);w.m_settings.ftAutoQsoDuplicatePolicy="never_worked";
-  require(!w.queueFt8FullAutoCqCandidate(rejected.first,rejected.second),"worked-call policy changed by audit hooks");
-  w.m_settings.ftAutoQsoDuplicatePolicy="none";
+  rejected.second.insert("worked",true);rejected.second.insert("latestCallUtc",QDateTime::currentDateTimeUtc().addDays(-2));
+  w.m_settings.ftDecodeFilterWorked=true;w.m_settings.ftDecodeFilterWorkedDays=10;
+  require(!w.queueFt8FullAutoCqCandidate(rejected.first,rejected.second),"worked filter (10 days) not applied to Auto QSO");
+  w.m_settings.ftDecodeFilterWorked=false;
   require(w.queueFt8FullAutoCqCandidate(a.first,a.second),"CQ received during a QSO was discarded");
   // A logbook lookup that finishes while busy must also enqueue its CQ.
   const QString key=b.second.value("cacheKey").toString();w.m_ftPendingAutoQsoByKey[key].append(b.first);
@@ -179,7 +180,7 @@ int main(int argc,char **argv){
  }
  for(const auto &action:{"control","candidate.enqueue","candidate.lookup","candidate.reject","candidate.select","candidate.wait","wait","qso.start","qso.rx_decision","qso.advance","qso.complete","qso.log","tx.arm","tx.defer","operator.select","sequencer.stop","tx.audio","qso.timeout"})
   require(actions.contains(QString::fromLatin1(action)),action);
- require(reasons.contains("already in log")&&reasons.contains("directed_traffic")&&reasons.contains("started")&&reasons.contains("error")&&reasons.contains("no_reply"),"decision/failure explanations absent");
+ require(reasons.contains("worked filter (10 days)")&&reasons.contains("directed_traffic")&&reasons.contains("started")&&reasons.contains("error")&&reasons.contains("no_reply"),"decision/failure explanations absent");
  require(modes.contains("FT8")&&modes.contains("FT4"),"audit must cover both modes");
  std::cout<<"PASS title/build across six languages; runtime-only logging; coalesced real queue waits; correlated FT8/FT4 JSONL gzip events ("<<events<<") for queue decisions, takeover, scheduling, audio/error and timeout\n";
 }

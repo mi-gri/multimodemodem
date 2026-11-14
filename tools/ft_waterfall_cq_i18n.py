@@ -872,3 +872,27 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'FT CQ retry starter etter QSO med %1 (Clear DX avslutter det nå).',
   'FT CQ retry začne po QSO s %1 (Clear DX jej hned ukončí).'),
 }.items()})
+# Decode filters also govern Auto QSO (the separate duplicate policy is gone).
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft_filter_worked_tooltip':(
+  'Hides stations that are already in the logbook (any band and mode). Auto QSO does not call them either.',
+  'Nasconde le stazioni già presenti nel log (qualsiasi banda e modo). Auto QSO non le chiama.',
+  "Masque les stations déjà présentes dans le log (toute bande et tout mode). Auto QSO ne les appelle pas non plus.",
+  'Blendet Stationen aus, die schon im Log stehen (jedes Band, jede Betriebsart). Auto QSO ruft sie auch nicht an.',
+  'Skjuler stasjoner som allerede er i loggen (alle bånd og moduser). Auto QSO kaller dem heller ikke.',
+  'Skryje stanice, které už jsou v logu (libovolné pásmo a druh provozu). Auto QSO je také nevolá.'),
+ 'ft_filter_countries_tooltip':(
+  'Hides stations from the DXCC countries listed below; Auto QSO does not call them either. Stations on the watch list stay visible.',
+  'Nasconde le stazioni dei paesi DXCC elencati sotto; Auto QSO non le chiama. Le stazioni della watch list restano visibili.',
+  "Masque les stations des pays DXCC listés ci-dessous ; Auto QSO ne les appelle pas non plus. Les stations de la liste de surveillance restent visibles.",
+  'Blendet Stationen aus den unten genannten DXCC-Ländern aus; Auto QSO ruft sie auch nicht an. Stationen der Beobachtungsliste bleiben sichtbar.',
+  'Skjuler stasjoner fra DXCC-landene under; Auto QSO kaller dem heller ikke. Stasjoner på overvåkingslisten forblir synlige.',
+  'Skryje stanice ze zemí DXCC uvedených níže; Auto QSO je také nevolá. Stanice ze sledovaného seznamu zůstanou viditelné.'),
+ 'ft_filter_continents_tooltip':(
+  'Hides stations from the ticked continents (cty.dat); Auto QSO does not call them either. Stations on the watch list stay visible.',
+  'Nasconde le stazioni dei continenti selezionati (cty.dat); Auto QSO non le chiama. Le stazioni della watch list restano visibili.',
+  "Masque les stations des continents cochés (cty.dat) ; Auto QSO ne les appelle pas non plus. Les stations de la liste de surveillance restent visibles.",
+  'Blendet Stationen der angehakten Kontinente aus (cty.dat); Auto QSO ruft sie auch nicht an. Stationen der Beobachtungsliste bleiben sichtbar.',
+  'Skjuler stasjoner fra de avkryssede kontinentene (cty.dat); Auto QSO kaller dem heller ikke. Stasjoner på overvåkingslisten forblir synlige.',
+  'Skryje stanice ze zaškrtnutých kontinentů (cty.dat); Auto QSO je také nevolá. Stanice ze sledovaného seznamu zůstanou viditelné.'),
+}.items()})
