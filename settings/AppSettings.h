@@ -66,6 +66,7 @@ public:
     QStringList logbookVisibleFields;
     int waterfallColorScalePercent = 80;
     QString waterfallPalette = "m3";
+    int waterfallMaxHz = 3000;          // upper edge of the waterfall (3000..5000 Hz, rig passband)
     // Global UI appearance. Theme names are stable keys, not translated labels:
     // avionica, qt_default, hacker_green, classic_dark, high_contrast.
     QString uiTheme = "avionica";

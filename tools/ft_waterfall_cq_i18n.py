@@ -772,3 +772,16 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'wspr_psk_info':('Decoded stations are reported to PSK Reporter when it is enabled in Settings (callsign with a known country only).', 'Le stazioni decodificate vengono inviate a PSK Reporter se è attivato nelle impostazioni (solo nominativi con paese noto).', "Les stations décodées sont signalées à PSK Reporter s'il est activé dans les paramètres (indicatifs de pays connu uniquement).", 'Dekodierte Stationen werden an PSK Reporter gemeldet, wenn er in den Einstellungen aktiviert ist (nur Rufzeichen mit bekanntem Land).', 'Dekodede stasjoner rapporteres til PSK Reporter når det er aktivert i innstillingene (kun kallesignaler med kjent land).', 'Dekódované stanice se hlásí do PSK Reporter, pokud je zapnut v nastavení (jen značky se známou zemí).'),
  'log.wspr_1_utc_2_decode_s_in_3_s':('WSPR %1 UTC: %2 decode(s) in %3 s', 'WSPR %1 UTC: %2 decodifiche in %3 s', 'WSPR %1 UTC : %2 décodage(s) en %3 s', 'WSPR %1 UTC: %2 Dekodierung(en) in %3 s', 'WSPR %1 UTC: %2 dekoding(er) på %3 s', 'WSPR %1 UTC: %2 dekódování za %3 s'),
 }.items()})
+
+# Settings > Appearance: waterfall upper edge.
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Waterfall':('Waterfall','Waterfall','Chute d’eau','Wasserfall','Fossefall','Vodopád'),
+ 'Upper edge':('Upper edge','Limite superiore','Limite haute','Obere Grenze','Øvre grense','Horní mez'),
+ 'Upper edge of the waterfall. Set it to the receive passband of the rig (FTX-1: 4000 Hz). WSPR always shows 1200-1800 Hz.':(
+  'Upper edge of the waterfall. Set it to the receive passband of the rig (FTX-1: 4000 Hz). WSPR always shows 1200-1800 Hz.',
+  'Limite superiore del waterfall. Impostala sulla banda passante in ricezione dell\'apparato (FTX-1: 4000 Hz). WSPR mostra sempre 1200-1800 Hz.',
+  'Limite haute de la chute d’eau. Réglez-la sur la bande passante de réception du poste (FTX-1 : 4000 Hz). WSPR affiche toujours 1200-1800 Hz.',
+  'Obere Grenze des Wasserfalls. Auf die Empfangsbandbreite des Funkgeräts stellen (FTX-1: 4000 Hz). WSPR zeigt immer 1200-1800 Hz.',
+  'Øvre grense for fossefallet. Sett den til mottaksbåndbredden til riggen (FTX-1: 4000 Hz). WSPR viser alltid 1200-1800 Hz.',
+  'Horní mez vodopádu. Nastavte ji na přijímací šířku pásma stanice (FTX-1: 4000 Hz). WSPR zobrazuje vždy 1200-1800 Hz.'),
+}.items()})

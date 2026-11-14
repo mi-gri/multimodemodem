@@ -12767,6 +12767,12 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
         m_waterfallWidget->setColorScalePercent(m_settings.waterfallColorScalePercent);
         m_waterfallWidget->setPaletteName(m_settings.waterfallPalette);
     }
+    if (m_dspEngine != nullptr && ui != nullptr && ui->cmbMode != nullptr) {
+        const bool wspr = WsprMode::isMode(ui->cmbMode->currentText());
+        QMetaObject::invokeMethod(m_dspEngine, "setDisplayRange", Qt::QueuedConnection,
+                                  Q_ARG(double, wspr ? 1200.0 : 100.0),
+                                  Q_ARG(double, wspr ? 1800.0 : double(m_settings.waterfallMaxHz)));
+    }
     if (m_cmbWaterfallPalette != nullptr) {
         const int paletteIndex = m_cmbWaterfallPalette->findData(m_settings.waterfallPalette);
         m_cmbWaterfallPalette->setCurrentIndex(paletteIndex >= 0 ? paletteIndex : 0);
@@ -14318,7 +14324,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
     // WSPR: only its band with some room (1200-1800 Hz), at full resolution.
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setDisplayRange", Qt::QueuedConnection,
         Q_ARG(double, WsprMode::isMode(modeName) ? 1200.0 : 100.0),
-        Q_ARG(double, WsprMode::isMode(modeName) ? 1800.0 : 3000.0));
+        Q_ARG(double, WsprMode::isMode(modeName) ? 1800.0 : double(m_settings.waterfallMaxHz)));
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setHopSamples", Qt::QueuedConnection,
         Q_ARG(int, WsprMode::isMode(modeName) ? 12288 : 2048));
     if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(Js8Mode::isMode(modeName) ? js8WaterfallPeriodMs() : waterfallPeriodMs(modeName));
@@ -25127,7 +25133,7 @@ void MainWindow::startRx()
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetRowSeconds(modeName, m_settings.ftWaterfallRowMs)));
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setDisplayRange", Qt::QueuedConnection,
         Q_ARG(double, WsprMode::isMode(modeName) ? 1200.0 : 100.0),
-        Q_ARG(double, WsprMode::isMode(modeName) ? 1800.0 : 3000.0));
+        Q_ARG(double, WsprMode::isMode(modeName) ? 1800.0 : double(m_settings.waterfallMaxHz)));
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setHopSamples", Qt::QueuedConnection,
         Q_ARG(int, WsprMode::isMode(modeName) ? 12288 : 2048));
     if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(Js8Mode::isMode(modeName) ? js8WaterfallPeriodMs() : waterfallPeriodMs(modeName));

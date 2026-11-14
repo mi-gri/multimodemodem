@@ -1776,6 +1776,18 @@ QWidget *AppSettingsDialog::makeAppearancePage()
 
 
     layout->addWidget(themeGroup);
+
+    QGroupBox *waterfallGroup = new QGroupBox(L(QStringLiteral("Waterfall")), holder);
+    auto *waterfallGrid = new QGridLayout(waterfallGroup);
+    waterfallGrid->setColumnStretch(1, 1);
+    m_comboWaterfallMaxHz = new QComboBox(waterfallGroup);
+    for (int hz : {3000, 3500, 4000, 4500, 5000}) m_comboWaterfallMaxHz->addItem(QStringLiteral("%1 Hz").arg(hz), hz);
+    const int maxIndex = m_comboWaterfallMaxHz->findData(m_initialSettings.waterfallMaxHz);
+    m_comboWaterfallMaxHz->setCurrentIndex(maxIndex >= 0 ? maxIndex : 0);
+    m_comboWaterfallMaxHz->setToolTip(L(QStringLiteral("Upper edge of the waterfall. Set it to the receive passband of the rig (FTX-1: 4000 Hz). WSPR always shows 1200-1800 Hz.")));
+    waterfallGrid->addWidget(new QLabel(L(QStringLiteral("Upper edge")), waterfallGroup), 0, 0);
+    waterfallGrid->addWidget(m_comboWaterfallMaxHz, 0, 1);
+    layout->addWidget(waterfallGroup);
     layout->addWidget(hint);
     layout->addStretch(1);
     return holder;
@@ -2851,6 +2863,9 @@ void AppSettingsDialog::collectSettings()
     }
     if (m_comboUiTheme != nullptr) {
         merged.uiTheme = m_comboUiTheme->currentData().toString().trimmed().toLower();
+    }
+    if (m_comboWaterfallMaxHz != nullptr) {
+        merged.waterfallMaxHz = m_comboWaterfallMaxHz->currentData().toInt();
     }
     if (m_chkUiUseThemeFont != nullptr) {
         merged.uiUseThemeFont = m_chkUiUseThemeFont->isChecked();

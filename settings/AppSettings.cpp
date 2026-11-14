@@ -229,6 +229,7 @@ void AppSettings::load()
     Q_UNUSED(settings.value("Display/waterfallPalette"));
     waterfallColorScalePercent = 80;
     waterfallPalette = "m3";
+    waterfallMaxHz = qBound(3000, settings.value("Display/waterfallMaxHz", waterfallMaxHz).toInt(), 5000);
     uiTheme = settings.value("Display/uiTheme", uiTheme).toString().trimmed().toLower();
     if (uiTheme != "avionica" && uiTheme != "qt_default" && uiTheme != "hacker_green" &&
         uiTheme != "classic_dark" && uiTheme != "high_contrast") {
@@ -886,6 +887,7 @@ bool AppSettings::save() const
     settings.setValue("Logbook/visibleFields", logbookVisibleFields);
     settings.setValue("Display/waterfallColorScalePercent", waterfallColorScalePercent);
     settings.setValue("Display/waterfallPalette", waterfallPalette);
+    settings.setValue("Display/waterfallMaxHz", qBound(3000, waterfallMaxHz, 5000));
     settings.setValue("Display/uiTheme", uiTheme);
     settings.setValue("Display/uiUseThemeFont", uiUseThemeFont);
     settings.setValue("Display/uiFontFamily", uiFontFamily);

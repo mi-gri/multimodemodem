@@ -216,6 +216,7 @@ private:
     QLineEdit *m_editWavelogRadioName = nullptr;
     class WavelogClient *m_wavelogProbe = nullptr;
     QComboBox *m_comboUiTheme = nullptr;
+    QComboBox *m_comboWaterfallMaxHz = nullptr;
     QCheckBox *m_chkSessionDiagnostics = nullptr;
     QLineEdit *m_editDiagnosticsFolder = nullptr;
     QCheckBox *m_chkUiUseThemeFont = nullptr;
