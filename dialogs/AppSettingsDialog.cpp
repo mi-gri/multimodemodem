@@ -14,6 +14,7 @@
 #include "AudioSettingsDialog.h"
 #include "LogbookSettingsDialog.h"
 #include "RigControlSettingsDialog.h"
+#include "../utils/WheelGuard.h"
 #include "../rotator/RotatorPeakSearch.h"
 #include "SoundCardCalibrationDialog.h"
 #include "TextMacroSettingsDialog.h"
@@ -601,6 +602,8 @@ AppSettingsDialog::AppSettingsDialog(const AppSettings &settings,
       m_textTranslator(std::move(textTranslator)),
       m_schedulerTranslator(std::move(schedulerTranslator))
 {
+    new WheelGuard(this);   // the wheel scrolls the page, it does not change fields in passing
+
     setWindowTitle(L(QStringLiteral("Settings")));
     setWindowModality(Qt::ApplicationModal);
     resize(984, 706);

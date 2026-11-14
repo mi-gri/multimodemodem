@@ -557,6 +557,14 @@ bool HamlibController::connectRig()
     }
 
     m_rig = rig;
+#ifdef HAMLIB_CACHE_ALWAYS
+    // Hamlib answers rig_get_freq() from its cache for a while after
+    // rig_set_freq(): with the CAT port on the wrong device (ttyS4 instead of
+    // the FTX-1, 2026-11-14) a QSY then "read back" the requested frequency
+    // although the radio never answered.  m³ polls itself, so every readback
+    // must come from the radio.
+    rig_set_cache_timeout_ms(rig, HAMLIB_CACHE_FREQ, 0);
+#endif
     setStatus(QStringLiteral("CAT connected"));
 
     if (m_config.catEnabled) {
