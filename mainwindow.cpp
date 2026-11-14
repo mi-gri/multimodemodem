@@ -1731,14 +1731,46 @@ void MainWindow::organizeSidePanel()
     auto *footerLayout = new QVBoxLayout(footer);
     footerLayout->setContentsMargins(0, 2, 0, 0);
     footerLayout->setSpacing(3);
-    for (QWidget *w : {static_cast<QWidget *>(m_grpFt8UtcClock), m_tabBandScheduler,
-                       static_cast<QWidget *>(m_btnShowRuntimeLog)}) {
+    for (QWidget *w : {static_cast<QWidget *>(m_grpFt8UtcClock), m_tabBandScheduler}) {
         if (w == nullptr) continue;
         const bool visible = !w->isHidden();
         ui->modeTabLayout->removeWidget(w);
         w->setParent(footer);
         footerLayout->addWidget(w);
         w->setVisible(visible);
+    }
+    // Waterfall speed of the current mode, always at hand at the very bottom.
+    {
+        auto *row = new QWidget(footer);
+        row->setObjectName(QStringLiteral("waterfallSpeedRow"));
+        auto *rowLayout = new QHBoxLayout(row);
+        rowLayout->setContentsMargins(4, 0, 0, 0);
+        m_lblWaterfallSpeed = new QLabel(row);
+        m_spinWaterfallSpeed = new QSpinBox(row);
+        m_spinWaterfallSpeed->setObjectName(QStringLiteral("spinWaterfallSpeed"));
+        m_spinWaterfallSpeed->setRange(0, 2000);
+        m_spinWaterfallSpeed->setSingleStep(25);
+        m_spinWaterfallSpeed->setSuffix(QLatin1Char(' ') + uiText("waterfall_speed_suffix", "ms/row"));
+        m_spinWaterfallSpeed->setSpecialValueText(uiText("waterfall_speed_fastest", "fastest"));
+        m_spinWaterfallSpeed->setToolTip(uiText("waterfall_speed_tip", "Waterfall speed of this mode: each row averages the spectrum over this time. Less scrolls faster, more keeps a longer history and calms the noise. Fastest: one row per FFT step (about 43 ms). Stored per mode."));
+        m_lblWaterfallSpeed->setToolTip(m_spinWaterfallSpeed->toolTip());
+        rowLayout->addWidget(m_lblWaterfallSpeed);
+        rowLayout->addWidget(m_spinWaterfallSpeed, 1);
+        footerLayout->addWidget(row);
+        connect(m_spinWaterfallSpeed, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int ms) {
+            if (ui == nullptr || ui->cmbMode == nullptr) return;
+            const QString key = waterfallModeKey(ui->cmbMode->currentText());
+            if (key.isEmpty()) return;
+            m_settings.waterfallRowMs.insert(key, ms);
+            QSettings settings(AppSettings::settingsFilePath(), QSettings::IniFormat);
+            settings.setValue(QStringLiteral("Waterfall/rowMs_") + key, ms);
+            if (key == QLatin1String("FT8")) {
+                m_settings.ftWaterfallRowMs = qBound(50, ms, 1000);
+                settings.setValue(QStringLiteral("FT8/waterfallRowMs"), m_settings.ftWaterfallRowMs);
+            }
+            applyWaterfallRangeForMode(ui->cmbMode->currentText());
+        });
+        updateWaterfallSpeedControl();
     }
     sideLayout->addWidget(footer, 0);
 
@@ -2831,17 +2863,7 @@ void MainWindow::setupCustomWidgets()
     // Status tab cleanup: do not create the old Rig/CAT diagnostic block here.
     // CAT/PTT diagnostics remain in Settings and the FT runtime log when needed.
 
-    if (ui->modeTabLayout != nullptr) {
-        m_btnShowRuntimeLog = new QPushButton(uiText("runtime_log_button", "Runtime log"), ui->tabModeSettings);
-        m_btnShowRuntimeLog->setToolTip(uiText("runtime_log_ft_tooltip", "Open the FT timing/CAT/PTT diagnostic log."));
-        m_btnShowRuntimeLog->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-        connect(m_btnShowRuntimeLog, &QPushButton::clicked, this, &MainWindow::showRuntimeLogDialog);
-        ui->modeTabLayout->addWidget(m_btnShowRuntimeLog, 0);
-        const QString modeName = (ui != nullptr && ui->cmbMode != nullptr) ? ui->cmbMode->currentText() : QString();
-        m_btnShowRuntimeLog->setVisible(Ft8Mode::isFamilyMode(modeName) || Msk144Mode::isMode(modeName) ||
-                                         Q65Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName) ||
-                                         modeName == CwDecoder::modeName());
-    }
+    // Runtime log: Help menu (setupHelpMenu), not in the side panel.
 
     m_settings.waterfallColorScalePercent = 80;
     m_settings.waterfallPalette = QStringLiteral("m3");
@@ -11364,9 +11386,13 @@ void MainWindow::setupUiConnections()
     m_actionWhatsThisMode->setShortcut(QKeySequence(QStringLiteral("Shift+F1")));
     m_actionWhatsThisMode->setStatusTip(M3I18n::text(QStringLiteral("Click a control to read its context help.")));
     m_actionWhatsThisMode->setToolTip(M3I18n::text(QStringLiteral("Click a control to read its context help.")));
+    m_actionRuntimeLog = new QAction(uiText("runtime_log_button", "Runtime log"), this);
+    m_actionRuntimeLog->setStatusTip(uiText("runtime_log_menu_tip", "Open the runtime log: FT timing, CAT/PTT, decoder and CW diagnostics."));
+    connect(m_actionRuntimeLog, &QAction::triggered, this, &MainWindow::showRuntimeLogDialog);
     if (ui->menuHelp != nullptr && ui->actionAboutM3 != nullptr) {
         ui->menuHelp->insertAction(ui->actionAboutM3, m_actionHelpContents);
         ui->menuHelp->insertAction(ui->actionAboutM3, m_actionWhatsThisMode);
+        ui->menuHelp->insertAction(ui->actionAboutM3, m_actionRuntimeLog);
         ui->menuHelp->insertSeparator(ui->actionAboutM3);
     }
     if (ui->menuFile != nullptr) {
@@ -14302,6 +14328,17 @@ void MainWindow::finishPendingModeChange()
 // configured upper edge.  The zoom may lengthen the FFT up to a per-mode
 // limit: CW keeps short windows (keying would smear), text modes 16384,
 // the FT/WSPR family 65536.
+void MainWindow::updateWaterfallSpeedControl()
+{
+    if (m_spinWaterfallSpeed == nullptr || ui == nullptr || ui->cmbMode == nullptr) return;
+    const QString mode = ui->cmbMode->currentText();
+    const QString key = waterfallModeKey(mode);
+    m_lblWaterfallSpeed->setText(uiText("waterfall_speed_label", "Waterfall %1:").arg(shortModeLabel(mode)));
+    const QSignalBlocker block(m_spinWaterfallSpeed);
+    m_spinWaterfallSpeed->setEnabled(!key.isEmpty());
+    m_spinWaterfallSpeed->setValue(key.isEmpty() ? 0 : m_settings.waterfallRowMsFor(key));
+}
+
 double MainWindow::waterfallRowSecondsForMode(const QString &modeName) const
 {
     const QString key = waterfallModeKey(modeName);
@@ -14310,6 +14347,7 @@ double MainWindow::waterfallRowSecondsForMode(const QString &modeName) const
 
 void MainWindow::applyWaterfallRangeForMode(const QString &modeName)
 {
+    updateWaterfallSpeedControl();
     const bool wspr = WsprMode::isMode(modeName);
     const double minHz = wspr ? 1200.0 : 100.0;
     const double maxHz = wspr ? 1800.0 : double(m_settings.waterfallMaxHz);
@@ -14505,11 +14543,6 @@ void MainWindow::handleModeChanged(const QString &modeName)
     qsyForModeChange(modeName);
     updateSideTabsForMode(modeName);
 
-    if (m_btnShowRuntimeLog != nullptr) {
-        m_btnShowRuntimeLog->setVisible(Ft8Mode::isFamilyMode(modeName) || Msk144Mode::isMode(modeName) ||
-                                         Q65Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName) ||
-                                         modeName == CwDecoder::modeName());
-    }
 
     updateWaterfallMarkers();
     updateTxPreview();
@@ -26222,12 +26255,6 @@ void MainWindow::updateTxControlState()
         // already identifies the current modem, so no extra group title is needed.
         m_grpTxImage->setTitle(QString());
         m_grpTxImage->setVisible(!textMode && !rxOnlyTextMode);
-    }
-    if (m_btnShowRuntimeLog != nullptr) {
-        m_btnShowRuntimeLog->setVisible(ft8Mode || msk144Mode || q65Mode || cwMode);
-        m_btnShowRuntimeLog->setToolTip(cwMode
-            ? uiText("runtime_log_cw_tooltip", "Open the live CW discriminator/timing log.")
-            : uiText("runtime_log_ft_tooltip", "Open the FT timing/CAT/PTT diagnostic log."));
     }
 
     m_btnLoadTxImage->setVisible(!textMode && !rxOnlyTextMode);

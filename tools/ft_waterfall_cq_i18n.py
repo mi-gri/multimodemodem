@@ -829,3 +829,15 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
  'fastest':('fastest','massima','maximale','am schnellsten','raskest','nejrychleji'),
  'Radio Telescope':('Radio Telescope','Radiotelescopio','Radiotélescope','Radioteleskop','Radioteleskop','Radioteleskop'),
 }.items()})
+
+# Waterfall speed control in the side panel footer.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'waterfall_speed_label':('Waterfall %1:','Waterfall %1:','Chute d’eau %1 :','Wasserfall %1:','Fossefall %1:','Vodopád %1:'),
+ 'waterfall_speed_suffix':('ms/row','ms/riga','ms/ligne','ms/Zeile','ms/linje','ms/řádek'),
+ 'waterfall_speed_fastest':('fastest', 'massima', 'maximale', 'am schnellsten', 'raskest', 'nejrychleji'),
+ 'waterfall_speed_tip':('Waterfall speed of this mode: each row averages the spectrum over this time. Less scrolls faster, more keeps a longer history and calms the noise. Fastest: one row per FFT step (about 43 ms). Stored per mode.', 'Velocità del waterfall di questo modo: ogni riga fa la media dello spettro su questo tempo. Meno scorre più veloce, di più mantiene una storia più lunga e calma il rumore. Più veloce: una riga per passo FFT (circa 43 ms). Salvata per modo.', 'Vitesse de la chute d’eau de ce mode : chaque ligne moyenne le spectre sur cette durée. Moins défile plus vite, plus garde un historique plus long et calme le bruit. Le plus rapide : une ligne par pas de FFT (environ 43 ms). Enregistrée par mode.', 'Wasserfall-Geschwindigkeit dieses Modus: Jede Zeile mittelt das Spektrum über diese Zeit. Weniger läuft schneller, mehr zeigt einen längeren Verlauf und ruhigeres Rauschen. Am schnellsten: eine Zeile pro FFT-Schritt (etwa 43 ms). Wird je Modus gespeichert.', 'Fossefallets hastighet for denne modusen: hver linje midler spekteret over denne tiden. Mindre ruller raskere, mer viser lengre historikk og roligere støy. Raskest: én linje per FFT-steg (omtrent 43 ms). Lagres per modus.', 'Rychlost vodopádu tohoto režimu: každý řádek průměruje spektrum za tento čas. Méně běží rychleji, více ukáže delší historii a klidnější šum. Nejrychleji: jeden řádek na krok FFT (asi 43 ms). Ukládá se pro každý režim.'),
+}.items()})
+
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'runtime_log_menu_tip':('Open the runtime log: FT timing, CAT/PTT, decoder and CW diagnostics.', 'Apre il log runtime: tempi FT, CAT/PTT, decoder e diagnostica CW.', 'Ouvre le journal d’exécution : timing FT, CAT/PTT, décodeur et diagnostic CW.', 'Öffnet das Laufzeitprotokoll: FT-Timing, CAT/PTT, Decoder- und CW-Diagnose.', 'Åpner kjøretidsloggen: FT-timing, CAT/PTT, dekoder og CW-diagnostikk.', 'Otevře provozní protokol: časování FT, CAT/PTT, dekodér a diagnostika CW.'),
+}.items()})

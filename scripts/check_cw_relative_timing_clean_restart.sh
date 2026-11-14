@@ -29,9 +29,10 @@ grep -Fq 'std::thread m_worker' "$root/modems/cw/skimmer/CwRelativeTimingTask.h"
 grep -Fq 'Threads::Threads' "$root/CMakeLists.txt"
 grep -Fq 'CwMorseBeamDecoder m_beamDecoder' \
   "$root/modems/cw/skimmer/CwRelativeTimingDecoder.h"
-grep -Fq 'm_btnShowRuntimeLog->setVisible(ft8Mode || msk144Mode || q65Mode || cwMode)' \
+# The runtime log (CW discriminator/timing, FT, CAT/PTT) is in the Help menu.
+grep -Fq 'connect(m_actionRuntimeLog, &QAction::triggered, this, &MainWindow::showRuntimeLogDialog)' \
   "$root/mainwindow.cpp"
-grep -Fq 'runtime_log_cw_tooltip' "$root/translations/ui_en.ini"
+grep -Fq 'runtime_log_menu_tip' "$root/translations/ui_en.ini"
 
 "$root/scripts/run_cw_native_regression.sh"
 echo "CW relative-timing clean-restart audit: PASS"

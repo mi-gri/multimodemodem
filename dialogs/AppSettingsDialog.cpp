@@ -1780,7 +1780,6 @@ QWidget *AppSettingsDialog::makeAppearancePage()
     QGroupBox *waterfallGroup = new QGroupBox(L(QStringLiteral("Waterfall")), holder);
     auto *waterfallGrid = new QGridLayout(waterfallGroup);
     waterfallGrid->setColumnStretch(1, 1);
-    waterfallGrid->setColumnStretch(3, 1);
     m_comboWaterfallMaxHz = new QComboBox(waterfallGroup);
     for (int hz : {3000, 3500, 4000, 4500, 5000}) m_comboWaterfallMaxHz->addItem(QStringLiteral("%1 Hz").arg(hz), hz);
     const int maxIndex = m_comboWaterfallMaxHz->findData(m_initialSettings.waterfallMaxHz);
@@ -1788,36 +1787,6 @@ QWidget *AppSettingsDialog::makeAppearancePage()
     m_comboWaterfallMaxHz->setToolTip(L(QStringLiteral("Upper edge of the waterfall. Set it to the receive passband of the rig (FTX-1: 4000 Hz). WSPR always shows 1200-1800 Hz.")));
     waterfallGrid->addWidget(new QLabel(L(QStringLiteral("Upper edge")), waterfallGroup), 0, 0);
     waterfallGrid->addWidget(m_comboWaterfallMaxHz, 0, 1);
-    // Time per row per mode: shorter scrolls faster, longer keeps more
-    // history and averages the noise.  0 = one row per FFT step (fastest).
-    auto *speedLabel = new QLabel(L(QStringLiteral("Time per row (speed) per mode")), waterfallGroup);
-    speedLabel->setToolTip(L(QStringLiteral("Waterfall speed: each row averages the spectrum over this time. Less scrolls faster, more keeps a longer history on the screen and calms the noise. Fastest: one row per FFT step (about 43 ms).")));
-    waterfallGrid->addWidget(speedLabel, 1, 0, 1, 4);
-    const QMap<QString, QString> modeLabels = {
-        {QStringLiteral("FT8"), QStringLiteral("FT8")}, {QStringLiteral("FT4"), QStringLiteral("FT4")},
-        {QStringLiteral("JS8"), QStringLiteral("JS8")}, {QStringLiteral("Q65"), QStringLiteral("Q65")},
-        {QStringLiteral("MSK144"), QStringLiteral("MSK144")}, {QStringLiteral("WSPR"), QStringLiteral("WSPR")},
-        {QStringLiteral("RTTY"), QStringLiteral("RTTY")}, {QStringLiteral("PSK"), QStringLiteral("PSK")},
-        {QStringLiteral("MFSK"), QStringLiteral("MFSK")}, {QStringLiteral("CW"), QStringLiteral("CW")},
-        {QStringLiteral("HELL"), QStringLiteral("Feld Hell")}, {QStringLiteral("SSTV"), QStringLiteral("SSTV")},
-        {QStringLiteral("WEFAX"), QStringLiteral("WEFAX")}, {QStringLiteral("RT"), L(QStringLiteral("Radio Telescope"))}};
-    int wfIndex = 0;
-    for (const QString &key : AppSettings::waterfallModeKeys()) {
-        auto *spin = new QSpinBox(waterfallGroup);
-        spin->setObjectName(QStringLiteral("spinWaterfallRowMs_") + key);
-        spin->setRange(0, 2000);
-        spin->setSingleStep(25);
-        spin->setSuffix(QStringLiteral(" ms"));
-        spin->setSpecialValueText(L(QStringLiteral("fastest")));
-        spin->setValue(m_initialSettings.waterfallRowMsFor(key));
-        spin->setToolTip(speedLabel->toolTip());
-        m_waterfallRowSpins.insert(key, spin);
-        const int r = 2 + wfIndex / 2;
-        const int c = (wfIndex % 2) * 2;
-        waterfallGrid->addWidget(new QLabel(modeLabels.value(key, key), waterfallGroup), r, c);
-        waterfallGrid->addWidget(spin, r, c + 1);
-        ++wfIndex;
-    }
     layout->addWidget(waterfallGroup);
     layout->addWidget(hint);
     layout->addStretch(1);
@@ -2952,11 +2921,7 @@ void AppSettingsDialog::collectSettings()
     if (m_spinCqRepeatCount != nullptr) {
         merged.ft8CqRepeatCount = m_spinCqRepeatCount->value();
     }
-    for (auto it = m_waterfallRowSpins.cbegin(); it != m_waterfallRowSpins.cend(); ++it)
-        merged.waterfallRowMs.insert(it.key(), it.value()->value());
-    if (m_waterfallRowSpins.contains(QStringLiteral("FT8"))) {
-        merged.ftWaterfallRowMs = qBound(50, m_waterfallRowSpins.value(QStringLiteral("FT8"))->value(), 1000);
-    }
+    // Waterfall speed per mode is set in the main window (side panel footer).
     if (m_spinFtWaterfallCqSeconds != nullptr) {
         merged.ftWaterfallCqSeconds = m_spinFtWaterfallCqSeconds->value();
     }

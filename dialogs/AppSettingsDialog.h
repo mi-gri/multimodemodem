@@ -226,7 +226,6 @@ private:
     QComboBox *m_comboDecodeTableFontFamily = nullptr;
     QSpinBox *m_spinDecodeTableFontSize = nullptr;
     QSpinBox *m_spinDecodeTableRowHeight = nullptr;
-    QMap<QString, QSpinBox *> m_waterfallRowSpins;   // per mode key, Appearance > Waterfall
     QSpinBox *m_spinFtWaterfallCqSeconds = nullptr;
     QPlainTextEdit *m_editFtBlacklist = nullptr;
     QPlainTextEdit *m_editFtWatchList = nullptr;

@@ -703,6 +703,7 @@ private slots:
     void setupWsprPage();
     void applyWaterfallRangeForMode(const QString &modeName);
     double waterfallRowSecondsForMode(const QString &modeName) const;
+    void updateWaterfallSpeedControl();
     QStringList wsprTxMessages(QString *error = nullptr) const;
     void wsprPlanNextPeriod();
     void wsprArmPeriod(qint64 periodStartMs);
@@ -1847,6 +1848,7 @@ private:
     QAction *m_actionStartRxRecording = nullptr;
     QAction *m_actionStopRxRecording = nullptr;
     QAction *m_actionHelpContents = nullptr;
+    QAction *m_actionRuntimeLog = nullptr;
     QAction *m_actionWhatsThisMode = nullptr;
 
     AudioEngine *m_audioEngine = nullptr;
@@ -1899,7 +1901,6 @@ private:
     int m_lastRigFilterSource = 0;
     QDialog *m_runtimeLogDialog = nullptr;
     QPlainTextEdit *m_runtimeLogText = nullptr;
-    QPushButton *m_btnShowRuntimeLog = nullptr;
     QStringList m_runtimeLogBuffer;
     DspConditioner m_decoderConditioner;
     DspConditioner m_waterfallConditioner;
@@ -2240,6 +2241,8 @@ private:
     QSpinBox *m_spinWsprTxHz = nullptr;
     QComboBox *m_cmbWsprPower = nullptr;
     QLabel *m_lblWsprTxStatus = nullptr;
+    QLabel *m_lblWaterfallSpeed = nullptr;
+    QSpinBox *m_spinWaterfallSpeed = nullptr;
     QTimer m_wsprTxTimer;
     qint64 m_wsprLastTxPeriodMs = -1;
     int m_wsprMessageIndex = 0;
