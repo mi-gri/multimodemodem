@@ -163,5 +163,34 @@ int main()
               "zoom: rows cover the zoomed part with a longer FFT");
         check(inside > 150 && inside > 2 * outsideMean, "zoom: signal filling the view stays visible");
     }
+    {
+        // TX monitor: the generated TX audio has no noise; it must not show
+        // saturated skirts (RX flattening put the baseline near -240 dB).
+        auto run = [](bool txMonitor, int &saturated, int &peak) {
+            DspEngine dsp;
+            dsp.setColumns(1000);
+            QVector<quint8> last;
+            QObject::connect(&dsp, &DspEngine::waterfallLineReady, [&](const QVector<quint8> &line, double, double) { last = line; });
+            double phase = 0.0;
+            for (int b = 0; b < 4 * 48000 / 1024; ++b) {
+                AudioBlock block;
+                block.sampleRate = 48000;
+                block.captureGeneration = 2;
+                block.firstSampleIndex = qint64(b) * 1024;
+                block.firstSampleUtcNs = 1700000000000000000LL + qint64(b) * 1024 * 1000000000LL / 48000;
+                block.samples.resize(1024);
+                for (float &v : block.samples) { v = 0.5f * static_cast<float>(std::sin(phase)); phase += 6.283185307179586 * 1500.0 / 48000.0; }
+                if (txMonitor) dsp.processTxMonitorBlock(block); else dsp.processAudioBlock(block);
+            }
+            saturated = 0;
+            peak = 0;
+            for (quint8 v : last) { if (v >= 250) ++saturated; peak = std::max(peak, int(v)); }
+        };
+        int satRx = 0, peakRx = 0, satTx = 0, peakTx = 0;
+        run(false, satRx, peakRx);
+        run(true, satTx, peakTx);
+        std::cout << "clean tone: RX path saturated columns " << satRx << ", TX monitor " << satTx << " (peak " << peakTx << ")\n";
+        check(satTx == 0 && peakTx >= 180 && satRx > satTx, "TX monitor: clean TX tone visible without saturated skirts");
+    }
     return ok ? 0 : 1;
 }

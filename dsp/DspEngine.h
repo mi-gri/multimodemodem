@@ -41,6 +41,14 @@ public slots:
     void processAudioBlock(const AudioBlock &block);
 
     /**
+     * @brief Local monitor of the generated TX audio.  It has no noise, so
+     *        the RX flattening would put its baseline near the numeric floor
+     *        and show every skirt saturated; TX rows show the top 22 dB
+     *        below the row's peak instead.  The next RX block switches back.
+     */
+    void processTxMonitorBlock(const AudioBlock &block);
+
+    /**
      * @brief Clears the internal DSP buffers.
      */
     void reset();
@@ -185,6 +193,9 @@ private:
     double m_zoomMinHz = 0.0;
     double m_zoomMaxHz = 0.0;
     int m_maxFftSize = 65536;
+    bool m_txMonitor = false;
+    void setTxMonitor(bool on);
+    void processAudioBlockInternal(const AudioBlock &block);
     double rowMinHz() const;
     double rowMaxHz() const;
 

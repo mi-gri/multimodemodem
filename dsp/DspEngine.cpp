@@ -59,7 +59,29 @@ DspEngine::DspEngine(QObject *parent)
 // Public slots
 // -----------------------------------------------------------------------------
 
+void DspEngine::setTxMonitor(bool on)
+{
+    if (on == m_txMonitor) return;
+    m_txMonitor = on;
+    // RX and TX rows have unrelated levels: neither may average into the
+    // other or into the RX baseline history.
+    m_waterfallLeveler.reset();
+    resetRowAverage();
+}
+
+void DspEngine::processTxMonitorBlock(const AudioBlock &block)
+{
+    setTxMonitor(true);
+    processAudioBlockInternal(block);
+}
+
 void DspEngine::processAudioBlock(const AudioBlock &block)
+{
+    setTxMonitor(false);
+    processAudioBlockInternal(block);
+}
+
+void DspEngine::processAudioBlockInternal(const AudioBlock &block)
 {
     if (block.samples.isEmpty() || block.sampleRate <= 0) {
         return;
@@ -394,8 +416,14 @@ void DspEngine::analyzeWindow(const QVector<float> &window, int sampleRate)
                    frac * levels.baselineDb[static_cast<std::size_t>(i0 + 1)];
         };
 
+        double txBaselineDb = 0.0;
+        if (m_txMonitor) {
+            double peakDb = -240.0;
+            for (double v : dbLine) peakDb = qMax(peakDb, v);
+            txBaselineDb = peakDb - 22.0;
+        }
         for (int x = 0; x < m_columns; ++x) {
-            const double baselineDb = baselineAt(x);
+            const double baselineDb = m_txMonitor ? txBaselineDb : baselineAt(x);
             const double flattenedDb = dbLine[x] - baselineDb;
 
             // Equivalent to the WSJT-X Wide Graph default transfer:

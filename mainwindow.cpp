@@ -10260,7 +10260,7 @@ void MainWindow::setupProcessingConnections()
 
                 QMetaObject::invokeMethod(
                     m_dspEngine,
-                    "processAudioBlock",
+                    "processTxMonitorBlock",
                     Qt::QueuedConnection,
                     Q_ARG(AudioBlock, block)
                     );
