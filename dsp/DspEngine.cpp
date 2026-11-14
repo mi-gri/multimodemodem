@@ -117,6 +117,7 @@ void DspEngine::setColumns(int columns)
         return;
     }
     m_columns = columns;
+    m_fftSizeSampleRate = 0;
     m_waterfallLeveler.reset();
     resetRowAverage();
 }
@@ -129,6 +130,8 @@ void DspEngine::setDisplayRange(double minHz, double maxHz)
     if (qAbs(minHz - m_minHz) < 1.0e-6 && qAbs(maxHz - m_maxHz) < 1.0e-6) return;
     m_minHz = minHz;
     m_maxHz = maxHz;
+    m_fftSizeSampleRate = 0;
+    m_waterfallLeveler.reset();
     resetRowAverage();
 }
 
@@ -138,6 +141,37 @@ void DspEngine::setHopSamples(int samples)
     if (samples == m_hopSize) return;
     m_hopSize = samples;
     resetRowAverage();
+}
+
+void DspEngine::setZoomRange(double minHz, double maxHz)
+{
+    if (!qIsFinite(minHz) || !qIsFinite(maxHz) || maxHz - minHz < 10.0) minHz = maxHz = 0.0;
+    if (qAbs(minHz - m_zoomMinHz) < 0.5 && qAbs(maxHz - m_zoomMaxHz) < 0.5) return;
+    m_zoomMinHz = minHz;
+    m_zoomMaxHz = maxHz;
+    m_fftSizeSampleRate = 0;          // re-evaluated with the next audio block
+    m_waterfallLeveler.reset();
+    resetRowAverage();
+}
+
+void DspEngine::setMaxFftSize(int samples)
+{
+    samples = qBound(8192, samples, 65536);
+    if (samples == m_maxFftSize) return;
+    m_maxFftSize = samples;
+    m_fftSizeSampleRate = 0;
+}
+
+double DspEngine::rowMinHz() const
+{
+    return m_zoomMaxHz > m_zoomMinHz ? qBound(m_minHz, m_zoomMinHz, m_maxHz) : m_minHz;
+}
+
+double DspEngine::rowMaxHz() const
+{
+    if (m_zoomMaxHz <= m_zoomMinHz) return m_maxHz;
+    const double hi = qBound(m_minHz, m_zoomMaxHz, m_maxHz);
+    return hi - rowMinHz() >= 10.0 ? hi : m_maxHz;
 }
 
 void DspEngine::resetRowAverage()
@@ -167,6 +201,17 @@ void DspEngine::updateFftSize(int sampleRate)
         while (size < 65536 && static_cast<double>(size) * qSqrt(2.0) < wanted) {
             size *= 2;
         }
+    }
+    // Zoomed: about one FFT bin per column of the visible part, never coarser
+    // than the mode's own resolution and not longer than its maximum.
+    if (m_zoomMaxHz > m_zoomMinHz && sampleRate > 0 && m_columns > 1) {
+        const double binHz = (rowMaxHz() - rowMinHz()) / static_cast<double>(m_columns - 1);
+        const double wanted = static_cast<double>(sampleRate) / qMax(0.1, binHz);
+        int zoomed = size;
+        while (zoomed < m_maxFftSize && static_cast<double>(zoomed) * qSqrt(2.0) < wanted) {
+            zoomed *= 2;
+        }
+        size = qMax(size, qMin(zoomed, m_maxFftSize));
     }
     if (size == m_fftSize) {
         return;
@@ -224,14 +269,17 @@ void DspEngine::analyzeWindow(const QVector<float> &window, int sampleRate)
 
     const double log10 = qLn(10.0);
     const double binsPerHz = static_cast<double>(m_fftSize) / static_cast<double>(sampleRate);
-    const double columnHz = (m_maxHz - m_minHz) / static_cast<double>(m_columns - 1);
-    const double binsPerColumn = columnHz * binsPerHz;
+    const double rowMin = rowMinHz();
+    const double rowMax = rowMaxHz();
+    const double columnHz = (rowMax - rowMin) / static_cast<double>(m_columns - 1);
+    const bool zoomed = rowMin > m_minHz + 1.0e-6 || rowMax < m_maxHz - 1.0e-6;
 
-    // Magnitude shown in waterfall column x, from a spectrum of magnitudes.
-    auto columnMagnitude = [&](const QVector<double> &mags, int x, double *freqOut) {
+    // Magnitude of column x of a row spanning [spanMin, spanMax].
+    auto magnitudeAt = [&](const QVector<double> &mags, double spanMin, double spanMax, int x, double *freqOut) {
         const double ratio = static_cast<double>(x) / static_cast<double>(m_columns - 1);
-        const double freq = m_minHz + ratio * (m_maxHz - m_minHz);
+        const double freq = spanMin + ratio * (spanMax - spanMin);
         if (freqOut != nullptr) *freqOut = freq;
+        const double binsPerColumn = (spanMax - spanMin) / static_cast<double>(m_columns - 1) * binsPerHz;
         const double binPosition = freq * binsPerHz;
         double mag = 0.0;
         if (binsPerColumn > 1.0) {
@@ -250,6 +298,9 @@ void DspEngine::analyzeWindow(const QVector<float> &window, int sampleRate)
             mag = ((1.0 - frac) * mags[bin0]) + (frac * mags[bin1]);
         }
         return mag;
+    };
+    auto columnMagnitude = [&](const QVector<double> &mags, int x, double *freqOut) {
+        return magnitudeAt(mags, rowMin, rowMax, x, freqOut);
     };
 
     // The strongest frequency of this window (not of the averaged row).
@@ -314,20 +365,37 @@ void DspEngine::analyzeWindow(const QVector<float> &window, int sampleRate)
          * Narrow receiver noise shelves receive a local lower-envelope correction.
          * No frequency bins are cropped, and decoder audio is untouched.
          */
+        // The noise baseline always comes from the full display range: in a
+        // zoom a signal can fill most of the row, and a lower envelope taken
+        // from the zoomed columns alone would treat it as background.
         std::vector<double> levelInput;
-        levelInput.reserve(static_cast<std::size_t>(dbLine.size()));
-        for (double value : dbLine) levelInput.push_back(value);
+        levelInput.reserve(static_cast<std::size_t>(m_columns));
+        if (zoomed) {
+            for (int x = 0; x < m_columns; ++x)
+                levelInput.push_back(20.0 * qLn(qMax(magnitudeAt(*rowMags, m_minHz, m_maxHz, x, nullptr), 1.0e-12)) / log10);
+        } else {
+            for (double value : dbLine) levelInput.push_back(value);
+        }
+        const double levelColumnHz = (m_maxHz - m_minHz) / static_cast<double>(m_columns - 1);
         const int receiverWidth = m_receiverFilterAge.isValid() && m_receiverFilterAge.elapsed() < 45000 ? m_receiverWidthHz : 0;
         const WaterfallLevelResult levels =
-            m_waterfallLeveler.update(levelInput, lineSeconds, columnHz,
+            m_waterfallLeveler.update(levelInput, lineSeconds, zoomed ? levelColumnHz : columnHz,
                 receiverWidth, m_narrowBandDisplay || (receiverWidth >= 50 && receiverWidth <= 1000));
         const bool haveBaseline = levels.baselineDb.size() ==
-                                  static_cast<std::size_t>(dbLine.size());
+                                  static_cast<std::size_t>(m_columns);
+        auto baselineAt = [&](int x) {
+            if (!haveBaseline) return levels.floorDb;
+            if (!zoomed) return levels.baselineDb[static_cast<std::size_t>(x)];
+            const double freq = rowMin + (rowMax - rowMin) * x / static_cast<double>(m_columns - 1);
+            const double pos = qBound(0.0, (freq - m_minHz) / levelColumnHz, static_cast<double>(m_columns - 1));
+            const int i0 = qMin(static_cast<int>(pos), m_columns - 2);
+            const double frac = pos - i0;
+            return (1.0 - frac) * levels.baselineDb[static_cast<std::size_t>(i0)] +
+                   frac * levels.baselineDb[static_cast<std::size_t>(i0 + 1)];
+        };
 
         for (int x = 0; x < m_columns; ++x) {
-            const double baselineDb = haveBaseline
-                ? levels.baselineDb[static_cast<std::size_t>(x)]
-                : levels.floorDb;
+            const double baselineDb = baselineAt(x);
             const double flattenedDb = dbLine[x] - baselineDb;
 
             // Equivalent to the WSJT-X Wide Graph default transfer:
@@ -341,7 +409,7 @@ void DspEngine::analyzeWindow(const QVector<float> &window, int sampleRate)
         }
 
         emit waterfallRowTime(m_windowCentreUtcMs);
-        emit waterfallLineReady(waterfallLine, m_minHz, m_maxHz);
+        emit waterfallLineReady(waterfallLine, rowMin, rowMax);
     }
 
     // QSO signal peak metric. Reuse the FFT that was already required for the

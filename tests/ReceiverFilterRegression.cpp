@@ -117,5 +117,51 @@ int main()
         std::cout << "PCM width=" << width << " CAT=" << cat << " noise colour=" << medianColour << " tone=" << signalColour << '\n';
         check(medianColour < 140 && signalColour > 200, "production FFT: narrow noise not saturated, carrier visible");
     }
+    {
+        // Zoom with real resolution: rows cover only the zoomed part, the FFT
+        // grows up to the limit, and a signal filling half the zoom is not
+        // taken for background by the flattening.
+        DspEngine dsp;
+        dsp.setTargetBinHz(1.5);
+        dsp.setTargetRowSeconds(0.2);
+        dsp.setColumns(1000);
+        dsp.setMaxFftSize(65536);
+        dsp.setZoomRange(1420.0, 1520.0);
+        double rowMin = 0.0, rowMax = 0.0;
+        QVector<quint8> last;
+        QObject::connect(&dsp, &DspEngine::waterfallLineReady, [&](const QVector<quint8> &line, double a, double b) {
+            last = line; rowMin = a; rowMax = b;
+        });
+        std::mt19937 rng(7);
+        std::normal_distribution<float> noise(0.0f, 0.05f);
+        double phase = 0.0;
+        int tone = 0;
+        for (int b = 0; b < 20 * 48000 / 1024; ++b) {
+            AudioBlock block;
+            block.sampleRate = 48000;
+            block.captureGeneration = 1;
+            block.firstSampleIndex = qint64(b) * 1024;
+            block.firstSampleUtcNs = 1700000000000000000LL + qint64(b) * 1024 * 1000000000LL / 48000;
+            block.samples.resize(1024);
+            for (int i = 0; i < 1024; ++i) {
+                const int n = b * 1024 + i;
+                if (n % 7680 == 0) tone = (tone * 5 + 3) % 8;
+                block.samples[i] = noise(rng) + 0.02f * static_cast<float>(std::sin(phase));
+                phase += 6.283185307179586 * (1450.0 + 6.25 * tone) / 48000.0;
+            }
+            dsp.processAudioBlock(block);
+        }
+        int inside = 0, outside = 0;
+        for (int x = 0; x < last.size(); ++x) {
+            const double f = rowMin + (rowMax - rowMin) * x / (last.size() - 1);
+            if (f > 1455.0 && f < 1490.0) inside = std::max(inside, int(last[x]));
+            if (f < 1440.0 || f > 1505.0) outside += last[x];
+        }
+        const int outsideMean = outside / std::max(1, last.size() / 2);
+        std::cout << "zoom rows " << rowMin << "-" << rowMax << " fft " << dsp.m_fftSize << " signal " << inside << " noise " << outsideMean << '\n';
+        check(std::abs(rowMin - 1420.0) < 0.5 && std::abs(rowMax - 1520.0) < 0.5 && dsp.m_fftSize == 65536,
+              "zoom: rows cover the zoomed part with a longer FFT");
+        check(inside > 150 && inside > 2 * outsideMean, "zoom: signal filling the view stays visible");
+    }
     return ok ? 0 : 1;
 }

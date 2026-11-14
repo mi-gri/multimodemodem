@@ -701,6 +701,7 @@ private slots:
     void setupJs8Page();
     void setupWsprDisplayPage();
     void setupWsprPage();
+    void applyWaterfallRangeForMode(const QString &modeName);
     void handleWsprDecoded(const QVector<WsprSpot> &spots, const QDateTime &periodUtc, int milliseconds);
     void clearWsprTable();
     void applyJs8Settings();

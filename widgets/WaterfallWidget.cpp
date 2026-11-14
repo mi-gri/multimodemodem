@@ -26,6 +26,14 @@ WaterfallWidget::WaterfallWidget(QWidget *parent)
     m_chordClickTimer.setSingleShot(true);
     m_chordClickTimer.setInterval(140);
     connect(&m_chordClickTimer, &QTimer::timeout, this, &WaterfallWidget::emitPendingSingleClick);
+    m_zoomReportTimer.setSingleShot(true);
+    m_zoomReportTimer.setInterval(250);
+    connect(&m_zoomReportTimer, &QTimer::timeout, this, [this]() {
+        const bool zoomed = m_viewInitialized && m_maxHz > m_minHz &&
+                            (m_viewMaxHz - m_viewMinHz) < (m_maxHz - m_minHz) - 0.5 &&
+                            m_scrollDirection == ScrollDirection::Down;
+        emit zoomRangeChanged(zoomed ? m_viewMinHz : 0.0, zoomed ? m_viewMaxHz : 0.0);
+    });
     setMinimumHeight(160);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     // The circular texture and all overlays reconstruct the complete frame.
@@ -98,16 +106,24 @@ void WaterfallWidget::addLine(const QVector<quint8> &line, double minHz, double 
         return;
     }
 
-    const bool rangeChanged = std::abs(m_minHz - minHz) > 1.0e-6 ||
-                              std::abs(m_maxHz - maxHz) > 1.0e-6;
-    m_minHz = minHz;
-    m_maxHz = maxHz;
-    if (!m_viewInitialized || rangeChanged) {
+    const bool rangeChanged = std::abs(m_dataMinHz - minHz) > 1.0e-6 ||
+                              std::abs(m_dataMaxHz - maxHz) > 1.0e-6;
+    m_dataMinHz = minHz;
+    m_dataMaxHz = maxHz;
+    if (!m_fullRangeSet) {
+        const bool fullChanged = std::abs(m_minHz - minHz) > 1.0e-6 || std::abs(m_maxHz - maxHz) > 1.0e-6;
+        m_minHz = minHz;
+        m_maxHz = maxHz;
+        if (!m_viewInitialized || fullChanged) {
+            resetFrequencyZoom();
+        }
+    } else if (!m_viewInitialized) {
         resetFrequencyZoom();
     }
     if (m_viewInitialized && rangeChanged) {
-        // Rows of another audio range (WSPR 1200-1800 Hz vs 100-3000 Hz)
-        // would be drawn at the wrong frequencies: start a fresh history.
+        // Rows of another audio range (WSPR 1200-1800 Hz vs 100-3000 Hz, or
+        // a zoom computed at full resolution) would be drawn at the wrong
+        // frequencies: start a fresh history.
         m_gpuClearPending = true;
         m_pendingGpuRows.clear();
         m_periodLabels.clear();
@@ -1425,7 +1441,25 @@ void WaterfallWidget::resetFrequencyZoom()
     m_viewMaxHz = m_maxHz;
     m_viewInitialized = true;
     updateFrequencyScrollBar();
-    requestRepaint();
+    requestRepaint();    scheduleZoomReport();
+}
+
+void WaterfallWidget::scheduleZoomReport()
+{
+    // Settle first: every wheel step or pan move would otherwise restart the
+    // DSP resolution and the history.
+    m_zoomReportTimer.start();
+}
+
+void WaterfallWidget::setFullFrequencyRange(double minHz, double maxHz)
+{
+    if (!(maxHz > minHz)) return;
+    const bool changed = !m_fullRangeSet || std::abs(m_minHz - minHz) > 1.0e-6 || std::abs(m_maxHz - maxHz) > 1.0e-6;
+    m_fullRangeSet = true;
+    if (!changed) return;
+    m_minHz = minHz;
+    m_maxHz = maxHz;
+    resetFrequencyZoom();
 }
 
 void WaterfallWidget::setVisibleRange(double minHz, double maxHz)
@@ -1441,7 +1475,7 @@ void WaterfallWidget::setVisibleRange(double minHz, double maxHz)
     m_viewMaxHz = start + span;
     m_viewInitialized = true;
     updateFrequencyScrollBar();
-    requestRepaint();
+    requestRepaint();    scheduleZoomReport();
 }
 
 void WaterfallWidget::zoomAt(double anchorHz, double factor)
@@ -1487,12 +1521,12 @@ void WaterfallWidget::updateFrequencyScrollBar()
 
 QRectF WaterfallWidget::waterfallSourceRect() const
 {
-    if (m_image.isNull() || m_maxHz <= m_minHz) return QRectF();
-    const double fullSpan = m_maxHz - m_minHz;
+    if (m_image.isNull() || m_dataMaxHz <= m_dataMinHz) return QRectF();
+    const double dataSpan = m_dataMaxHz - m_dataMinHz;
     const double leftRatio = qBound(0.0,
-        (visibleMinHz() - m_minHz) / fullSpan, 1.0);
+        (visibleMinHz() - m_dataMinHz) / dataSpan, 1.0);
     const double rightRatio = qBound(0.0,
-        (visibleMaxHz() - m_minHz) / fullSpan, 1.0);
+        (visibleMaxHz() - m_dataMinHz) / dataSpan, 1.0);
     const double left = leftRatio * static_cast<double>(m_image.width() - 1);
     const double right = rightRatio * static_cast<double>(m_image.width() - 1);
     return QRectF(left, 0.0, qMax(1.0, right - left + 1.0), m_image.height());
@@ -1819,9 +1853,11 @@ void WaterfallWidget::drawGpuWaterfall()
     glClearColor(4.0f / 255.0f, 6.0f / 255.0f, 8.0f / 255.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    const double fullSpan = qMax(1.0e-9, m_maxHz - m_minHz);
-    const float x0 = static_cast<float>(qBound(0.0, (visibleMinHz() - m_minHz) / fullSpan, 1.0));
-    const float x1 = static_cast<float>(qBound(0.0, (visibleMaxHz() - m_minHz) / fullSpan, 1.0));
+    // Texture columns cover the range of the rows (the zoomed part once the
+    // DSP follows the zoom, the full range before).
+    const double dataSpan = qMax(1.0e-9, m_dataMaxHz - m_dataMinHz);
+    const float x0 = static_cast<float>(qBound(0.0, (visibleMinHz() - m_dataMinHz) / dataSpan, 1.0));
+    const float x1 = static_cast<float>(qBound(0.0, (visibleMaxHz() - m_dataMinHz) / dataSpan, 1.0));
     const float invHeight = 1.0f / static_cast<float>(qMax(1, m_gpuTextureHeight));
     const float ringOffset = static_cast<float>(m_gpuWriteRow) * invHeight;
 

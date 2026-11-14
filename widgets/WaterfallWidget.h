@@ -119,11 +119,24 @@ signals:
      */
     void displayColumnsWanted(int columns);
 
+    /**
+     * @brief The visible frequency range after a zoom or pan settled
+     *        (minHz >= maxHz: not zoomed); the DSP then computes only this
+     *        part at full pixel resolution.
+     */
+    void zoomRangeChanged(double minHz, double maxHz);
+
 public slots:
     /**
      * @brief Adds one new FFT intensity line.
      */
     void addLine(const QVector<quint8> &line, double minHz, double maxHz);
+
+    /**
+     * @brief Full range of the waterfall (zoom limits); rows may cover only
+     *        a zoomed part of it.  Without a call the rows define it.
+     */
+    void setFullFrequencyRange(double minHz, double maxHz);
 
     /**
      * @brief UTC (ms) of the row passed with the next addLine(); 0 = unknown.
@@ -252,8 +265,13 @@ private:
     QString m_paletteName = QStringLiteral("m3");
     ScrollDirection m_scrollDirection = ScrollDirection::Down;
 
-    double m_minHz = 100.0;
+    double m_minHz = 100.0;              // full range (zoom limits)
     double m_maxHz = 3000.0;
+    double m_dataMinHz = 100.0;          // range covered by the rows in the history
+    double m_dataMaxHz = 3000.0;
+    bool m_fullRangeSet = false;
+    QTimer m_zoomReportTimer;
+    void scheduleZoomReport();
     double m_viewMinHz = 100.0;
     double m_viewMaxHz = 3000.0;
     bool m_viewInitialized = false;

@@ -10362,6 +10362,9 @@ void MainWindow::setupProcessingConnections()
     connect(m_waterfallWidget, &WaterfallWidget::displayColumnsWanted,
             m_dspEngine, &DspEngine::setColumns,
             Qt::QueuedConnection);
+    connect(m_waterfallWidget, &WaterfallWidget::zoomRangeChanged,
+            m_dspEngine, &DspEngine::setZoomRange,
+            Qt::QueuedConnection);
 
     connect(m_dspEngine, &DspEngine::dominantFrequencyChanged,
             this, &MainWindow::handleDominantFrequency,
@@ -12767,12 +12770,7 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
         m_waterfallWidget->setColorScalePercent(m_settings.waterfallColorScalePercent);
         m_waterfallWidget->setPaletteName(m_settings.waterfallPalette);
     }
-    if (m_dspEngine != nullptr && ui != nullptr && ui->cmbMode != nullptr) {
-        const bool wspr = WsprMode::isMode(ui->cmbMode->currentText());
-        QMetaObject::invokeMethod(m_dspEngine, "setDisplayRange", Qt::QueuedConnection,
-                                  Q_ARG(double, wspr ? 1200.0 : 100.0),
-                                  Q_ARG(double, wspr ? 1800.0 : double(m_settings.waterfallMaxHz)));
-    }
+    if (ui != nullptr && ui->cmbMode != nullptr) applyWaterfallRangeForMode(ui->cmbMode->currentText());
     if (m_cmbWaterfallPalette != nullptr) {
         const int paletteIndex = m_cmbWaterfallPalette->findData(m_settings.waterfallPalette);
         m_cmbWaterfallPalette->setCurrentIndex(paletteIndex >= 0 ? paletteIndex : 0);
@@ -14306,6 +14304,25 @@ void MainWindow::finishPendingModeChange()
 }
 
 
+// Waterfall range of a mode: WSPR 1200-1800 Hz, else 100 Hz up to the
+// configured upper edge.  The zoom may lengthen the FFT up to a per-mode
+// limit: CW keeps short windows (keying would smear), text modes 16384,
+// the FT/WSPR family 65536.
+void MainWindow::applyWaterfallRangeForMode(const QString &modeName)
+{
+    const bool wspr = WsprMode::isMode(modeName);
+    const double minHz = wspr ? 1200.0 : 100.0;
+    const double maxHz = wspr ? 1800.0 : double(m_settings.waterfallMaxHz);
+    const bool longWindowMode = wspr || Ft8Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName) ||
+                                Q65Mode::isFamilyMode(modeName);
+    const int maxFft = modeName == CwDecoder::modeName() ? 8192 : (longWindowMode ? 65536 : 16384);
+    if (m_waterfallWidget != nullptr) m_waterfallWidget->setFullFrequencyRange(minHz, maxHz);
+    if (m_dspEngine == nullptr) return;
+    QMetaObject::invokeMethod(m_dspEngine, "setDisplayRange", Qt::QueuedConnection, Q_ARG(double, minHz), Q_ARG(double, maxHz));
+    QMetaObject::invokeMethod(m_dspEngine, "setMaxFftSize", Qt::QueuedConnection, Q_ARG(int, maxFft));
+    QMetaObject::invokeMethod(m_dspEngine, "setHopSamples", Qt::QueuedConnection, Q_ARG(int, wspr ? 12288 : 2048));
+}
+
 void MainWindow::handleModeChanged(const QString &modeName)
 {
     restoreTxLevelForContext();
@@ -14322,11 +14339,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setTargetRowSeconds",
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetRowSeconds(modeName, m_settings.ftWaterfallRowMs)));
     // WSPR: only its band with some room (1200-1800 Hz), at full resolution.
-    if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setDisplayRange", Qt::QueuedConnection,
-        Q_ARG(double, WsprMode::isMode(modeName) ? 1200.0 : 100.0),
-        Q_ARG(double, WsprMode::isMode(modeName) ? 1800.0 : double(m_settings.waterfallMaxHz)));
-    if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setHopSamples", Qt::QueuedConnection,
-        Q_ARG(int, WsprMode::isMode(modeName) ? 12288 : 2048));
+    applyWaterfallRangeForMode(modeName);
     if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(Js8Mode::isMode(modeName) ? js8WaterfallPeriodMs() : waterfallPeriodMs(modeName));
     if(m_txPreparationPending)stopImageTx();
     if (m_nativeWeakSignalTxPending) {
@@ -25131,11 +25144,7 @@ void MainWindow::startRx()
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetBinHz(modeName)));
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setTargetRowSeconds",
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetRowSeconds(modeName, m_settings.ftWaterfallRowMs)));
-    if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setDisplayRange", Qt::QueuedConnection,
-        Q_ARG(double, WsprMode::isMode(modeName) ? 1200.0 : 100.0),
-        Q_ARG(double, WsprMode::isMode(modeName) ? 1800.0 : double(m_settings.waterfallMaxHz)));
-    if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setHopSamples", Qt::QueuedConnection,
-        Q_ARG(int, WsprMode::isMode(modeName) ? 12288 : 2048));
+    applyWaterfallRangeForMode(modeName);
     if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(Js8Mode::isMode(modeName) ? js8WaterfallPeriodMs() : waterfallPeriodMs(modeName));
     const bool cwRttyMode = modeName == CwDecoder::modeName() ||
                             modeName == RttyDecoder::modeName();

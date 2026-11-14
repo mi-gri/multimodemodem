@@ -1373,6 +1373,9 @@ if(BUILD_TESTING)
         tests/ReceiverFilterRegression.cpp dsp/WaterfallLeveler.cpp dsp/DspEngine.cpp)
     target_include_directories(m3_receiver_filter_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(m3_receiver_filter_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core "${M3_FFTW3_LIBRARY}")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(m3_receiver_filter_regression PRIVATE -fno-access-control)
+    endif()
     add_test(NAME m3_receiver_filter_regression COMMAND m3_receiver_filter_regression)
     add_executable(m3_waterfall_cq_regression
         tests/WaterfallCqRegression.cpp dsp/WaterfallLeveler.cpp dsp/DspEngine.cpp widgets/CqSpots.h

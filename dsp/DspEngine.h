@@ -97,6 +97,21 @@ public slots:
      */
     void setHopSamples(int samples);
 
+    /**
+     * @brief Visible part of the display range while the waterfall is zoomed
+     *        (minHz >= maxHz: not zoomed).  Rows then cover only this part at
+     *        one column per pixel, and the FFT gets longer, up to
+     *        setMaxFftSize(), so the zoom shows real detail.
+     */
+    void setZoomRange(double minHz, double maxHz);
+
+    /**
+     * @brief Longest FFT the zoom may use (8192 .. 65536).  A long window
+     *        smears fast keying in time: CW keeps 8192, text modes 16384,
+     *        the FT/WSPR family 65536.
+     */
+    void setMaxFftSize(int samples);
+
 signals:
     /**
      * @brief Sends one normalized waterfall intensity line.
@@ -167,6 +182,11 @@ private:
 
     double m_minHz = 100.0;
     double m_maxHz = 3000.0;
+    double m_zoomMinHz = 0.0;
+    double m_zoomMaxHz = 0.0;
+    int m_maxFftSize = 65536;
+    double rowMinHz() const;
+    double rowMaxHz() const;
 
     WaterfallLeveler m_waterfallLeveler;
     int m_receiverWidthHz = 0;
