@@ -14438,6 +14438,12 @@ void MainWindow::handleModeChanged(const QString &modeName)
         }
         m_ftCallerQueueMode = ftPerfModeName;
     } else {
+        // A QSO or CQ sequence cannot continue in another mode. Without this
+        // the session stayed "QSO active" after returning to FT8 and blocked
+        // Auto QSO and CQ repeat (seen after FT8 -> WSPR during a call).
+        if (m_ftSession.qsoActive || m_ftSession.cqRepeatActive || m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan) {
+            stopFt8Sequencer(QStringLiteral("left FT mode"));
+        }
         if (!m_ft8CallerQueue.isEmpty()) {
             clearFt8CallerQueue(QStringLiteral("left FT mode"));
         }
@@ -18428,17 +18434,25 @@ void MainWindow::handleFt8AutoCqToggled(bool enabled)
     }
 
 
-    if (ui != nullptr && ui->cmbMode != nullptr && Ft8Mode::isFamilyMode(ui->cmbMode->currentText()) &&
-        !m_ftSession.qsoActive && !m_txRunning && !m_ftTxWorkerRunning && !m_ft8PendingTxArmed) {
-        QTimer::singleShot(0, this, [this]() {
-            if (m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked() &&
-                !m_ft8OperatorStopLatched && !m_ftSession.cqRepeatActive && !m_ftSession.qsoActive && !m_txRunning && !m_ftTxWorkerRunning && !m_ft8PendingTxArmed) {
-                startFt8CqRepeat();
-            }
-        });
+    if (m_ftSession.qsoActive) {
+        appendLog(QStringLiteral("FT CQ retry starts after the QSO with %1 (Clear DX ends it now).")
+                      .arg(m_ftSession.dxCall.trimmed().toUpper()));
+    } else {
+        QTimer::singleShot(0, this, [this]() { startFt8CqRepeatIfIdle(QStringLiteral("CQ retry enabled")); });
     }
 
     updateFt8SequencerUi();
+}
+
+bool MainWindow::startFt8CqRepeatIfIdle(const QString &reason)
+{
+    if (ui == nullptr || ui->cmbMode == nullptr || !Ft8Mode::isFamilyMode(ui->cmbMode->currentText())) return false;
+    if (m_chkFt8CqRepeat == nullptr || !m_chkFt8CqRepeat->isChecked() || m_ft8OperatorStopLatched) return false;
+    if (m_ftSession.cqRepeatActive || m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning || m_ft8PendingTxArmed)
+        return false;
+    traceFtAutomation("cq.start", reason);
+    startFt8CqRepeat();
+    return true;
 }
 
 void MainWindow::handleFt8FullAutoQsoToggled(bool enabled)
@@ -19104,7 +19118,10 @@ void MainWindow::clearFt8Dx()
     *attempt = [this, attempt](int left) {
         const bool busy = m_txRunning || m_ftTxWorkerRunning ||
                           (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning());
-        if (!busy) { activateNextFt8QueuedCaller(); return; }
+        if (!busy) {
+            if (!activateNextFt8QueuedCaller()) startFt8CqRepeatIfIdle(QStringLiteral("Clear DX"));
+            return;
+        }
         if (left > 0) QTimer::singleShot(250, this, [attempt, left]() { (*attempt)(left - 1); });
     };
     QTimer::singleShot(0, this, [attempt]() { (*attempt)(12); });

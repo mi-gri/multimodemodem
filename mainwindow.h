@@ -865,6 +865,8 @@ private slots:
     // active, but the existing linear sequencer remains the sole owner of TX.
     void considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, bool blacklistedDecode);
     bool activateNextFt8QueuedCaller();
+    // Starts CQ repeat when it is checked and FT is idle; false otherwise.
+    bool startFt8CqRepeatIfIdle(const QString &reason);
     // A given-up QSO whose RR73/73 arrives later (both reports were exchanged):
     // log it and send the 73 after the current QSO.
     void handleFt8LateFinal(const Ft8RxDecoder::Decode &decode, const QString &senderCall);

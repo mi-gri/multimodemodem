@@ -862,3 +862,13 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'FT-valg ignorert: %1 ville gjort mitt eget kallesignal %2 til motstasjon.',
   'Výběr FT ignorován: %1 by z mé vlastní značky %2 udělal protistanici.'),
 }.items()})
+# CQ retry enabled during a QSO.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'log.ft_cq_retry_starts_after_the_qso_with_1_clear_dx_ends_it_now':(
+  'FT CQ retry starts after the QSO with %1 (Clear DX ends it now).',
+  'Il CQ retry FT parte dopo il QSO con %1 (Clear DX lo termina subito).',
+  'Le CQ retry FT démarre après le QSO avec %1 (Clear DX le termine tout de suite).',
+  'FT CQ-Retry startet nach dem QSO mit %1 (DX löschen beendet es sofort).',
+  'FT CQ retry starter etter QSO med %1 (Clear DX avslutter det nå).',
+  'FT CQ retry začne po QSO s %1 (Clear DX jej hned ukončí).'),
+}.items()})
