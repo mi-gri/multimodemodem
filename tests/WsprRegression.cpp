@@ -3,6 +3,7 @@
 // of synthesized signals in white noise.
 #include "modems/wspr/WsprDecoder.h"
 #include "modems/wspr/WsprEngine.h"
+#include "modems/wspr/tx/WsprTransmitter.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -50,6 +51,46 @@ int main(int argc, char **argv)
     // K1ABC FN42 37 and DO3BOX JO30 23 packed as by wsprsim.
     const unsigned char k1abc[M3Wspr::kDataBytes] = {0xf7, 0x0c, 0x23, 0x8b, 0x0d, 0x19, 0x40, 0, 0, 0, 0};
     const unsigned char do3box[M3Wspr::kDataBytes] = {0x5c, 0x69, 0x5b, 0xb7, 0xa0, 0x95, 0xc0, 0, 0, 0, 0};
+
+    // Packing as WSJT-X wsprsim (reference bytes from wsprsim -d).
+    {
+        struct Ref { const char *message; unsigned char data[7]; };
+        const Ref refs[] = {
+            {"K1ABC FN42 37", {0xF7, 0x0C, 0x23, 0x8B, 0x0D, 0x19, 0x40}},
+            {"PJ4/K1ABC 33", {0xF7, 0x0C, 0x23, 0x81, 0x0E, 0x98, 0xC0}},
+            {"<PJ4/K1ABC> FK52UD 33", {0x88, 0x24, 0x7C, 0x69, 0xA2, 0xE7, 0x80}},
+            {"DO3BOX/P 23", {0x5C, 0x69, 0x5B, 0xBD, 0x4F, 0x36, 0x40}},
+            {"DO3BOX/12 30", {0x5C, 0x69, 0x5B, 0xBD, 0x50, 0xD8, 0x00}},
+            {"<DO3BOX> JO30LJ 23", {0xA2, 0xC1, 0x02, 0x9A, 0xD3, 0xCA, 0x00}},
+        };
+        bool allSame = true;
+        for (const Ref &r : refs) {
+            unsigned char d[M3Wspr::kDataBytes];
+            std::string error;
+            const bool ok = M3Wspr::pack(r.message, d, &error);
+            bool same = ok;
+            for (int i = 0; i < 7 && same; ++i) same = d[i] == r.data[i];
+            if (!same) std::printf("  pack mismatch: %s (%s)\n", r.message, error.c_str());
+            allSame = allSame && same;
+        }
+        check(allSame, "pack: types 1, 2 (prefix, 1- and 2-character suffix) and 3 equal wsprsim");
+        unsigned char d[M3Wspr::kDataBytes];
+        check(!M3Wspr::pack("DO3BOX JO30", d) && !M3Wspr::pack("DO3BOX JO30 x", d) &&
+                  !M3Wspr::pack("TOOLONGCALL JO30 23", d) && !M3Wspr::pack("DO3BOX ZZ30 23", d) &&
+                  !M3Wspr::pack("<DO3BOX> JO30 23", d) && !M3Wspr::pack("A/B/C 23", d),
+              "pack: invalid messages are refused");
+        check(M3Wspr::validPowerDbm(25) == 27 && M3Wspr::validPowerDbm(99) == 60 && M3Wspr::validPowerDbm(-5) == 0,
+              "power snaps to valid dBm values");
+        // Round trip through the decoder's unpacking (type 3 after type 1 filled the hash).
+        M3Wspr::HashTable h;
+        M3Wspr::Message msg1, msg3;
+        unsigned char d1[M3Wspr::kDataBytes], d3[M3Wspr::kDataBytes];
+        M3Wspr::pack("DO3BOX JO30 23", d1);
+        M3Wspr::pack("<DO3BOX> JO30LJ 23", d3);
+        check(M3Wspr::unpack(d1, h, msg1) && msg1.text == "DO3BOX JO30 23" &&
+                  M3Wspr::unpack(d3, h, msg3) && msg3.text == "<DO3BOX> JO30LJ 23",
+              "pack/unpack round trip of types 1 and 3");
+    }
 
     M3Wspr::HashTable hashes;
     M3Wspr::Message message;
@@ -104,6 +145,37 @@ int main(int argc, char **argv)
     bool repeatSame = again.size() == results.size();
     for (size_t i = 0; repeatSame && i < again.size(); ++i) repeatSame = again[i].message.text == results[i].message.text;
     check(repeatSame, "second decode of the same record gives the same decodes");
+
+    // Transmitter: channel symbols as wsprsim -c, and its own waveform decodes.
+    {
+        unsigned char d[M3Wspr::kDataBytes];
+        unsigned char sym[M3Wspr::kSymbols];
+        M3Wspr::pack("K1ABC FN42 37", d);
+        M3Wspr::channelSymbolsForData(d, sym);
+        const unsigned char ref[20] = {3, 3, 0, 0, 2, 0, 0, 0, 1, 0, 2, 0, 1, 3, 1, 2, 2, 2, 1, 0};
+        bool symOk = true;
+        for (int i = 0; i < 20; ++i) symOk = symOk && sym[i] == ref[i];
+        check(symOk, "channel symbols equal wsprsim -c");
+
+        WsprTransmitter tx(QStringLiteral("do3box jo30 23"), 12000, 1530.0);
+        std::vector<float> air(120 * 12000);
+        std::normal_distribution<float> n12(0.0f, 1.0f);
+        const int produced = tx.generate(air.data(), static_cast<int>(air.size()));
+        // 0.58 peak; noise for about -24 dB in 2500 Hz.
+        const float sigma = 0.58f / std::sqrt(2.0f) / std::sqrt(std::pow(10.0f, -24.0f / 10.0f) * 2500.0f / 6000.0f);
+        for (float &v : air) v += sigma * n12(rng);
+        const auto txDecodes = engine.decode(air.data(), air.size());
+        bool txOk = tx.generationSucceeded() && produced == 12000 + 162 * 8192 && tx.isFinished();
+        bool found = false;
+        for (const auto &dd : txDecodes)
+            if (dd.message.text == "DO3BOX JO30 23" && std::fabs(dd.audioHz - 1530.0) < 0.5 &&
+                std::fabs(dd.dtSeconds) < 0.3) found = true;
+        check(txOk && found, "transmitter waveform (1 s lead, 162 symbols) decodes at 1530 Hz, DT 0");
+        WsprTransmitter outside(QStringLiteral("DO3BOX JO30 23"), 48000, 1700.0);
+        WsprTransmitter bad(QStringLiteral("DO3BOX JO30"), 48000, 1500.0);
+        check(!outside.generationSucceeded() && !bad.generationSucceeded(),
+              "transmitter refuses frequencies outside 1400-1600 Hz and invalid messages");
+    }
 
     std::vector<float> noise(120 * 12000);
     for (float &v : noise) v = gauss(rng) * 0.05f;

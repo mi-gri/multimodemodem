@@ -67,6 +67,15 @@ struct Message
     bool plausible = false;  // power and grid pass wsprd's sanity checks
 };
 
+// Nearest valid WSPR power (0, 3, 7, 10, ... 60 dBm), as wsprsim rounds.
+int validPowerDbm(int dbm);
+
+// Packs a WSPR message as wsprsim does: "K1ABC FN42 37" (type 1),
+// "PJ4/K1ABC 37" or "K1ABC/P 37" (type 2), "<PJ4/K1ABC> FK52UD 37"
+// (type 3).  Unlike wsprsim it validates every field and returns false with
+// @p error for anything it cannot encode exactly.
+bool pack(const std::string &message, unsigned char *data, std::string *error = nullptr);
+
 // Unpacks 11 data bytes; updates @p hashes for type 1/2 messages.
 // Returns false for undecodable bit patterns.
 bool unpack(const unsigned char *data, HashTable &hashes, Message &out);

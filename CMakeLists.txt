@@ -381,11 +381,13 @@ add_library(m3_wspr STATIC
     modems/wspr/WsprDecoder.cpp
     modems/wspr/WsprEngine.h
     modems/wspr/WsprEngine.cpp
+    modems/wspr/tx/WsprTransmitter.h
+    modems/wspr/tx/WsprTransmitter.cpp
     third_party/wsjtx_gpl/wspr/WsprCodec.h
     third_party/wsjtx_gpl/wspr/WsprCodec.cpp
 )
 target_include_directories(m3_wspr PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/modems/wspr")
-target_link_libraries(m3_wspr PUBLIC m3_weak_signal_codec m3_linear_resampler ${QT}::Core Threads::Threads "${M3_FFTW3_LIBRARY}")
+target_link_libraries(m3_wspr PUBLIC m3_weak_signal_codec m3_linear_resampler ${QT}::Core ${QT}::Gui Threads::Threads "${M3_FFTW3_LIBRARY}")
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(m3_wspr PRIVATE -Wall -Wextra)
 endif()
