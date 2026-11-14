@@ -14,6 +14,11 @@
 
 #ifdef M3_WITH_HAMLIB
 #include <hamlib/rig.h>
+#ifndef RIG_MODEL_FTX1
+// Older distribution Hamlib headers (Ubuntu 24.04, Fedora) predate the FTX-1;
+// same number as upstream riglist.h. Such builds cannot select it anyway.
+#define RIG_MODEL_FTX1 RIG_MAKE_MODEL(RIG_YAESU, 51)
+#endif
 #include <cstring>
 #endif
 
