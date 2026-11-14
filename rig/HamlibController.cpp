@@ -1631,6 +1631,12 @@ bool HamlibController::forceUsbMode(bool required)
         return false;
     }
 
+    // Already in USB (snapshot just taken): no mode write, no restore. Saves
+    // two CAT round trips before PTT and keeps the receive filter untouched.
+    if (m_havePreTxMode && static_cast<rmode_t>(m_preTxMode) == RIG_MODE_USB) {
+        return true;
+    }
+
     int ret = RIG_OK;
     if (splitTx) {
         ret = rig_set_split_mode(rig, RIG_VFO_CURR, RIG_MODE_USB, kDigitalWidePassbandHz);
@@ -1686,6 +1692,15 @@ bool HamlibController::forceDataUsbMode(bool required)
         RIG_MODE_USBD3,
 #endif
     };
+
+    // Already in a Data/Pkt USB mode (snapshot just taken): no mode write, no
+    // restore. Saves two CAT round trips before PTT and keeps the receive
+    // filter width untouched (a mode write also resets the width).
+    if (m_havePreTxMode) {
+        for (rmode_t mode : modes) {
+            if (static_cast<rmode_t>(m_preTxMode) == mode) return true;
+        }
+    }
 
     QString lastError;
     for (rmode_t mode : modes) {
