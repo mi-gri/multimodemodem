@@ -852,3 +852,13 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'log.wspr_decision_receive':('WSPR %1 UTC: receive (%2).', 'WSPR %1 UTC: ricezione (%2).', 'WSPR %1 UTC : réception (%2).', 'WSPR %1 UTC: Empfang (%2).', 'WSPR %1 UTC: mottak (%2).', 'WSPR %1 UTC: příjem (%2).'),
  'log.wspr_decision_transmit':('WSPR %1 UTC: transmit (TX share %2 %).', 'WSPR %1 UTC: trasmissione (quota TX %2 %).', 'WSPR %1 UTC : émission (part TX %2 %).', 'WSPR %1 UTC: Senden (TX-Anteil %2 %).', 'WSPR %1 UTC: sending (TX-andel %2 %).', 'WSPR %1 UTC: vysílání (podíl TX %2 %).'),
 }.items()})
+# Double-click that would make my own call the correspondent.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'log.ft_selection_ignored_1_would_make_my_own_call_2_the_correspondent':(
+  'FT selection ignored: %1 would make my own call %2 the correspondent.',
+  'Selezione FT ignorata: %1 renderebbe il mio nominativo %2 il corrispondente.',
+  "Sélection FT ignorée : %1 ferait de mon propre indicatif %2 le correspondant.",
+  'FT-Auswahl ignoriert: %1 würde mein eigenes Rufzeichen %2 zur Gegenstation machen.',
+  'FT-valg ignorert: %1 ville gjort mitt eget kallesignal %2 til motstasjon.',
+  'Výběr FT ignorován: %1 by z mé vlastní značky %2 udělal protistanici.'),
+}.items()})
