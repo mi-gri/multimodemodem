@@ -2,7 +2,44 @@
 
 MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow below.
 
-## Unreleased
+## m³ 0.6.7
+
+- WSPR-2: new mode. Receiver is a C++ port of the WSJT-X wsprd decoder
+  (third_party/wsjtx_gpl/wspr, GPL-3.0), measured against wsprd on the same recordings;
+  spot table, PSK Reporter upload of received spots, WSPR frequency list including
+  2200 m and 630 m, waterfall 1200-1800 Hz at 0.73 Hz resolution.
+- WSPR beacon: transmits in even minutes with an adjustable TX share; gated by the Auto
+  mode switch; tones start at :01 after the even minute; every period decision
+  (receive/transmit and why) is in the runtime log. The TX button stops the beacon.
+- Waterfall: FFT with FFTW (CPU for FT8 124 -> 19 ms per second); upper edge as a setting
+  (3000-5000 Hz); zoom with real resolution; time per row per mode, speed control at the
+  bottom of the side panel; during TX the top 22 dB of the TX signal is shown.
+- CAT: the receive passband follows the waterfall's upper edge for USB/LSB/PKTUSB/PKTLSB
+  (on connect, on a width change and when the rig enters such a mode).
+- Yaesu FTX-1: receive width set and read directly with the SH command (CAT Table 5),
+  because Hamlib 4.7 releases send a malformed command; DATA SHIFT is set to half the
+  width so the DATA passband runs from 0 Hz to the waterfall edge (4000 Hz: shift
+  2000 Hz).
+- CAT: with TX audio route Data/Pkt the mode is written before PTT only when it differs;
+  this saves about 0.2 s before and after every transmission (the first answer to a CQ
+  started ~0.85 s into the slot) and keeps the receive filter unchanged.
+- CAT: the frequency readback always comes from the radio (Hamlib frequency cache off),
+  so a lost CAT link no longer looks like a successful QSY.
+- Settings: the mouse wheel changes combo boxes and number fields only when they have
+  focus; otherwise it scrolls the page (a wheel turn had changed the CAT port).
+- Auto QSO honours the decode filter's hidden countries and continents (watched stations
+  exempt); before, the filter only hid rows and Auto QSO still answered a hidden country.
+- FT: a double-click on an own TX line ("DX MYCALL ...") selects the addressee; a
+  selection that would make the own call the correspondent is ignored (one
+  "DO3BOX DO3BOX JO30" had been transmitted).
+- FT controls: the band selector is released when an armed TX is stopped.
+- WEFAX is a service mode: its frequencies are not sorted into amateur bands.
+- Radio Telescope mode needs a rotator; a notice offers a bench test without rotator.
+- RTTY: soft-integrated bit decisions and fade-tolerant slicer gates.
+- Runtime log moved to the Help menu.
+- Bundled Hamlib updated to upstream master 1b3fb4a6 (FTX-1 fixes); built without
+  libsamplerate. CMake finds fftw3.h next to the FFTW library (Homebrew on Apple
+  Silicon); RIG_MODEL_FTX1 is defined for older distribution Hamlib headers.
 
 - QSO map: every repaint and every mouse move (tooltip) searched the whole logbook once
   per marker for the best known locator; with 13,500 QSOs and 1,000 markers the GUI froze

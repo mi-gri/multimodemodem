@@ -1,9 +1,27 @@
-# MultiModeModem (m³) 0.6.6
+# MultiModeModem (m³) 0.6.7
 
 MultiModeModem (m³) is a fork of MadModem 0.6.5 by Lucian-Ioan Papadopol, IZ6NNH,
 maintained by Michael Grigutsch, DO3BOX. From 0.6.6 on m³ numbers its own versions;
 the m³ build number counts on top. Source: https://github.com/mi-gri/MultiModeModem
 License: GPL-3.0-or-later (see LICENSE.md).
+
+## New in MultiModeModem 0.6.7
+
+- WSPR-2 receive and beacon: a C++ port of the WSJT-X wsprd decoder with spot table and
+  PSK Reporter upload; the beacon transmits in even minutes with an adjustable TX share
+  (only with the Auto mode switch on) and logs every period decision.
+- Waterfall: FFTW-based, upper edge selectable 3000-5000 Hz, zoom with real resolution,
+  speed per mode; the receiver passband of the radio follows the upper edge via CAT.
+- Yaesu FTX-1: receive width and DATA SHIFT are set directly, so the DATA passband
+  matches the waterfall (Hamlib releases send a malformed width command).
+- Auto QSO honours the hidden countries/continents of the decode filter; a double-click
+  on an own TX line can no longer make the own call the correspondent.
+- Faster first answer to a CQ with TX audio route Data/Pkt (no needless mode write
+  before PTT).
+- Settings: the mouse wheel no longer changes unfocused fields such as the CAT port.
+- Bundled Hamlib updated (FTX-1 fixes); macOS arm64 builds find FFTW again.
+
+Details: CHANGELOG.md.
 
 ## New in MultiModeModem 0.6.6
 
