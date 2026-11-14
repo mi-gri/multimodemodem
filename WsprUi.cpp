@@ -94,6 +94,26 @@ void MainWindow::setupWsprPage()
     m_lblWsprStatus->setWordWrap(true);
     m_lblWsprStatus->setText(uiText("wspr_waiting", "WSPR RX: waiting for the next even minute"));
     grid->addWidget(m_lblWsprStatus);
+    {
+        auto *rowLine = new QHBoxLayout;
+        m_wsprWaterfallRowMs = qBound(250, QSettings(AppSettings::settingsFilePath(), QSettings::IniFormat)
+                                               .value(QStringLiteral("WSPR/waterfallRowMs"), 500).toInt(), 2000);
+        m_spinWsprWaterfallRowMs = new QSpinBox(group);
+        m_spinWsprWaterfallRowMs->setRange(250, 2000);
+        m_spinWsprWaterfallRowMs->setSingleStep(250);
+        m_spinWsprWaterfallRowMs->setSuffix(QStringLiteral(" ms"));
+        m_spinWsprWaterfallRowMs->setValue(m_wsprWaterfallRowMs);
+        m_spinWsprWaterfallRowMs->setToolTip(uiText("wspr_waterfall_row_tip", "Waterfall speed in WSPR: time per row. Less scrolls faster, more keeps a longer history on the screen and calms the noise."));
+        rowLine->addWidget(new QLabel(uiText("wspr_waterfall_row", "Waterfall: time per row"), group));
+        rowLine->addWidget(m_spinWsprWaterfallRowMs, 1);
+        grid->addLayout(rowLine);
+        connect(m_spinWsprWaterfallRowMs, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int ms) {
+            m_wsprWaterfallRowMs = ms;
+            QSettings(AppSettings::settingsFilePath(), QSettings::IniFormat).setValue(QStringLiteral("WSPR/waterfallRowMs"), ms);
+            if (ui != nullptr && ui->cmbMode != nullptr && WsprMode::isMode(ui->cmbMode->currentText()))
+                applyWaterfallRangeForMode(ui->cmbMode->currentText());
+        });
+    }
     auto *psk = new QLabel(uiText("wspr_psk_info", "Decoded stations are reported to PSK Reporter when it is enabled in Settings (callsign with a known country only)."),
                            group);
     psk->setWordWrap(true);

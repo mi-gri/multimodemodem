@@ -809,3 +809,9 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'log.wspr_tx_armed_1_utc_2_hz_3':('WSPR TX armed: %1 UTC, %2 Hz, %3', 'TX WSPR armato: %1 UTC, %2 Hz, %3', 'TX WSPR armé : %1 UTC, %2 Hz, %3', 'WSPR-TX vorbereitet: %1 UTC, %2 Hz, %3', 'WSPR-TX klargjort: %1 UTC, %2 Hz, %3', 'TX WSPR připraven: %1 UTC, %2 Hz, %3'),
  'log.wspr_tx_period_missed_the_beacon_plans_the_next_period':('WSPR TX period missed; the beacon plans the next period.', 'Periodo TX WSPR mancato; il beacon pianifica il prossimo periodo.', 'Période TX WSPR manquée ; la balise planifie la période suivante.', 'WSPR-TX-Slot verpasst; die Bake plant den nächsten Slot.', 'WSPR TX-periode bommet; baken planlegger neste periode.', 'Perioda TX WSPR zmeškána; maják plánuje další periodu.'),
 }.items()})
+
+# WSPR waterfall row time.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'wspr_waterfall_row':('Waterfall: time per row', 'Waterfall: tempo per riga', 'Chute d’eau : durée par ligne', 'Wasserfall: Zeit pro Zeile', 'Fossefall: tid per linje', 'Vodopád: čas na řádek'),
+ 'wspr_waterfall_row_tip':('Waterfall speed in WSPR: time per row. Less scrolls faster, more keeps a longer history on the screen and calms the noise.', 'Velocità del waterfall in WSPR: tempo per riga. Meno scorre più veloce, di più mantiene una storia più lunga sullo schermo e calma il rumore.', 'Vitesse de la chute d’eau en WSPR : durée par ligne. Moins défile plus vite, plus garde un historique plus long à l’écran et calme le bruit.', 'Wasserfall-Geschwindigkeit in WSPR: Zeit pro Zeile. Weniger läuft schneller, mehr zeigt einen längeren Verlauf und ruhigeres Rauschen.', 'Fossefallets hastighet i WSPR: tid per linje. Mindre ruller raskere, mer viser lengre historikk og roligere støy.', 'Rychlost vodopádu ve WSPR: čas na řádek. Méně běží rychleji, více ukáže delší historii a klidnější šum.'),
+}.items()})
