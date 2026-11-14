@@ -54,6 +54,7 @@
 #include "modems/weatherfax/tx/WeatherFaxTransmitter.h"
 #include "widgets/RttyScopeWidget.h"
 #include "dxcc/CtyCountryFile.h"
+#include "dxcc/CtyUpdater.h"
 #include "utils/ProductName.h"
 #include "network/PskReporter.h"
 #include "rig/HamlibController.h"
@@ -11408,10 +11409,14 @@ void MainWindow::setupUiConnections()
     m_actionRuntimeLog = new QAction(uiText("runtime_log_button", "Runtime log"), this);
     m_actionRuntimeLog->setStatusTip(uiText("runtime_log_menu_tip", "Open the runtime log: FT timing, CAT/PTT, decoder and CW diagnostics."));
     connect(m_actionRuntimeLog, &QAction::triggered, this, &MainWindow::showRuntimeLogDialog);
+    m_actionCtyUpdate = new QAction(uiText("cty_update_action", "Update country file (cty.csv)"), this);
+    m_actionCtyUpdate->setStatusTip(uiText("cty_update_tip", "Downloads the current cty.csv from country-files.com and uses it if it is complete and newer."));
+    connect(m_actionCtyUpdate, &QAction::triggered, this, [this]() { startCtyUpdate(true); });
     if (ui->menuHelp != nullptr && ui->actionAboutM3 != nullptr) {
         ui->menuHelp->insertAction(ui->actionAboutM3, m_actionHelpContents);
         ui->menuHelp->insertAction(ui->actionAboutM3, m_actionWhatsThisMode);
         ui->menuHelp->insertAction(ui->actionAboutM3, m_actionRuntimeLog);
+        ui->menuHelp->insertAction(ui->actionAboutM3, m_actionCtyUpdate);
         ui->menuHelp->insertSeparator(ui->actionAboutM3);
     }
     if (ui->menuFile != nullptr) {
@@ -12676,6 +12681,8 @@ void MainWindow::applyDecodeTableVisualSettings()
 void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSettings)
 {
     const bool fullApply = (previousSettings == nullptr);
+    if (fullApply || previousSettings->ctyWeeklyUpdate != m_settings.ctyWeeklyUpdate)
+        QTimer::singleShot(0, this, [this]() { scheduleWeeklyCtyCheck(); });
     const bool appearanceChanged = fullApply || uiAppearanceSettingsChanged(*previousSettings, m_settings);
     const bool decodeVisualChanged = fullApply || decodeTableSettingsChanged(*previousSettings, m_settings);
     const bool catChanged = fullApply || catSettingsKey(*previousSettings) != catSettingsKey(m_settings);
@@ -25028,6 +25035,59 @@ void MainWindow::showAboutM3()
     dialog.exec();
 }
 
+
+void MainWindow::startCtyUpdate(bool userInitiated)
+{
+    if (m_ctyUpdater == nullptr) {
+        m_ctyUpdater = new CtyUpdater(this);
+        connect(m_ctyUpdater, &CtyUpdater::finished, this, &MainWindow::handleCtyUpdateFinished);
+    }
+    if (m_ctyUpdater->isRunning()) return;
+    appendLog(QStringLiteral("Country file: checking %1 ...").arg(CtyCountryFile::downloadUrl()));
+    if (m_actionCtyUpdate != nullptr) m_actionCtyUpdate->setEnabled(false);
+    m_ctyUpdater->start(userInitiated);
+}
+
+void MainWindow::handleCtyUpdateFinished(bool ok, bool updated, const QString &message, bool userInitiated)
+{
+    if (m_actionCtyUpdate != nullptr) m_actionCtyUpdate->setEnabled(true);
+    appendLog(QStringLiteral("Country file: %1").arg(message));
+    SessionDiagnostics::instance().record("cty.update", {{"ok", ok}, {"updated", updated}, {"message", message},
+                                                          {"version", CtyCountryFile::instance().version()}});
+    if (ok) {
+        m_settings.ctyLastCheckUtc = QDateTime::currentDateTimeUtc();
+        savePersistentSettings();
+    }
+    if (userInitiated) {
+        const CtyCountryFile &cty = CtyCountryFile::instance();
+        const QString text = ok
+            ? uiText("cty_update_result_ok", "Country file in use: version %1, %2 entities.")
+                  .arg(cty.version().isEmpty() ? QStringLiteral("?") : cty.version()).arg(cty.entityCount())
+            : uiText("cty_update_result_failed", "The country file could not be updated; the previous file stays in use.");
+        if (ok) QMessageBox::information(this, uiText("cty_update_title", "Country file"), text + QStringLiteral("\n\n") + message);
+        else QMessageBox::warning(this, uiText("cty_update_title", "Country file"), text + QStringLiteral("\n\n") + message);
+    }
+}
+
+void MainWindow::scheduleWeeklyCtyCheck()
+{
+    static bool reported = false;
+    if (!reported) {
+        reported = true;
+        const CtyCountryFile &cty = CtyCountryFile::instance();
+        appendLog(cty.isLoaded()
+            ? QStringLiteral("Country file: version %1, %2 entities, %3")
+                  .arg(cty.version().isEmpty() ? QStringLiteral("?") : cty.version()).arg(cty.entityCount()).arg(cty.sourcePath())
+            : QStringLiteral("Country file: not loaded (%1)").arg(cty.errorString()));
+    }
+    if (!m_settings.ctyWeeklyUpdate) return;
+    const QDateTime last = m_settings.ctyLastCheckUtc;
+    if (last.isValid() && last.secsTo(QDateTime::currentDateTimeUtc()) < 7 * 86400) return;
+    // Not during startup work; a quiet background check a little later.
+    QTimer::singleShot(90 * 1000, this, [this]() {
+        if (m_settings.ctyWeeklyUpdate) startCtyUpdate(false);
+    });
+}
 
 void MainWindow::showRuntimeLogDialog()
 {

@@ -1,6 +1,7 @@
 #ifndef CTYCOUNTRYFILE_H
 #define CTYCOUNTRYFILE_H
 
+#include <QByteArray>
 #include <QHash>
 #include <QString>
 #include <QStringList>
@@ -9,8 +10,11 @@
 /**
  * @brief Lightweight loader for AD1C/K1EA country-files.com cty.csv.
  *
- * The file is intentionally loaded from the executable directory, so users can
- * update DXCC/prefix data by replacing cty.csv without rebuilding MultiModeModem.
+ * The bundled file lives next to the executable; a downloaded copy in the
+ * user data folder (Help -> Update country file) is used instead when it is
+ * at least as new. instance() returns the current data set; installing a new
+ * file swaps it atomically and keeps the previous one alive, so lookups that
+ * run on other threads (decoder, logbook index) never see freed data.
  */
 class CtyCountryFile
 {
@@ -41,7 +45,27 @@ public:
 
     static const CtyCountryFile &instance();
 
+    /// country-files.com big CTY in CSV form (the variant m³ ships).
+    static QString downloadUrl() { return QStringLiteral("https://www.country-files.com/bigcty/cty.csv"); }
+    static QString bundledFilePath();
+    static QString userFilePath();
+
+    struct InstallResult
+    {
+        bool ok = false;        ///< file valid (installed or already current)
+        bool updated = false;   ///< a newer version is now in use
+        QString version;        ///< version of the checked file (VERyyyymmdd)
+        int entities = 0;
+        QString message;        ///< English one-line summary for the log
+    };
+    /// Validates downloaded cty.csv data and, if it is complete and not older
+    /// than the data in use, stores it in the user data folder and switches to it.
+    static InstallResult installDownloaded(const QByteArray &data);
+    /// Minimum number of DXCC entities a complete cty.csv must contain.
+    static constexpr int kMinimumEntities = 300;
+
     bool isLoaded() const { return m_loaded; }
+    QString version() const { return m_version; }   ///< e.g. "20261114", empty if unknown
     QString sourcePath() const { return m_sourcePath; }
     QString errorString() const { return m_errorString; }
     int entityCount() const { return m_entities.size(); }
@@ -65,6 +89,7 @@ public:
 
 private:
     CtyCountryFile();
+    explicit CtyCountryFile(const QString &path);
 
     bool loadFromFile(const QString &path);
     static QString cleanPrefixToken(const QString &token);
@@ -80,6 +105,7 @@ private:
     bool m_loaded = false;
     QString m_sourcePath;
     QString m_errorString;
+    QString m_version;
 };
 
 #endif // CTYCOUNTRYFILE_H

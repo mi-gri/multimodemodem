@@ -3,21 +3,125 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QSaveFile>
+#include <QStandardPaths>
+#include <QTemporaryFile>
 #include <QRegularExpression>
 #include <QTextStream>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <memory>
+#include <mutex>
+#include <vector>
+
+namespace {
+std::atomic<const CtyCountryFile *> g_current{nullptr};
+std::mutex g_installMutex;
+// Replaced data sets stay alive until exit: a lookup on another thread may
+// still be using one. Updates are rare (manual or weekly), a few MB each.
+std::vector<std::unique_ptr<const CtyCountryFile>> &retired()
+{
+    static std::vector<std::unique_ptr<const CtyCountryFile>> list;
+    return list;
+}
+} // namespace
 
 const CtyCountryFile &CtyCountryFile::instance()
 {
-    static const CtyCountryFile inst;
-    return inst;
+    static const CtyCountryFile *initial = [] {
+        // The newer of the bundled file and a downloaded user copy.
+        auto bundled = std::unique_ptr<const CtyCountryFile>(new CtyCountryFile(bundledFilePath()));
+        auto user = std::unique_ptr<const CtyCountryFile>(new CtyCountryFile(userFilePath()));
+        const bool userUsable = user->isLoaded() && user->entityCount() >= kMinimumEntities &&
+                                (!bundled->isLoaded() || user->version() >= bundled->version());
+        const CtyCountryFile *chosen = userUsable ? user.release() : bundled.release();
+        const CtyCountryFile *expected = nullptr;
+        g_current.compare_exchange_strong(expected, chosen);
+        return chosen;
+    }();
+    Q_UNUSED(initial);
+    return *g_current.load(std::memory_order_acquire);
+}
+
+QString CtyCountryFile::bundledFilePath()
+{
+    return QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("cty.csv"));
+}
+
+QString CtyCountryFile::userFilePath()
+{
+    QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (dir.isEmpty()) dir = QDir::homePath() + QStringLiteral("/.MultiModeModem");
+    return QDir(dir).filePath(QStringLiteral("cty.csv"));
+}
+
+CtyCountryFile::InstallResult CtyCountryFile::installDownloaded(const QByteArray &data)
+{
+    InstallResult result;
+    if (data.size() < 10000 || data.size() > 8 * 1024 * 1024) {
+        result.message = QStringLiteral("cty.csv download rejected: unexpected size %1 bytes").arg(data.size());
+        return result;
+    }
+    // Parse from a private temporary file with the normal loader.
+    QTemporaryFile temp;
+    if (!temp.open() || temp.write(data) != data.size() || !temp.flush()) {
+        result.message = QStringLiteral("cty.csv download could not be stored temporarily");
+        return result;
+    }
+    auto candidate = std::unique_ptr<const CtyCountryFile>(new CtyCountryFile(temp.fileName()));
+    result.version = candidate->version();
+    result.entities = candidate->entityCount();
+    if (!candidate->isLoaded() || candidate->entityCount() < kMinimumEntities || candidate->version().isEmpty()) {
+        result.message = QStringLiteral("cty.csv download rejected: %1 entities, version '%2' (incomplete or not a cty.csv)")
+                             .arg(candidate->entityCount()).arg(candidate->version());
+        return result;
+    }
+    std::lock_guard<std::mutex> lock(g_installMutex);
+    const CtyCountryFile &current = instance();
+    if (current.isLoaded() && candidate->version() < current.version()) {
+        result.message = QStringLiteral("cty.csv download is older (%1) than the data in use (%2); kept the current file")
+                             .arg(candidate->version(), current.version());
+        result.ok = true;
+        return result;
+    }
+    if (current.isLoaded() && candidate->version() == current.version()) {
+        result.ok = true;
+        result.message = QStringLiteral("cty.csv is up to date (version %1, %2 entities)")
+                             .arg(current.version()).arg(current.entityCount());
+        return result;
+    }
+    const QString target = userFilePath();
+    QDir().mkpath(QFileInfo(target).absolutePath());
+    QSaveFile out(target);
+    if (!out.open(QIODevice::WriteOnly) || out.write(data) != data.size() || !out.commit()) {
+        result.message = QStringLiteral("cty.csv could not be saved to %1: %2").arg(target, out.errorString());
+        return result;
+    }
+    // Same data, but recorded with its final path for the settings display.
+    auto installed = std::unique_ptr<const CtyCountryFile>(new CtyCountryFile(target));
+    if (!installed->isLoaded() || installed->version() != candidate->version()) {
+        result.message = QStringLiteral("cty.csv saved to %1 but could not be reloaded").arg(target);
+        return result;
+    }
+    const CtyCountryFile *previous = g_current.exchange(installed.release(), std::memory_order_acq_rel);
+    if (previous != nullptr) retired().emplace_back(previous);
+    result.ok = true;
+    result.updated = true;
+    result.message = QStringLiteral("cty.csv updated to version %1 (%2 entities, was %3)")
+                         .arg(result.version).arg(result.entities)
+                         .arg(previous != nullptr && !previous->version().isEmpty() ? previous->version() : QStringLiteral("unknown"));
+    return result;
 }
 
 CtyCountryFile::CtyCountryFile()
+    : CtyCountryFile(bundledFilePath())
 {
-    const QString exePath = QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("cty.csv"));
-    loadFromFile(exePath);
+}
+
+CtyCountryFile::CtyCountryFile(const QString &path)
+{
+    loadFromFile(path);
 }
 
 QString CtyCountryFile::normalizeCallsignForDxcc(const QString &callsign)
@@ -148,6 +252,12 @@ bool CtyCountryFile::loadFromFile(const QString &path)
             if (cq.hasMatch() || itu.hasMatch()) m_zoneOverrides.insert(t, qMakePair(cq.captured(1).toInt(), itu.captured(1).toInt()));
             if (t.startsWith('=')) {
                 t.remove(0, 1);
+                // country-files.com marks the file version as "=VERyyyymmdd".
+                if (t.size() == 11 && t.startsWith(QLatin1String("VER")) &&
+                    std::all_of(t.cbegin() + 3, t.cend(), [](QChar c) { return c.isDigit(); })) {
+                    m_version = t.mid(3);
+                    continue;
+                }
                 if (!t.isEmpty()) {
                     e.exactCalls.append(t);
                 }

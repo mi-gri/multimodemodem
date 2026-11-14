@@ -896,3 +896,31 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Skjuler stasjoner fra de avkryssede kontinentene (cty.dat); Auto QSO kaller dem heller ikke. Stasjoner på overvåkingslisten forblir synlige.',
   'Skryje stanice ze zaškrtnutých kontinentů (cty.dat); Auto QSO je také nevolá. Stanice ze sledovaného seznamu zůstanou viditelné.'),
 }.items()})
+# Country file (cty.csv) update.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'cty_update_action':('Update country file (cty.csv)','Aggiorna file paesi (cty.csv)','Mettre à jour le fichier des pays (cty.csv)','Länderdatei aktualisieren (cty.csv)','Oppdater landfil (cty.csv)','Aktualizovat soubor zemí (cty.csv)'),
+ 'cty_update_tip':('Downloads the current cty.csv from country-files.com and uses it if it is complete and newer.',
+   'Scarica il cty.csv attuale da country-files.com e lo usa se è completo e più recente.',
+   "Télécharge le cty.csv actuel depuis country-files.com et l'utilise s'il est complet et plus récent.",
+   'Lädt die aktuelle cty.csv von country-files.com und verwendet sie, wenn sie vollständig und neuer ist.',
+   'Laster ned gjeldende cty.csv fra country-files.com og bruker den hvis den er komplett og nyere.',
+   'Stáhne aktuální cty.csv z country-files.com a použije jej, pokud je úplný a novější.'),
+ 'cty_update_result_ok':('Country file in use: version %1, %2 entities.','File paesi in uso: versione %1, %2 entità.',"Fichier des pays utilisé : version %1, %2 entités.",'Verwendete Länderdatei: Version %1, %2 Einträge.','Landfil i bruk: versjon %1, %2 enheter.','Používaný soubor zemí: verze %1, %2 entit.'),
+ 'cty_update_result_failed':('The country file could not be updated; the previous file stays in use.',"Impossibile aggiornare il file paesi; resta in uso quello precedente.","Le fichier des pays n'a pas pu être mis à jour ; le fichier précédent reste utilisé.",'Die Länderdatei konnte nicht aktualisiert werden; die bisherige bleibt in Gebrauch.','Landfilen kunne ikke oppdateres; den forrige brukes fortsatt.','Soubor zemí se nepodařilo aktualizovat; zůstává používán předchozí.'),
+ 'cty_update_title':('Country file','File paesi','Fichier des pays','Länderdatei','Landfil','Soubor zemí'),
+ 'log.country_file_checking_1':('Country file: checking %1 ...','File paesi: controllo %1 ...','Fichier des pays : vérification de %1 ...','Länderdatei: prüfe %1 ...','Landfil: sjekker %1 ...','Soubor zemí: kontroluji %1 ...'),
+ 'log.country_file_1':('Country file: %1','File paesi: %1','Fichier des pays : %1','Länderdatei: %1','Landfil: %1','Soubor zemí: %1'),
+}.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Country file (cty.csv)':('Country file (cty.csv)','File paesi (cty.csv)','Fichier des pays (cty.csv)','Länderdatei (cty.csv)','Landfil (cty.csv)','Soubor zemí (cty.csv)'),
+ 'In use: version %1, %2 entities':('In use: version %1, %2 entities','In uso: versione %1, %2 entità','Utilisé : version %1, %2 entités','In Gebrauch: Version %1, %2 Einträge','I bruk: versjon %1, %2 enheter','Používá se: verze %1, %2 entit'),
+ 'No country file loaded':('No country file loaded','Nessun file paesi caricato','Aucun fichier des pays chargé','Keine Länderdatei geladen','Ingen landfil lastet','Není načten soubor zemí'),
+ 'Check weekly for a new country file (country-files.com)':('Check weekly for a new country file (country-files.com)','Controlla ogni settimana un nuovo file paesi (country-files.com)','Rechercher chaque semaine un nouveau fichier des pays (country-files.com)','Wöchentlich nach neuer Länderdatei suchen (country-files.com)','Se ukentlig etter ny landfil (country-files.com)','Každý týden hledat nový soubor zemí (country-files.com)'),
+ 'Downloads cty.csv over HTTPS at most once a week and uses it only if it is complete and newer. Help -> Update country file checks at once.':(
+  'Downloads cty.csv over HTTPS at most once a week and uses it only if it is complete and newer. Help -> Update country file checks at once.',
+  'Scarica cty.csv via HTTPS al massimo una volta a settimana e lo usa solo se completo e più recente. Aiuto -> Aggiorna file paesi controlla subito.',
+  "Télécharge cty.csv en HTTPS au plus une fois par semaine et ne l'utilise que s'il est complet et plus récent. Aide -> Mettre à jour le fichier des pays vérifie immédiatement.",
+  'Lädt cty.csv höchstens einmal pro Woche über HTTPS und verwendet sie nur, wenn sie vollständig und neuer ist. Hilfe -> Länderdatei aktualisieren prüft sofort.',
+  'Laster ned cty.csv over HTTPS høyst én gang i uken og bruker den bare hvis den er komplett og nyere. Hjelp -> Oppdater landfil sjekker straks.',
+  'Stahuje cty.csv přes HTTPS nejvýše jednou týdně a použije jej jen, je-li úplný a novější. Nápověda -> Aktualizovat soubor zemí zkontroluje hned.'),
+}.items()})

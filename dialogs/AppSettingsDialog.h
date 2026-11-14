@@ -200,6 +200,7 @@ private:
     QCheckBox *m_chkWatchListIcon = nullptr;
     QCheckBox *m_chkLogbookStrikeWorkedCalls = nullptr;
     QCheckBox *m_chkLogbookUdpEnabled = nullptr;
+    QCheckBox *m_chkCtyWeeklyUpdate = nullptr;
     QCheckBox *m_chkPskReporterEnabled = nullptr;
     QPushButton *m_btnAntennaByBand = nullptr;
     QMap<QString, QString> m_antennaByBand;

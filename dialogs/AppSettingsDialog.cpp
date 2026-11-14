@@ -1,4 +1,5 @@
 #include "../runtime/SessionDiagnostics.h"
+#include "../dxcc/CtyCountryFile.h"
 #include <QFileDialog>
 #include <QDir>
 #include <QDesktopServices>
@@ -1295,6 +1296,26 @@ QWidget *AppSettingsDialog::makeLogbookPage()
     m_chkLogbookStrikeWorkedCalls->setChecked(m_initialSettings.logbookStrikeWorkedCalls);
     displayLayout->addWidget(m_chkLogbookStrikeWorkedCalls);
     layout->addWidget(displayGroup);
+
+    // Country data used for DXCC, filters, Auto QSO priorities and the map.
+    QGroupBox *ctyGroup = new QGroupBox(L(QStringLiteral("Country file (cty.csv)")), holder);
+    ctyGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+    QVBoxLayout *ctyLayout = new QVBoxLayout(ctyGroup);
+    ctyLayout->setContentsMargins(10, 8, 10, 10);
+    ctyLayout->setSpacing(6);
+    const CtyCountryFile &cty = CtyCountryFile::instance();
+    QLabel *ctyInfo = new QLabel(cty.isLoaded()
+        ? L(QStringLiteral("In use: version %1, %2 entities")).arg(cty.version().isEmpty() ? QStringLiteral("?") : cty.version())
+              .arg(cty.entityCount())
+        : L(QStringLiteral("No country file loaded")), ctyGroup);
+    ctyInfo->setToolTip(cty.sourcePath());
+    ctyInfo->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    ctyLayout->addWidget(ctyInfo);
+    m_chkCtyWeeklyUpdate = new QCheckBox(L(QStringLiteral("Check weekly for a new country file (country-files.com)")), ctyGroup);
+    m_chkCtyWeeklyUpdate->setToolTip(L(QStringLiteral("Downloads cty.csv over HTTPS at most once a week and uses it only if it is complete and newer. Help -> Update country file checks at once.")));
+    m_chkCtyWeeklyUpdate->setChecked(m_initialSettings.ctyWeeklyUpdate);
+    ctyLayout->addWidget(m_chkCtyWeeklyUpdate);
+    layout->addWidget(ctyGroup);
 
     QGroupBox *udpGroup = new QGroupBox(L(QStringLiteral("UDP QSO logging")), holder);
     udpGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
@@ -2810,6 +2831,9 @@ void AppSettingsDialog::collectSettings()
     if (m_logbookPage != nullptr) {
         m_selectedLogbookPath = m_logbookPage->selectedPath().trimmed();
         merged.logbookFilePath = m_selectedLogbookPath;
+    }
+    if (m_chkCtyWeeklyUpdate != nullptr) {
+        merged.ctyWeeklyUpdate = m_chkCtyWeeklyUpdate->isChecked();
     }
     if (m_chkLogbookStrikeWorkedCalls != nullptr) {
         merged.logbookStrikeWorkedCalls = m_chkLogbookStrikeWorkedCalls->isChecked();

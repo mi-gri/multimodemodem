@@ -867,6 +867,10 @@ private slots:
     bool activateNextFt8QueuedCaller();
     // Starts CQ repeat when it is checked and FT is idle; false otherwise.
     bool startFt8CqRepeatIfIdle(const QString &reason);
+    // Country file (cty.csv) download: Help menu and optional weekly check.
+    void startCtyUpdate(bool userInitiated);
+    void handleCtyUpdateFinished(bool ok, bool updated, const QString &message, bool userInitiated);
+    void scheduleWeeklyCtyCheck();
     // A given-up QSO whose RR73/73 arrives later (both reports were exchanged):
     // log it and send the 73 after the current QSO.
     void handleFt8LateFinal(const Ft8RxDecoder::Decode &decode, const QString &senderCall);
@@ -1855,6 +1859,8 @@ private:
     QAction *m_actionStopRxRecording = nullptr;
     QAction *m_actionHelpContents = nullptr;
     QAction *m_actionRuntimeLog = nullptr;
+    class CtyUpdater *m_ctyUpdater = nullptr;
+    QAction *m_actionCtyUpdate = nullptr;
     QAction *m_actionWhatsThisMode = nullptr;
 
     AudioEngine *m_audioEngine = nullptr;

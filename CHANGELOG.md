@@ -4,6 +4,12 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Country file: Help -> "Update country file (cty.csv)" downloads the current big CTY
+  from country-files.com over verified HTTPS; it replaces the data in use only when it
+  parses completely (at least 300 entities, a VER date) and is not older. The copy is
+  kept in the user data folder; at start the newer of it and the bundled file is used.
+  Settings -> Logbook shows the version in use and offers a weekly check (off by
+  default). Bundled cty.csv updated to VER20261114.
 - WSPR-2: new mode. Receiver is a C++ port of the WSJT-X wsprd decoder
   (third_party/wsjtx_gpl/wspr, GPL-3.0), measured against wsprd on the same recordings;
   spot table, PSK Reporter upload of received spots, WSPR frequency list including

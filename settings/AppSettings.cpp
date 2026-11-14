@@ -186,6 +186,8 @@ void AppSettings::load()
 {
     QSettings settings(settingsFilePath(), QSettings::IniFormat);
     sessionDiagnosticsEnabled = settings.value("Diagnostics/sessionEnabled", false).toBool();
+    ctyWeeklyUpdate = settings.value("Cty/weeklyUpdate", false).toBool();
+    ctyLastCheckUtc = settings.value("Cty/lastCheckUtc").toDateTime();
     sessionDiagnosticsFolder = settings.value("Diagnostics/folder").toString();
     // The former default folder of MultiModeModem (…/MultiModeModem/diagnostics) becomes
     // the program's own default again; old recordings stay where they are.
@@ -867,6 +869,8 @@ bool AppSettings::save() const
 #endif
     QSettings settings(settingsFilePath(), QSettings::IniFormat);
     settings.setValue("Diagnostics/sessionEnabled", sessionDiagnosticsEnabled);
+    settings.setValue("Cty/weeklyUpdate", ctyWeeklyUpdate);
+    settings.setValue("Cty/lastCheckUtc", ctyLastCheckUtc);
     settings.setValue("Diagnostics/folder", sessionDiagnosticsFolder);
 
     settings.setValue("Audio/inputDevice", audioInputName);

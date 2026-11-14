@@ -3,6 +3,7 @@
 
 #include <QHash>
 #include <QMap>
+#include <QDateTime>
 #include <QString>
 #include <QVector>
 #include <QStringList>
@@ -20,6 +21,9 @@ class AppSettings
 {
 public:
     bool sessionDiagnosticsEnabled = false;
+    // Country file (cty.csv): optional weekly check on country-files.com.
+    bool ctyWeeklyUpdate = false;
+    QDateTime ctyLastCheckUtc;
     QString sessionDiagnosticsFolder;
     QString qrzUsername;
     QString qrzPassword; // Local profile; never included in diagnostics or URLs.
