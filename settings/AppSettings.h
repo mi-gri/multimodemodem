@@ -67,6 +67,12 @@ public:
     int waterfallColorScalePercent = 80;
     QString waterfallPalette = "m3";
     int waterfallMaxHz = 3000;          // upper edge of the waterfall (3000..5000 Hz, rig passband)
+    // Waterfall time per row per mode key (FT8, FT4, JS8, Q65, MSK144, WSPR,
+    // RTTY, PSK, MFSK, CW, HELL, SSTV, WEFAX, RT); 0 = one row per FFT step
+    // (about 43 ms at 48 kHz).  FT8 mirrors ftWaterfallRowMs.
+    QMap<QString, int> waterfallRowMs;
+    static QStringList waterfallModeKeys();
+    int waterfallRowMsFor(const QString &modeKey) const;
     // Global UI appearance. Theme names are stable keys, not translated labels:
     // avionica, qt_default, hacker_green, classic_dark, high_contrast.
     QString uiTheme = "avionica";

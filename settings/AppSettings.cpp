@@ -653,6 +653,17 @@ void AppSettings::load()
     ftHighlightNewCall = settings.value("FT8/highlightNewCall", ftHighlightNewCall).toBool();
     ftWaterfallCqSeconds = qBound(0, settings.value("FT8/waterfallCqSeconds", ftWaterfallCqSeconds).toInt(), 600);
     ftWaterfallRowMs = qBound(50, settings.value("FT8/waterfallRowMs", ftWaterfallRowMs).toInt(), 1000);
+    // Per-mode waterfall speed; earlier builds had FT8 (FT4 half of it) and
+    // a WSPR value on the WSPR page.
+    waterfallRowMs.clear();
+    for (const QString &key : waterfallModeKeys()) {
+        int fallback = 0;
+        if (key == QLatin1String("FT8")) fallback = ftWaterfallRowMs;
+        else if (key == QLatin1String("FT4")) fallback = ftWaterfallRowMs / 2;
+        else if (key == QLatin1String("WSPR")) fallback = settings.value("WSPR/waterfallRowMs", 500).toInt();
+        waterfallRowMs.insert(key, qBound(0, settings.value(QStringLiteral("Waterfall/rowMs_") + key, fallback).toInt(), 2000));
+    }
+    ftWaterfallRowMs = qBound(50, waterfallRowMs.value(QStringLiteral("FT8"), ftWaterfallRowMs), 1000);
     ftDecodeFilterCqEnd = settings.value("FT8/decodeFilterCqEnd", ftDecodeFilterCqEnd).toBool();
     ftDecodeFilterWorked = settings.value("FT8/decodeFilterWorked", ftDecodeFilterWorked).toBool();
     ftDecodeFilterWorkedDays = qBound(0, settings.value("FT8/decodeFilterWorkedDays", ftDecodeFilterWorkedDays).toInt(), 3650);
@@ -1090,7 +1101,9 @@ bool AppSettings::save() const
     settings.setValue("FT8/highlightNewGrid", ftHighlightNewGrid);
     settings.setValue("FT8/highlightNewCall", ftHighlightNewCall);
     settings.setValue("FT8/waterfallCqSeconds", ftWaterfallCqSeconds);
-    settings.setValue("FT8/waterfallRowMs", ftWaterfallRowMs);
+    settings.setValue("FT8/waterfallRowMs", qBound(50, waterfallRowMsFor(QStringLiteral("FT8")), 1000));
+    for (const QString &key : waterfallModeKeys())
+        settings.setValue(QStringLiteral("Waterfall/rowMs_") + key, waterfallRowMsFor(key));
     settings.setValue("FT8/decodeFilterCqEnd", ftDecodeFilterCqEnd);
     settings.setValue("FT8/decodeFilterWorked", ftDecodeFilterWorked);
     settings.setValue("FT8/decodeFilterWorkedDays", ftDecodeFilterWorkedDays);
@@ -1205,4 +1218,21 @@ bool AppSettings::save() const
 #endif
 
     return settings.status() == QSettings::NoError;
+}
+
+QStringList AppSettings::waterfallModeKeys()
+{
+    return {QStringLiteral("FT8"), QStringLiteral("FT4"), QStringLiteral("JS8"), QStringLiteral("Q65"),
+            QStringLiteral("MSK144"), QStringLiteral("WSPR"), QStringLiteral("RTTY"), QStringLiteral("PSK"),
+            QStringLiteral("MFSK"), QStringLiteral("CW"), QStringLiteral("HELL"), QStringLiteral("SSTV"),
+            QStringLiteral("WEFAX"), QStringLiteral("RT")};
+}
+
+int AppSettings::waterfallRowMsFor(const QString &modeKey) const
+{
+    if (modeKey == QLatin1String("FT8") && !waterfallRowMs.contains(modeKey)) return ftWaterfallRowMs;
+    const int fallback = modeKey == QLatin1String("FT8") ? ftWaterfallRowMs
+                       : modeKey == QLatin1String("FT4") ? ftWaterfallRowMs / 2
+                       : modeKey == QLatin1String("WSPR") ? 500 : 0;
+    return qBound(0, waterfallRowMs.value(modeKey, fallback), 2000);
 }

@@ -83,7 +83,7 @@ void MainWindow::setupWsprPage()
     outer->setSpacing(8);
     installModeFrequencyGroup(WsprMode::modeName());
 
-    auto *group = new QGroupBox(uiText("wspr_rx", "WSPR receive"), m_pageWsprSettings);
+    auto *group = new QGroupBox(uiText("wspr_rx_group", "WSPR receive"), m_pageWsprSettings);
     auto *grid = new QVBoxLayout(group);
     grid->setContentsMargins(8, 8, 8, 8);
     auto *info = new QLabel(uiText("wspr_rx_info", "WSPR-2: 2-minute periods from each even UTC minute. Each period is decoded after 114 s; RX must run from the start of a period. Receive only."),
@@ -94,26 +94,6 @@ void MainWindow::setupWsprPage()
     m_lblWsprStatus->setWordWrap(true);
     m_lblWsprStatus->setText(uiText("wspr_waiting", "WSPR RX: waiting for the next even minute"));
     grid->addWidget(m_lblWsprStatus);
-    {
-        auto *rowLine = new QHBoxLayout;
-        m_wsprWaterfallRowMs = qBound(250, QSettings(AppSettings::settingsFilePath(), QSettings::IniFormat)
-                                               .value(QStringLiteral("WSPR/waterfallRowMs"), 500).toInt(), 2000);
-        m_spinWsprWaterfallRowMs = new QSpinBox(group);
-        m_spinWsprWaterfallRowMs->setRange(250, 2000);
-        m_spinWsprWaterfallRowMs->setSingleStep(250);
-        m_spinWsprWaterfallRowMs->setSuffix(QStringLiteral(" ms"));
-        m_spinWsprWaterfallRowMs->setValue(m_wsprWaterfallRowMs);
-        m_spinWsprWaterfallRowMs->setToolTip(uiText("wspr_waterfall_row_tip", "Waterfall speed in WSPR: time per row. Less scrolls faster, more keeps a longer history on the screen and calms the noise."));
-        rowLine->addWidget(new QLabel(uiText("wspr_waterfall_row", "Waterfall: time per row"), group));
-        rowLine->addWidget(m_spinWsprWaterfallRowMs, 1);
-        grid->addLayout(rowLine);
-        connect(m_spinWsprWaterfallRowMs, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int ms) {
-            m_wsprWaterfallRowMs = ms;
-            QSettings(AppSettings::settingsFilePath(), QSettings::IniFormat).setValue(QStringLiteral("WSPR/waterfallRowMs"), ms);
-            if (ui != nullptr && ui->cmbMode != nullptr && WsprMode::isMode(ui->cmbMode->currentText()))
-                applyWaterfallRangeForMode(ui->cmbMode->currentText());
-        });
-    }
     auto *psk = new QLabel(uiText("wspr_psk_info", "Decoded stations are reported to PSK Reporter when it is enabled in Settings (callsign with a known country only)."),
                            group);
     psk->setWordWrap(true);
@@ -122,7 +102,7 @@ void MainWindow::setupWsprPage()
 
     // Beacon TX: automatic operation, so only with Auto mode (Settings).
     QSettings stored(AppSettings::settingsFilePath(), QSettings::IniFormat);
-    auto *txGroup = new QGroupBox(uiText("wspr_tx", "WSPR transmit"), m_pageWsprSettings);
+    auto *txGroup = new QGroupBox(uiText("wspr_tx_group", "WSPR transmit"), m_pageWsprSettings);
     auto *txGrid = new QGridLayout(txGroup);
     txGrid->setContentsMargins(8, 8, 8, 8);
     int row = 0;
@@ -452,6 +432,6 @@ void MainWindow::wsprArmPeriod(qint64 periodStartMs)
     appendLog(QStringLiteral("WSPR TX armed: %1 UTC, %2 Hz, %3").arg(at).arg(hz, 0, 'f', 0).arg(message));
     SessionDiagnostics::instance().record("wspr.tx.armed", {{"period_utc_ms", periodStartMs}, {"audio_hz", hz}, {"message", message}});
     if (m_lblWsprTxStatus != nullptr)
-        m_lblWsprTxStatus->setText(uiText("wspr_tx_armed", "Beacon on: TX at %1 UTC (%2)").arg(at, message));
+        m_lblWsprTxStatus->setText(uiText("wspr_tx_status_armed", "Beacon on: TX at %1 UTC (%2)").arg(at, message));
     updateTxControlState();
 }

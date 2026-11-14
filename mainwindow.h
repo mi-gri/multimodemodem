@@ -702,6 +702,7 @@ private slots:
     void setupWsprDisplayPage();
     void setupWsprPage();
     void applyWaterfallRangeForMode(const QString &modeName);
+    double waterfallRowSecondsForMode(const QString &modeName) const;
     QStringList wsprTxMessages(QString *error = nullptr) const;
     void wsprPlanNextPeriod();
     void wsprArmPeriod(qint64 periodStartMs);
@@ -2239,8 +2240,6 @@ private:
     QSpinBox *m_spinWsprTxHz = nullptr;
     QComboBox *m_cmbWsprPower = nullptr;
     QLabel *m_lblWsprTxStatus = nullptr;
-    QSpinBox *m_spinWsprWaterfallRowMs = nullptr;
-    int m_wsprWaterfallRowMs = 500;
     QTimer m_wsprTxTimer;
     qint64 m_wsprLastTxPeriodMs = -1;
     int m_wsprMessageIndex = 0;

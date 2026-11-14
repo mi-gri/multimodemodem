@@ -311,18 +311,11 @@ double waterfallTargetBinHz(const QString &modeName)
     return 0.0;
 }
 
-// Waterfall row time per mode (DspEngine::setTargetRowSeconds); 0 = one row per hop.
-// ft8RowMs is the operator's setting (JTDX writes an FT8 row every ~0.29 s);
-// FT4, with symbols a third as long, scrolls twice as fast.
-double waterfallTargetRowSeconds(const QString &modeName, int ft8RowMs, int wsprRowMs = 500)
+// Waterfall settings key of a mode (Settings > Appearance > Waterfall).
+QString waterfallModeKey(const QString &modeName)
 {
-    const double ft8 = qBound(50, ft8RowMs, 1000) / 1000.0;
-    if (modeName == QStringLiteral("FT8")) return ft8;
-    if (modeName == QStringLiteral("FT4")) return ft8 / 2.0;
-    // WSPR: 0.68-s symbols, 2-minute transmissions; the operator chooses the
-    // row time on the WSPR page (0.25 .. 2 s, default 0.5 s).
-    if (WsprMode::isMode(modeName)) return qBound(250, wsprRowMs, 2000) / 1000.0;
-    return 0.0;
+    if (RadioTelescopeMode::isMode(modeName)) return QStringLiteral("RT");
+    return M3StandardFrequencies::listModeForName(modeName);
 }
 
 // T/R period whose starts the waterfall marks with a line and the UTC; 0 = none.
@@ -14309,6 +14302,12 @@ void MainWindow::finishPendingModeChange()
 // configured upper edge.  The zoom may lengthen the FFT up to a per-mode
 // limit: CW keeps short windows (keying would smear), text modes 16384,
 // the FT/WSPR family 65536.
+double MainWindow::waterfallRowSecondsForMode(const QString &modeName) const
+{
+    const QString key = waterfallModeKey(modeName);
+    return key.isEmpty() ? 0.0 : m_settings.waterfallRowMsFor(key) / 1000.0;
+}
+
 void MainWindow::applyWaterfallRangeForMode(const QString &modeName)
 {
     const bool wspr = WsprMode::isMode(modeName);
@@ -14321,12 +14320,13 @@ void MainWindow::applyWaterfallRangeForMode(const QString &modeName)
     if (m_dspEngine == nullptr) return;
     QMetaObject::invokeMethod(m_dspEngine, "setDisplayRange", Qt::QueuedConnection, Q_ARG(double, minHz), Q_ARG(double, maxHz));
     QMetaObject::invokeMethod(m_dspEngine, "setMaxFftSize", Qt::QueuedConnection, Q_ARG(int, maxFft));
-    // WSPR: four windows of the 65536-point FFT per row (75 % overlap at
-    // 0.5 s rows at 48 kHz); everything else steps 2048 samples.
-    const int wsprHop = qMax(2048, qBound(250, m_wsprWaterfallRowMs, 2000) * 48 / 4);
-    QMetaObject::invokeMethod(m_dspEngine, "setHopSamples", Qt::QueuedConnection, Q_ARG(int, wspr ? wsprHop : 2048));
+    // About four FFT windows per row (48 kHz), at least 2048 samples apart and
+    // never more than the shortest FFT, so no audio is skipped; slow rows
+    // then cost little even with the 65536-point FFT.
+    const int hop = qBound(2048, qRound(waterfallRowSecondsForMode(modeName) * 48000.0 / 4.0), 8192);
+    QMetaObject::invokeMethod(m_dspEngine, "setHopSamples", Qt::QueuedConnection, Q_ARG(int, hop));
     QMetaObject::invokeMethod(m_dspEngine, "setTargetRowSeconds", Qt::QueuedConnection,
-                              Q_ARG(double, waterfallTargetRowSeconds(modeName, m_settings.ftWaterfallRowMs, m_wsprWaterfallRowMs)));
+                              Q_ARG(double, waterfallRowSecondsForMode(modeName)));
 }
 
 void MainWindow::handleModeChanged(const QString &modeName)
@@ -14345,7 +14345,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setTargetBinHz",
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetBinHz(modeName)));
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setTargetRowSeconds",
-        Qt::QueuedConnection, Q_ARG(double, waterfallTargetRowSeconds(modeName, m_settings.ftWaterfallRowMs, m_wsprWaterfallRowMs)));
+        Qt::QueuedConnection, Q_ARG(double, waterfallRowSecondsForMode(modeName)));
     // WSPR: only its band with some room (1200-1800 Hz), at full resolution.
     applyWaterfallRangeForMode(modeName);
     if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(Js8Mode::isMode(modeName) ? js8WaterfallPeriodMs() : waterfallPeriodMs(modeName));
@@ -24533,10 +24533,7 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
         }
         updateFt8WaterfallOverlays();
     }
-    if (m_dspEngine != nullptr && ui->cmbMode != nullptr) {
-        QMetaObject::invokeMethod(m_dspEngine, "setTargetRowSeconds", Qt::QueuedConnection,
-            Q_ARG(double, waterfallTargetRowSeconds(ui->cmbMode->currentText(), m_settings.ftWaterfallRowMs, m_wsprWaterfallRowMs)));
-    }
+    if (ui->cmbMode != nullptr) applyWaterfallRangeForMode(ui->cmbMode->currentText());   // per-mode speed
 
     const QString newLogbookPath = dialog.selectedLogbookPath().trimmed();
     const bool logbookPathChanged = !newLogbookPath.isEmpty() &&
@@ -25161,7 +25158,7 @@ void MainWindow::startRx()
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setTargetBinHz",
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetBinHz(modeName)));
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setTargetRowSeconds",
-        Qt::QueuedConnection, Q_ARG(double, waterfallTargetRowSeconds(modeName, m_settings.ftWaterfallRowMs, m_wsprWaterfallRowMs)));
+        Qt::QueuedConnection, Q_ARG(double, waterfallRowSecondsForMode(modeName)));
     applyWaterfallRangeForMode(modeName);
     if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(Js8Mode::isMode(modeName) ? js8WaterfallPeriodMs() : waterfallPeriodMs(modeName));
     const bool cwRttyMode = modeName == CwDecoder::modeName() ||
