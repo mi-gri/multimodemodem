@@ -25175,6 +25175,8 @@ void MainWindow::startRx()
         applyQ65Settings();
     } else if (Js8Mode::isMode(modeName)) {
         applyJs8Settings();
+    } else if (WsprMode::isMode(modeName)) {
+        // No settings to apply: fixed WSPR-2 periods and 1400-1600 Hz.
     } else {
         appendLog(modeName + " is not implemented yet.");
         return;
