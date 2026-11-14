@@ -105,6 +105,13 @@ void WaterfallWidget::addLine(const QVector<quint8> &line, double minHz, double 
     if (!m_viewInitialized || rangeChanged) {
         resetFrequencyZoom();
     }
+    if (m_viewInitialized && rangeChanged) {
+        // Rows of another audio range (WSPR 1200-1800 Hz vs 100-3000 Hz)
+        // would be drawn at the wrong frequencies: start a fresh history.
+        m_gpuClearPending = true;
+        m_pendingGpuRows.clear();
+        m_periodLabels.clear();
+    }
 
     // QOpenGLWidget does not paint while the top-level window is minimized.
     // Presentation rows must not build up while no frame can be shown, but the

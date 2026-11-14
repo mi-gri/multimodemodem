@@ -305,6 +305,9 @@ double waterfallTargetBinHz(const QString &modeName)
 {
     if (modeName == QStringLiteral("FT8")) return 1.5;  // ~JTDX/WSJT-X FT8 wide graph
     if (modeName == QStringLiteral("FT4")) return 3.0;  // shorter symbols, wider tones
+    // WSPR: tones 1.46 Hz apart, a signal is about 6 Hz wide; 65536 points at
+    // 48 kHz (0.73 Hz) over 600 Hz give a bin per one or two pixels.
+    if (WsprMode::isMode(modeName)) return 0.7;
     return 0.0;
 }
 
@@ -316,6 +319,9 @@ double waterfallTargetRowSeconds(const QString &modeName, int ft8RowMs)
     const double ft8 = qBound(50, ft8RowMs, 1000) / 1000.0;
     if (modeName == QStringLiteral("FT8")) return ft8;
     if (modeName == QStringLiteral("FT4")) return ft8 / 2.0;
+    // WSPR: 0.68-s symbols, 2-minute transmissions; one row per second keeps
+    // more than a whole period on the screen and calms the noise.
+    if (WsprMode::isMode(modeName)) return 1.0;
     return 0.0;
 }
 
@@ -324,6 +330,7 @@ int waterfallPeriodMs(const QString &modeName)
 {
     if (modeName == QStringLiteral("FT8")) return 15000;
     if (modeName == QStringLiteral("FT4")) return 7500;
+    if (WsprMode::isMode(modeName)) return 120000;
     return 0;
 }
 
@@ -14308,6 +14315,12 @@ void MainWindow::handleModeChanged(const QString &modeName)
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetBinHz(modeName)));
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setTargetRowSeconds",
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetRowSeconds(modeName, m_settings.ftWaterfallRowMs)));
+    // WSPR: only its band with some room (1200-1800 Hz), at full resolution.
+    if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setDisplayRange", Qt::QueuedConnection,
+        Q_ARG(double, WsprMode::isMode(modeName) ? 1200.0 : 100.0),
+        Q_ARG(double, WsprMode::isMode(modeName) ? 1800.0 : 3000.0));
+    if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setHopSamples", Qt::QueuedConnection,
+        Q_ARG(int, WsprMode::isMode(modeName) ? 12288 : 2048));
     if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(Js8Mode::isMode(modeName) ? js8WaterfallPeriodMs() : waterfallPeriodMs(modeName));
     if(m_txPreparationPending)stopImageTx();
     if (m_nativeWeakSignalTxPending) {
@@ -25112,6 +25125,11 @@ void MainWindow::startRx()
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetBinHz(modeName)));
     if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setTargetRowSeconds",
         Qt::QueuedConnection, Q_ARG(double, waterfallTargetRowSeconds(modeName, m_settings.ftWaterfallRowMs)));
+    if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setDisplayRange", Qt::QueuedConnection,
+        Q_ARG(double, WsprMode::isMode(modeName) ? 1200.0 : 100.0),
+        Q_ARG(double, WsprMode::isMode(modeName) ? 1800.0 : 3000.0));
+    if (m_dspEngine != nullptr) QMetaObject::invokeMethod(m_dspEngine, "setHopSamples", Qt::QueuedConnection,
+        Q_ARG(int, WsprMode::isMode(modeName) ? 12288 : 2048));
     if (m_waterfallWidget != nullptr) m_waterfallWidget->setPeriodMs(Js8Mode::isMode(modeName) ? js8WaterfallPeriodMs() : waterfallPeriodMs(modeName));
     const bool cwRttyMode = modeName == CwDecoder::modeName() ||
                             modeName == RttyDecoder::modeName();

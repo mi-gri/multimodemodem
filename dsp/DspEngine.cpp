@@ -82,6 +82,25 @@ void DspEngine::setColumns(int columns)
     resetRowAverage();
 }
 
+void DspEngine::setDisplayRange(double minHz, double maxHz)
+{
+    if (!qIsFinite(minHz) || !qIsFinite(maxHz)) return;
+    minHz = qBound(10.0, minHz, 5000.0);
+    maxHz = qBound(minHz + 100.0, maxHz, 6000.0);
+    if (qAbs(minHz - m_minHz) < 1.0e-6 && qAbs(maxHz - m_maxHz) < 1.0e-6) return;
+    m_minHz = minHz;
+    m_maxHz = maxHz;
+    resetRowAverage();
+}
+
+void DspEngine::setHopSamples(int samples)
+{
+    samples = qBound(512, samples, 16384);
+    if (samples == m_hopSize) return;
+    m_hopSize = samples;
+    resetRowAverage();
+}
+
 void DspEngine::resetRowAverage()
 {
     m_rowPowerSum.clear();

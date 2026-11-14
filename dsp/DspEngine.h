@@ -83,6 +83,19 @@ public slots:
      */
     void setColumns(int columns);
 
+    /**
+     * @brief Audio range of the waterfall row (default 100 .. 3000 Hz).
+     *        WSPR shows 1200 .. 1800 Hz around its 1400 .. 1600 Hz band.
+     */
+    void setDisplayRange(double minHz, double maxHz);
+
+    /**
+     * @brief Step between analysis windows (default 2048 samples).  Slow
+     *        displays with long FFTs (WSPR: 65536 points, one row per second)
+     *        need far fewer windows.
+     */
+    void setHopSamples(int samples);
+
 signals:
     /**
      * @brief Sends one normalized waterfall intensity line.
