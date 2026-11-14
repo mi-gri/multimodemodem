@@ -148,6 +148,8 @@ private:
     Ts890FilterQuery m_ts890Filter;
     QString m_filterContext;
     QElapsedTimer m_filterRetryClock;
+    QElapsedTimer m_ftx1WidthClock;   // last direct "SH0;" read (FTX-1)
+    int m_ftx1WidthHz = 0;
     bool m_lastPtt = false;
     QString m_lastStatus;
     bool m_externalTransmit = false;

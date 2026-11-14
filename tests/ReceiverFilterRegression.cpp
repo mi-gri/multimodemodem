@@ -1,5 +1,6 @@
 #include "dsp/WaterfallLeveler.h"
 #include "rig/Ts890FilterQuery.h"
+#include "rig/Ftx1Width.h"
 #include "dsp/DspEngine.h"
 #include <algorithm>
 #include <cmath>
@@ -14,6 +15,18 @@ int main()
         std::cout << (condition ? "PASS " : "FAIL ") << name << '\n';
         ok = condition && ok;
     };
+    // FTX-1 CAT Table 5: DATA 19 = 3200 Hz, 21 = 4000 Hz; SSB 23 = 4000 Hz.
+    check(Ftx1Width::parseAnswer("SH0019;") == 19 && Ftx1Width::hzForIndex("PKTUSB", 19) == 3200,
+          "FTX-1 DATA SH0019 is 3200 Hz");
+    check(Ftx1Width::indexForHz("PKTUSB", 4000) == 21 && Ftx1Width::setCommand(21) == "SH0021;",
+          "FTX-1 DATA 4000 Hz -> SH0021;");
+    check(Ftx1Width::indexForHz("PKTUSB", 3000) == 18 && Ftx1Width::indexForHz("PKTUSB", 5000) == 21,
+          "FTX-1 DATA 3000 Hz exact, 5000 Hz capped at 4000");
+    check(Ftx1Width::indexForHz("USB", 4000) == 23 && Ftx1Width::indexForHz("USB", 3000) == 20 &&
+          Ftx1Width::hzForIndex("USB", 23) == 4000, "FTX-1 SSB table");
+    check(Ftx1Width::indexForHz("FM", 4000) == 0 && Ftx1Width::parseAnswer("SH024;") == -1 &&
+          Ftx1Width::parseAnswer("?;") == -1 && Ftx1Width::hzForIndex("PKTUSB", 0) == 0,
+          "FTX-1 rejects FM, malformed answers and default index");
     Ts890FilterQuery query;
     bool complete = false;
     check(query.command("RTTY") == "SL0;" && query.accept("RTTY", "SL000;", complete) && complete && query.widthHz() == 250,

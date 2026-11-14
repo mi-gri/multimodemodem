@@ -1,6 +1,7 @@
 #include "../runtime/SessionDiagnostics.h"
 #include <QScopeGuard>
 #include "HamlibController.h"
+#include "Ftx1Width.h"
 
 #include "../settings/AppSettings.h"
 #include "../utils/SerialPortEndpoint.h"
@@ -158,6 +159,23 @@ int HamlibController::hamRadioDeluxeModelId()
 {
     return kHamRadioDeluxeModelId;
 }
+
+#ifdef M3_WITH_HAMLIB
+namespace {
+// Direct FTX-1 "SH0;" read on the CAT worker's own handle. Returns the width
+// index or -1; never marks CAT disconnected.
+int readFtx1WidthIndex(RIG *rig)
+{
+    const QByteArray cmd = Ftx1Width::readCommand();
+    unsigned char reply[32] = {};
+    unsigned char terminator[] = {';', 0};
+    const int size = rig_send_raw(rig, reinterpret_cast<const unsigned char *>(cmd.constData()), cmd.size(),
+                                  reply, static_cast<int>(sizeof(reply)), terminator);
+    if (size <= 0 || size >= static_cast<int>(sizeof(reply))) return -1;
+    return Ftx1Width::parseAnswer(QByteArray(reinterpret_cast<const char *>(reply), size));
+}
+} // namespace
+#endif
 
 bool HamlibController::isHamRadioDeluxeModel(int rigModel)
 {
@@ -607,6 +625,8 @@ bool HamlibController::disconnectRig()
     m_lastFrequencyHz = 0.0;
     m_ts890Filter.reset();
     m_filterContext.clear();
+    m_ftx1WidthClock.invalidate();
+    m_ftx1WidthHz = 0;
     m_filterRetryClock.invalidate();
     emit receiverFilterChanged(QString(), 0, 0);
     if (!m_lastModeName.isEmpty()) {
@@ -759,6 +779,17 @@ void HamlibController::pollNow()
                 m_filterRetryClock.invalidate();
                 emit receiverFilterChanged(modeName, m_ts890Filter.widthHz(), 2);
             }
+        } else if (rig->caps->rig_model == RIG_MODEL_FTX1 &&
+                   (Ftx1Width::isSsbMode(modeName) || Ftx1Width::isDataMode(modeName))) {
+            // Hamlib only knows a nominal width here; read the radio's SH value
+            // on mode changes and every 10 s (front-panel changes).
+            const QString context = modeName + QLatin1Char('/') + QString::number(activeVfo);
+            if (context != m_filterContext || !m_ftx1WidthClock.isValid() || m_ftx1WidthClock.elapsed() >= 10000) {
+                m_filterContext = context;
+                m_ftx1WidthClock.start();
+                m_ftx1WidthHz = Ftx1Width::hzForIndex(modeName, readFtx1WidthIndex(rig));
+            }
+            emit receiverFilterChanged(modeName, m_ftx1WidthHz, m_ftx1WidthHz > 0 ? 2 : 0);
         } else {
             emit receiverFilterChanged(modeName, width > 0 && width <= 12000 ? static_cast<int>(width) : 0,
                                        width > 0 && width <= 12000 ? 1 : 0);
@@ -852,6 +883,28 @@ bool HamlibController::setDataPassbandHz(int widthHz)
     if (!dataOrSsb) {
         SessionDiagnostics::instance().record("cat.setDataPassbandHz.skipped", {{"mode", modeName}});
         return false;
+    }
+    if (rig->caps->rig_model == RIG_MODEL_FTX1) {
+        // Hamlib 4.7 sends a malformed SH command for the FTX-1; use Table 5.
+        const int index = Ftx1Width::indexForHz(modeName, widthHz);
+        const QByteArray cmd = Ftx1Width::setCommand(index);
+        const int sent = rig_send_raw(rig, reinterpret_cast<const unsigned char *>(cmd.constData()), cmd.size(),
+                                      nullptr, 0, nullptr);
+        SessionDiagnostics::instance().record("cat.ftx1.setWidth",
+            {{"command", QString::fromLatin1(cmd)}, {"index", index},
+             {"table_hz", Ftx1Width::hzForIndex(modeName, index)}, {"result", sent}});
+        if (sent < 0) {
+            emitError(QStringLiteral("FTX-1 could not set the receive width (%1): %2")
+                          .arg(QString::fromLatin1(cmd), QString::fromLocal8Bit(rigerror(sent))));
+            return false;
+        }
+        const int readIndex = readFtx1WidthIndex(rig);
+        m_ftx1WidthClock.start();
+        m_ftx1WidthHz = Ftx1Width::hzForIndex(modeName, readIndex);
+        SessionDiagnostics::instance().record("cat.ftx1.readWidth",
+            {{"index", readIndex}, {"width_hz", m_ftx1WidthHz}});
+        emit receiverFilterChanged(modeName, m_ftx1WidthHz, m_ftx1WidthHz > 0 ? 2 : 0);
+        return readIndex == index;
     }
     const int ret = rig_set_mode(rig, RIG_VFO_CURR, mode, static_cast<pbwidth_t>(widthHz));
     if (ret != RIG_OK) {
