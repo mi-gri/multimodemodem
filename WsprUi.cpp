@@ -345,7 +345,9 @@ void MainWindow::updateWsprTxAvailability()
 
 void MainWindow::wsprStopBeacon(const QString &reason)
 {
-    const bool wasOn = m_chkWsprTx != nullptr && m_chkWsprTx->isChecked();
+    // Unchecking the box arrives here with the box already off.
+    const bool wasOn = (m_chkWsprTx != nullptr && m_chkWsprTx->isChecked()) ||
+                       reason == QLatin1String("beacon switched off");
     m_wsprTxTimer.stop();
     if (m_chkWsprTx != nullptr && m_chkWsprTx->isChecked()) {
         const QSignalBlocker block(m_chkWsprTx);
@@ -386,13 +388,23 @@ void MainWindow::wsprPlanNextPeriod()
     const bool transmit = percent > 0 && !(afterTx && percent <= 50) &&
                           static_cast<int>(QRandomGenerator::global()->bounded(100)) < percent;
     // At least 5 s to prepare the waveform and key the rig.
+    const QString nextAt = QDateTime::fromMSecsSinceEpoch(nextStart, Qt::UTC).toString(QStringLiteral("HH:mm"));
     if (!transmit || nextStart - nowMs < 5000 || m_nativeWeakSignalTxPending) {
+        const QString why = percent <= 0 ? uiText("wspr_reason_zero", "TX share 0 %")
+            : (afterTx && percent <= 50) ? uiText("wspr_reason_after_tx", "previous period transmitted")
+            : !transmit ? uiText("wspr_reason_random", "random draw, TX share %1 %").arg(percent)
+            : m_nativeWeakSignalTxPending ? uiText("wspr_reason_armed", "a transmission is already armed")
+                                          : uiText("wspr_reason_too_close", "too close to the period start");
+        appendLog(uiText("log.wspr_decision_receive", "WSPR %1 UTC: receive (%2).").arg(nextAt, why));
+        SessionDiagnostics::instance().record("wspr.tx.decision", {{"period_utc_ms", nextStart}, {"transmit", false},
+                                                                   {"tx_percent", percent}, {"reason", why}});
         if (m_lblWsprTxStatus != nullptr)
             m_lblWsprTxStatus->setText(uiText("wspr_tx_next_rx", "Beacon on: %1 UTC receive, next decision at %2 UTC")
                                            .arg(QDateTime::fromMSecsSinceEpoch(nextStart, Qt::UTC).toString(QStringLiteral("HH:mm")),
                                                 QDateTime::fromMSecsSinceEpoch(nextStart + periodMs / 2, Qt::UTC).toString(QStringLiteral("HH:mm:ss"))));
         return;
     }
+    appendLog(uiText("log.wspr_decision_transmit", "WSPR %1 UTC: transmit (TX share %2 %).").arg(nextAt).arg(percent));
     wsprArmPeriod(nextStart);
 }
 

@@ -841,3 +841,14 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'runtime_log_menu_tip':('Open the runtime log: FT timing, CAT/PTT, decoder and CW diagnostics.', 'Apre il log runtime: tempi FT, CAT/PTT, decoder e diagnostica CW.', 'Ouvre le journal d’exécution : timing FT, CAT/PTT, décodeur et diagnostic CW.', 'Öffnet das Laufzeitprotokoll: FT-Timing, CAT/PTT, Decoder- und CW-Diagnose.', 'Åpner kjøretidsloggen: FT-timing, CAT/PTT, dekoder og CW-diagnostikk.', 'Otevře provozní protokol: časování FT, CAT/PTT, dekodér a diagnostika CW.'),
 }.items()})
+
+# WSPR beacon decisions in the runtime log.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'wspr_reason_zero':('TX share 0 %', 'quota TX 0 %', 'part TX 0 %', 'TX-Anteil 0 %', 'TX-andel 0 %', 'podíl TX 0 %'),
+ 'wspr_reason_after_tx':('previous period transmitted', 'periodo precedente in trasmissione', 'période précédente en émission', 'vorheriger Slot war TX', 'forrige periode var TX', 'předchozí perioda vysílala'),
+ 'wspr_reason_random':('random draw, TX share %1 %', 'estrazione casuale, quota TX %1 %', 'tirage au sort, part TX %1 %', 'Zufallsauswahl, TX-Anteil %1 %', 'tilfeldig trekning, TX-andel %1 %', 'náhodný výběr, podíl TX %1 %'),
+ 'wspr_reason_armed':('a transmission is already armed', 'una trasmissione è già armata', 'une émission est déjà armée', 'eine Aussendung ist schon vorbereitet', 'en sending er allerede klargjort', 'vysílání je již připraveno'),
+ 'wspr_reason_too_close':('too close to the period start', "troppo vicino all'inizio del periodo", 'trop près du début de la période', 'zu kurz vor Slot-Beginn', 'for nær starten av perioden', 'příliš blízko začátku periody'),
+ 'log.wspr_decision_receive':('WSPR %1 UTC: receive (%2).', 'WSPR %1 UTC: ricezione (%2).', 'WSPR %1 UTC : réception (%2).', 'WSPR %1 UTC: Empfang (%2).', 'WSPR %1 UTC: mottak (%2).', 'WSPR %1 UTC: příjem (%2).'),
+ 'log.wspr_decision_transmit':('WSPR %1 UTC: transmit (TX share %2 %).', 'WSPR %1 UTC: trasmissione (quota TX %2 %).', 'WSPR %1 UTC : émission (part TX %2 %).', 'WSPR %1 UTC: Senden (TX-Anteil %2 %).', 'WSPR %1 UTC: sending (TX-andel %2 %).', 'WSPR %1 UTC: vysílání (podíl TX %2 %).'),
+}.items()})
