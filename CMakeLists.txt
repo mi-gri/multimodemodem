@@ -354,6 +354,16 @@ find_library(M3_FFTW3_LIBRARY NAMES fftw3 fftw3-3 libfftw3.so.3)
 if(NOT M3_FFTW3_LIBRARY)
     message(FATAL_ERROR "FT reference recovery requires FFTW3 double precision (libfftw3-dev / fftw / brew fftw)")
 endif()
+# System <fftw3.h> (waterfall, WSPR): not in the default search path on
+# Homebrew/Apple Silicon (/opt/homebrew/include).
+get_filename_component(_m3_fftw3_libdir "${M3_FFTW3_LIBRARY}" DIRECTORY)
+find_path(M3_FFTW3_INCLUDE_DIR fftw3.h HINTS "${_m3_fftw3_libdir}/../include")
+if(NOT M3_FFTW3_INCLUDE_DIR)
+    message(FATAL_ERROR "fftw3.h not found next to ${M3_FFTW3_LIBRARY}; set M3_FFTW3_INCLUDE_DIR")
+endif()
+if(NOT M3_FFTW3_INCLUDE_DIR IN_LIST CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
+    include_directories(SYSTEM "${M3_FFTW3_INCLUDE_DIR}")
+endif()
 add_library(m3_ft_reference STATIC
     modems/ft8/FtReferenceRecovery.h modems/ft8/FtReferenceRecovery.cpp
     third_party/mshv_gpl/ft_reference/budget.cpp
