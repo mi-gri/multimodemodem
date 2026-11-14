@@ -20,6 +20,8 @@
  */
 
 #include "hamlib/config.h"
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>  /* String function definitions */
@@ -30,9 +32,14 @@
 #include "hamlib/rig_state.h"
 #include "iofunc.h"
 #include "misc.h"
-#include "num_stdio.h"
+#include "rigctl_protocol.h"
 
 #include "dummy.h"
+#include "dummy_common.h"
+#include "stream.h"
+#include "stream_net.h"
+#include "stream_proto.h"
+#include "stream_convert.h"
 
 #define CMD_MAX 64
 #define BUF_MAX 1024
@@ -45,7 +52,58 @@ struct netrigctl_priv_data
     int rigctld_vfo_mode;
     vfo_t rx_vfo;
     vfo_t tx_vfo;
+    char parm_value[BUF_MAX];
 };
+
+static int parse_rprt_status(const char *response)
+{
+    const char *token = response + strlen(NETRIGCTL_RET);
+    char *end;
+    long status;
+
+    errno = 0;
+    status = strtol(token, &end, 10);
+
+    while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')
+    {
+        ++end;
+    }
+
+    if (errno == ERANGE || end == token || *end != '\0'
+            || status > 0 || status < INT_MIN || status > INT_MAX)
+    {
+        return -RIG_EPROTO;
+    }
+
+    return (int)status;
+}
+
+static int parse_protocol_uint(const char *token, unsigned int *value)
+{
+    char *end;
+    unsigned long parsed;
+
+    if (token == NULL || value == NULL || token[0] == '-')
+    {
+        return -RIG_EPROTO;
+    }
+
+    errno = 0;
+    parsed = strtoul(token, &end, 10);
+
+    while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')
+    {
+        ++end;
+    }
+
+    if (errno == ERANGE || end == token || *end != '\0' || parsed > UINT_MAX)
+    {
+        return -RIG_EPROTO;
+    }
+
+    *value = (unsigned int)parsed;
+    return RIG_OK;
+}
 
 int netrigctl_get_vfo_mode(RIG *rig)
 {
@@ -57,7 +115,8 @@ int netrigctl_get_vfo_mode(RIG *rig)
 /*
  * Helper function with protocol return code parsing
  */
-static int netrigctl_transaction(RIG *rig, char *cmd, int len, char *buf)
+static int netrigctl_transaction_internal(RIG *rig, char *cmd, int len,
+        char *buf, int sensitive)
 {
     int ret;
     hamlib_port_t *rp = RIGPORT(rig);
@@ -67,7 +126,8 @@ static int netrigctl_transaction(RIG *rig, char *cmd, int len, char *buf)
     /* flush anything in the read buffer before command is sent */
     rig_flush(rp);
 
-    ret = write_block(rp, (unsigned char *) cmd, len);
+    ret = sensitive ? write_block_sensitive(rp, (unsigned char *) cmd, len)
+          : write_block(rp, (unsigned char *) cmd, len);
 
     if (ret != RIG_OK)
     {
@@ -83,10 +143,15 @@ static int netrigctl_transaction(RIG *rig, char *cmd, int len, char *buf)
 
     if (strncmp(buf, NETRIGCTL_RET, strlen(NETRIGCTL_RET)) == 0)
     {
-        return atoi(buf + strlen(NETRIGCTL_RET));
+        return parse_rprt_status(buf);
     }
 
     return ret;
+}
+
+static int netrigctl_transaction(RIG *rig, char *cmd, int len, char *buf)
+{
+    return netrigctl_transaction_internal(rig, cmd, len, buf, 0);
 }
 
 /* this will fill vfostr with the vfo value if the vfo mode is enabled
@@ -223,25 +288,7 @@ int parse_array_int(const char *s, const char *delim, int *array, int array_len)
 int parse_array_double(const char *s, const char *delim, double *array,
                        int array_len)
 {
-    char *p;
-    char *dup = strdup(s);
-    char *rest = dup;
-    int n = 0;
-
-    while ((p = strtok_r(rest, delim, &rest)))
-    {
-        if (n == array_len)   // too many items
-        {
-            return n;
-        }
-
-        array[n] = atof(p);
-        //printf("%f\n", array[n]);
-        ++n;
-    }
-
-    free(dup);
-    return n;
+    return dummy_parse_rigctl_double_list(s, delim, array, array_len);
 }
 
 
@@ -282,7 +329,8 @@ static int netrigctl_open(RIG *rig)
     }
     else
     {
-        rig_debug(RIG_DEBUG_ERR, "%s:  unknown value returned from netrigctl_transaction=%d\n",
+        rig_debug(RIG_DEBUG_ERR,
+                  "%s:  unknown value returned from netrigctl_transaction=%d\n",
                   __func__, ret);
     }
 
@@ -331,17 +379,9 @@ static int netrigctl_open(RIG *rig)
             RETURNFUNC((ret < 0) ? ret : -RIG_EPROTO);
         }
 
-        ret = num_sscanf(buf, "%"SCNfreq"%"SCNfreq"%"SCNXll"%d%d%x%x",
-                         &(rs->rx_range_list[i].startf),
-                         &(rs->rx_range_list[i].endf),
-                         &(rs->rx_range_list[i].modes),
-                         &(rs->rx_range_list[i].low_power),
-                         &(rs->rx_range_list[i].high_power),
-                         &(rs->rx_range_list[i].vfo),
-                         &(rs->rx_range_list[i].ant)
-                        );
+        ret = dummy_parse_rigctl_range(buf, &rs->rx_range_list[i]);
 
-        if (ret != 7)
+        if (ret != RIG_OK)
         {
             RETURNFUNC(-RIG_EPROTO);
         }
@@ -361,17 +401,9 @@ static int netrigctl_open(RIG *rig)
             RETURNFUNC((ret < 0) ? ret : -RIG_EPROTO);
         }
 
-        ret = num_sscanf(buf, "%"SCNfreq"%"SCNfreq"%"SCNXll"%d%d%x%x",
-                         &rs->tx_range_list[i].startf,
-                         &rs->tx_range_list[i].endf,
-                         &rs->tx_range_list[i].modes,
-                         &rs->tx_range_list[i].low_power,
-                         &rs->tx_range_list[i].high_power,
-                         &rs->tx_range_list[i].vfo,
-                         &rs->tx_range_list[i].ant
-                        );
+        ret = dummy_parse_rigctl_range(buf, &rs->tx_range_list[i]);
 
-        if (ret != 7)
+        if (ret != RIG_OK)
         {
             RETURNFUNC(-RIG_EPROTO);
         }
@@ -625,6 +657,10 @@ static int netrigctl_open(RIG *rig)
         rs->vfo_list = RIG_VFO_A | RIG_VFO_B;
     }
 
+    dummy_reset_agc_levels(rig->caps->agc_levels,
+                           &rig->caps->agc_level_count);
+    dummy_reset_agc_levels(rs->agc_levels, &rs->agc_level_count);
+
     if (prot_ver == 0) { RETURNFUNC(RIG_OK); }
 
     // otherwise we continue reading protocol 1 fields
@@ -644,7 +680,7 @@ static int netrigctl_open(RIG *rig)
             RETURNFUNC((ret < 0) ? ret : -RIG_EPROTO);
         }
 
-        if (strncmp(buf, "done", 4) == 0) { RETURNFUNC(RIG_OK); }
+        if (strncmp(buf, "done", 4) == 0) { break; }
 
         if (sscanf(buf, "%31[^=]=%1023[^\t\n]", setting, value) == 2)
         {
@@ -785,7 +821,17 @@ static int netrigctl_open(RIG *rig)
                 rig->caps->ctcss_list = calloc(CTCSS_LIST_SIZE, sizeof(tone_t));
                 n = parse_array_double(value, " \n\r", ctcss, CTCSS_LIST_SIZE);
 
-                for (i = 0; i < CTCSS_LIST_SIZE && ctcss[i] != 0; ++i) { rig->caps->ctcss_list[i] = ctcss[i] * 10; }
+                if (rig->caps->ctcss_list == NULL)
+                {
+                    RETURNFUNC(-RIG_ENOMEM);
+                }
+
+                if (n < 0)
+                {
+                    RETURNFUNC(-RIG_EPROTO);
+                }
+
+                for (i = 0; i < n && ctcss[i] != 0; ++i) { rig->caps->ctcss_list[i] = ctcss[i] * 10; }
 
                 if (n < CTCSS_LIST_SIZE) { rig->caps->ctcss_list[n] = 0; }
             }
@@ -802,31 +848,26 @@ static int netrigctl_open(RIG *rig)
             }
             else if (strcmp(setting, "agc_levels") == 0)
             {
-                char *p = strtok(value, " ");
-                rig->caps->agc_levels[0] = RIG_AGC_NONE; // default value gets overwritten
-                rig->caps->agc_level_count = 0;
+                enum agc_level_e agc_levels[HAMLIB_MAX_AGC_LEVELS];
+                int agc_level_count;
 
-                while (p)
+                ret = dummy_parse_agc_levels(value, agc_levels, &agc_level_count);
+
+                if (ret != RIG_OK)
                 {
-                    int agc_code;
-                    char agc_string[32];
-                    int n = sscanf(p, "%d=%31s\n", &agc_code, agc_string);
-
-                    if (n == 2)
-                    {
-                        rig->caps->agc_levels[i++] = agc_code;
-                        rig->caps->agc_level_count++;
-                        rig_debug(RIG_DEBUG_VERBOSE, "%s: rig has agc code=%d, level=%s\n", __func__,
-                                  agc_code, agc_string);
-                    }
-                    else
-                    {
-                        rig_debug(RIG_DEBUG_ERR, "%s did not parse code=agc from '%s'\n", __func__, p);
-                    }
-
-                    rig_debug(RIG_DEBUG_VERBOSE, "%d=%s\n", agc_code, agc_string);
-                    p = strtok(NULL, " ");
+                    rig_debug(RIG_DEBUG_ERR,
+                              "%s: ignoring invalid agc_levels field '%s'\n",
+                              __func__, buf);
+                    dummy_reset_agc_levels(rig->caps->agc_levels,
+                                           &rig->caps->agc_level_count);
+                    dummy_reset_agc_levels(rs->agc_levels,
+                                           &rs->agc_level_count);
+                    continue;
                 }
+
+                memcpy(rig->caps->agc_levels, agc_levels, sizeof(agc_levels));
+                memcpy(rs->agc_levels, agc_levels, sizeof(agc_levels));
+                rig->caps->agc_level_count = rs->agc_level_count = agc_level_count;
             }
             else if (strcmp(setting, "level_gran") == 0)
             {
@@ -834,25 +875,34 @@ static int netrigctl_open(RIG *rig)
 
                 for (i = 0; p != NULL && i < RIG_SETTING_MAX; ++i)
                 {
-                    int level;
-                    sscanf(p, "%d", &level);
+                    gran_t parsed;
+                    int idx;
+                    setting_t level;
+
+                    if (sscanf(p, "%d", &idx) != 1 || idx < 0
+                            || idx >= RIG_SETTING_MAX)
+                    {
+                        RETURNFUNC(-RIG_EPROTO);
+                    }
+
+                    level = rig_idx2setting(idx);
 
                     if (RIG_LEVEL_IS_FLOAT(level))
                     {
-                        double min, max, step;
-                        sscanf(p, "%*d=%lf,%lf,%lf", &min, &max, &step);
-                        rig->caps->level_gran[i].min.f = rs->level_gran[i].min.f = min;
-                        rig->caps->level_gran[i].max.f = rs->level_gran[i].max.f = max;
-                        rig->caps->level_gran[i].step.f = rs->level_gran[i].step.f = step;
+                        if (dummy_parse_rigctl_gran(p, 1, &idx, &parsed) != RIG_OK)
+                        {
+                            RETURNFUNC(-RIG_EPROTO);
+                        }
                     }
                     else
                     {
-                        int min, max, step;
-                        sscanf(p, "%*d=%d,%d,%d", &min, &max, &step);
-                        rig->caps->level_gran[i].min.i = rs->level_gran[i].min.i = min;
-                        rig->caps->level_gran[i].max.i = rs->level_gran[i].max.i = max;
-                        rig->caps->level_gran[i].step.i = rs->level_gran[i].step.i = step;
+                        if (dummy_parse_rigctl_gran(p, 0, &idx, &parsed) != RIG_OK)
+                        {
+                            RETURNFUNC(-RIG_EPROTO);
+                        }
                     }
+
+                    rig->caps->level_gran[idx] = rs->level_gran[idx] = parsed;
 
                     p = strtok(NULL, ";");
                 }
@@ -863,31 +913,58 @@ static int netrigctl_open(RIG *rig)
 
                 for (i = 0; p != NULL && i < RIG_SETTING_MAX; ++i)
                 {
+                    char *equals;
+                    char *index_end;
+                    long parsed_index;
                     int idx, level;
-                    sscanf(p, "%d", &idx);
+                    gran_t parsed;
+
+                    errno = 0;
+                    parsed_index = strtol(p, &index_end, 10);
+                    equals = strchr(p, '=');
+
+                    if (errno == ERANGE || equals == NULL || equals == p
+                            || index_end != equals || equals[1] == '\0'
+                            || strchr(equals + 1, '=') != NULL
+                            || parsed_index < 0 || parsed_index >= RIG_SETTING_MAX)
+                    {
+                        RETURNFUNC(-RIG_EPROTO);
+                    }
+
+                    idx = (int)parsed_index;
                     level = rig_idx2setting(idx);
 
-                    rig->caps->parm_gran[i].step.s = 0;
+                    rig->caps->parm_gran[idx].step.s = 0;
 
                     if (RIG_PARM_IS_FLOAT(level))
                     {
-                        double min, max, step;
-                        sscanf(p, "%*d=%lf,%lf,%lf", &min, &max, &step);
-                        rig->caps->parm_gran[i].min.f = rs->parm_gran[i].min.f = min;
-                        rig->caps->parm_gran[i].max.f = rs->parm_gran[i].max.f = max;
-                        rig->caps->parm_gran[i].step.f = rs->parm_gran[i].step.f = step;
+                        if (dummy_parse_rigctl_gran(p, 1, &idx, &parsed) != RIG_OK)
+                        {
+                            RETURNFUNC(-RIG_EPROTO);
+                        }
+
+                        rig->caps->parm_gran[idx] = rs->parm_gran[idx] = parsed;
                     }
                     else if (RIG_PARM_IS_STRING(level))
                     {
-                        rig->caps->parm_gran[i].step.s = strdup(value);
+                        char *string_value = strdup(equals + 1);
+
+                        if (string_value == NULL)
+                        {
+                            RETURNFUNC(-RIG_ENOMEM);
+                        }
+
+                        rig->caps->parm_gran[idx].step.s = string_value;
+                        rs->parm_gran[idx].step.s = string_value;
                     }
                     else // must be INT
                     {
-                        int min, max, step;
-                        sscanf(p, "%*d=%d,%d,%d", &min, &max, &step);
-                        rig->caps->parm_gran[i].min.i = rs->parm_gran[i].min.i = min;
-                        rig->caps->parm_gran[i].max.i = rs->parm_gran[i].max.i = max;
-                        rig->caps->parm_gran[i].step.i = rs->parm_gran[i].step.i = step;
+                        if (dummy_parse_rigctl_gran(p, 0, &idx, &parsed) != RIG_OK)
+                        {
+                            RETURNFUNC(-RIG_EPROTO);
+                        }
+
+                        rig->caps->parm_gran[idx] = rs->parm_gran[idx] = parsed;
                     }
 
                     p = strtok(NULL, ";");
@@ -916,6 +993,79 @@ static int netrigctl_open(RIG *rig)
     }
     while (1);
 
+    /* Query streaming capabilities from rigctld.
+     * Streaming commands require '+' ext_resp prefix.
+     * Gracefully skip if rigctld doesn't support streaming. */
+    {
+        char cmd[CMD_MAX];
+        int caps_count = 0;
+        /* This connection's advertisement, published as SESSION caps: the
+         * caps depend on the server this rig is connected to, and rig_caps
+         * is shared by every netrigctl rig in the process — never written
+         * (backend guide, "Capabilities that depend on the connection").
+         * Entries are copied by stream_set_session_caps, so the parse
+         * buffer lives on the stack. */
+        struct rig_stream_caps netrigctl_stream_caps[HAMLIB_MAX_STREAM_CAPS];
+
+        SNPRINTF(cmd, sizeof(cmd), "+\\stream_caps\n");
+        ret = netrigctl_transaction(rig, cmd, strlen(cmd), buf);
+
+        if (ret > 0 && strncmp(buf, NETRIGCTL_RET, strlen(NETRIGCTL_RET)) != 0)
+        {
+            /* First line is a caps line, not an RPRT error */
+            memset(netrigctl_stream_caps, 0, sizeof(netrigctl_stream_caps));
+
+            char *saveptr = NULL;
+
+            do
+            {
+                strtok_r(buf, "\r\n", &saveptr);
+
+                if (strncmp(buf, NETRIGCTL_RET, strlen(NETRIGCTL_RET)) == 0)
+                {
+                    break;
+                }
+
+                if (caps_count < HAMLIB_MAX_STREAM_CAPS)
+                {
+                    struct rig_stream_caps sc;
+
+                    if (rig_stream_net_parse_caps_line(buf, &sc) == 0)
+                    {
+                        netrigctl_stream_caps[caps_count++] = sc;
+                    }
+                }
+
+                ret = read_string(rp, (unsigned char *) buf, BUF_MAX, "\n", 1, 0, 1);
+
+                if (ret <= 0)
+                {
+                    break;
+                }
+            }
+            while (1);
+
+            ret = stream_set_session_caps(rig, netrigctl_stream_caps,
+                                          caps_count);
+
+            if (ret != RIG_OK)
+            {
+                rig_debug(RIG_DEBUG_WARN,
+                          "%s: publishing session stream caps failed: %s\n",
+                          __func__, rigerror(ret));
+            }
+        }
+        else
+        {
+            /* No streaming on this server: clear any session caps left from
+             * a previous connection of this rig. */
+            stream_set_session_caps(rig, NULL, 0);
+        }
+
+        rig_debug(RIG_DEBUG_VERBOSE, "%s: discovered %d stream caps\n",
+                  __func__, caps_count);
+    }
+
     if (rs->auto_power_on)
     {
         rig_set_powerstat(rig, 1);
@@ -937,6 +1087,9 @@ static int netrigctl_close(RIG *rig)
         rig_set_powerstat(rig, 0);
     }
 
+    /* The session caps described the connection being torn down. */
+    stream_set_session_caps(rig, NULL, 0);
+
     ret = netrigctl_transaction(rig, "q\n", 2, buf);
 
     if (ret != RIG_OK)
@@ -955,6 +1108,7 @@ static int netrigctl_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
 {
     int ret;
     char cmd[CMD_MAX];
+    char fstr[CMD_MAX];
     char buf[BUF_MAX];
     char vfostr[16] = "";
 
@@ -965,9 +1119,17 @@ static int netrigctl_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
 
     if (ret != RIG_OK) { return ret; }
 
-    SNPRINTF(cmd, sizeof(cmd), "F%s %"FREQFMT"\n", vfostr, freq);
+    ret = rigctl_format_decimal(fstr, sizeof(fstr), "%"FREQFMT, freq);
+
+    if (ret != RIG_OK) { return ret; }
+
+    SNPRINTF(cmd, sizeof(cmd), "F%s %s\n", vfostr, fstr);
 #else
-    SNPRINTF(cmd, sizeof(cmd), "F %"FREQFMT"\n", freq);
+    ret = rigctl_format_decimal(fstr, sizeof(fstr), "%"FREQFMT, freq);
+
+    if (ret != RIG_OK) { return ret; }
+
+    SNPRINTF(cmd, sizeof(cmd), "F %s\n", fstr);
 #endif
 
     ret = netrigctl_transaction(rig, cmd, strlen(cmd), buf);
@@ -1012,7 +1174,10 @@ static int netrigctl_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
         return (ret < 0) ? ret : -RIG_EPROTO;
     }
 
-    CHKSCN1ARG(num_sscanf(buf, "%"SCNfreq, freq));
+    if (rigctl_parse_double(buf, RIGCTL_DECIMAL_DOT_ONLY, freq) != RIG_OK)
+    {
+        return -RIG_EPROTO;
+    }
 
 #if 0 // implement set_freq VFO later if it can be detected
     ret = read_string(RIGPORT(rig), buf, BUF_MAX, "\n", 1, 0, 1);
@@ -1121,7 +1286,7 @@ static int netrigctl_set_vfo(RIG *rig, vfo_t vfo)
     }
 
     priv->vfo_curr = vfo; // remember our vfo
-    STATE(rig)->current_vfo = vfo;
+    rig_set_current_vfo_state(rig, vfo);
     return ret;
 }
 
@@ -1596,6 +1761,7 @@ static int netrigctl_set_split_freq(RIG *rig, vfo_t vfo, freq_t tx_freq)
 {
     int ret;
     char cmd[CMD_MAX];
+    char fstr[CMD_MAX];
     char buf[BUF_MAX];
     char vfostr[16] = "";
 
@@ -1605,7 +1771,12 @@ static int netrigctl_set_split_freq(RIG *rig, vfo_t vfo, freq_t tx_freq)
 
     if (ret != RIG_OK) { return ret; }
 
-    SNPRINTF(cmd, sizeof(cmd), "I%s %"FREQFMT"\n", vfostr, tx_freq);
+    ret = rigctl_format_decimal(fstr, sizeof(fstr), "%"FREQFMT,
+                                          tx_freq);
+
+    if (ret != RIG_OK) { return ret; }
+
+    SNPRINTF(cmd, sizeof(cmd), "I%s %s\n", vfostr, fstr);
 
     ret = netrigctl_transaction(rig, cmd, strlen(cmd), buf);
 
@@ -1642,7 +1813,10 @@ static int netrigctl_get_split_freq(RIG *rig, vfo_t vfo, freq_t *tx_freq)
         return (ret < 0) ? ret : -RIG_EPROTO;
     }
 
-    CHKSCN1ARG(num_sscanf(buf, "%"SCNfreq, tx_freq));
+    if (rigctl_parse_double(buf, RIGCTL_DECIMAL_DOT_ONLY, tx_freq) != RIG_OK)
+    {
+        return -RIG_EPROTO;
+    }
 
     return RIG_OK;
 }
@@ -2026,7 +2200,9 @@ static int netrigctl_set_level(RIG *rig, vfo_t vfo, setting_t level,
 
     if (RIG_LEVEL_IS_FLOAT(level))
     {
-        SNPRINTF(lstr, sizeof(lstr), "%f", val.f);
+        ret = rigctl_format_decimal(lstr, sizeof(lstr), "%f", val.f);
+
+        if (ret != RIG_OK) { return ret; }
     }
     else
     {
@@ -2079,7 +2255,10 @@ static int netrigctl_get_level(RIG *rig, vfo_t vfo, setting_t level,
 
     if (RIG_LEVEL_IS_FLOAT(level))
     {
-        val->f = atof(buf);
+        if (rigctl_parse_float(buf, RIGCTL_DECIMAL_DOT_ONLY, &val->f) != RIG_OK)
+        {
+            return -RIG_EPROTO;
+        }
     }
     else
     {
@@ -2158,27 +2337,84 @@ static int netrigctl_get_powerstat(RIG *rig, powerstat_t *status)
 }
 
 
+int netrigctl_format_parm_command(char *cmd, size_t cmd_size,
+                                  setting_t parm, value_t val)
+{
+    const char *parm_name;
+    int len;
+
+    if (cmd == NULL || cmd_size == 0)
+    {
+        return -RIG_EINVAL;
+    }
+
+    cmd[0] = '\0';
+    parm_name = rig_strparm(parm);
+
+    if (parm_name[0] == '\0')
+    {
+        return -RIG_EINVAL;
+    }
+
+    if (RIG_PARM_IS_FLOAT(parm))
+    {
+        char pstr[32];
+        int ret = rigctl_format_decimal(pstr, sizeof(pstr), "%f", val.f);
+
+        if (ret != RIG_OK)
+        {
+            return ret;
+        }
+
+        len = snprintf(cmd, cmd_size, "P %s %s\n", parm_name, pstr);
+    }
+    else if (RIG_PARM_IS_STRING(parm))
+    {
+        if (val.cs == NULL || val.cs[0] == '\0'
+                || strpbrk(val.cs, "\r\n") != NULL)
+        {
+            return -RIG_EINVAL;
+        }
+
+        len = snprintf(cmd, cmd_size, "P %s %s\n", parm_name, val.cs);
+    }
+    else
+    {
+        len = snprintf(cmd, cmd_size, "P %s %d\n", parm_name, val.i);
+    }
+
+    if (len < 0)
+    {
+        cmd[0] = '\0';
+        return -RIG_EINVAL;
+    }
+
+    if ((size_t)len >= cmd_size)
+    {
+        cmd[0] = '\0';
+        return -RIG_ETRUNC;
+    }
+
+    return len;
+}
+
+
 static int netrigctl_set_parm(RIG *rig, setting_t parm, value_t val)
 {
     int ret;
     char cmd[CMD_MAX];
     char buf[BUF_MAX];
-    char pstr[32];
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s called\n", __func__);
 
-    if (RIG_PARM_IS_FLOAT(parm))
+    ret = netrigctl_format_parm_command(cmd, sizeof(cmd), parm, val);
+
+    if (ret < 0)
     {
-        SNPRINTF(pstr, sizeof(pstr), "%f", val.f);
-    }
-    else
-    {
-        SNPRINTF(pstr, sizeof(pstr), "%d", val.i);
+        return ret;
     }
 
-    SNPRINTF(cmd, sizeof(cmd), "P %s %s\n", rig_strparm(parm), pstr);
-
-    ret = netrigctl_transaction(rig, cmd, strlen(cmd), buf);
+    ret = netrigctl_transaction(rig, cmd, ret, buf);
 
     if (ret > 0)
     {
@@ -2191,11 +2427,102 @@ static int netrigctl_set_parm(RIG *rig, setting_t parm, value_t val)
 }
 
 
+int netrigctl_decode_parm_response(setting_t parm, value_t *val,
+                                   const char *response, size_t response_len,
+                                   char *string_value,
+                                   size_t string_value_size)
+{
+    const char *source = response;
+    size_t source_len;
+
+    if (val == NULL || response == NULL || response_len == 0
+            || response[response_len - 1] != '\n')
+    {
+        return -RIG_EPROTO;
+    }
+
+    source_len = response_len - 1;
+
+    if (source_len > 0 && response[source_len - 1] == '\r')
+    {
+        source_len--;
+    }
+
+    if (source_len == 0 || memchr(response, '\0', source_len) != NULL
+            || memchr(response, '\r', source_len) != NULL
+            || memchr(response, '\n', source_len) != NULL)
+    {
+        return -RIG_EPROTO;
+    }
+
+    if (RIG_PARM_IS_FLOAT(parm))
+    {
+        if (rigctl_parse_float(response, RIGCTL_DECIMAL_DOT_ONLY,
+                               &val->f) != RIG_OK)
+        {
+            return -RIG_EPROTO;
+        }
+
+        return RIG_OK;
+    }
+
+    if (!RIG_PARM_IS_STRING(parm))
+    {
+        val->i = atoi(response);
+        return RIG_OK;
+    }
+
+    if (string_value == NULL || string_value_size == 0)
+    {
+        return -RIG_EINVAL;
+    }
+
+    if (parm == RIG_PARM_KEYERTYPE)
+    {
+        static const struct
+        {
+            const char *name;
+            const char *value;
+        } keyertype_values[] = {
+            { "STRAIGHT", "0" },
+            { "BUG", "1" },
+            { "PADDLE", "2" },
+            { "UNKNOWN", "4" },
+        };
+
+        for (size_t i = 0;
+                i < sizeof(keyertype_values) / sizeof(keyertype_values[0]); i++)
+        {
+            if (strlen(keyertype_values[i].name) == source_len
+                    && memcmp(source, keyertype_values[i].name, source_len) == 0)
+            {
+                source = keyertype_values[i].value;
+                source_len = strlen(source);
+                break;
+            }
+        }
+    }
+
+    if (source_len >= string_value_size)
+    {
+        return -RIG_ETRUNC;
+    }
+
+    memcpy(string_value, source, source_len);
+    string_value[source_len] = '\0';
+    val->cs = string_value;
+
+    return RIG_OK;
+}
+
+
 static int netrigctl_get_parm(RIG *rig, setting_t parm, value_t *val)
 {
     int ret;
     char cmd[CMD_MAX];
     char buf[BUF_MAX];
+    struct netrigctl_priv_data *priv =
+        (struct netrigctl_priv_data *)STATE(rig)->priv;
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s called\n", __func__);
 
@@ -2208,16 +2535,14 @@ static int netrigctl_get_parm(RIG *rig, setting_t parm, value_t *val)
         return (ret < 0) ? ret : -RIG_EPROTO;
     }
 
-    if (RIG_PARM_IS_FLOAT(parm))
+    if (ret == sizeof(buf) - 1 && buf[ret - 1] != '\n')
     {
-        val->f = atoi(buf);
-    }
-    else
-    {
-        val->i = atoi(buf);
+        return -RIG_ETRUNC;
     }
 
-    return RIG_OK;
+    return netrigctl_decode_parm_response(parm, val, buf, ret,
+                                          priv->parm_value,
+                                          sizeof(priv->parm_value));
 }
 
 
@@ -2710,14 +3035,19 @@ static int netrigctl_get_trn(RIG *rig, int *trn)
 static int netrigctl_mW2power(RIG *rig, float *power, unsigned int mwpower,
                               freq_t freq, rmode_t mode)
 {
-    char cmdbuf[32];
+    char cmdbuf[CMD_MAX];
+    char fstr[CMD_MAX];
     char buf[BUF_MAX];
     int ret;
 
     ENTERFUNC;
 
-    SNPRINTF(cmdbuf, sizeof(cmdbuf), "\\mW2power %u %.0f %s\n", mwpower, freq,
-             rig_strrmode(mode));
+    ret = rigctl_format_decimal(fstr, sizeof(fstr), "%.0f", freq);
+
+    if (ret != RIG_OK) { RETURNFUNC(ret); }
+
+    SNPRINTF(cmdbuf, sizeof(cmdbuf), "\\mW2power %u %s %s\n", mwpower,
+             fstr, rig_strrmode(mode));
     ret = netrigctl_transaction(rig, cmdbuf, strlen(cmdbuf), buf);
 
     if (ret <= 0)
@@ -2725,7 +3055,10 @@ static int netrigctl_mW2power(RIG *rig, float *power, unsigned int mwpower,
         RETURNFUNC(-RIG_EPROTO);
     }
 
-    *power = atof(buf);
+    if (rigctl_parse_float(buf, RIGCTL_DECIMAL_DOT_ONLY, power) != RIG_OK)
+    {
+        RETURNFUNC(-RIG_EPROTO);
+    }
 
     RETURNFUNC(RIG_OK);
 }
@@ -2734,14 +3067,24 @@ static int netrigctl_mW2power(RIG *rig, float *power, unsigned int mwpower,
 static int netrigctl_power2mW(RIG *rig, unsigned int *mwpower, float power,
                               freq_t freq, rmode_t mode)
 {
-    char cmdbuf[64];
+    char cmdbuf[CMD_MAX];
+    char fstr[CMD_MAX];
+    char pstr[32];
     char buf[BUF_MAX];
     int ret;
 
     ENTERFUNC;
 
     // we shouldn't need any precision than microwatts
-    SNPRINTF(cmdbuf, sizeof(cmdbuf), "\\power2mW %.3f %.0f %s\n", power, freq,
+    ret = rigctl_format_decimal(pstr, sizeof(pstr), "%.3f", power);
+
+    if (ret != RIG_OK) { RETURNFUNC(ret); }
+
+    ret = rigctl_format_decimal(fstr, sizeof(fstr), "%.0f", freq);
+
+    if (ret != RIG_OK) { RETURNFUNC(ret); }
+
+    SNPRINTF(cmdbuf, sizeof(cmdbuf), "\\power2mW %s %s %s\n", pstr, fstr,
              rig_strrmode(mode));
     ret = netrigctl_transaction(rig, cmdbuf, strlen(cmdbuf), buf);
 
@@ -2750,7 +3093,10 @@ static int netrigctl_power2mW(RIG *rig, unsigned int *mwpower, float power,
         RETURNFUNC(-RIG_EPROTO);
     }
 
-    *mwpower = atof(buf);
+    if (parse_protocol_uint(buf, mwpower) != RIG_OK)
+    {
+        RETURNFUNC(-RIG_EPROTO);
+    }
 
     RETURNFUNC(RIG_OK);
 }
@@ -2762,11 +3108,15 @@ int netrigctl_password(RIG *rig, const char *key1)
     int retval;
 
     ENTERFUNC;
-    rig_debug(RIG_DEBUG_VERBOSE, "%s: key1=%s\n", __func__, key1);
+    rig_debug(RIG_DEBUG_VERBOSE, "%s: submitting password\n", __func__);
     SNPRINTF(cmdbuf, sizeof(cmdbuf), "\\password %s\n", key1);
-    retval = netrigctl_transaction(rig, cmdbuf, strlen(cmdbuf), buf);
+    retval = netrigctl_transaction_internal(rig, cmdbuf, strlen(cmdbuf), buf,
+                                            1);
 
-    if (retval != RIG_OK) { retval = -RIG_EPROTO; }
+    if (retval > RIG_OK)
+    {
+        retval = -RIG_EPROTO;
+    }
 
     RETURNFUNC(retval);
 }
@@ -2817,8 +3167,466 @@ int netrigctl_send_raw(RIG *rig, char *s)
     return ret;
 }
 
+
+static int netrigctl_stream_open(RIG *rig, struct rig_stream *stream)
+{
+    int ret;
+    /* Larger than CMD_MAX: type + format + rate + key=value options. */
+    char cmd[160];
+    char native_req[64] = "";
+    char buf[BUF_MAX];
+    hamlib_port_t *rp = RIGPORT(rig);
+    struct rig_stream_net_session *sess;
+    int stream_id = -1;
+    int source_id = 0;
+    int udp_port = -1;
+    unsigned int subscribe_token = 0;
+    int max_payload = -1;
+    int conversions = -1;
+    char host[256];
+    const char *colon;
+
+    rig_debug(RIG_DEBUG_VERBOSE, "%s: called type=%d\n", __func__, stream->type);
+
+    /* Streaming commands require '+' ext_resp prefix. The server performs
+     * any format conversion, so the full requested shape is forwarded:
+     * channels (the server would otherwise default to 1 and serve
+     * mislabeled data) and the native-only demand for it to enforce too —
+     * by stage name, so the server refuses exactly the stages this client
+     * required and converts the rest. */
+    if (stream->config.require_native != RIG_STREAM_CONV_NONE)
+    {
+        char stages[48];
+
+        if (stream_native_req_str(stream->config.require_native, stages,
+                                  sizeof(stages)) < 0)
+        {
+            rig_debug(RIG_DEBUG_ERR,
+                      "%s: cannot render require_native 0x%x\n",
+                      __func__, (unsigned)stream->config.require_native);
+            return -RIG_EINVAL;
+        }
+
+        SNPRINTF(native_req, sizeof(native_req), " require_native=%s", stages);
+    }
+
+    SNPRINTF(cmd, sizeof(cmd), "+\\stream_open %s %s %d channels=%d%s\n",
+             stream_type_name(stream->type),
+             stream_format_name(stream->config.format),
+             stream->config.sample_rate,
+             stream->config.channels,
+             native_req);
+
+    ret = netrigctl_transaction(rig, cmd, strlen(cmd), buf);
+
+    if (ret < 0)
+    {
+        rig_debug(RIG_DEBUG_ERR, "%s: stream_open failed: %s\n",
+                  __func__, rigerror(ret));
+        return ret;
+    }
+
+    /* Parse ext_resp key:value lines (stream_id, source_id, udp_port,
+     * subscribe_token, max_payload) terminated by an RPRT line. */
+    char *saveptr = NULL;
+
+    do
+    {
+        strtok_r(buf, "\r\n", &saveptr);
+
+        if (strncmp(buf, NETRIGCTL_RET, strlen(NETRIGCTL_RET)) == 0)
+        {
+            /* The RPRT value is already the (negative) Hamlib error code,
+             * same convention as netrigctl_transaction(). */
+            int rprt = atoi(buf + strlen(NETRIGCTL_RET));
+
+            if (rprt != 0)
+            {
+                return rprt;
+            }
+
+            break;
+        }
+
+        if (sscanf(buf, "stream_id: %d", &stream_id) == 1)
+        {
+            rig_debug(RIG_DEBUG_VERBOSE, "%s: stream_id=%d\n",
+                      __func__, stream_id);
+        }
+        else if (sscanf(buf, "source_id: %d", &source_id) == 1)
+        {
+            rig_debug(RIG_DEBUG_VERBOSE, "%s: source_id=%d\n",
+                      __func__, source_id);
+        }
+        else if (sscanf(buf, "udp_port: %d", &udp_port) == 1)
+        {
+            rig_debug(RIG_DEBUG_VERBOSE, "%s: udp_port=%d\n",
+                      __func__, udp_port);
+        }
+        else if (sscanf(buf, "subscribe_token: %u", &subscribe_token) == 1)
+        {
+            rig_debug(RIG_DEBUG_VERBOSE, "%s: subscribe_token=%u\n",
+                      __func__, subscribe_token);
+        }
+        else if (sscanf(buf, "max_payload: %d", &max_payload) == 1)
+        {
+            rig_debug(RIG_DEBUG_VERBOSE, "%s: max_payload=%d\n",
+                      __func__, max_payload);
+        }
+        else if (strncmp(buf, "conversions:", 12) == 0)
+        {
+            /* Comma-separated stage names; NONE (or, from an older
+             * server, an empty value) = native stream. Unknown names are
+             * skipped by the shared parser so a future server may add
+             * stages without breaking this client. */
+            conversions = stream_conversions_parse(buf + 12);
+            rig_debug(RIG_DEBUG_VERBOSE, "%s: conversions=0x%x\n",
+                      __func__, conversions);
+        }
+
+        ret = read_string(rp, (unsigned char *) buf, BUF_MAX, "\n", 1, 0, 1);
+
+        if (ret <= 0)
+        {
+            break;
+        }
+    }
+    while (1);
+
+    if (stream_id < 0 || udp_port <= 0 || udp_port > 65535)
+    {
+        rig_debug(RIG_DEBUG_ERR,
+                  "%s: missing stream_id=%d or udp_port=%d\n",
+                  __func__, stream_id, udp_port);
+        return -RIG_EPROTO;
+    }
+
+    /* Adopt the server's effective (clamped) payload budget so this client
+     * packetizes TX to match the negotiated path MTU. Clamp to the datagram
+     * buffer capacity (leaving room for the header and an embedded time block)
+     * so a malformed or hostile advertisement cannot drive an oversized write. */
+    if (max_payload > 0)
+    {
+        int ceiling = RIG_STREAM_MAX_DATAGRAM - RIG_STREAM_HEADER_SIZE
+                      - RIG_STREAM_TIME_BLOCK_SIZE;
+
+        stream->max_payload = max_payload < ceiling ? max_payload : ceiling;
+    }
+
+    /* Conversion happens at the server, so its report is authoritative:
+     * replace the locally computed indicator (an older server without the
+     * line leaves the local value in place). */
+    if (conversions >= 0)
+    {
+        stream->conversions = conversions;
+    }
+
+    /* Extract hostname from RIGPORT pathname (format "host:port") */
+    strncpy(host, rp->pathname, sizeof(host) - 1);
+    host[sizeof(host) - 1] = '\0';
+    colon = strrchr(host, ':');
+
+    if (colon)
+    {
+        host[colon - host] = '\0';
+    }
+
+    /* Allocate and initialize session */
+    sess = calloc(1, sizeof(*sess));
+
+    if (!sess)
+    {
+        return -RIG_ENOMEM;
+    }
+
+    sess->udp_sock = -1;
+    sess->remote_stream_id = stream_id;
+    sess->remote_source_id = source_id;
+    sess->remote_udp_port = udp_port;
+    sess->subscribe_token = (uint32_t)subscribe_token;
+    sess->keepalive_interval_s = STATE(rig)->stream_keepalive_interval_s
+                                 ? (int)STATE(rig)->stream_keepalive_interval_s
+                                 : RIG_STREAM_NET_KEEPALIVE_INTERVAL;
+    sess->stream = stream;
+    sess->rx_first = 1;
+    /* Rig-level transport_buffer defaults; per-stream config.transport_buffer_* overrides. */
+    sess->transport_buffer_ms = STATE(rig)->stream_transport_buffer_ms;
+    sess->transport_buffer_bytes = STATE(rig)->stream_transport_buffer_bytes;
+
+    /* Create UDP socket to rigctld */
+    if (rig_stream_net_udp_connect(sess, host, udp_port) < 0)
+    {
+        rig_debug(RIG_DEBUG_ERR, "%s: UDP connect to %s:%d failed\n",
+                  __func__, host, udp_port);
+        free(sess);
+        return -RIG_EIO;
+    }
+
+    /* Cache format invariants for per-packet header builds */
+    sess->format_id = stream_format_to_id(stream->config.format);
+    sess->sample_size = rig_stream_format_sample_size(stream->config.format);
+
+    if (sess->sample_size <= 0)
+    {
+        sess->sample_size = 1;
+    }
+
+    stream->backend_priv = sess;
+
+    /* RX streams subscribe to start the server's data flow. */
+    if (stream->type == RIG_STREAM_TYPE_AUDIO_RX
+            || stream->type == RIG_STREAM_TYPE_IQ_RX)
+    {
+        if (rig_stream_net_subscribe(sess, stream, 5000) < 0)
+        {
+            rig_debug(RIG_DEBUG_ERR, "%s: subscribe failed\n", __func__);
+            rig_stream_net_session_cleanup(sess);
+            stream->backend_priv = NULL;
+            return -RIG_EIO;
+        }
+    }
+
+    /* Start the receive thread for both directions: RX receives data and
+     * control; TX receives PONG and async write-status frames from the
+     * server, surfaced via rig_stream_wait_write_status(). */
+    sess->rx_running = 1;
+    sess->last_ping_sent = time(NULL);
+
+    if (pthread_create(&sess->rx_thread, NULL,
+                       rig_stream_net_rx_thread, stream) != 0)
+    {
+        rig_debug(RIG_DEBUG_ERR, "%s: rx_thread create failed\n", __func__);
+        sess->rx_running = 0;
+        rig_stream_net_session_cleanup(sess);
+        stream->backend_priv = NULL;
+        return -RIG_EIO;
+    }
+
+    rig_debug(RIG_DEBUG_VERBOSE,
+              "%s: opened stream_id=%d udp_port=%d host=%s\n",
+              __func__, stream_id, udp_port, host);
+
+    return RIG_OK;
+}
+
+
+static int netrigctl_stream_close(RIG *rig, struct rig_stream *stream)
+{
+    int ret;
+    char cmd[CMD_MAX];
+    char buf[BUF_MAX];
+    struct rig_stream_net_session *sess;
+
+    rig_debug(RIG_DEBUG_VERBOSE, "%s: called\n", __func__);
+
+    sess = (struct rig_stream_net_session *)stream->backend_priv;
+
+    if (!sess)
+    {
+        return -RIG_EINVAL;
+    }
+
+    /* Stop RX thread if running */
+    if (sess->rx_running)
+    {
+        sess->rx_running = 0;
+        pthread_join(sess->rx_thread, NULL);
+    }
+
+    /* Streaming commands require '+' ext_resp prefix. */
+    SNPRINTF(cmd, sizeof(cmd), "+\\stream_close %d\n", sess->remote_stream_id);
+    ret = netrigctl_transaction(rig, cmd, strlen(cmd), buf);
+
+    if (ret >= 0)
+    {
+        if (strncmp(buf, "stream_close:", 13) == 0)
+        {
+            ret = read_string(RIGPORT(rig), (unsigned char *)buf, BUF_MAX,
+                              "\n", 1, 0, 1);
+        }
+
+        if (ret >= 0)
+        {
+            ret = strncmp(buf, NETRIGCTL_RET, strlen(NETRIGCTL_RET)) == 0
+                  ? parse_rprt_status(buf) : -RIG_EPROTO;
+        }
+    }
+
+    if (ret < 0)
+    {
+        rig_debug(RIG_DEBUG_WARN, "%s: stream_close returned %s\n",
+                  __func__, rigerror(ret));
+    }
+
+    rig_stream_net_session_cleanup(sess);
+    stream->backend_priv = NULL;
+
+    return ret;
+}
+
+
+static int netrigctl_stream_write(RIG *rig, struct rig_stream *stream,
+                                  const void *buffer, size_t buffer_size,
+                                  size_t *bytes_written, int timeout_ms,
+                                  const struct rig_stream_write_info *info)
+{
+    struct rig_stream_net_session *sess;
+    const unsigned char *p = buffer;
+    size_t left = buffer_size, sent = 0, budget;
+    int timed;
+
+    (void)timeout_ms;  /* UDP sendto is non-blocking */
+
+    sess = (struct rig_stream_net_session *)stream->backend_priv;
+
+    if (!sess)
+    {
+        return -RIG_EINVAL;
+    }
+
+    /* A codec frame is one datagram: it cannot be cut. */
+    if (stream->is_codec)
+    {
+        int ret = rig_stream_net_send_data(sess, stream, buffer, buffer_size,
+                                           info);
+
+        if (ret < 0) { return -RIG_EIO; }
+
+        if (bytes_written) { *bytes_written = (size_t)ret; }
+
+        return RIG_OK;
+    }
+
+    /* A write is not limited to one datagram -- locally it never is -- so cut
+     * it into whole sample frames of at most the negotiated payload. A burst
+     * target travels as an embedded time block; room is kept for it in every
+     * datagram, as the first carries the target and SOB and the last EOB.
+     * The server writes each datagram to its backend with that datagram's
+     * flags, which is how a burst written in pieces looks anyway. */
+    timed = info && (info->time_valid || info->flags);
+    budget = stream->max_payload > 0 ? (size_t)stream->max_payload : 0;
+
+    if (timed)
+    {
+        budget = budget > RIG_STREAM_TIME_BLOCK_SIZE
+                 ? budget - RIG_STREAM_TIME_BLOCK_SIZE : 0;
+    }
+
+    if (stream->frame_bytes > 0)
+    {
+        budget -= budget % stream->frame_bytes;
+    }
+
+    if (budget == 0)
+    {
+        rig_debug(RIG_DEBUG_ERR, "%s: no room for a sample frame in a %d-byte "
+                  "payload\n", __func__, stream->max_payload);
+        return -RIG_EINVAL;
+    }
+
+    while (left > 0)
+    {
+        size_t n = left < budget ? left : budget;
+        struct rig_stream_write_info part;
+        const struct rig_stream_write_info *part_info = NULL;
+        int ret;
+
+        if (timed && sent == 0)
+        {
+            part = *info;
+
+            if (n < left) { part.flags &= ~RIG_STREAM_TIME_FLAG_EOB; }
+
+            part_info = &part;
+        }
+        else if (timed && n == left && (info->flags & RIG_STREAM_TIME_FLAG_EOB))
+        {
+            memset(&part, 0, sizeof(part));
+            part.flags = RIG_STREAM_TIME_FLAG_EOB;
+            part_info = &part;
+        }
+
+        ret = rig_stream_net_send_data(sess, stream, p, n, part_info);
+
+        if (ret < 0)
+        {
+            /* What already went out stays sent: report it as a short
+             * write, and the failure only when nothing could be sent. */
+            if (sent == 0) { return -RIG_EIO; }
+
+            break;
+        }
+
+        p += n;
+        left -= n;
+        sent += n;
+    }
+
+    if (bytes_written)
+    {
+        *bytes_written = sent;
+    }
+
+    return RIG_OK;
+}
+
+
+/* Send a simple stream command that takes only the stream_id argument. */
+static int netrigctl_stream_simple_cmd(RIG *rig, struct rig_stream *stream,
+                                       const char *cmd_name)
+{
+    int ret;
+    char cmd[CMD_MAX];
+    char buf[BUF_MAX];
+    struct rig_stream_net_session *sess;
+
+    sess = (struct rig_stream_net_session *)stream->backend_priv;
+
+    if (!sess)
+    {
+        return -RIG_EINVAL;
+    }
+
+    SNPRINTF(cmd, sizeof(cmd), "+\\%s %d\n", cmd_name, sess->remote_stream_id);
+    ret = netrigctl_transaction(rig, cmd, strlen(cmd), buf);
+    return (ret < 0) ? ret : RIG_OK;
+}
+
+
+static int netrigctl_stream_pause(RIG *rig, struct rig_stream *stream)
+{
+    return netrigctl_stream_simple_cmd(rig, stream, "stream_pause");
+}
+
+
+static int netrigctl_stream_resume(RIG *rig, struct rig_stream *stream)
+{
+    return netrigctl_stream_simple_cmd(rig, stream, "stream_resume");
+}
+
+
+/* TX bypasses the local ring buffer (stream_write sends directly over UDP), so
+ * the frontend's default flush would never drain the remote radio's TX FIFO.
+ * Forward the flush so the daemon drains the real backend stream. */
+static int netrigctl_stream_drain(RIG *rig, struct rig_stream *stream,
+                                  int timeout_ms)
+{
+    (void)timeout_ms;  /* the daemon applies its own flush timeout */
+    return netrigctl_stream_simple_cmd(rig, stream, "stream_drain");
+}
+
+
 /*
  * Netrigctl rig capabilities.
+ *
+ * netrigctl discovers the remote rig's capabilities at open and records many
+ * of them (max_rit/xit, has_*_func/level, vfo_ops, ptt_type, timeout,
+ * ctcss/dcs lists, several method pointers, and stream_caps) directly into this
+ * shared per-model struct. Those fields are therefore process-global, not
+ * per-connection: opening two netrigctl rigs against servers with different
+ * capabilities in one process makes the last open win for every instance. Run
+ * a single netrigctl instance per process, or resolve the discovered values
+ * from per-instance state instead of this struct.
  */
 
 struct rig_caps netrigctl_caps =
@@ -2934,6 +3742,13 @@ struct rig_caps netrigctl_caps =
     .password =   netrigctl_password,
     .set_lock_mode = netrigctl_set_lock_mode,
     .get_lock_mode = netrigctl_get_lock_mode,
+
+    .stream_open =   netrigctl_stream_open,
+    .stream_close =  netrigctl_stream_close,
+    .stream_write =  netrigctl_stream_write,
+    .stream_drain =  netrigctl_stream_drain,
+    .stream_pause =  netrigctl_stream_pause,
+    .stream_resume = netrigctl_stream_resume,
 
     .hamlib_check_rig_caps = HAMLIB_CHECK_RIG_CAPS
 };

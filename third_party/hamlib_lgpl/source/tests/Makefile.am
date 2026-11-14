@@ -14,11 +14,45 @@ DISTCLEANFILES = rigctl.log rigctl.sum testbcd.log testbcd.sum
 
 bin_PROGRAMS = rigctl rigctld rigmem rigsmtr rigswr rotctl rotctld rigctlcom rigctltcp rigctlsync ampctl ampctld rigtestmcast rigtestmcastrx $(TESTLIBUSB)
 
-check_PROGRAMS = dumpmem testrig testrigopen testrigcaps testbcd testfreq listrigs testloc rig_bench testcache cachetest cachetest2 testcookie testgrid hamlibmodels testmW2power test2038
+GENERATED_TEST_WRAPPERS = \
+	test2038.sh \
+	testbcd.sh \
+	testcache.sh \
+	testcookie.sh \
+	testfreq.sh \
+	testgrid.sh \
+	testloc.sh \
+	testrig.sh \
+	testrigcaps.sh
+
+check_PROGRAMS = \
+	cachetest \
+	cachetest2 \
+	dumpmem \
+	hamlibmodels \
+	listrigs \
+	rig_bench \
+	test2038 \
+	testbcd \
+	testcache \
+	testcookie \
+	testfreq \
+	testgrid \
+	testloc \
+	testmW2power \
+	testrig \
+	testrigcaps \
+	testrigopen
 # Document building testsecurity
 ### check_PROGRAMS += testsecurity
 
-RIGCOMMONSRC = rigctl_parse.c rigctl_parse.h dumpcaps.c dumpstate.c uthash.h rig_tests.c rig_tests.h dumpcaps.h
+# rigstreamtest is a streaming diagnostic tool rather than a unit test, so it is
+# built with everything else instead of only under "make check". It is not
+# installed: it drives a radio's audio/IQ streams from the build tree.
+noinst_PROGRAMS = rigstreamtest
+
+DAEMONCLIENTSRC = daemon_client.c daemon_client.h
+RIGCOMMONSRC = rigctl_parse.c rigctl_parse.h rigctld_stream.c rigctld_stream.h rigctld_client.c rigctld_client.h $(DAEMONCLIENTSRC) dumpcaps.c dumpstate.c uthash.h rig_tests.c rig_tests.h dumpcaps.h
 ROTCOMMONSRC = rotctl_parse.c rotctl_parse.h dumpcaps_rot.c uthash.h dumpcaps_rot.h
 AMPCOMMONSRC = ampctl_parse.c ampctl_parse.h dumpcaps_amp.c uthash.h 
 
@@ -28,16 +62,17 @@ rigctlcom_SOURCES = rigctlcom.c $(RIGCOMMONSRC)
 rigctltcp_SOURCES = rigctltcp.c $(RIGCOMMONSRC)
 rigctlsync_SOURCES = rigctlsync.c $(RIGCOMMONSRC)
 rotctl_SOURCES = rotctl.c $(ROTCOMMONSRC)
-rotctld_SOURCES = rotctld.c $(ROTCOMMONSRC)
+rotctld_SOURCES = rotctld.c $(ROTCOMMONSRC) $(DAEMONCLIENTSRC)
 ampctl_SOURCES = ampctl.c $(AMPCOMMONSRC)
-ampctld_SOURCES = ampctld.c $(AMPCOMMONSRC)
+ampctld_SOURCES = ampctld.c $(AMPCOMMONSRC) $(DAEMONCLIENTSRC)
 rigmem_SOURCES = rigmem.c memsave.c memload.c memcsv.c
+rigstreamtest_SOURCES = rigstreamtest.c rigstreamtest_util.c rigstreamtest_util.h
 if TESTS_HAVE_LIBUSB
     rigtestlibusb_SOURCES = rigtestlibusb.c
 endif
 
 # include generated include files ahead of any in sources
-rigctl_CPPFLAGS = -I$(top_builddir)/tests -I$(top_builddir)/src -I$(srcdir) -I$(top_builddir)/security $(AM_CPPFLAGS) 
+rigctl_CPPFLAGS = -I$(top_builddir)/tests -I$(top_srcdir)/src -I$(top_builddir)/src -I$(srcdir) -I$(top_builddir)/security $(AM_CPPFLAGS)
 
 # all the programs need this
 LDADD = $(top_builddir)/src/libhamlib.la $(top_builddir)/lib/libmisc.la $(DL_LIBS) -lm
@@ -47,14 +82,14 @@ LDADD += $(ANDROID_LIBS)
 endif
 
 rigmem_CFLAGS = $(AM_CFLAGS) $(LIBXML2_CFLAGS) -I$(top_builddir)/src
-rigctld_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_builddir)/src -I$(top_builddir)/security
+rigctld_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_srcdir)/src -I$(top_builddir)/src -I$(top_builddir)/security
 rotctl_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_builddir)/src
 rotctld_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_builddir)/src
 ampctl_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_builddir)/src
 ampctld_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_builddir)/src
-rigctlcom_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_builddir)/security
-rigctltcp_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_builddir)/security
-rigctlsync_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_builddir)/security
+rigctlcom_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_srcdir)/src -I$(top_builddir)/security
+rigctltcp_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_srcdir)/src -I$(top_builddir)/security
+rigctlsync_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) -I$(top_srcdir)/src -I$(top_builddir)/security
 if TESTS_HAVE_LIBUSB
     rigtestlibusb_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS) $(LIBUSB_CFLAGS)
 endif
@@ -72,6 +107,10 @@ rigmem_LDADD = $(LIBXML2_LIBS) $(LDADD)
 rigctlcom_LDADD = $(NET_LIBS) $(PTHREAD_LIBS) $(LDADD) $(READLINE_LIBS)
 rigctltcp_LDADD = $(NET_LIBS) $(PTHREAD_LIBS) $(LDADD) $(READLINE_LIBS)
 rigctlsync_LDADD = $(NET_LIBS) $(PTHREAD_LIBS) $(LDADD) $(READLINE_LIBS)
+rigstreamtest_LDADD = $(PTHREAD_LIBS) $(LDADD)
+rigstreamtest_CFLAGS = $(AM_CFLAGS) $(PTHREAD_CFLAGS)
+rigstreamtest_CPPFLAGS = -I$(top_srcdir)/src -I$(top_builddir)/src \
+    $(AM_CPPFLAGS)
 if TESTS_HAVE_LIBUSB
     rigtestlibusb_LDADD = $(LIBUSB_LIBS)
 endif
@@ -103,7 +142,7 @@ if HTML_MATRIX
 EXTRA_PROGRAMS = rigmatrix
 # rigmatrix needs libgd
 rigmatrix_LDFLAGS = -lgd -lz
-rigmatrix.html: rigmatrix_head.html rigmatrix listrigs
+rigmatrix.html: rigmatrix_head.html rigmatrix listrigs rigctl
 	mkdir -p sup-info/support
 	( cat $(srcdir)/rigmatrix_head.html && cd sup-info && ../rigmatrix ) > sup-info/rigmatrix.html
 	for f in $$(./listrigs | tail -n +2 | cut -f1) ; do ( ./rigctl -m $$f -u > sup-info/support/model$$f.txt || exit 0 ) ; done
@@ -117,13 +156,27 @@ EXTRA_DIST = \
 	hamlib_tuner_control \
 	rig_split_lst.awk \
 	rigmatrix_head.html \
+	rigstreamtest-dummy.sh \
+	rigstreamtest-hw.sh \
+	rigstreamtest-hw-loss.sh \
 	testcaps.sh \
+	testctlbounds.sh \
 	testctld.pl \
-	testrotctld.pl
+	testctlptt.sh \
+	testroutingaccess.sh \
+	testrotctld.pl \
+	make/README.md
 
 # Support 'make check' target for simple tests
 # Omitting cachetest.sh because it needs 2 instances of rigctld running
-check_SCRIPTS = amptest.sh test2038.sh testbcd.sh testcache.sh testcaps.sh testcookie.sh testfreq.sh testgrid.sh testloc.sh testrig.sh testrigcaps.sh
+check_SCRIPTS = \
+	amptest.sh \
+	rigstreamtest-dummy.sh \
+	testcaps.sh \
+	testctlbounds.sh \
+	testctlptt.sh \
+	testroutingaccess.sh \
+	$(GENERATED_TEST_WRAPPERS)
 
 TESTS = $(check_SCRIPTS)
 
@@ -169,4 +222,22 @@ test2038.sh:
 	echo 'LD_LIBRARY_PATH=$(top_builddir)/src/.libs:$(top_builddir)/dummy/.libs ./test2038 1' > test2038.sh
 	chmod +x ./test2038.sh
 
-CLEANFILES = rigmatrix testrig.sh testfreq.sh testbcd.sh testloc.sh testrigcaps.sh testcache.sh testcookie.sh rigtestlibusb build-w32.sh build-w64.sh build-w64-jtsdk.sh testgrid.sh testrigcaps.sh test2038.sh tuner_control.log
+CLEANFILES = \
+	build-w32.sh \
+	build-w64-jtsdk.sh \
+	build-w64.sh \
+	rigmatrix \
+	rigtestlibusb \
+	tuner_control.log \
+	$(GENERATED_TEST_WRAPPERS)
+
+# Keep each subsystem's test registration, flags, sources, libraries, and
+# backend prerequisites together. See make/README.md for the layout rules.
+include $(srcdir)/make/tests-core.am
+include $(srcdir)/make/tests-network.am
+include $(srcdir)/make/tests-dummy.am
+include $(srcdir)/make/tests-icom.am
+include $(srcdir)/make/tests-kenwood.am
+include $(srcdir)/make/tests-yaesu.am
+include $(srcdir)/make/tests-guohetec.am
+include $(srcdir)/make/tests-devices.am

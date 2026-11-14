@@ -26,10 +26,10 @@
 
 #include "hamlib/rig.h"
 #include "hamlib/rig_state.h"
+#include "cache.h"
 #include "kenwood.h"
 #include "th.h"
 #include "misc.h"
-
 
 // Some commands are very slow to process so we put a DELAY in those places
 #define DELAY hl_usleep(300*1000)
@@ -55,7 +55,7 @@
 
 #define THD72_VFO (RIG_VFO_A|RIG_VFO_B)
 
-static rmode_t thd72_mode_table[3] =
+static rmode_t thd72_mode_table[KENWOOD_MODE_TABLE_MAX] =
 {
     [0] = RIG_MODE_FM,  /* normal, but narrow compared to broadcast */
     [1] = RIG_MODE_FMN, /* what kenwood calls narrow */
@@ -172,12 +172,12 @@ static int thd72_set_vfo(RIG *rig, vfo_t vfo)
     case RIG_VFO_VFO:
     case RIG_VFO_MAIN:
         cmd = "BC 0";
-        STATE(rig)->current_vfo = RIG_VFO_A;
+        rig_set_current_vfo_state(rig, RIG_VFO_A);
         break;
 
     case RIG_VFO_B:
     case RIG_VFO_SUB:
-        STATE(rig)->current_vfo = RIG_VFO_B;
+        rig_set_current_vfo_state(rig, RIG_VFO_B);
         cmd = "BC 1";
         break;
 
@@ -342,7 +342,7 @@ static int thd72_get_split_vfo(RIG *rig, vfo_t vfo, split_t *split,
 static int thd72_vfoc(RIG *rig, vfo_t vfo, char *vfoc)
 {
     rig_debug(RIG_DEBUG_TRACE, "%s: called VFO=%s\n", __func__, rig_strvfo(vfo));
-    vfo = (vfo == RIG_VFO_CURR) ? STATE(rig)->current_vfo : vfo;
+    vfo = (vfo == RIG_VFO_CURR) ? rig_get_current_vfo_state(rig) : vfo;
 
     switch (vfo)
     {
@@ -1450,7 +1450,7 @@ static int thd72_get_channel(RIG *rig, vfo_t vfo, channel_t *chan,
     return RIG_OK;
 }
 
-#ifdef false  /* not working */
+#if 0  /* not working */
 #define CMD_SZ 5
 #define BLOCK_SZ 256
 #define BLOCK_COUNT 256

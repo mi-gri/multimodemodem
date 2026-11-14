@@ -127,7 +127,7 @@
          { 241, 25.0f } \
     } }
 
-static struct cmdparams ic7600_extcmds[] =
+static const struct cmdparams ic7600_extcmds[] =
 {
     { {.s = RIG_PARM_BEEP}, CMD_PARAM_TYPE_PARM, C_CTL_MEM, S_MEM_PARM, SC_MOD_RW, 2, {0x00, 0x59}, CMD_DAT_BOL, 1 },
     { {.s = RIG_PARM_BACKLIGHT}, CMD_PARAM_TYPE_PARM, C_CTL_MEM, S_MEM_PARM, SC_MOD_RW, 2, {0x00, 0x38}, CMD_DAT_LVL, 2 },
@@ -173,7 +173,8 @@ static const struct icom_priv_caps ic7600_priv_caps =
     .x1ax03_supported = 1,
     .mode_with_filter = 1,
     .data_mode_supported = 1,
-    .clock_cmds = &ic7600_clock_cmds
+    .clock_cmds = &ic7600_clock_cmds,
+    .power_status_read_not_supported = 1
 };
 
 struct rig_caps ic7600_caps =

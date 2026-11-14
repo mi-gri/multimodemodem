@@ -102,6 +102,7 @@ CONFIGURE_ARGS=(
     "--without-readline"
     "--without-indi"
     "--without-libusb"
+    "--without-samplerate"
     "--disable-html-matrix"
     "--disable-winradio"
 )

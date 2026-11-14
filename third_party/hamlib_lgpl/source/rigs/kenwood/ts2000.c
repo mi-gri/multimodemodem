@@ -91,7 +91,7 @@
 /*
  * 38 CTCSS sub-audible tones + 1750 tone
  */
-tone_t ts2000_ctcss_list[] =
+static tone_t ts2000_ctcss_list[] =
 {
     670,  719,  744,  770,  797,  825,  854,  885,  915,  948,
     974, 1000, 1035, 1072, 1109, 1148, 1188, 1230, 1273, 1318,
@@ -103,7 +103,7 @@ tone_t ts2000_ctcss_list[] =
 /*
  * 103 available DCS codes
  */
-tone_t ts2000_dcs_list[] =
+static tone_t ts2000_dcs_list[] =
 {
     23,  25,  26,  31,   32,  36,  43,  47,       51,  53,
     54,  65,  71,  72,  73,   74, 114, 115, 116, 122, 125, 131,
@@ -117,7 +117,7 @@ tone_t ts2000_dcs_list[] =
     0,
 };
 
-int ts2000_ext_tokens[] =
+static int ts2000_ext_tokens[] =
 {
     TOK_FUNC_NOISE_REDUCTION_2, TOK_FUNC_FILTER_WIDTH_DATA,
     TOK_LEVEL_DSP_RX_EQUALIZER, TOK_LEVEL_DSP_TX_EQUALIZER, TOK_LEVEL_DSP_TX_BANDWIDTH,
@@ -125,7 +125,7 @@ int ts2000_ext_tokens[] =
     TOK_BACKEND_NONE,
 };
 
-const struct confparams ts2000_ext_funcs[] =
+static const struct confparams ts2000_ext_funcs[] =
 {
     {
         TOK_FUNC_NOISE_REDUCTION_2, "NR2", "Noise reduction 2", "Noise reduction 2",
@@ -134,7 +134,7 @@ const struct confparams ts2000_ext_funcs[] =
     { RIG_CONF_END, NULL, }
 };
 
-const struct confparams ts2000_ext_levels[] =
+static const struct confparams ts2000_ext_levels[] =
 {
     {
         TOK_LEVEL_DSP_RX_EQUALIZER, "DSP_RX_EQUALIZER", "DSP RX equalizer", "DSP RX equalizer type",
@@ -596,6 +596,9 @@ static int ts2000_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val)
     size_t ack_len, ack_len_expected;
     int levelint;
     int retval;
+    int cache_ms;
+    int timeout_ms;
+    ptt_t ptt;
     char vfo_num = (vfo == RIG_VFO_C) ? '1' : '0';
 
     ENTERFUNC;
@@ -698,7 +701,9 @@ static int ts2000_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val)
         RETURNFUNC(RIG_OK);
 
     case RIG_LEVEL_STRENGTH:
-        if (CACHE(rig)->ptt != RIG_PTT_OFF)
+        rig_get_cache_ptt(rig, &ptt, &cache_ms, &timeout_ms);
+
+        if (ptt != RIG_PTT_OFF)
         {
             val->i = -9 * 6;
             break;
@@ -885,7 +890,9 @@ static int ts2000_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val)
         int raw_value;
         char read_vfo_num;
 
-        if (CACHE(rig)->ptt == RIG_PTT_OFF)
+        rig_get_cache_ptt(rig, &ptt, &cache_ms, &timeout_ms);
+
+        if (ptt == RIG_PTT_OFF)
         {
             val->f = 0;
             break;
@@ -1479,7 +1486,7 @@ int ts2000_set_channel(RIG *rig, vfo_t vfo, const channel_t *chan)
 {
     char sqltype = '0';
     char buf[128];
-    char mode, tx_mode = 0;
+    int mode, tx_mode = 0;
     char shift = '0';
     short dcscode = 0;
     short code = 0;

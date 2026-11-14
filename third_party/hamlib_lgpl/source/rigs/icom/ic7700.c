@@ -103,7 +103,7 @@
          { 241, 15.0f } \
     } }
 
-static struct cmdparams ic7700_extcmds[] =
+static const struct cmdparams ic7700_extcmds[] =
 {
     { {.s = RIG_LEVEL_VOXDELAY}, CMD_PARAM_TYPE_LEVEL, C_CTL_MEM, S_MEM_PARM, SC_MOD_RW, 2, {0x01, 0x82}, CMD_DAT_INT, 1 },
     { { 0 } }
@@ -146,7 +146,8 @@ static const struct icom_priv_caps ic7700_priv_caps =
     .x1ax03_supported = 1,
     .mode_with_filter = 1,
     .data_mode_supported = 1,
-    .clock_cmds = &ic7700_clock_cmds
+    .clock_cmds = &ic7700_clock_cmds,
+    .power_status_read_not_supported = 1
 };
 
 

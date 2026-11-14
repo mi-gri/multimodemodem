@@ -7,8 +7,28 @@ Copyright (C) 2000-2026  The Hamlib Group
 
 Please send Hamlib bug reports to hamlib-developer@lists.sourceforge.net
 
-+
+
 Version 5.x -- future
+        * Fix: Keep PTT overrides local to each rig instance without changing
+          model capabilities. GitHub PR #2255.
+        * rigctl/rigctld: Honor explicit PTT NONE selections and default to
+          RTS for a PTT device path only when no type was selected. Invalid
+          PTT types now report an error on stderr and exit with status 2.
+        * QMX: Add SWR and RF power meter readback using the QRP Labs
+          SW and PC CAT commands.  The power meter full scale (6W stock,
+          12W with the PA0RDT PA modification) is read from the radio at
+          open time.
+        * New data streaming subsystem (experimental): audio and I/Q streams
+          between a backend and an application through the rig_stream_* API,
+          or over the network from rigctld via a UDP wire protocol.  Includes
+          a dummy reference backend, the rigstreamtest diagnostic tool, and
+          the stream_* rigctld commands.  See HAMLIB_STREAMING.md and
+          HAMLIB_STREAMING_BACKEND_GUIDE.md.
+        * New Icom network backends using Icom's RS-BA1/LAN protocol: CI-V
+          control over UDP plus audio and I/Q streaming.  Models IC-7610,
+          IC-9700, IC-705, IC-905, IC-7760 and IC-7300MK2 (Network), numbered
+          3095-3100.  Configured with the net_* parameters; see
+          rigs/icom/ICOM.md.
         * rig_get_conf deprecated and replaced by rig_get_conf2
         * rot_get_conf deprecated and replaced by rot_get_conf2
         * Change FT1000MP Mark V model names to align with FT1000MP
@@ -16,6 +36,87 @@ Version 5.x -- future
           heap buffers - Github issues #487 & #1445 (n3gb)
         * Update bandwidth handling in rigs/yaesu/newcat.c to use data in
           priv_caps. Moves lots of hard-coded data into tables.  (n3gb)
+        * Fix: Remove debug history race. GitHub PR #2105  (TNX David
+          Christle)
+        * Fix: Prevent network AGC parser overflow. GitHub PR #2106
+          (TNX David Christle)
+        * Harden command and backend parser bounds. GitHub PR #2112
+          (TNX David Christle)
+        * ATS Mini: New backend and model.  GitHub PR #2089.  (TNX
+          Jon Snow)
+        * Fix(dummy): Copy string parameter values. GitHub PR #2115
+          (TNX David Christle)
+        * Feature: Add data streaming subsystem for audio and I/Q.
+          GitHub PR #2116.  (TNX Mikael Nousiainen)
+        * New: TCI 2.0 (Expert Electronics) backend, CAT only.  GitHub
+          PR #2083.  (TNX Jeff Francis)
+        * TH-D75: New dedicated backend.  GitHub PR #2120.  (TNX David
+          Christle)
+        * ID-5100: Correct ID-5100 VFO switching.  GitHub PR #2129 (TNX
+          David Christle)
+        * Fix(rigctl): Enforce locale-neutral decimal protocol.  GitHub
+          PR #2131.  (TNX David Christle)
+        * Fix(cache): Synchronize cache and routing state.  GitHub PR
+          #2146.  (TNX David Christle)
+        * Core: Add exclusive mode support to serial port opening.  GitHub
+          PR #2200.  (TNX Ben Woodard)
+        * Tests: Clear rigctld PID after startup timeout.  GitHub PR #2154.
+          (TNX David Christle)
+
+Version 4.7.2
+        * 2026-06-21
+        * FTX-1: Rewrite set_channel using VFO-B + BM workaround, also fix
+          the get_channel side, auto-exit Memory mode before VFO-state
+          setters, and MC cursor targeting in ftx1_set_channel.  GitHub
+          PR # 2035.  (TNX Terrell Deppe)
+        * IC-7600/IC-7610: Update clock routines; fix IC-7610 clock commands.
+          GitHub PR #2040 (TNX George Baltz)
+        * Icom: Add CWR to modes eligible for DSP filtering.  GitHub PR #2041.
+          (TNX George Baltz)
+        * Kenwood: New model Hamgeek uSGX.  GitHub PR #2043  (TNX Leo Pizzolante)
+        * Skywatcher: Now initialize motors on rot_open.  GitHub PR #2046
+          (TNX Mario Haustein)
+        * C23:  Fix errors when compiling with C23 support.  GitHub PR #2048
+          (TNX George Baltz)
+        * DX-SR8:  Fix serial configuration, timing, and control bugs.  GitHub
+          PR #2052  (TNX Jeff Sheldon)
+        * FT-710:  Fix FT-710 VFO swap after cross-band tune.  GiHub PR #2063
+          (TNX Mike Del Tito)
+        * Android:  Replace legacy Android build with NDK SDK in the GNU build
+          system.  GitHub PR #2061 (TNX William Goodspeed)
+        * src/settings.c: Directly open the file descriptor from mkstemp.  GitHub
+          PR #2067.  (TNX Kai Pastor)
+        * IC-705:  Fix power2mW for Icom IC-705 on PKT* modes.  GitHub PR
+          #2069.  (TNX Daniele Forsi, Brian Coxi (reporter))
+        * X6100: Fix power2mW for Xiegu X6100,  GitHub PR #2070.  (TNX Johannes
+          Schwab)
+        * rigctld:  Fix send_raw stack out-of-bounds write and uninitialized memory;
+          CVE-2026-54634/GitHub GHSA-gpcq-c37x-pr4.  (TNX George Baltz)
+        * rigctld:  Fix stack/heap overflow primitive in read_string_generic +
+          auth bypass in rigctld + weak password handling; GitHub GHSA-f72v-7gmh-m9mj.
+          (TNX George Baltz)
+        * X6100:  Adjust X6100 S-meter Look Up Table.  GitHub PR $2074.  (TNX Nannk)
+
+Version 4.7.1
+        * 2026-04-15
+        * Fix unknown type compilation errors on Alpine Linux.  (TNX Bradfor Boyle)
+        * Fix rig port timeout.  (TNX Matthias Moelller)
+        * Update ReleaseNotes*.md.  (TNX George Baltz)
+        * Fix various FTX-1 meter, level and CTCSS table.  (TNX KJ5HST)
+        * Add power off capability to Flrig backend.  (TNX Philip Rose)
+        * Replace strncpy with memcpy to quell GCC 16 warning.  (TNX George Baltz)
+        * Add SWR to supported 'get levels' for K3/K4.  (TNX Tom Crayner (reporter))
+        * Add get_split_vfo to TS-850 backend.  (TNX Elisamuel Resto)
+        * New simplecat backend.  Supports Bunzee Labs DDX.  (TNX Dhiru Kholia)
+        * Fix and generalize clock handling for Icom radios.  (TNX George Baltz)
+        * Fix Yaesu attenuator levels and LVL_KEYSPD reinitialization.  (TNX George Baltz)
+        * Add new rig model Harris PRC-138.  (TNX Antonio Regazzoni)
+        * Various FT-710 fixes, eespecially handling SH format and RX bandwidth.
+          Ensure FT-710 simulator rejects RF command.  (TNX George Baltz)
+        * Fix low power calculation for K3/K3S.  (N0NB)
+        * Fix FTX-1 SH bandwidth command in set/get_mode.  (TNX Terrell Deppe)
+        * Quell initializer overrides prior initialzation clang warning in ftx1.c
+          and fix compiler warning in hd1780.c.  (TNX George Baltz)
 
 Version 4.7.0
         * 2026-02-15

@@ -15,6 +15,8 @@ EXTRA_DIST = \
 	README.macos \
 	README.md \
 	README.multicast \
+	HAMLIB_STREAMING.md \
+	HAMLIB_STREAMING_BACKEND_GUIDE.md \
 	ReleaseNotes_4.7.md \
 	ReleaseNotes_5.0.md \
 	hamlib.m4 \
@@ -30,7 +32,7 @@ SUBDIRS = macros include lib security \
 	$(AMP_BACKEND_LIST) \
 	src \
 	$(BINDINGS) \
-	tests doc
+	tests test doc
 
 ## Static list of distributed directories.
 DIST_SUBDIRS = \
@@ -50,6 +52,7 @@ DIST_SUBDIRS = \
 	security \
 	simulators \
 	src \
+	test \
 	tests
 
 # Install any third party macros into our tree for distribution

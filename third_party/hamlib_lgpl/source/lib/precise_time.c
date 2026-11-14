@@ -89,6 +89,7 @@ double monotonic_seconds()
 // On Windows, use QueryPerformanceCounter and QueryPerformanceFrequency.
 
 #include <windows.h>
+#include <assert.h>
 
 static double PCFreq = 0.0;
 

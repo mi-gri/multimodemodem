@@ -94,9 +94,6 @@ extern int read_history();
 
 static pthread_mutex_t rot_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-#define STR1(S) #S
-#define STR(S) STR1(S)
-
 #define MAXNAMSIZ 32
 #define MAXNBOPT 100    /* max number of different options */
 #define MAXARGSZ 127
@@ -341,8 +338,6 @@ static void hash_delete_all()
  */
 static void rp_getline(const char *s)
 {
-    int i;
-
     /* free allocated memory and set pointers to NULL */
     if (input_line)
     {
@@ -358,7 +353,7 @@ static void rp_getline(const char *s)
     /* cmd, arg1, arg2, arg3, arg4, arg5, arg6
      * arg5 and arg 6 are currently unused.
      */
-    for (i = 0; i < 7; i++)
+    for (int i = 0; i < 7; i++)
     {
         parsed_input[i] = NULL;
     }
@@ -374,9 +369,7 @@ static void rp_getline(const char *s)
  */
 static char parse_arg(const char *arg)
 {
-    int i;
-
-    for (i = 0; test_list[i].cmd != 0; i++)
+    for (int i = 0; test_list[i].cmd != 0; i++)
     {
         if (!strncmp(arg, test_list[i].name, MAXNAMSIZ))
         {
@@ -408,9 +401,8 @@ static int scanfc(FILE *fin, const char *format, void *p)
 
             if (!feof(fin))
             {
-                rig_debug(RIG_DEBUG_TRACE, "%s fscanf of:", __func__);
-                dump_hex((unsigned char *)p, strlen(p));
-                rig_debug(RIG_DEBUG_TRACE, " failed with format '%s'\n", format);
+                rig_debug(RIG_DEBUG_TRACE, "%s: fscanf failed with format '%s'\n",
+                          __func__, format);
             }
 
         }
@@ -461,11 +453,15 @@ static int next_word(char *buffer, int argc, const char **argv, int newline)
 
     if (reading_stdin)
     {
+        char stdin_format[32];
+        SNPRINTF(stdin_format, sizeof(stdin_format), " %%c%%%d[^ \t\n#]",
+                 MAXARGSZ - 1);
+
         do
         {
             do
             {
-                ret = scanf(" %c%" STR(MAXARGSZ) "[^ \t\n#]", &c, &buffer[1]);
+                ret = scanf(stdin_format, &c, &buffer[1]);
             }
             while (EINTR == ret);
 
@@ -1532,11 +1528,9 @@ void version()
 
 void usage_rot(FILE *fout)
 {
-    int i;
-
     fprintf(fout, "Commands (some may not be available for this rotator):\n");
 
-    for (i = 0; test_list[i].cmd != 0; i++)
+    for (int i = 0; test_list[i].cmd != 0; i++)
     {
         fprintf(fout,
                 "%c: %-12s(",
@@ -2561,17 +2555,24 @@ declare_proto_rot(send_cmd)
 
     if (send_cmd_term == -1 || backend_num == -1)
     {
-        const char *p = arg1, *pp = NULL;
+        const char *p = arg1;
         int i;
 
-        for (i = 0; i < BUFSZ - 1 && p != pp; i++)
+        for (i = 0; i < BUFSZ - 1 && *p == '\\'; i++)
         {
-            pp = p + 1;
-            bufcmd[i] = strtol(p + 1, (char **) &p, 0);
+            char *end;
+
+            bufcmd[i] = strtol(p + 1, &end, 0);
+            if (end == p + 1)
+            {
+                break;
+            }
+
+            p = end;
         }
 
         /* must save length to allow 0x00 to be sent as part of a command */
-        cmd_len = i - 1;
+        cmd_len = i;
 
         /* no End Of Message chars */
         eom_buf[0] = '\0';
@@ -2947,4 +2948,3 @@ int print_conf_list2(const struct confparams *cfp, rig_ptr_t data, FILE *fout)
 
     return 1;  /* !=0, we want them all ! */
 }
-

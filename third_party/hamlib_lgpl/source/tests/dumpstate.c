@@ -28,6 +28,7 @@
 #include "sprintflst.h"
 #include "rigctl_parse.h"
 #include "../rigs/icom/icom.h"
+#include "dumpcaps.h"
 
 void range_print(FILE *fout, const struct freq_range_list range_list[], int rx);
 int range_sanity_check(const struct freq_range_list range_list[], int rx);
@@ -723,9 +724,9 @@ int dumpstate(RIG *rig, FILE *fout)
 
     fprintf(fout, "Bandwidths:");
 
-    for (i = 1; i < RIG_MODE_TESTS_MAX; i <<= 1)
+    for (rmode_t mode = 1; mode < RIG_MODE_TESTS_MAX; mode <<= 1)
     {
-        pbwidth_t pbnorm = rig_passband_normal(rig, i);
+        pbwidth_t pbnorm = rig_passband_normal(rig, mode);
 
         if (pbnorm == 0)
         {
@@ -733,12 +734,12 @@ int dumpstate(RIG *rig, FILE *fout)
         }
 
         sprintf_freq(freqbuf, sizeof(freqbuf), pbnorm);
-        fprintf(fout, "\n\t%s\tNormal: %s,\t", rig_strrmode(i), freqbuf);
+        fprintf(fout, "\n\t%s\tNormal: %s,\t", rig_strrmode(mode), freqbuf);
 
-        sprintf_freq(freqbuf, sizeof(freqbuf), rig_passband_narrow(rig, i));
+        sprintf_freq(freqbuf, sizeof(freqbuf), rig_passband_narrow(rig, mode));
         fprintf(fout, "Narrow: %s,\t", freqbuf);
 
-        sprintf_freq(freqbuf, sizeof(freqbuf), rig_passband_wide(rig, i));
+        sprintf_freq(freqbuf, sizeof(freqbuf), rig_passband_wide(rig, mode));
         fprintf(fout, "Wide: %s", freqbuf);
     }
 
@@ -784,6 +785,12 @@ int dumpstate(RIG *rig, FILE *fout)
     }
 
     fprintf(fout, "\n");
+
+    /* The served view: for netrigctl the session caps hold the remote
+     * server's advertisement for THIS connection, so the dump shows the
+     * relayed effective + native sets — the model declaration (dump_caps'
+     * business) has no streaming entries of its own. */
+    dumpcaps_stream_state(rig, fout);
 
     fprintf(fout, "Has priv data:\t%c\n", rs->priv != NULL ? 'Y' : 'N');
     /*

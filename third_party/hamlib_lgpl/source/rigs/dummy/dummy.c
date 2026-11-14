@@ -49,46 +49,9 @@
 #include "cache.h"
 
 #include "dummy.h"
-
-#define NB_CHAN 22      /* see caps->chan_list */
-
+#include "dummy_stream.h"
 
 #define CMDSLEEP 20*1000  /* ms for each command */
-
-struct dummy_priv_data
-{
-    /* current vfo already in rig_state ? */
-    vfo_t curr_vfo;
-    vfo_t last_vfo; /* VFO A or VFO B, when in MEM mode */
-
-    split_t split;
-    vfo_t tx_vfo;
-    ptt_t ptt;
-    powerstat_t powerstat;
-    int bank;
-    value_t parms[RIG_SETTING_MAX];
-    int ant_option[4]; /* simulate 4 antennas */
-    int trn; /* transceive */
-
-    channel_t *curr;    /* points to vfo_a, vfo_b or mem[] */
-
-    // we're trying to emulate all sorts of vfo possibilities so this looks redundant
-    channel_t vfo_maina;
-    channel_t vfo_mainb;
-    channel_t vfo_suba;
-    channel_t vfo_subb;
-    channel_t vfo_c;
-    channel_t mem[NB_CHAN];
-
-    struct ext_list *ext_funcs;
-    struct ext_list *ext_parms;
-
-    char *magic_conf;
-    int static_data;
-
-    //freq_t freq_vfoa;
-    //freq_t freq_vfob;
-};
 
 /* levels pertain to each VFO */
 static const struct confparams dummy_ext_levels[] =
@@ -141,6 +104,27 @@ static const struct confparams dummy_cfg_params[] =
     {
         TOK_CFG_STATIC_DATA, "static_data", "Static data", "Output only static data, no randomization of meter values",
         "0", RIG_CONF_CHECKBUTTON, { }
+    },
+    {
+        TOK_CFG_STREAM_MODE, "stream_mode", "Stream mode", "Streaming mode: tone, silence, or loopback",
+        "tone", RIG_CONF_STRING, { }
+    },
+    {
+        TOK_CFG_STREAM_TONE_FREQ, "stream_tone_freq", "Tone freq", "Audio tone frequency in Hz",
+        "1000.0", RIG_CONF_NUMERIC, { .n = { 20.0, 20000.0, 1.0 } }
+    },
+    {
+        TOK_CFG_STREAM_TONE_AMP, "stream_tone_amp", "Tone amplitude", "Tone amplitude 0.0 to 1.0",
+        "0.5", RIG_CONF_NUMERIC, { .n = { 0.0, 1.0, 0.01 } }
+    },
+    {
+        TOK_CFG_STREAM_IQ_OFFSET, "stream_iq_offset", "IQ offset", "I/Q offset frequency in Hz",
+        "1000.0", RIG_CONF_NUMERIC, { .n = { -100000.0, 100000.0, 1.0 } }
+    },
+    {
+        TOK_CFG_STREAM_SYNTH_GAP, "stream_synth_gap", "Synthetic gap",
+        "Inject one RX gap of N samples for testing (0 = off)",
+        "0", RIG_CONF_NUMERIC, { .n = { 0, 10000000, 1 } }
     },
     { RIG_CONF_END, NULL, }
 };
@@ -208,11 +192,10 @@ static void init_chan(RIG *rig, vfo_t vfo, channel_t *chan)
 static void copy_chan(channel_t *dest, const channel_t *src)
 {
     struct ext_list *saved_ext_levels;
-    int i;
 
     /* TODO: ext_levels[] of different sizes */
 
-    for (i = 0; !RIG_IS_EXT_END(src->ext_levels[i]) &&
+    for (int i = 0; !RIG_IS_EXT_END(src->ext_levels[i]) &&
             !RIG_IS_EXT_END(dest->ext_levels[i]); i++)
     {
         dest->ext_levels[i] = src->ext_levels[i];
@@ -226,7 +209,6 @@ static void copy_chan(channel_t *dest, const channel_t *src)
 static int dummy_init(RIG *rig)
 {
     struct dummy_priv_data *priv;
-    int i;
 
     ENTERFUNC;
     priv = (struct dummy_priv_data *)calloc(1, sizeof(struct dummy_priv_data));
@@ -237,6 +219,8 @@ static int dummy_init(RIG *rig)
     }
 
     STATE(rig)->priv = (void *)priv;
+
+    pthread_mutex_init(&priv->stream_states_lock, NULL);
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s called\n", __func__);
     RIGPORT(rig)->type.rig = RIG_PORT_NONE;
@@ -250,7 +234,7 @@ static int dummy_init(RIG *rig)
 
     memset(priv->mem, 0, sizeof(priv->mem));
 
-    for (i = 0; i < NB_CHAN; i++)
+    for (int i = 0; i < NB_CHAN; i++)
     {
         priv->mem[i].channel_num = i;
         priv->mem[i].vfo = RIG_VFO_MEM;
@@ -331,6 +315,12 @@ static int dummy_init(RIG *rig)
 
     priv->magic_conf = strdup("DX");
 
+    priv->stream_mode = DUMMY_STREAM_TONE;
+    priv->stream_tone_freq = 1000.0f;
+    priv->stream_tone_amp = 0.5f;
+    priv->stream_iq_offset = 1000.0f;
+    priv->stream_synth_gap = 0;
+
     RETURNFUNC(RIG_OK);
 }
 
@@ -338,11 +328,10 @@ static int dummy_cleanup(RIG *rig)
 {
     struct rig_state *rs = STATE(rig);
     struct dummy_priv_data *priv = (struct dummy_priv_data *)rs->priv;
-    int i;
 
     ENTERFUNC;
 
-    for (i = 0; i < NB_CHAN; i++)
+    for (int i = 0; i < NB_CHAN; i++)
     {
         free(priv->mem[i].ext_levels);
     }
@@ -355,6 +344,16 @@ static int dummy_cleanup(RIG *rig)
     free(priv->ext_funcs);
     free(priv->ext_parms);
     free(priv->magic_conf);
+
+    for (int i = 0; i < RIG_SETTING_MAX; i++)
+    {
+        if (RIG_PARM_IS_STRING(rig_idx2setting(i)))
+        {
+            free(priv->parms[i].s);
+        }
+    }
+
+    pthread_mutex_destroy(&priv->stream_states_lock);
 
     free(priv);
 
@@ -412,6 +411,46 @@ static int dummy_set_conf(RIG *rig, hamlib_token_t token, const char *val)
         priv->static_data = atoi(val) ? 1 : 0;
         break;
 
+    case TOK_CFG_STREAM_MODE:
+        if (strcmp(val, "tone") == 0)
+        {
+            priv->stream_mode = DUMMY_STREAM_TONE;
+        }
+        else if (strcmp(val, "silence") == 0)
+        {
+            priv->stream_mode = DUMMY_STREAM_SILENCE;
+        }
+        else if (strcmp(val, "loopback") == 0)
+        {
+            priv->stream_mode = DUMMY_STREAM_LOOPBACK;
+        }
+        else if (strcmp(val, "counter") == 0)
+        {
+            priv->stream_mode = DUMMY_STREAM_COUNTER;
+        }
+        else
+        {
+            RETURNFUNC(-RIG_EINVAL);
+        }
+
+        break;
+
+    case TOK_CFG_STREAM_TONE_FREQ:
+        priv->stream_tone_freq = (float)atof(val);
+        break;
+
+    case TOK_CFG_STREAM_TONE_AMP:
+        priv->stream_tone_amp = (float)atof(val);
+        break;
+
+    case TOK_CFG_STREAM_IQ_OFFSET:
+        priv->stream_iq_offset = (float)atof(val);
+        break;
+
+    case TOK_CFG_STREAM_SYNTH_GAP:
+        priv->stream_synth_gap = atol(val);
+        break;
+
     default:
         RETURNFUNC(-RIG_EINVAL);
     }
@@ -434,6 +473,34 @@ static int dummy_get_conf(RIG *rig, hamlib_token_t token, char *val)
 
     case TOK_CFG_STATIC_DATA:
         SNPRINTF(val, 128, "%d", priv->static_data);
+        break;
+
+    case TOK_CFG_STREAM_MODE:
+        switch (priv->stream_mode)
+        {
+        case DUMMY_STREAM_TONE:     strcpy(val, "tone");     break;
+        case DUMMY_STREAM_SILENCE:  strcpy(val, "silence");  break;
+        case DUMMY_STREAM_LOOPBACK: strcpy(val, "loopback"); break;
+        case DUMMY_STREAM_COUNTER:  strcpy(val, "counter");  break;
+        default:                    strcpy(val, "unknown");   break;
+        }
+
+        break;
+
+    case TOK_CFG_STREAM_TONE_FREQ:
+        SNPRINTF(val, 128, "%.1f", priv->stream_tone_freq);
+        break;
+
+    case TOK_CFG_STREAM_TONE_AMP:
+        SNPRINTF(val, 128, "%.2f", priv->stream_tone_amp);
+        break;
+
+    case TOK_CFG_STREAM_IQ_OFFSET:
+        SNPRINTF(val, 128, "%.1f", priv->stream_iq_offset);
+        break;
+
+    case TOK_CFG_STREAM_SYNTH_GAP:
+        SNPRINTF(val, 128, "%ld", priv->stream_synth_gap);
         break;
 
     default:
@@ -465,7 +532,10 @@ static int dummy_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
 
     if (vfo == RIG_VFO_CURR) { vfo = priv->curr_vfo; }
 
-    if (vfo == RIG_VFO_CURR || vfo == RIG_VFO_TX) { vfo = vfo_fixup(rig, vfo, CACHE(rig)->split); }
+    if (vfo == RIG_VFO_CURR || vfo == RIG_VFO_TX)
+    {
+        vfo = vfo_fixup_current(rig, vfo);
+    }
 
 // if needed for testing enable this to emulate a rig with 100hz resolution
 #if 0
@@ -496,7 +566,8 @@ static int dummy_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
 
     if (rig->callbacks.freq_event)
     {
-        rig_debug(RIG_DEBUG_TRACE, "%s callbacks.freq_event(%p, %p)\n", __func__, rig->callbacks.freq_event, rig->callbacks.freq_arg);
+        rig_debug(RIG_DEBUG_TRACE, "%s callbacks.freq_event(%p, %p)\n", __func__,
+                  rig->callbacks.freq_event, rig->callbacks.freq_arg);
         rig->callbacks.freq_event(rig, vfo, freq, rig->callbacks.freq_arg);
     }
 
@@ -560,7 +631,6 @@ static int dummy_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
 {
     struct dummy_priv_data *priv = (struct dummy_priv_data *)STATE(rig)->priv;
     channel_t *curr = priv->curr;
-    struct rig_cache *cachep = CACHE(rig);
     char buf[16];
 
     ENTERFUNC;
@@ -569,7 +639,7 @@ static int dummy_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
     rig_debug(RIG_DEBUG_VERBOSE, "%s called: %s %s %s\n", __func__,
               rig_strvfo(vfo), rig_strrmode(mode), buf);
 
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    vfo = vfo_fixup_current(rig, vfo);
 
     if (vfo == RIG_VFO_CURR) { vfo = priv->curr_vfo; }
 
@@ -618,7 +688,7 @@ static int dummy_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
         RETURNFUNC(-RIG_EINVAL);
     }
 
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    vfo = vfo_fixup_current(rig, vfo);
 
     if (RIG_PASSBAND_NOCHANGE == width) { RETURNFUNC(RIG_OK); }
 
@@ -646,7 +716,8 @@ static int dummy_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
 
     if (rig->callbacks.mode_event)
     {
-        rig_debug(RIG_DEBUG_TRACE, "%s callbacks.mode_event(%p, %p)\n", __func__, rig->callbacks.mode_event, rig->callbacks.mode_arg);
+        rig_debug(RIG_DEBUG_TRACE, "%s callbacks.mode_event(%p, %p)\n", __func__,
+                  rig->callbacks.mode_event, rig->callbacks.mode_arg);
         rig->callbacks.mode_event(rig, vfo, mode, width, rig->callbacks.mode_arg);
     }
 
@@ -731,8 +802,9 @@ static int dummy_set_vfo(RIG *rig, vfo_t vfo)
             priv->curr = &priv->mem[curr->channel_num];
             break;
         }
+
         rig_debug(RIG_DEBUG_ERR, "%s: invalid memory channel %d\n", __func__,
-		  curr->channel_num);
+                  curr->channel_num);
         RETURNFUNC(-RIG_EINVAL);
 
     case RIG_VFO_TX:
@@ -751,13 +823,14 @@ static int dummy_set_vfo(RIG *rig, vfo_t vfo)
 
     if (rig->callbacks.vfo_event)
     {
-        rig_debug(RIG_DEBUG_TRACE, "%s callbacks.vfo_event(%p, %p)\n", __func__, rig->callbacks.vfo_event, rig->callbacks.vfo_arg);
+        rig_debug(RIG_DEBUG_TRACE, "%s callbacks.vfo_event(%p, %p)\n", __func__,
+                  rig->callbacks.vfo_event, rig->callbacks.vfo_arg);
         rig->callbacks.vfo_event(rig, vfo, rig->callbacks.vfo_arg);
     }
 
     priv->last_vfo = priv->curr_vfo;
     priv->curr_vfo = vfo;
-    STATE(rig)->current_vfo = vfo;
+    rig_set_current_vfo_state(rig, vfo);
 
     RETURNFUNC(RIG_OK);
 }
@@ -780,9 +853,11 @@ static int dummy_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
     struct dummy_priv_data *priv = (struct dummy_priv_data *)STATE(rig)->priv;
 
     ENTERFUNC;
+
     if (rig->callbacks.ptt_event)
     {
-        rig_debug(RIG_DEBUG_TRACE, "%s callbacks.ptt_event(%p, %p)\n", __func__, rig->callbacks.ptt_event, rig->callbacks.ptt_arg);
+        rig_debug(RIG_DEBUG_TRACE, "%s callbacks.ptt_event(%p, %p)\n", __func__,
+                  rig->callbacks.ptt_event, rig->callbacks.ptt_arg);
         rig->callbacks.ptt_event(rig, vfo, ptt, rig->callbacks.ptt_arg);
     }
 
@@ -1146,22 +1221,25 @@ static int dummy_set_split_vfo(RIG *rig, vfo_t vfo, split_t split, vfo_t tx_vfo)
 
     switch (split)
     {
-        case RIG_SPLIT_OFF:
-            priv->split = RIG_SPLIT_OFF;
-            break;
+    case RIG_SPLIT_OFF:
+        priv->split = RIG_SPLIT_OFF;
+        break;
 
-        case RIG_SPLIT_ON:
-            priv->split = RIG_SPLIT_ON;
-            break;
+    case RIG_SPLIT_ON:
+        priv->split = RIG_SPLIT_ON;
+        break;
 
-        default:
-            rig_debug(RIG_DEBUG_ERR, "%s: unsupported split %d", __func__, split);
-            RETURNFUNC(-RIG_EINVAL);
+    default:
+        rig_debug(RIG_DEBUG_ERR, "%s: unsupported split %d", __func__, split);
+        RETURNFUNC(-RIG_EINVAL);
     }
 
     if (tx_vfo == RIG_VFO_NONE || tx_vfo == RIG_VFO_CURR) { tx_vfo = priv->curr_vfo; }
 
-    if (tx_vfo == RIG_VFO_CURR || tx_vfo == RIG_VFO_TX) { tx_vfo = vfo_fixup(rig, vfo, CACHE(rig)->split); }
+    if (tx_vfo == RIG_VFO_CURR || tx_vfo == RIG_VFO_TX)
+    {
+        tx_vfo = vfo_fixup(rig, tx_vfo, split);
+    }
 
     priv->tx_vfo = tx_vfo;
 
@@ -1447,7 +1525,8 @@ static int dummy_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val)
         break;
     }
 
-    memcpy(val, &curr->levels[idx], sizeof(value_t));
+    memcpy(val, &curr->levels[idx], RIG_LEVEL_IS_FLOAT(level)
+           ? sizeof(curr->levels[idx].f) : sizeof(curr->levels[idx].i));
     rig_debug(RIG_DEBUG_VERBOSE, "%s called: %s\n", __func__,
               rig_strlevel(level));
 
@@ -1691,6 +1770,7 @@ static int dummy_set_parm(RIG *rig, setting_t parm, value_t val)
     struct dummy_priv_data *priv = (struct dummy_priv_data *)STATE(rig)->priv;
     int idx;
     char pstr[32];
+    char *string_value = NULL;
 
     ENTERFUNC;
     idx = rig_setting2idx(parm);
@@ -1698,6 +1778,21 @@ static int dummy_set_parm(RIG *rig, setting_t parm, value_t val)
     if (idx >= RIG_SETTING_MAX)
     {
         RETURNFUNC(-RIG_EINVAL);
+    }
+
+    if (RIG_PARM_IS_STRING(parm))
+    {
+        if (val.cs == NULL)
+        {
+            RETURNFUNC(-RIG_EINVAL);
+        }
+
+        string_value = strdup(val.cs);
+
+        if (string_value == NULL)
+        {
+            RETURNFUNC(-RIG_ENOMEM);
+        }
     }
 
     if (RIG_PARM_IS_FLOAT(parm))
@@ -1716,7 +1811,16 @@ static int dummy_set_parm(RIG *rig, setting_t parm, value_t val)
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s called: %s %s\n", __func__,
               rig_strparm(parm), pstr);
-    priv->parms[idx] = val;
+
+    if (string_value != NULL)
+    {
+        free(priv->parms[idx].s);
+        priv->parms[idx].s = string_value;
+    }
+    else
+    {
+        priv->parms[idx] = val;
+    }
 
     RETURNFUNC(RIG_OK);
 }
@@ -2076,9 +2180,8 @@ static int dummy_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
         {
             struct ext_list *saved_ext_levels = curr->ext_levels;
             int saved_ch = curr->channel_num;
-            int i;
 
-            for (i = 0; !RIG_IS_EXT_END(curr->ext_levels[i]); i++)
+            for (int i = 0; !RIG_IS_EXT_END(curr->ext_levels[i]); i++)
             {
                 curr->ext_levels[i].val.i = 0;
             }
@@ -2092,9 +2195,8 @@ static int dummy_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
         {
             struct ext_list *saved_ext_levels = curr->ext_levels;
             channel_t *mem_chan = &priv->mem[curr->channel_num];
-            int i;
 
-            for (i = 0; !RIG_IS_EXT_END(mem_chan->ext_levels[i]); i++)
+            for (int i = 0; !RIG_IS_EXT_END(mem_chan->ext_levels[i]); i++)
             {
                 mem_chan->ext_levels[i].val.i = 0;
             }
@@ -2360,8 +2462,9 @@ static int dummy_mW2power(RIG *rig, float *power, unsigned int mwpower,
 static int m_year, m_month, m_day, m_hour, m_min, m_sec, m_utc_offset;
 static double m_msec;
 
-static int dummy_set_clock(RIG *rig, int year, int month, int day, int hour, int min,
-                    int sec, double msec, int utc_offset)
+static int dummy_set_clock(RIG *rig, int year, int month, int day, int hour,
+                           int min,
+                           int sec, double msec, int utc_offset)
 {
     int retval = RIG_OK;
 
@@ -2386,7 +2489,7 @@ static int dummy_set_clock(RIG *rig, int year, int month, int day, int hour, int
 }
 
 static int dummy_get_clock(RIG *rig, int *year, int *month, int *day, int *hour,
-                    int *min, int *sec, double *msec, int *utc_offset)
+                           int *min, int *sec, double *msec, int *utc_offset)
 {
     int retval = RIG_OK;
 
@@ -2455,6 +2558,58 @@ static int dummy_get_clock(RIG *rig, int *year, int *month, int *day, int *hour,
     .channel_desc = 1,  \
     .ext_levels = 1,    \
     }
+
+/* Native declaration only: the dummy hardware "is" a float radio. The
+ * frontend derives and serves the wider effective set (all PCM/IQ formats
+ * and additional rates via conversion); the backend threads produce and
+ * consume F32/CF32 exclusively. Rates stay wide so resampler-less builds
+ * keep full rate coverage (design doc section 3.7). */
+static const struct rig_stream_caps dummy_stream_caps[] =
+{
+    {
+        .type = RIG_STREAM_TYPE_AUDIO_RX,
+        /* OPUS here is a FABRICATED test codec: the dummy emits its
+         * generator bytes (tone or counter mode) labeled OPUS so codec
+         * passthrough can be system-tested byte-exactly without a codec
+         * library. Codec formats are native-only — no conversion stage
+         * ever touches them. */
+        .formats = RIG_STREAM_FORMAT_PCM_F32 | RIG_STREAM_FORMAT_OPUS,
+        .sample_rates = { 8000, 16000, 24000, 48000, 96000, 0 },
+        .channels = { 1, 2, 0 },
+        .max_streams = DUMMY_MAX_STREAMS_PER_TYPE,
+    },
+    {
+        .type = RIG_STREAM_TYPE_AUDIO_TX,
+        /* OPUS: fabricated test codec, symmetric with AUDIO_RX. */
+        .formats = RIG_STREAM_FORMAT_PCM_F32 | RIG_STREAM_FORMAT_OPUS,
+        .sample_rates = { 8000, 16000, 24000, 48000, 96000, 0 },
+        .channels = { 1, 2, 0 },
+        .max_streams = DUMMY_MAX_STREAMS_PER_TYPE,
+        .caps_flags = RIG_STREAM_CAP_TIMED_TX_COARSE
+                    | RIG_STREAM_CAP_TIMED_TX_SAMPLE
+                    | RIG_STREAM_CAP_BURST_PTT,
+        .tx_schedule_horizon_ms = 30000,
+    },
+    {
+        .type = RIG_STREAM_TYPE_IQ_RX,
+        .formats = RIG_STREAM_FORMAT_IQ_CF32,
+        .sample_rates = { 24000, 48000, 96000, 192000, 0 },
+        .channels = { 1, 2, 3, 4, 0 },  /* coherent multi-channel I/Q */
+        .max_streams = DUMMY_MAX_STREAMS_PER_TYPE,
+    },
+    {
+        .type = RIG_STREAM_TYPE_IQ_TX,
+        .formats = RIG_STREAM_FORMAT_IQ_CF32,
+        .sample_rates = { 24000, 48000, 96000, 192000, 0 },
+        .channels = { 1, 2, 3, 4, 0 },  /* coherent multi-channel I/Q */
+        .max_streams = DUMMY_MAX_STREAMS_PER_TYPE,
+        .caps_flags = RIG_STREAM_CAP_TIMED_TX_COARSE
+                    | RIG_STREAM_CAP_TIMED_TX_SAMPLE
+                    | RIG_STREAM_CAP_BURST_PTT,
+        .tx_schedule_horizon_ms = 30000,
+    },
+    { 0 },  /* sentinel */
+};
 
 struct rig_caps dummy_caps =
 {
@@ -2609,6 +2764,8 @@ struct rig_caps dummy_caps =
     },
     .spectrum_attenuator = { 10, 20, 30, RIG_DBLST_END, },
 
+    .stream_caps = dummy_stream_caps,
+
     .priv =  NULL,    /* priv */
 
     .extlevels =    dummy_ext_levels,
@@ -2695,6 +2852,10 @@ struct rig_caps dummy_caps =
     .mW2power =   dummy_mW2power,
     .set_clock = dummy_set_clock,
     .get_clock = dummy_get_clock,
+
+    .stream_open =  dummy_stream_open,
+    .stream_close = dummy_stream_close,
+
     .hamlib_check_rig_caps = HAMLIB_CHECK_RIG_CAPS
 };
 

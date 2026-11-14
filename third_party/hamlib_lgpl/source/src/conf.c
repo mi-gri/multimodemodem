@@ -40,7 +40,9 @@
 #include "hamlib/rig.h"
 #include "hamlib/port.h"
 #include "hamlib/rig_state.h"
+#include "event.h"
 #include "token.h"
+#include "stream_convert.h"     /* RIG_RESAMPLE_* quality constants */
 
 
 /*
@@ -103,8 +105,10 @@ static const struct confparams frontend_cfg_params[] =
         "0", RIG_CONF_NUMERIC, { .n = { 0.0, 1000.0, .001 } }
     },
     {
-        TOK_POLL_INTERVAL, "poll_interval", "Rig state poll interval in ms",
-        "Polling interval in ms for transceive emulation, defaults to 1000, value of 0 disables polling",
+        TOK_POLL_INTERVAL, "poll_interval",
+        "Rig state publication interval in ms",
+        "Maximum interval between multicast state keepalives; changes may "
+        "publish sooner, defaults to 1000, value of 0 disables publication",
         "1000", RIG_CONF_NUMERIC, { .n = { 0, 1000000, 1 } }
     },
     {
@@ -140,7 +144,71 @@ static const struct confparams frontend_cfg_params[] =
     {
         TOK_CACHE_TIMEOUT, "cache_timeout", "Cache timeout value in ms",
         "Cache timeout, value of 0 disables caching",
-        "500", RIG_CONF_NUMERIC, { .n = {0, 5000, 1}}
+        "1000", RIG_CONF_NUMERIC, { .n = {0, 5000, 1}}
+    },
+    {
+        TOK_STREAM_TIME_STALE_COARSE, "stream_time_stale_coarse",
+        "Stream time staleness threshold for accuracy downgrade in ms",
+        "Default for all streams; 0 selects the built-in default (1000 ms)",
+        "0", RIG_CONF_NUMERIC, { .n = {0, 3600000, 1}}
+    },
+    {
+        TOK_STREAM_TIME_STALE_INVALIDATE, "stream_time_stale_invalidate",
+        "Stream time staleness threshold for invalidation in ms",
+        "Default for all streams; 0 selects the built-in default (5000 ms)",
+        "0", RIG_CONF_NUMERIC, { .n = {0, 3600000, 1}}
+    },
+    {
+        TOK_STREAM_TRANSPORT_BUFFER_MS, "stream_transport_buffer_ms",
+        "Stream transport buffer as ms of stream data",
+        "Default for all streams; 0 selects the built-in default (250 ms)",
+        "0", RIG_CONF_NUMERIC, { .n = {0, 60000, 1}}
+    },
+    {
+        TOK_STREAM_TRANSPORT_BUFFER_BYTES, "stream_transport_buffer_bytes",
+        "Stream transport buffer explicit size in bytes",
+        "Default for all streams; 0 derives the size from the stream rate",
+        "0", RIG_CONF_NUMERIC, { .n = {0, 8388608, 1}}
+    },
+    {
+        TOK_STREAM_METADATA_REFRESH, "stream_metadata_refresh",
+        "Stream metadata unconditional-refresh cadence in ms",
+        "Default for all streams; 0 selects the built-in default",
+        "0", RIG_CONF_NUMERIC, { .n = {0, 60000, 1}}
+    },
+    {
+        TOK_STREAM_METADATA_INTERVAL, "stream_metadata_interval",
+        "Stream metadata change-poll interval in ms",
+        "Default for all streams; 0 selects the built-in default",
+        "0", RIG_CONF_NUMERIC, { .n = {0, 60000, 1}}
+    },
+    {
+        TOK_STREAM_SOURCE_ID, "stream_source_id",
+        "Stream source ID carried in every stream packet",
+        "-1 derives a stable ID from static configuration; 0 emits unset",
+        "-1", RIG_CONF_NUMERIC, { .n = {-1, 65535, 1}}
+    },
+    {
+        TOK_STREAM_KEEPALIVE_TIMEOUT, "stream_keepalive_timeout",
+        "Seconds of silence before a stream server drops a client",
+        "Raise it on a lossy link so consecutive lost pings do not end the "
+        "stream; 0 selects the built-in default",
+        "0", RIG_CONF_NUMERIC, { .n = {0, 3600, 1}}
+    },
+    {
+        TOK_STREAM_RESAMPLE_QUALITY, "stream_resample_quality",
+        "Stream resampler quality",
+        "libsamplerate sinc converter for stream rate conversion, applied "
+        "to pipelines created after the change",
+        "medium", RIG_CONF_COMBO, { .c = {{ "medium", "best", "fast", NULL }} }
+    },
+    {
+        TOK_STREAM_KEEPALIVE_INTERVAL, "stream_keepalive_interval",
+        "Stream keepalive ping interval in seconds",
+        "Must stay well below stream_keepalive_timeout, since the ratio of "
+        "the two is how many lost pings a stream survives; 0 selects the "
+        "built-in default",
+        "0", RIG_CONF_NUMERIC, { .n = {0, 3600, 1}}
     },
     {
         TOK_AUTO_POWER_ON, "auto_power_on", "Auto power on",
@@ -262,24 +330,40 @@ static int frontend_set_conf(RIG *rig, hamlib_token_t token, const char *val)
     switch (token)
     {
     case TOK_PATHNAME:
-        strncpy(rp->pathname, val, HAMLIB_FILPATHLEN - 1);
+        SNPRINTF(rp->pathname, sizeof(rp->pathname), "%s", val);
 
         if (strstr(rig->caps->model_name, "SmartSDR Slice"))
         {
-            // override any port selection to prevent user errors/questions
             char *val2 = strdup(val);
-            char *p = strchr(val2, ':'); // port in here?
+            char *p;
 
-            if (p)
+            if (val2 == NULL)
             {
-                *p = 0;  // terminate it
-                rig_debug(RIG_DEBUG_WARN, "%s: overriding port and changing to 4992\n",
-                          __func__);
+                return -RIG_ENOMEM;
             }
 
-            sprintf(rp->pathname, "%s:%s", val2, "4992");
+            p = strchr(val2, ':');
 
-            rig_debug(RIG_DEBUG_WARN, "%s: pathname=%s\n", __func__, rp->pathname);
+            if (p != NULL && p[1] != '\0')
+            {
+                SNPRINTF(rp->pathname, sizeof(rp->pathname), "%s", val);
+            }
+            else
+            {
+                if (p != NULL)
+                {
+                    *p = 0;
+                    rig_debug(RIG_DEBUG_WARN,
+                              "%s: overriding port and changing to 4992\n",
+                              __func__);
+                }
+
+                snprintf(rp->pathname, HAMLIB_FILPATHLEN, "%s:%s",
+                         val2, "4992");
+                rig_debug(RIG_DEBUG_WARN, "%s: pathname=%s\n", __func__,
+                          rp->pathname);
+            }
+
             free(val2);
         }
 
@@ -536,32 +620,26 @@ static int frontend_set_conf(RIG *rig, hamlib_token_t token, const char *val)
         if (!strcmp(val, "RIG"))
         {
             pttp->type.ptt = RIG_PTT_RIG;
-            caps->ptt_type = RIG_PTT_RIG;
         }
         else if (!strcmp(val, "RIGMICDATA"))
         {
             pttp->type.ptt = RIG_PTT_RIG_MICDATA;
-            caps->ptt_type = RIG_PTT_RIG_MICDATA;
         }
         else if (!strcmp(val, "DTR"))
         {
             pttp->type.ptt = RIG_PTT_SERIAL_DTR;
-            caps->ptt_type = RIG_PTT_SERIAL_DTR;
         }
         else if (!strcmp(val, "RTS"))
         {
             pttp->type.ptt = RIG_PTT_SERIAL_RTS;
-            caps->ptt_type = RIG_PTT_SERIAL_RTS;
         }
         else if (!strcmp(val, "Parallel"))
         {
             pttp->type.ptt = RIG_PTT_PARALLEL;
-            caps->ptt_type = RIG_PTT_PARALLEL;
         }
         else if (!strcmp(val, "CM108"))
         {
             pttp->type.ptt = RIG_PTT_CM108;
-            caps->ptt_type = RIG_PTT_CM108;
         }
         else if (!strcmp(val, "GPIO"))
         {
@@ -570,25 +648,20 @@ static int frontend_set_conf(RIG *rig, hamlib_token_t token, const char *val)
         else if (!strcmp(val, "GPION"))
         {
             pttp->type.ptt = RIG_PTT_GPION;
-            caps->ptt_type = RIG_PTT_GPION;
         }
         else if (!strcmp(val, "None"))
         {
             pttp->type.ptt = RIG_PTT_NONE;
-            caps->ptt_type = RIG_PTT_NONE;
         }
         else
         {
             return -RIG_EINVAL;
         }
 
-        // JTDX and WSJTX currently use state.pttport to check for PTT_NONE
-        //rs->pttport_deprecated.type.ptt = pttp->type.ptt;
-
         break;
 
     case TOK_PTT_PATHNAME:
-        strncpy(pttp->pathname, val, HAMLIB_FILPATHLEN - 1);
+        SNPRINTF(pttp->pathname, sizeof(pttp->pathname), "%s", val);
         break;
 
     case TOK_PTT_BITNUM:
@@ -646,11 +719,11 @@ static int frontend_set_conf(RIG *rig, hamlib_token_t token, const char *val)
         break;
 
     case TOK_DCD_PATHNAME:
-        strncpy(dcdp->pathname, val, HAMLIB_FILPATHLEN - 1);
+        SNPRINTF(dcdp->pathname, sizeof(dcdp->pathname), "%s", val);
         break;
 
     case TOK_DEVICE_ID:
-        strncpy(rs->device_id, val, HAMLIB_RIGNAMSIZ - 1);
+        SNPRINTF(rs->device_id, sizeof(rs->device_id), "%s", val);
         break;
 
 
@@ -664,9 +737,7 @@ static int frontend_set_conf(RIG *rig, hamlib_token_t token, const char *val)
             return -RIG_EINVAL;
         }
 
-        rs->poll_interval = val_i;
-        // Make sure cache times out before next poll cycle
-        rig_set_cache_timeout_ms(rig, HAMLIB_CACHE_ALL, atol(val));
+        rig_set_poll_interval(rig, val_i);
         break;
 
     case TOK_LO_FREQ:
@@ -675,6 +746,110 @@ static int frontend_set_conf(RIG *rig, hamlib_token_t token, const char *val)
 
     case TOK_CACHE_TIMEOUT:
         rig_set_cache_timeout_ms(rig, HAMLIB_CACHE_ALL, atol(val));
+        break;
+
+    case TOK_STREAM_TIME_STALE_COARSE:
+        if (1 != sscanf(val, "%ld", &val_i) || val_i < 0)
+        {
+            return -RIG_EINVAL;
+        }
+
+        rs->stream_time_stale_coarse_ms = (unsigned int)val_i;
+        break;
+
+    case TOK_STREAM_TIME_STALE_INVALIDATE:
+        if (1 != sscanf(val, "%ld", &val_i) || val_i < 0)
+        {
+            return -RIG_EINVAL;
+        }
+
+        rs->stream_time_stale_invalidate_ms = (unsigned int)val_i;
+        break;
+
+    case TOK_STREAM_TRANSPORT_BUFFER_MS:
+        if (1 != sscanf(val, "%ld", &val_i) || val_i < 0)
+        {
+            return -RIG_EINVAL;
+        }
+
+        rs->stream_transport_buffer_ms = (unsigned int)val_i;
+        break;
+
+    case TOK_STREAM_TRANSPORT_BUFFER_BYTES:
+        if (1 != sscanf(val, "%ld", &val_i) || val_i < 0)
+        {
+            return -RIG_EINVAL;
+        }
+
+        rs->stream_transport_buffer_bytes = (unsigned int)val_i;
+        break;
+
+    case TOK_STREAM_METADATA_REFRESH:
+        if (1 != sscanf(val, "%ld", &val_i) || val_i < 0)
+        {
+            return -RIG_EINVAL;
+        }
+
+        rs->stream_metadata_refresh_ms = (unsigned int)val_i;
+        break;
+
+    case TOK_STREAM_METADATA_INTERVAL:
+        if (1 != sscanf(val, "%ld", &val_i) || val_i < 0)
+        {
+            return -RIG_EINVAL;
+        }
+
+        rs->stream_metadata_interval_ms = (unsigned int)val_i;
+        break;
+
+    case TOK_STREAM_SOURCE_ID:
+        if (1 != sscanf(val, "%ld", &val_i) || val_i < -1 || val_i > 65535)
+        {
+            return -RIG_EINVAL;
+        }
+
+        rs->stream_source_id = (int)val_i;
+        break;
+
+    case TOK_STREAM_KEEPALIVE_TIMEOUT:
+        if (1 != sscanf(val, "%ld", &val_i) || val_i < 0 || val_i > 3600)
+        {
+            return -RIG_EINVAL;
+        }
+
+        rs->stream_keepalive_timeout_s = (unsigned int)val_i;
+        break;
+
+    case TOK_STREAM_KEEPALIVE_INTERVAL:
+        if (1 != sscanf(val, "%ld", &val_i) || val_i < 0 || val_i > 3600)
+        {
+            return -RIG_EINVAL;
+        }
+
+        rs->stream_keepalive_interval_s = (unsigned int)val_i;
+        break;
+
+    case TOK_STREAM_RESAMPLE_QUALITY:
+
+        /* Stored as RIG_RESAMPLE_* + 1 so a zeroed state means "unset"
+         * (built-in medium). Applied to pipelines created afterwards. */
+        if (strcmp(val, "best") == 0)
+        {
+            rs->stream_resample_quality = RIG_RESAMPLE_BEST + 1;
+        }
+        else if (strcmp(val, "medium") == 0)
+        {
+            rs->stream_resample_quality = RIG_RESAMPLE_MEDIUM + 1;
+        }
+        else if (strcmp(val, "fast") == 0)
+        {
+            rs->stream_resample_quality = RIG_RESAMPLE_FAST + 1;
+        }
+        else
+        {
+            return -RIG_EINVAL;
+        }
+
         break;
 
     case TOK_AUTO_POWER_ON:
@@ -977,7 +1152,7 @@ static int frontend_get_conf2(RIG *rig, hamlib_token_t token, char *val,
             return -RIG_EINVAL;
         }
 
-        strcpy(val, s);
+        SNPRINTF(val, val_len, "%s", s);
         break;
 
     case TOK_HANDSHAKE:
@@ -1007,7 +1182,7 @@ static int frontend_get_conf2(RIG *rig, hamlib_token_t token, char *val,
             return -RIG_EINVAL;
         }
 
-        strcpy(val, s);
+        SNPRINTF(val, val_len, "%s", s);
         break;
 
     case TOK_RTS_STATE:
@@ -1034,7 +1209,7 @@ static int frontend_get_conf2(RIG *rig, hamlib_token_t token, char *val,
             return -RIG_EINVAL;
         }
 
-        strcpy(val, s);
+        SNPRINTF(val, val_len, "%s", s);
         break;
 
     case TOK_DTR_STATE:
@@ -1061,7 +1236,7 @@ static int frontend_get_conf2(RIG *rig, hamlib_token_t token, char *val,
             return -RIG_EINVAL;
         }
 
-        strcpy(val, s);
+        SNPRINTF(val, val_len, "%s", s);
         break;
 
     case TOK_DEVICE_ID:
@@ -1073,7 +1248,7 @@ static int frontend_get_conf2(RIG *rig, hamlib_token_t token, char *val,
         break;
 
     case TOK_POLL_INTERVAL:
-        SNPRINTF(val, val_len, "%d", rs->poll_interval);
+        SNPRINTF(val, val_len, "%d", rig_get_poll_interval(rig));
         break;
 
     case TOK_PTT_TYPE:
@@ -1119,11 +1294,11 @@ static int frontend_get_conf2(RIG *rig, hamlib_token_t token, char *val,
             return -RIG_EINVAL;
         }
 
-        strcpy(val, s);
+        SNPRINTF(val, val_len, "%s", s);
         break;
 
     case TOK_PTT_PATHNAME:
-        strcpy(val, pttp->pathname);
+        SNPRINTF(val, val_len, "%s", pttp->pathname);
         break;
 
     case TOK_PTT_BITNUM:
@@ -1173,11 +1348,11 @@ static int frontend_get_conf2(RIG *rig, hamlib_token_t token, char *val,
             return -RIG_EINVAL;
         }
 
-        strcpy(val, s);
+        SNPRINTF(val, val_len, "%s", s);
         break;
 
     case TOK_DCD_PATHNAME:
-        strcpy(val, dcdp->pathname);
+        SNPRINTF(val, val_len, "%s", dcdp->pathname);
         break;
 
     case TOK_LO_FREQ:
@@ -1192,6 +1367,54 @@ static int frontend_get_conf2(RIG *rig, hamlib_token_t token, char *val,
 
     case TOK_CACHE_TIMEOUT:
         SNPRINTF(val, val_len, "%d", rig_get_cache_timeout_ms(rig, HAMLIB_CACHE_ALL));
+        break;
+
+    case TOK_STREAM_TIME_STALE_COARSE:
+        SNPRINTF(val, val_len, "%u", rs->stream_time_stale_coarse_ms);
+        break;
+
+    case TOK_STREAM_TIME_STALE_INVALIDATE:
+        SNPRINTF(val, val_len, "%u", rs->stream_time_stale_invalidate_ms);
+        break;
+
+    case TOK_STREAM_TRANSPORT_BUFFER_MS:
+        SNPRINTF(val, val_len, "%u", rs->stream_transport_buffer_ms);
+        break;
+
+    case TOK_STREAM_TRANSPORT_BUFFER_BYTES:
+        SNPRINTF(val, val_len, "%u", rs->stream_transport_buffer_bytes);
+        break;
+
+    case TOK_STREAM_METADATA_REFRESH:
+        SNPRINTF(val, val_len, "%u", rs->stream_metadata_refresh_ms);
+        break;
+
+    case TOK_STREAM_METADATA_INTERVAL:
+        SNPRINTF(val, val_len, "%u", rs->stream_metadata_interval_ms);
+        break;
+
+    case TOK_STREAM_SOURCE_ID:
+        SNPRINTF(val, val_len, "%d", rs->stream_source_id);
+        break;
+
+    case TOK_STREAM_KEEPALIVE_TIMEOUT:
+        SNPRINTF(val, val_len, "%u", rs->stream_keepalive_timeout_s);
+        break;
+
+    case TOK_STREAM_KEEPALIVE_INTERVAL:
+        SNPRINTF(val, val_len, "%u", rs->stream_keepalive_interval_s);
+        break;
+
+    case TOK_STREAM_RESAMPLE_QUALITY:
+        switch (rs->stream_resample_quality)
+        {
+        case RIG_RESAMPLE_BEST + 1: SNPRINTF(val, val_len, "best"); break;
+
+        case RIG_RESAMPLE_FAST + 1: SNPRINTF(val, val_len, "fast"); break;
+
+        default:                    SNPRINTF(val, val_len, "medium"); break;
+        }
+
         break;
 
     case TOK_AUTO_POWER_ON:
@@ -1370,7 +1593,9 @@ const struct confparams *HAMLIB_API rig_confparam_lookup(RIG *rig,
 
         return NULL;
     }
-    if (!name) {
+
+    if (!name)
+    {
         rig_debug(RIG_DEBUG_ERR, "%s: name is NULL\n", __func__);
         return NULL;
     }

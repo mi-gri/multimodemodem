@@ -107,7 +107,7 @@ static int skywatcher_cmd(ROT *rot, const char *cmd, char *response,
     return RIG_OK;
 }
 
-uint32_t skywatcher_convert24bit(long input)
+static uint32_t skywatcher_convert24bit(long input)
 {
     return ((input & 0x0000FF) << 16) | (input & 0x00FF00) | ((
                 input & 0xFF0000) >> 16);
@@ -131,7 +131,7 @@ static const char *skywatcher_get_info(ROT *rot)
     return info;
 }
 
-int skywatcher_get_spr(ROT *rot, int motor_index, uint32_t *result)
+static int skywatcher_get_spr(ROT *rot, int motor_index, uint32_t *result)
 {
     skywatcher_priv_data *priv = ROTSTATE(rot)->priv;
 
@@ -150,7 +150,7 @@ int skywatcher_get_spr(ROT *rot, int motor_index, uint32_t *result)
     return RIG_OK;
 }
 
-int skywatcher_get_motor_position(ROT *rot, int motor_index, float *result)
+static int skywatcher_get_motor_position(ROT *rot, int motor_index, float *result)
 {
     char str[16];
     char req[16];
@@ -192,7 +192,7 @@ static int skywatcher_stop(ROT *rot)
     return RIG_OK;
 }
 
-int skywatcher_set_motor_position(ROT *rot, int motor_index, float angle)
+static int skywatcher_set_motor_position(ROT *rot, int motor_index, float angle)
 {
     char str[16];
     char req[16];

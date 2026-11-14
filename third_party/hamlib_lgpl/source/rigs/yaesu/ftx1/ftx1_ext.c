@@ -12,9 +12,13 @@
  * Extended Menu Numbers (FTX-1 CAT spec page 10-13):
  *   Format: EX P1 P2 P3 P4; where P1=group, P2=section, P3=item, P4=value
  *
+ * Antenna tuner menu (hardware-verified against the rad-con model):
+ *   EX030104 GENERAL TUNER SELECT: 0=Option, 1=ATAS (neither needs SPA-1)
+ *   EX030701/EX030702 per-antenna type (ANT1/ANT2): 0=INT,1=INT(FAST),2=EXT,3=ATAS
+ *            - INT and INT(FAST) require the SPA-1 amplifier
+ *   EX030704 HF ANT SELECT: 0=ANT1, 1=ANT2
+ *
  * SPA-1 Specific Settings:
- *   EX030104 TUNER SELECT: 0=INT, 1=INT(FAST), 2=EXT, 3=ATAS
- *            - INT and INT(FAST) require SPA-1 amplifier
  *   EX030503-09 TX GENERAL (field head power limits):
  *            - HF/50M: 5-10W, V/U: 5-100W (field head only)
  *   EX030705-11 OPTION (SPA-1 power limits):
@@ -24,6 +28,8 @@
  *       Refer to CAT manual for exact menu numbers and parameter ranges.
  */
 
+#include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <hamlib/rig.h>
@@ -57,28 +63,22 @@
  */
 static int ftx1_check_ex_spa1_guardrail(RIG *rig, int group, int section, int item, int value)
 {
-    /*
-     * TUNER SELECT (EX030104): Values 0 (INT) and 1 (INT FAST) require SPA-1
-     * Internal tuner is only available in SPA-1 amplifier
-     */
-    if (group == FTX1_EX_TUNER_SELECT_GROUP &&
-        section == FTX1_EX_TUNER_SELECT_SECTION &&
-        item == FTX1_EX_TUNER_SELECT_ITEM)
-    {
-        if ((value == 0 || value == 1) && !ftx1_has_spa1(rig))
-        {
-            rig_debug(RIG_DEBUG_WARN,
-                      "%s: TUNER SELECT INT/INT(FAST) requires SPA-1 amplifier\n",
-                      __func__);
-            return -RIG_ENAVAIL;
-        }
-    }
+    (void)value;
 
     /*
-     * OPTION section (EX0307xx): SPA-1 max power settings
-     * These settings only apply when SPA-1 is connected
+     * GENERAL TUNER SELECT (EX030104) is 0=Option / 1=ATAS — neither requires
+     * SPA-1, so it is intentionally NOT gated here.  The per-antenna tuner
+     * *type* (EX030701/EX030702) is where INT/INT_FAST need SPA-1; that path
+     * is gated by FTX1_MENU_FLAG_SPA1 in ftx1_menu.c.
      */
-    if (group == FTX1_EX_OPTION_GROUP && section == FTX1_EX_OPTION_SECTION)
+
+    /*
+     * OPTION power-limit settings (EX030705-11): only apply with SPA-1.
+     * Items 1-4 in this section (tuner type, ANT2 op, HF ANT select) are NOT
+     * gated — EXT/ATAS tuning and antenna select work on any head type.
+     */
+    if (group == FTX1_EX_OPTION_GROUP && section == FTX1_EX_OPTION_SECTION &&
+        item >= 5)
     {
         if (!ftx1_has_spa1(rig))
         {
@@ -188,6 +188,35 @@ int ftx1_set_ex_menu(RIG *rig, int group, int section, int item, int value, int 
     return newcat_set_cmd(rig);
 }
 
+int ftx1_parse_ex_menu_response(const char *response, int group, int section,
+                                int item, int *value)
+{
+    char expected[9];
+    char *endptr;
+    long parsed_value;
+
+    SNPRINTF(expected, sizeof(expected), "EX%02d%02d%02d",
+             group, section, item);
+
+    if (strncmp(response, expected, sizeof(expected) - 1) != 0)
+    {
+        return -RIG_EPROTO;
+    }
+
+    errno = 0;
+    parsed_value = strtol(response + sizeof(expected) - 1, &endptr, 10);
+
+    if (endptr == response + sizeof(expected) - 1 || errno == ERANGE
+            || parsed_value < INT_MIN || parsed_value > INT_MAX
+            || endptr[0] != ';' || endptr[1] != '\0')
+    {
+        return -RIG_EPROTO;
+    }
+
+    *value = (int)parsed_value;
+    return RIG_OK;
+}
+
 /*
  * ftx1_get_ex_menu - Get FTX-1 extended menu parameter
  */
@@ -209,63 +238,39 @@ int ftx1_get_ex_menu(RIG *rig, int group, int section, int item, int *value)
         return ret;
     }
 
-    /* Response: EX P1 P2 P3 P4; - parse value after 8 chars (EX + 6 digits) */
-    if (strlen(priv->ret_data) > 8)
+    /* Response: EX P1 P2 P3 P4; */
+    if (ftx1_parse_ex_menu_response(priv->ret_data, group, section, item,
+                                    value) != RIG_OK)
     {
-        char *valstr = priv->ret_data + 8;
-        /* Remove trailing semicolon */
-        char *semi = strchr(valstr, ';');
-        if (semi) *semi = '\0';
-
-        char *endptr;
-        long parsed_value = strtol(valstr, &endptr, 10);
-        if (endptr == valstr)
-        {
-            rig_debug(RIG_DEBUG_ERR, "%s: failed to parse value from '%s'\n",
-                      __func__, valstr);
-            return -RIG_EPROTO;
-        }
-        *value = (int)parsed_value;
-        rig_debug(RIG_DEBUG_VERBOSE, "%s: value=%d\n", __func__, *value);
-    }
-    else
-    {
-        rig_debug(RIG_DEBUG_ERR, "%s: response too short '%s'\n",
+        rig_debug(RIG_DEBUG_ERR, "%s: invalid EX response '%s'\n",
                   __func__, priv->ret_data);
         return -RIG_EPROTO;
     }
 
+    rig_debug(RIG_DEBUG_VERBOSE, "%s: value=%d\n", __func__, *value);
     return RIG_OK;
 }
 
 /*
- * ftx1_set_tuner_select - Set antenna tuner type with SPA-1 guardrail
+ * ftx1_set_tuner_select - Set the GENERAL tuner select (EX030104)
  *
- * Values: 0=INT, 1=INT(FAST), 2=EXT, 3=ATAS
- * INT and INT(FAST) require SPA-1 amplifier
+ * 0 = Option (route tune per the active antenna's tuner type, EX030701/2)
+ * 1 = ATAS   (route tune to a motorized ATAS antenna)
+ *
+ * Neither value requires SPA-1.  The per-antenna tuner *type* (INT/INT_FAST/
+ * EXT/ATAS) is set via OPT_TUNER_ANT1/ANT2; INT/INT_FAST there need SPA-1.
  */
-int ftx1_set_tuner_select(RIG *rig, int tuner_type)
+int ftx1_set_tuner_select(RIG *rig, int tuner_select)
 {
-    rig_debug(RIG_DEBUG_VERBOSE, "%s: tuner_type=%d\n", __func__, tuner_type);
+    rig_debug(RIG_DEBUG_VERBOSE, "%s: tuner_select=%d\n", __func__, tuner_select);
 
-    if (tuner_type < 0 || tuner_type > 3)
+    if (tuner_select < 0 || tuner_select > 1)
     {
         return -RIG_EINVAL;
     }
 
-    /*
-     * GUARDRAIL: INT (0) and INT(FAST) (1) tuner types require SPA-1
-     */
-    if ((tuner_type == 0 || tuner_type == 1) && !ftx1_has_spa1(rig))
-    {
-        rig_debug(RIG_DEBUG_WARN,
-                  "%s: internal tuner (INT/INT FAST) requires SPA-1 amplifier\n",
-                  __func__);
-        return -RIG_ENAVAIL;
-    }
-
     /* EX030104 = group 3, section 1, item 4, 1 digit */
-    return ftx1_set_ex_menu(rig, 3, 1, 4, tuner_type, 1);
+    return ftx1_set_ex_menu(rig, 3, 1, 4, tuner_select, 1);
 }
 
 /*
@@ -274,6 +279,71 @@ int ftx1_set_tuner_select(RIG *rig, int tuner_type)
 int ftx1_get_tuner_select(RIG *rig, int *tuner_type)
 {
     return ftx1_get_ex_menu(rig, 3, 1, 4, tuner_type);
+}
+
+/*
+ * ftx1_get_effective_tuner_type - tuner type of the currently active HF antenna
+ *
+ * Reads the active antenna (EX030704: 0=ANT1, 1=ANT2), then the per-antenna
+ * tuner type (EX030701 for ANT1, EX030702 for ANT2).
+ * Returns 0=INT, 1=INT(FAST), 2=EXT, 3=ATAS.
+ *
+ * Mirrors the hardware-verified rad-con Power.getTuner(): the effective tuner
+ * is the per-antenna type of the active antenna, independent of the general
+ * TUNER SELECT (EX030104).
+ *
+ * On a Field head without SPA-1, the general tuner select (EX030104) is used
+ * as the effective tuner type. If the head type couldn't be detected, the
+ * per-antenna type is used as before.
+ */
+int ftx1_get_effective_tuner_type(RIG *rig, int *type)
+{
+    int ret, ant, item;
+    int head_type = ftx1_get_head_type(rig);
+
+    if ((head_type == FTX1_HEAD_FIELD_BATTERY || head_type == FTX1_HEAD_FIELD_12V)
+            && !ftx1_has_spa1(rig)) {
+        int tuner_select;
+        ret = ftx1_get_ex_menu(rig, 3, 1, 4, &tuner_select);
+        if (ret != RIG_OK)
+        {
+            return ret;
+        }
+        if (tuner_select == 0)
+        {
+            *type = FTX1_TUNER_TYPE_EXT;
+        }
+        else if (tuner_select == 1)
+        {
+            *type = FTX1_TUNER_TYPE_ATAS;
+        }
+        else
+        {
+            return -RIG_EPROTO;
+        }
+        return RIG_OK;
+    }
+
+    /* Active HF antenna: EX030704 (0=ANT1, 1=ANT2) */
+    ret = ftx1_get_ex_menu(rig, 3, 7, 4, &ant);
+    if (ret != RIG_OK)
+    {
+        return ret;
+    }
+
+    /* ANT1 -> EX030701 (item 1), ANT2 -> EX030702 (item 2) */
+    item = (ant == 1) ? 2 : 1;
+
+    ret = ftx1_get_ex_menu(rig, 3, 7, item, type);
+    if (ret != RIG_OK)
+    {
+        return ret;
+    }
+
+    rig_debug(RIG_DEBUG_VERBOSE, "%s: active ant=%d, tuner type=%d\n",
+              __func__, ant, *type);
+
+    return RIG_OK;
 }
 
 /*

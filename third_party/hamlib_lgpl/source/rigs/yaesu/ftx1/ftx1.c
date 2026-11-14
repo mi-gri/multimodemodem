@@ -85,6 +85,7 @@ extern int ftx1_get_att_helper(RIG *rig, vfo_t vfo, value_t *val);
 
 /* Wrappers from ftx1_func.c for rig caps */
 extern int ftx1_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width);
+extern int ftx1_get_mode(RIG *rig, vfo_t vfo, rmode_t *mode, pbwidth_t *width);
 extern int ftx1_set_ptt_func(RIG *rig, vfo_t vfo, ptt_t ptt);
 extern int ftx1_get_ptt_func(RIG *rig, vfo_t vfo, ptt_t *ptt);
 extern int ftx1_set_powerstat_func(RIG *rig, powerstat_t status);
@@ -336,7 +337,7 @@ static const struct confparams ftx1_ext_parms[] = {
     { TOK_GEN_BEEP_LEVEL, "GEN_BEEP_LEVEL", "GEN_BEEP_LEVEL", "GEN_BEEP_LEVEL (0-100)", "0", RIG_CONF_NUMERIC, { .n = { 0, 100, 1 } } },
     { TOK_GEN_RF_SQL_VR, "GEN_RF_SQL_VR", "GEN_RF_SQL_VR", "GEN_RF_SQL_VR (0-2)", "0", RIG_CONF_NUMERIC, { .n = { 0, 2, 1 } } },
     { TOK_GEN_TUN_LIN_PORT, "GEN_TUN_LIN_PORT", "GEN_TUN_LIN_PORT", "GEN_TUN_LIN_PORT (0-3)", "0", RIG_CONF_NUMERIC, { .n = { 0, 3, 1 } } },
-    { TOK_GEN_TUNER_SELECT, "GEN_TUNER_SELECT", "GEN_TUNER_SELECT", "GEN_TUNER_SELECT (0-3)", "0", RIG_CONF_NUMERIC, { .n = { 0, 3, 1 } } },
+    { TOK_GEN_TUNER_SELECT, "GEN_TUNER_SELECT", "GEN_TUNER_SELECT", "General tuner select: 0=Option, 1=ATAS", "0", RIG_CONF_NUMERIC, { .n = { 0, 1, 1 } } },
     { TOK_GEN_CAT1_RATE, "GEN_CAT1_RATE", "GEN_CAT1_RATE", "GEN_CAT1_RATE (0-4)", "0", RIG_CONF_NUMERIC, { .n = { 0, 4, 1 } } },
     { TOK_GEN_CAT1_TIMEOUT, "GEN_CAT1_TIMEOUT", "GEN_CAT1_TIMEOUT", "GEN_CAT1_TIMEOUT (0-3)", "0", RIG_CONF_NUMERIC, { .n = { 0, 3, 1 } } },
     { TOK_GEN_CAT1_STOP_BIT, "GEN_CAT1_STOP_BIT", "GEN_CAT1_STOP_BIT", "GEN_CAT1_STOP_BIT (0-1)", "0", RIG_CONF_NUMERIC, { .n = { 0, 1, 1 } } },
@@ -555,10 +556,10 @@ static const struct confparams ftx1_ext_parms[] = {
     { TOK_VMI_COLOR_CLAR, "VMI_COLOR_CLAR", "VMI_COLOR_CLAR", "VMI_COLOR_CLAR (0-1)", "0", RIG_CONF_NUMERIC, { .n = { 0, 1, 1 } } },
 
     /* SPA-1 Amplifier Settings (EX0307) - Require SPA-1 hardware */
-    { TOK_OPT_TUNER_ANT1, "OPT_TUNER_ANT1", "OPT_TUNER_ANT1", "Tuner ANT1 (0-3, SPA-1 only)", "0", RIG_CONF_NUMERIC, { .n = { 0, 3, 1 } } },
-    { TOK_OPT_TUNER_ANT2, "OPT_TUNER_ANT2", "OPT_TUNER_ANT2", "Tuner ANT2 (0-3, SPA-1 only)", "0", RIG_CONF_NUMERIC, { .n = { 0, 3, 1 } } },
+    { TOK_OPT_TUNER_ANT1, "OPT_TUNER_ANT1", "OPT_TUNER_ANT1", "Tuner type ANT1: 0=INT,1=INT_FAST,2=EXT,3=ATAS (INT needs SPA-1)", "0", RIG_CONF_NUMERIC, { .n = { 0, 3, 1 } } },
+    { TOK_OPT_TUNER_ANT2, "OPT_TUNER_ANT2", "OPT_TUNER_ANT2", "Tuner type ANT2: 0=INT,1=INT_FAST,2=EXT,3=ATAS (INT needs SPA-1)", "0", RIG_CONF_NUMERIC, { .n = { 0, 3, 1 } } },
     { TOK_OPT_ANT2_OP, "OPT_ANT2_OP", "OPT_ANT2_OP", "ANT2 operation (0-2, SPA-1 only)", "0", RIG_CONF_NUMERIC, { .n = { 0, 2, 1 } } },
-    { TOK_OPT_HF_ANT_SEL, "OPT_HF_ANT_SEL", "OPT_HF_ANT_SEL", "HF antenna select (0-1, SPA-1 only)", "0", RIG_CONF_NUMERIC, { .n = { 0, 1, 1 } } },
+    { TOK_OPT_HF_ANT_SEL, "OPT_HF_ANT_SEL", "OPT_HF_ANT_SEL", "HF antenna select: 0=ANT1, 1=ANT2", "0", RIG_CONF_NUMERIC, { .n = { 0, 1, 1 } } },
     { TOK_OPT_HF_MAX_PWR, "OPT_HF_MAX_PWR", "OPT_HF_MAX_PWR", "HF max power 5-100W (SPA-1 only)", "100", RIG_CONF_NUMERIC, { .n = { 5, 100, 1 } } },
     { TOK_OPT_50M_MAX_PWR, "OPT_50M_MAX_PWR", "OPT_50M_MAX_PWR", "50MHz max power 5-100W (SPA-1 only)", "100", RIG_CONF_NUMERIC, { .n = { 5, 100, 1 } } },
     { TOK_OPT_70M_MAX_PWR, "OPT_70M_MAX_PWR", "OPT_70M_MAX_PWR", "70MHz max power 5-50W (SPA-1 only)", "50", RIG_CONF_NUMERIC, { .n = { 5, 50, 1 } } },
@@ -570,6 +571,9 @@ static const struct confparams ftx1_ext_parms[] = {
     { TOK_OPT_GPS, "OPT_GPS", "OPT_GPS", "GPS enable (0-1)", "0", RIG_CONF_NUMERIC, { .n = { 0, 1, 1 } } },
     { TOK_OPT_GPS_PINNING, "OPT_GPS_PINNING", "OPT_GPS_PINNING", "GPS pinning (0-1)", "0", RIG_CONF_NUMERIC, { .n = { 0, 1, 1 } } },
     { TOK_OPT_GPS_BAUDRATE, "OPT_GPS_BAUDRATE", "OPT_GPS_BAUDRATE", "GPS baudrate (0-4)", "0", RIG_CONF_NUMERIC, { .n = { 0, 4, 1 } } },
+
+    /* ATAS motor control (write): 0=stop, 1=up, 2=down, 3=auto-tune start */
+    { TOK_ATAS_CTRL, "ATAS_CTRL", "ATAS_CTRL", "ATAS control (write): 0=stop,1=up,2=down,3=start", "0", RIG_CONF_NUMERIC, { .n = { 0, 3, 1 } } },
 
     /* Terminating entry */
     { RIG_CONF_END, NULL, }
@@ -977,6 +981,12 @@ static int ftx1_set_ext_parm(RIG *rig, hamlib_token_t token, value_t val)
     rig_debug(RIG_DEBUG_VERBOSE, "%s: token=0x%lx val=%.0f\n", __func__,
               (unsigned long)token, val.f);
 
+    /* Synthetic control tokens are dispatched directly, not via the EX table */
+    if (token == TOK_ATAS_CTRL)
+    {
+        return ftx1_atas_ctrl(rig, (int)val.f);
+    }
+
     return ftx1_menu_set_token(rig, token, val);
 }
 
@@ -995,6 +1005,15 @@ static int ftx1_get_ext_parm(RIG *rig, hamlib_token_t token, value_t *val)
 {
     rig_debug(RIG_DEBUG_VERBOSE, "%s: token=0x%lx\n", __func__,
               (unsigned long)token);
+
+    /* ATAS_CTRL is write-only; report tune activity (0/1) so a read succeeds */
+    if (token == TOK_ATAS_CTRL)
+    {
+        int active = 0;
+        int ret = ftx1_get_tuner(rig, &active);
+        val->f = (float)active;
+        return ret;
+    }
 
     return ftx1_menu_get_token(rig, token, val);
 }
@@ -1025,8 +1044,8 @@ struct rig_caps ftx1_caps = {
     /* DUAL_WATCH uses FR command for dual/single receive mode */
     /* Contour (CO command) is FTX-1 specific - handle via ext_level */
     /* Note: NA command (narrow filter) available via ftx1_set_na_helper/ftx1_get_na_helper but no RIG_FUNC_NAR exists in Hamlib */
-    .has_get_func = RIG_FUNC_COMP | RIG_FUNC_VOX | RIG_FUNC_TONE | RIG_FUNC_TSQL | RIG_FUNC_SBKIN | RIG_FUNC_FBKIN | RIG_FUNC_NB | RIG_FUNC_NR | RIG_FUNC_MN | RIG_FUNC_LOCK | RIG_FUNC_MON | RIG_FUNC_TUNER | RIG_FUNC_RIT | RIG_FUNC_XIT | RIG_FUNC_APF | RIG_FUNC_ANF | RIG_FUNC_DUAL_WATCH,
-    .has_set_func = RIG_FUNC_COMP | RIG_FUNC_VOX | RIG_FUNC_TONE | RIG_FUNC_TSQL | RIG_FUNC_SBKIN | RIG_FUNC_FBKIN | RIG_FUNC_NB | RIG_FUNC_NR | RIG_FUNC_MN | RIG_FUNC_LOCK | RIG_FUNC_MON | RIG_FUNC_TUNER | RIG_FUNC_RIT | RIG_FUNC_XIT | RIG_FUNC_APF | RIG_FUNC_ANF | RIG_FUNC_DUAL_WATCH,
+    .has_get_func = RIG_FUNC_COMP | RIG_FUNC_VOX | RIG_FUNC_TONE | RIG_FUNC_TSQL | RIG_FUNC_CSQL | RIG_FUNC_SBKIN | RIG_FUNC_FBKIN | RIG_FUNC_NB | RIG_FUNC_NR | RIG_FUNC_MN | RIG_FUNC_LOCK | RIG_FUNC_MON | RIG_FUNC_TUNER | RIG_FUNC_RIT | RIG_FUNC_XIT | RIG_FUNC_APF | RIG_FUNC_ANF | RIG_FUNC_DUAL_WATCH,
+    .has_set_func = RIG_FUNC_COMP | RIG_FUNC_VOX | RIG_FUNC_TONE | RIG_FUNC_TSQL | RIG_FUNC_CSQL | RIG_FUNC_SBKIN | RIG_FUNC_FBKIN | RIG_FUNC_NB | RIG_FUNC_NR | RIG_FUNC_MN | RIG_FUNC_LOCK | RIG_FUNC_MON | RIG_FUNC_TUNER | RIG_FUNC_RIT | RIG_FUNC_XIT | RIG_FUNC_APF | RIG_FUNC_ANF | RIG_FUNC_DUAL_WATCH,
     /* Note: PBT_IN/PBT_OUT removed - FTX-1 has width (SH P2=0) and IF shift (IS), not true passband tuning */
     /* Note: BALANCE removed - FTX-1 has no audio balance control via CAT */
     .has_get_level = RIG_LEVEL_AF | RIG_LEVEL_RF | RIG_LEVEL_SQL | RIG_LEVEL_IF | RIG_LEVEL_APF | RIG_LEVEL_NB | RIG_LEVEL_NR | RIG_LEVEL_RFPOWER | RIG_LEVEL_MICGAIN | RIG_LEVEL_KEYSPD | RIG_LEVEL_NOTCHF | RIG_LEVEL_COMP | RIG_LEVEL_AGC | RIG_LEVEL_BKINDL | RIG_LEVEL_METER | RIG_LEVEL_VOXGAIN | RIG_LEVEL_VOXDELAY | RIG_LEVEL_ANTIVOX | RIG_LEVEL_RAWSTR | RIG_LEVEL_SWR | RIG_LEVEL_ALC | RIG_LEVEL_STRENGTH | RIG_LEVEL_ATT | RIG_LEVEL_PREAMP | RIG_LEVEL_MONITOR_GAIN | RIG_LEVEL_CWPITCH | RIG_LEVEL_BAND_SELECT | RIG_LEVEL_VD_METER | RIG_LEVEL_ID_METER | RIG_LEVEL_RFPOWER_METER | RIG_LEVEL_RFPOWER_METER_WATTS | RIG_LEVEL_COMP_METER | RIG_LEVEL_BKIN_DLYMS,
@@ -1101,54 +1120,74 @@ struct rig_caps ftx1_caps = {
         {1, 99, RIG_MTYPE_MEM, NEWCAT_MEM_CAP},
         {100, 117, RIG_MTYPE_EDGE, NEWCAT_MEM_CAP},  /* PMS */
         {500, 503, RIG_MTYPE_MEM, NEWCAT_MEM_CAP},  /* 60m */
+        {  1,   5, RIG_MTYPE_VOICE},
         RIG_CHAN_END,
     },
+#define FTX1_ALL_MODES ( \
+        RIG_MODE_LSB | \
+        RIG_MODE_USB | \
+        RIG_MODE_CW | \
+        RIG_MODE_FM | \
+        RIG_MODE_AM | \
+        RIG_MODE_RTTY | \
+        RIG_MODE_CWR | \
+        RIG_MODE_PKTLSB | \
+        RIG_MODE_RTTYR | \
+        RIG_MODE_PKTFM | \
+        RIG_MODE_FMN | \
+        RIG_MODE_PKTUSB | \
+        RIG_MODE_AMN | \
+        RIG_MODE_C4FM | \
+        RIG_MODE_PKTFMN | \
+    0 )
     /* FTX-1 uses MAIN/SUB VFOs, not A/B. This ensures vfo_fixup() preserves
      * MAIN as MAIN instead of converting to VFOA (which shares cache slot). */
     .rx_range_list1 = {
-        {kHz(30), MHz(56), RIG_MODE_ALL, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(76), MHz(108), RIG_MODE_WFM, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(118), MHz(164), RIG_MODE_AM | RIG_MODE_FM, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(430), MHz(470), RIG_MODE_ALL, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {kHz(30), MHz(75) - 1, FTX1_ALL_MODES, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(75), MHz(76) - 1, FTX1_ALL_MODES, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(76), MHz(108), (FTX1_ALL_MODES & (~RIG_MODE_FM)) | RIG_MODE_WFM, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(108) + 1, MHz(174), FTX1_ALL_MODES, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(400), MHz(470), FTX1_ALL_MODES, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
         RIG_FRNG_END,
     },
     .tx_range_list1 = {
-        {kHz(1800), MHz(2) - 1, RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(3.5), MHz(4) - 1, RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(5.1675), MHz(5.4065), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},  /* 60m */
-        {MHz(7), MHz(7.3), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(10.1), MHz(10.15), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(14), MHz(14.35), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(18.068), MHz(18.168), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(21), MHz(21.45), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(24.89), MHz(24.99), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(28), MHz(29.7), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(50), MHz(54), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(144), MHz(148), RIG_MODE_ALL, 5000, 50000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(430), MHz(450), RIG_MODE_ALL, 5000, 20000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {kHz(1800), MHz(2) - 1, FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(3.5), MHz(4) - 1, FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(5.1675), MHz(5.4065), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},  /* 60m */
+        {MHz(7), MHz(7.3), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(10.1), MHz(10.15), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(14), MHz(14.35), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(18.068), MHz(18.168), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(21), MHz(21.45), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(24.89), MHz(24.99), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(28), MHz(29.7), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(50), MHz(54), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(144), MHz(148), FTX1_ALL_MODES, 5000, 50000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(430), MHz(450), FTX1_ALL_MODES, 5000, 20000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
         RIG_FRNG_END,
     },
     .rx_range_list2 = {
-        {kHz(30), MHz(56), RIG_MODE_ALL, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(76), MHz(108), RIG_MODE_WFM, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(118), MHz(164), RIG_MODE_AM | RIG_MODE_FM, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(430), MHz(470), RIG_MODE_ALL, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {kHz(30), MHz(75) - 1, FTX1_ALL_MODES, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(75), MHz(76) - 1, FTX1_ALL_MODES, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(76), MHz(108), (FTX1_ALL_MODES & (~RIG_MODE_FM)) | RIG_MODE_WFM, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(108) + 1, MHz(174), FTX1_ALL_MODES, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(400), MHz(470), FTX1_ALL_MODES, -1, -1, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
         RIG_FRNG_END,
     },
     .tx_range_list2 = {
-        {kHz(1800), MHz(2) - 1, RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(3.5), MHz(4) - 1, RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(5.1675), MHz(5.4065), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},  /* 60m */
-        {MHz(7), MHz(7.3), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(10.1), MHz(10.15), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(14), MHz(14.35), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(18.068), MHz(18.168), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(21), MHz(21.45), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(24.89), MHz(24.99), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(28), MHz(29.7), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(50), MHz(54), RIG_MODE_ALL, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(144), MHz(148), RIG_MODE_ALL, 5000, 50000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
-        {MHz(430), MHz(450), RIG_MODE_ALL, 5000, 20000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {kHz(1800), MHz(2) - 1, FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(3.5), MHz(4) - 1, FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(5.1675), MHz(5.4065), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},  /* 60m */
+        {MHz(7), MHz(7.3), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(10.1), MHz(10.15), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(14), MHz(14.35), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(18.068), MHz(18.168), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(21), MHz(21.45), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(24.89), MHz(24.99), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(28), MHz(29.7), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(50), MHz(54), FTX1_ALL_MODES, 5000, 100000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(144), MHz(148), FTX1_ALL_MODES, 5000, 50000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
+        {MHz(430), MHz(450), FTX1_ALL_MODES, 5000, 20000, RIG_VFO_MAIN | RIG_VFO_SUB, RIG_ANT_1},
         RIG_FRNG_END,
     },
     .tuning_steps = {
@@ -1196,6 +1235,7 @@ struct rig_caps ftx1_caps = {
         /* FM modes */
         {RIG_MODE_FM | RIG_MODE_PKTFM, Hz(12000)},  /* Normal FM */
         {RIG_MODE_FM | RIG_MODE_PKTFM, Hz(9000)},   /* Narrow FM */
+        {RIG_MODE_WFM, kHz(200)},                   /* Normal WFM */
         /* Any mode, any filter */
         {RIG_MODE_SSB | RIG_MODE_CW | RIG_MODE_CWR | RIG_MODE_RTTY | RIG_MODE_RTTYR | RIG_MODE_PKTLSB | RIG_MODE_PKTUSB, RIG_FLT_ANY},
         RIG_FLT_END,
@@ -1208,7 +1248,7 @@ struct rig_caps ftx1_caps = {
     .set_freq = ftx1_set_freq,
     .get_freq = ftx1_get_freq,
     .set_mode = ftx1_set_mode,
-    .get_mode = newcat_get_mode,
+    .get_mode = ftx1_get_mode,
     .set_vfo = ftx1_set_vfo,
     .get_vfo = ftx1_get_vfo,
     .set_ptt = ftx1_set_ptt_func,
@@ -1232,6 +1272,7 @@ struct rig_caps ftx1_caps = {
     .stop_morse = ftx1_stop_morse_func,
     .wait_morse = ftx1_wait_morse_func,
     .send_voice_mem = newcat_send_voice_mem,
+    .stop_voice_mem = newcat_stop_voice_mem,
     .set_clock = newcat_set_clock,
     .get_clock = newcat_get_clock,
     .set_trn = ftx1_set_trn_func,

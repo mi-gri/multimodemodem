@@ -73,6 +73,8 @@
 #include "sprintflst.h"
 #include "hamlibdatetime.h"
 #include "cache.h"
+#include "stream.h"
+#include "rig_internal.h"
 
 /**
  * \brief Hamlib short license name
@@ -185,37 +187,37 @@ const char hamlib_copyright[231] = /* hamlib 1.2 ABI specifies 231 bytes */
 
 #define ICOM_EXCEPTIONS (rig->caps->rig_model == RIG_MODEL_IC9700 || rig->caps->rig_model == RIG_MODEL_IC9100 || rig->caps->rig_model == RIG_MODEL_IC910)
 
-// If the OS/library supports it, use a recursive mutex for the main lock.
-// This eliminates depth races, and guards against multiple app threads, too.
-// Set define to 0 to use depth-based locking. It should be deduced from the
-//   environment, but I can't find a fine-grained enough parameter. Should be
-//   OK on any POSIX-2017 or later system.
-#define USE_RECURSIVE_MUTEX 1
-#if USE_RECURSIVE_MUTEX
+// Rig lock for all front side thread control
 #define LOCK(n) rig_lock(rig,n)
-#else
-// The LOCK macro is for the primary thread calling the rig functions
-// For a separate thread use rig_lock directly
-// The purpose here is to avoid deadlock during recursion
-// Any other thread should grab the mutex itself via rig_lock
-#define LOCK(n) if (STATE(rig)->depth == 1) { rig_debug(RIG_DEBUG_CACHE, "%s: %s\n", n?"lock":"unlock", __func__);  rig_lock(rig,n); }
-#endif
 
-MUTEX(morse_mutex);
-
-// returns true if mutex is busy
-int MUTEX_CHECK(pthread_mutex_t *m)
+static bool morse_busy_load(const struct rig_state *rs)
 {
-    int trylock = pthread_mutex_trylock(m);
-
-    if (trylock != EBUSY)
-    {
-        pthread_mutex_unlock(m);
-    }
-
-    return trylock == EBUSY;
+    return __atomic_load_n(&rs->morse_busy, __ATOMIC_RELAXED);
 }
 
+static void morse_busy_store(struct rig_state *rs, bool busy)
+{
+    // The busy hint does not publish any other state, so relaxed ordering is sufficient.
+    __atomic_store_n(&rs->morse_busy, busy, __ATOMIC_RELAXED);
+}
+
+/* Per-rig bookkeeping of the core, kept out of the installed headers */
+struct rig_private
+{
+    int no_get_vfo;     /* the backend found that this rig lacks get_vfo */
+};
+
+static void no_get_vfo_set(RIG *rig)
+{
+    // Set under the API mutex but read outside it; it publishes no other state.
+    __atomic_store_n(&rig->private_addr->no_get_vfo, 1, __ATOMIC_RELAXED);
+}
+
+int HAMLIB_API rig_has_get_vfo(RIG *rig)
+{
+    return rig->caps->get_vfo != NULL
+           && !__atomic_load_n(&rig->private_addr->no_get_vfo, __ATOMIC_RELAXED);
+}
 
 /*
  * Data structure to track the opened rig (by rig_open)
@@ -296,7 +298,7 @@ typedef struct async_data_handler_priv_data_s
     async_data_handler_args args;
 } async_data_handler_priv_data;
 
-static int async_data_handler_start(RIG *rig);
+static int start_pthread(pthread_t *thread, void *(*routine)(void *), void *arg);
 static int async_data_handler_stop(RIG *rig);
 static void *async_data_handler(void *arg);
 
@@ -312,7 +314,6 @@ typedef struct morse_data_handler_priv_data_s
     int keyspd;
 } morse_data_handler_priv_data;
 
-static int morse_data_handler_start(RIG *rig);
 static int morse_data_handler_stop(RIG *rig);
 int morse_data_handler_set_keyspd(RIG *rig, int keyspd);
 static void *morse_data_handler(void *arg);
@@ -425,51 +426,49 @@ MUTEX(mutex_debugmsgsave);
  */
 void add2debugmsgsave(const char *s)
 {
-    const char *p;
-    char stmp[DEBUGMSGSAVE_SIZE];
-    int i, nlines;
-    int maxmsg = DEBUGMSGSAVE_SIZE / 2;
-    MUTEX_LOCK(mutex_debugmsgsave);
-    memset(stmp, 0, sizeof(stmp));
+    const size_t maxmsg = DEBUGMSGSAVE_SIZE / 2;
+    size_t append_len;
+    size_t current_len;
+    size_t i;
+    size_t nlines;
+    char *keep;
 
-    // we'll keep 20 lines including this one
-    // so count the lines
-    for (i = 0, nlines = 0; debugmsgsave[i] != 0; ++i)
+    MUTEX_LOCK(mutex_debugmsgsave);
+
+    current_len = strlen(debugmsgsave);
+    keep = debugmsgsave;
+
+    for (i = 0, nlines = 0; i < current_len; ++i)
     {
         if (debugmsgsave[i] == '\n') { ++nlines; }
     }
 
-    // strip the last 19 lines
-    p =  debugmsgsave;
-
-    while ((nlines > 19 || strlen(debugmsgsave) > maxmsg) && p != NULL)
+    while (nlines > 19 || current_len > maxmsg)
     {
-        p = strchr(debugmsgsave, '\n');
+        char *newline = strchr(keep, '\n');
 
-        if (p && strlen(p + 1) > 0)
+        if (newline == NULL)
         {
-            strcpy(stmp, p + 1);
-            strcpy(debugmsgsave, stmp);
-        }
-        else
-        {
-            debugmsgsave[0] = '\0';
+            keep += current_len;
+            current_len = 0;
+            break;
         }
 
+        size_t remove_len = (size_t)(newline + 1 - keep);
+        keep = newline + 1;
+        current_len -= remove_len;
         --nlines;
-
-        if (nlines == 0 && strlen(debugmsgsave) > maxmsg) { strcpy(debugmsgsave, "!!!!debugmsgsave too long\n"); }
     }
 
-    if (strlen(stmp) + strlen(s) + 1 < DEBUGMSGSAVE_SIZE)
+    if (keep != debugmsgsave)
     {
-        strcat(debugmsgsave, s);
+        memmove(debugmsgsave, keep, current_len + 1);
     }
-    else
+
+    append_len = strlen(s);
+    if (append_len <= sizeof(debugmsgsave) - current_len - 1)
     {
-        rig_debug(RIG_DEBUG_BUG,
-                  "%s: debugmsgsave overflow!! len of debugmsgsave=%d, len of add=%d\n", __func__,
-                  (int)strlen(debugmsgsave), (int)strlen(s));
+        memmove(debugmsgsave + current_len, s, append_len + 1);
     }
 
     MUTEX_UNLOCK(mutex_debugmsgsave);
@@ -587,10 +586,10 @@ static int rig_check_rig_caps()
  */
 static void vaporize(RIG *rig)
 {
-    if (CACHE(rig))
+    if (rig->cache_addr)
     {
-        free(CACHE(rig));
-        CACHE(rig) = NULL;
+        rig_cache_destroy(rig->cache_addr);
+        rig->cache_addr = NULL;
     }
 
     if (RIGPORT(rig))
@@ -613,6 +612,9 @@ static void vaporize(RIG *rig)
         free(STATE(rig));
         STATE(rig) = NULL;
     }
+
+    free(rig->private_addr);
+    rig->private_addr = NULL;
     /* Other buffers go here, as they are converted
      *  to pointers/calloc - WIP
      */
@@ -639,7 +641,6 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
     const struct rig_caps *caps;
     struct rig_state *rs;
     hamlib_port_t *rp, *pttp, *dcdp;
-    struct rig_cache *cachep;
     int i;
     size_t needed;
 
@@ -738,17 +739,23 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
         return NULL;
     }
 
-    // Allocate space for cached data
-    needed = sizeof(struct rig_cache);
-    rig_debug(RIG_DEBUG_TRACE, "Requesting %zu bytes for rig_cache\n", needed);
-    CACHE(rig) = calloc(1, needed);
-    if (!CACHE(rig))
+    rig->cache_addr = rig_cache_create();
+
+    if (!rig->cache_addr)
     {
-        rig_debug(RIG_DEBUG_ERR, "%s:Cache calloc failed\n", __func__);
+        rig_debug(RIG_DEBUG_ERR, "%s: Cache allocation failed\n", __func__);
         vaporize(rig);
         return NULL;
     }
-    cachep = CACHE(rig);
+
+    rig->private_addr = calloc(1, sizeof(struct rig_private));
+
+    if (!rig->private_addr)
+    {
+        rig_debug(RIG_DEBUG_ERR, "%s: Private data allocation failed\n", __func__);
+        vaporize(rig);
+        return NULL;
+    }
 
     rs->rig_model = caps->rig_model;
     rs->priv = NULL;
@@ -757,6 +764,7 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
     rs->comm_state = 0;
     rs->comm_status = RIG_COMM_STATUS_DISCONNECTED;
     rs->tuner_control_pathname = DEFAULT_TUNER_CONTROL_PATHNAME;
+    rs->stream_source_id = -1;
     strncpy(rs->client_version, "Hamlib", sizeof(rs->client_version));
 
     rp->fd = -1;
@@ -842,11 +850,10 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
     dcdp->type.dcd = caps->dcd_type;
 
     rs->vfo_comp = 0.0; /* override it with preferences */
-    rs->current_vfo = RIG_VFO_CURR; /* we don't know yet! */
     rs->vfo_ops = caps->vfo_ops;
-    rs->rx_vfo = RIG_VFO_CURR;  /* we don't know yet! */
-    rs->tx_vfo = RIG_VFO_CURR;  /* we don't know yet! */
-    rs->poll_interval = 1000; // enable polling by default
+    rig_set_rx_vfo_state(rig, RIG_VFO_CURR);  /* we don't know yet! */
+    rig_set_vfo_state(rig, RIG_VFO_CURR, RIG_VFO_CURR);
+    rig_set_poll_interval(rig, 1000); // enable polling by default
 #if 0
     rs->multicast_data_addr =
         "224.0.0.1"; // do not enable multicast data publishing by default
@@ -861,8 +868,6 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
     rs->multicast_data_port = 4532;
     rs->multicast_cmd_port = 4532;
     rs->lo_freq = 0;
-    cachep->timeout_ms = 500;  // 500ms cache timeout by default
-    cachep->ptt = 0;
     rs->targetable_vfo = rig->caps->targetable_vfo;
     rs->model_name = rig->caps->model_name;
     rs->mfg_name = rig->caps->mfg_name;
@@ -1001,7 +1006,8 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
 
     /* emulation by frontend */
     if ((caps->has_get_level & RIG_LEVEL_STRENGTH) == 0
-            && (caps->has_get_level & RIG_LEVEL_RAWSTR) == RIG_LEVEL_RAWSTR)
+            && (caps->has_get_level & RIG_LEVEL_RAWSTR) == RIG_LEVEL_RAWSTR
+            && caps->str_cal.size)
     {
         rs->has_get_level |= RIG_LEVEL_STRENGTH;
     }
@@ -1020,14 +1026,9 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
     rs->powerstat = RIG_POWER_ON; // default to power on until proven otherwise
 
     // Set up lock for any API entry point
-    // If available, use a recursive mutex. Else, fall back on the
-    //   depth count.
     pthread_mutexattr_t api_attr;
     pthread_mutexattr_init(&api_attr);
-#if USE_RECURSIVE_MUTEX
     pthread_mutexattr_settype(&api_attr, PTHREAD_MUTEX_RECURSIVE);
-    HAMLIB_TRACE;
-#endif
     pthread_mutex_init(&rs->api_mutex, &api_attr);
     pthread_mutexattr_destroy(&api_attr);
 
@@ -1071,13 +1072,57 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
  *
  * \sa rig_init(), rig_close()
  */
+/* Report the rig's power state during open and clear auto_power_on when it is
+ * already on. Split out of rig_open() because the probe has to run at
+ * different points depending on who owns the transport: for an ordinary port
+ * the core has already opened it, but a RIG_PORT_CUSTOM backend only opens its
+ * own transport inside caps->rig_open(), so probing before that would talk to
+ * a closed port. */
+static void rig_open_check_powerstat(RIG *rig, int skip_init)
+{
+    struct rig_state *rs = STATE(rig);
+    powerstat_t powerflag;
+    int status;
+
+    if (rig->caps->get_powerstat == NULL || skip_init)
+    {
+        return;
+    }
+
+    status = rig_get_powerstat(rig, &powerflag);
+
+    if (status == RIG_OK && (powerflag == RIG_POWER_OFF
+                             || powerflag == RIG_POWER_STANDBY)
+            && rs->auto_power_on == 0)
+    {
+        // rig_open() should succeed even if the rig is powered off, so simply log power status
+        rig_debug(RIG_DEBUG_ERR,
+                  "%s: rig power is off, use --set-conf=auto_power_on=1 or set_powerstat if power on is wanted\n",
+                  __func__);
+    }
+
+    // don't need auto_power_on if power is already on
+    if (status == RIG_OK && powerflag == RIG_POWER_ON) { rs->auto_power_on = 0; }
+
+    if (status == -RIG_ETIMEOUT)
+    {
+        // rig_open() should succeed even if get_powerstat() fails,
+        // as many rigs cannot get power status while powered off
+        rig_debug(RIG_DEBUG_ERR, "%s: Some rigs cannot get_powerstat while off\n",
+                  __func__);
+        rig_debug(RIG_DEBUG_ERR, "%s: Known rigs: K3, K3S\n", __func__);
+    }
+}
+
 int HAMLIB_API rig_open(RIG *rig)
 {
     struct rig_caps *caps;
+    struct rig_cache_routing_snapshot routing;
     struct rig_state *rs;
     hamlib_port_t *rp, *pttp, *dcdp;
     int status = RIG_OK;
     value_t parm_value;
+    vfo_t current_vfo;
     //unsigned int net1, net2, net3, net4, net5, net6, net7, net8, port;
     int is_network = 0;
     int retval = 0;
@@ -1150,7 +1195,6 @@ int HAMLIB_API rig_open(RIG *rig)
               "%s: async_data_enable=%d, async_data_supported=%d\n", __func__,
               rs->async_data_enabled, caps->async_data_supported);
     rs->async_data_enabled = rs->async_data_enabled && caps->async_data_supported;
-    rp->asyncio = rs->async_data_enabled;
 
     if (strlen(rp->pathname) > 0)
     {
@@ -1188,7 +1232,11 @@ int HAMLIB_API rig_open(RIG *rig)
 
 #endif
 
-    if (is_network)
+    /* A backend that manages its own transport (RIG_PORT_CUSTOM, e.g. the Icom
+     * network backend's multi-socket session) or has no port (RIG_PORT_NONE) must
+     * not have its explicit port_type overridden by the pathname-based heuristic. */
+    if (is_network && rp->type.rig != RIG_PORT_NONE
+            && rp->type.rig != RIG_PORT_CUSTOM)
     {
         rig_debug(RIG_DEBUG_TRACE, "%s: using network address %s\n", __func__,
                   rp->pathname);
@@ -1204,7 +1252,9 @@ int HAMLIB_API rig_open(RIG *rig)
                 || rig->caps->rig_model == RIG_MODEL_SMARTSDR_H
            )
         {
-            if (strstr(rp->pathname, "127.0.0.1"))
+            /* Allow 127.0.0.1:<port> for local TCP simulators (e.g. simflex). */
+            if (strstr(rp->pathname, "127.0.0.1") != NULL
+                    && strchr(rp->pathname, ':') == NULL)
             {
                 rig_debug_clear();
                 rig_debug(RIG_DEBUG_ERR,
@@ -1513,8 +1563,12 @@ int HAMLIB_API rig_open(RIG *rig)
     rig_debug(RIG_DEBUG_VERBOSE, "%s: %p rs->comm_state==1?=%d\n", __func__,
               &rs->comm_state,
               rs->comm_state);
-    hl_usleep(100 *
-              1000); // wait a bit after opening to give some serial ports time
+    // The wait is for the rig port, which port_open() does not open for RIG_PORT_NONE
+    if (rp->type.rig != RIG_PORT_NONE)
+    {
+        hl_usleep(100 *
+                  1000); // wait a bit after opening to give some serial ports time
+    }
 
 
     /*
@@ -1526,32 +1580,13 @@ int HAMLIB_API rig_open(RIG *rig)
 
     if (caps->rig_open != NULL)
     {
-        if (caps->get_powerstat != NULL && !skip_init)
+        /* A RIG_PORT_CUSTOM backend owns its transport and only opens it in
+         * caps->rig_open(), so its power probe has to wait until after that. */
+        int custom_port = (rp->type.rig == RIG_PORT_CUSTOM);
+
+        if (!custom_port)
         {
-            powerstat_t powerflag;
-            status = rig_get_powerstat(rig, &powerflag);
-
-            if (status == RIG_OK && (powerflag == RIG_POWER_OFF
-                                     || powerflag == RIG_POWER_STANDBY)
-                    && rs->auto_power_on == 0)
-            {
-                // rig_open() should succeed even if the rig is powered off, so simply log power status
-                rig_debug(RIG_DEBUG_ERR,
-                          "%s: rig power is off, use --set-conf=auto_power_on=1 or set_powerstat if power on is wanted\n",
-                          __func__);
-            }
-
-            // don't need auto_power_on if power is already on
-            if (status == RIG_OK && powerflag == RIG_POWER_ON) { STATE(rig)->auto_power_on = 0; }
-
-            if (status == -RIG_ETIMEOUT)
-            {
-                // rig_open() should succeed even if get_powerstat() fails,
-                // as many rigs cannot get power status while powered off
-                rig_debug(RIG_DEBUG_ERR, "%s: Some rigs cannot get_powerstat while off\n",
-                          __func__);
-                rig_debug(RIG_DEBUG_ERR, "%s: Known rigs: K3, K3S\n", __func__);
-            }
+            rig_open_check_powerstat(rig, skip_init);
         }
 
         status = caps->rig_open(rig);
@@ -1564,40 +1599,52 @@ int HAMLIB_API rig_open(RIG *rig)
             rs->comm_status = RIG_COMM_STATUS_ERROR;
             RETURNFUNC2(status);
         }
+
+        if (custom_port)
+        {
+            rig_open_check_powerstat(rig, skip_init);
+        }
     }
 
-    /*
-     * trigger state->current_vfo first retrieval
-     */
+    /* Trigger the initial current VFO retrieval. */
 
-    if (caps->get_vfo && rig_get_vfo(rig, &rs->current_vfo) == RIG_OK)
+    if (caps->get_vfo && rig_get_vfo(rig, &current_vfo) == RIG_OK)
     {
-        rs->tx_vfo = rs->current_vfo;
+        rig_set_vfo_state(rig, current_vfo, current_vfo);
     }
     else
     {
         // No get_vfo available, so set some sensible defaults
-        rs->tx_vfo = RIG_VFO_TX;
+        rig_set_tx_vfo_state(rig, RIG_VFO_TX);
 
         // If we haven't gotten the VFO by now we will default to VFO_CURR
-        if (rs->current_vfo == RIG_VFO_NONE) { rs->current_vfo = RIG_VFO_CURR; }
+        if (rig_get_current_vfo_state(rig) == RIG_VFO_NONE)
+        {
+            rig_set_current_vfo_state(rig, RIG_VFO_CURR);
+        }
 
+        rig_get_cache_routing_snapshot(rig, &routing);
         rig_debug(RIG_DEBUG_TRACE, "%s: vfo_curr=%s, tx_vfo=%s\n", __func__,
-                  rig_strvfo(rs->current_vfo), rig_strvfo(rs->tx_vfo));
+                  rig_strvfo(routing.current_vfo),
+                  rig_strvfo(routing.tx_vfo));
 
         if (rig->caps->set_vfo == NULL)
         {
             // for non-Icom rigs if there's no set_vfo then we need to set one
-            rs->current_vfo = vfo_fixup(rig, RIG_VFO_A, CACHE(rig)->split);
+            rig_set_current_vfo_state(
+                rig, vfo_fixup_current(rig, RIG_VFO_A));
             rig_debug(RIG_DEBUG_TRACE, "%s: No set_vfo function rig so default vfo=%s\n",
-                      __func__, rig_strvfo(rs->current_vfo));
+                      __func__, rig_strvfo(rig_get_current_vfo_state(rig)));
         }
         else
         {
             rig_debug(RIG_DEBUG_TRACE, "%s: default vfo = %s\n", __func__,
-                      rig_strvfo(rs->current_vfo));
+                      rig_strvfo(rig_get_current_vfo_state(rig)));
         }
     }
+
+    rig_get_cache_routing_snapshot(rig, &routing);
+    rig_observe_current_vfo(rig, routing.current_vfo);
 
     if (skip_init)
     {
@@ -1605,7 +1652,7 @@ int HAMLIB_API rig_open(RIG *rig)
         RETURNFUNC2(RIG_OK);
     }
 
-    status = async_data_handler_start(rig);
+    status = rig_async_data_handler_start(rig, start_pthread);
 
     if (status < 0)
     {
@@ -1617,13 +1664,15 @@ int HAMLIB_API rig_open(RIG *rig)
     // Some models don't support CW so don't need morse handler
     if (rig->caps->send_morse)
     {
-        status = morse_data_handler_start(rig);
+        status = rig_morse_data_handler_start(rig, start_pthread);
 
         if (status < 0)
         {
             rig_debug(RIG_DEBUG_ERR, "%s: cw_data_handler_start failed: %.23000s\n", __func__,
                       rigerror(status));
+            async_data_handler_stop(rig);
             port_close(rp, rp->type.rig);
+            rs->comm_status = RIG_COMM_STATUS_ERROR;
             RETURNFUNC2(status);
         }
     }
@@ -1731,6 +1780,17 @@ int HAMLIB_API rig_open(RIG *rig)
 
     rs->comm_status = RIG_COMM_STATUS_OK;
 
+    /* Initialize streaming subsystem state — unless the backend already
+     * created it from its rig_open hook by publishing session caps
+     * (stream_set_session_caps creates the state on first use). */
+    if (rs->stream_state == NULL
+            && rig_stream_state_init((struct rig_stream_state **)&rs->stream_state)
+            != 0)
+    {
+        rig_debug(RIG_DEBUG_WARN, "%s: stream state init failed\n", __func__);
+        /* Non-fatal — streaming just won't be available */
+    }
+
     add_opened_rig(rig);
 
     RETURNFUNC2(RIG_OK);
@@ -1764,7 +1824,6 @@ int HAMLIB_API rig_close(RIG *rig)
 
     ENTERFUNC;
 
-
     caps = rig->caps;
     rs = STATE(rig);
     rp = RIGPORT(rig);
@@ -1787,6 +1846,17 @@ int HAMLIB_API rig_close(RIG *rig)
         rig_poll_routine_stop(rig);
         network_multicast_receiver_stop(rig);
         network_multicast_publisher_stop(rig);
+    }
+
+    /* Streams go first, before the backend closes and before the ports do.
+     * Their threads run on backend resources, so a backend that releases
+     * anything in rig_close would be pulling it out from under a thread that
+     * is still reading it; and a stream_close that has to tell the radio to
+     * stop needs the link it is told over to still be open. */
+    if (rs->stream_state)
+    {
+        rig_stream_state_cleanup(rs->stream_state);
+        rs->stream_state = NULL;
     }
 
     // Let the backend say 73 to the rig.
@@ -1898,7 +1968,7 @@ int HAMLIB_API rig_close(RIG *rig)
     port_close(rp, rp->type.rig);
 
     // zero split so it will allow it to be set again on open for rigctld
-    CACHE(rig)->split = 0;
+    rig_set_cache_split(rig, RIG_SPLIT_OFF, RIG_VFO_NONE);
     rs->comm_state = 0;
     rig_debug(RIG_DEBUG_VERBOSE, "%s(%d): %p rs->comm_state==0?=%d\n", __func__,
               __LINE__, &rs->comm_state,
@@ -2091,9 +2161,11 @@ static int twiddling(RIG *rig)
 // but we might have trou
 static int skip_freq(RIG *rig, vfo_t vfo)
 {
-    struct rig_cache *cachep = CACHE(rig);
     struct rig_state *rs = STATE(rig);
+    struct rig_cache_routing_snapshot routing;
     int retval = 0;
+
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     // if option is not select do not skip
     // WSJT-X needs set all the time....gpredict can skip
@@ -2106,18 +2178,18 @@ static int skip_freq(RIG *rig, vfo_t vfo)
         return 0;
     }
 
-    if (cachep->ptt && cachep->split
+    if (routing.ptt && routing.split
             && ((rig->caps->targetable_vfo & RIG_TARGETABLE_FREQ) == 0)
-            && (vfo == RIG_VFO_RX || vfo == rs->rx_vfo))
+            && (vfo == RIG_VFO_RX || vfo == routing.rx_vfo))
     {
         rig_debug(RIG_DEBUG_VERBOSE,
                   "%s: skip setting frequency on RX vfo when PTT is on\n", __func__);
         retval = 1;
     }
 
-    if ((!cachep->ptt) && cachep->split
+    if ((!routing.ptt) && routing.split
             && ((rig->caps->targetable_vfo & RIG_TARGETABLE_FREQ) == 0)
-            && (vfo == RIG_VFO_TX || vfo == rs->tx_vfo))
+            && (vfo == RIG_VFO_TX || vfo == routing.tx_vfo))
     {
         rig_debug(RIG_DEBUG_VERBOSE,
                   "%s: skip setting frequency on TX vfo when PTT is not on\n", __func__);
@@ -2151,7 +2223,7 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
 #endif
 {
     const struct rig_caps *caps;
-    struct rig_cache *cachep;
+    struct rig_cache_routing_snapshot routing;
     struct rig_state *rs;
     int retcode;
     freq_t freq_new = freq;
@@ -2159,6 +2231,7 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
     static int last_band = -1;
     int curr_band;
     int band_changing = 0;
+    freq_t cached_freq;
 
     if (CHECK_RIG_ARG(rig))
     {
@@ -2166,12 +2239,12 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
         return -RIG_EINVAL;
     }
 
-    cachep = CACHE(rig);
     rs = STATE(rig);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     curr_band = rig_get_band(rig, freq, -1);
 
-    if (rs->tx_vfo == vfo && curr_band != last_band)
+    if (routing.tx_vfo == vfo && curr_band != last_band)
     {
         rig_debug(RIG_DEBUG_VERBOSE, "%s: band changing to %s\n", __func__,
                   rig_get_band_str(rig, curr_band, 0));
@@ -2179,7 +2252,7 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
         //rig_band_changed(rig, curr_band);
         last_band = curr_band;
 
-        if (cachep->ptt)
+        if (routing.ptt)
         {
             rig_set_ptt(rig, RIG_VFO_CURR, RIG_PTT_OFF);
             hl_usleep(200); // make sure PTT is off
@@ -2189,6 +2262,7 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
     ELAPSED1;
     ENTERFUNC;
     LOCK(1);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
 
 #if BUILTINFUNC
@@ -2203,29 +2277,33 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
     if (rs->doppler == 0)
     {
         if (vfo == RIG_VFO_A || vfo == RIG_VFO_MAIN || (vfo == RIG_VFO_CURR
-                && rs->current_vfo == RIG_VFO_A))
+                && routing.current_vfo == RIG_VFO_A))
         {
-            if (cachep->freqMainA != freq && (((int)freq % 10) != 0)
+            rig_get_cache_freq(rig, RIG_VFO_A, &cached_freq, NULL);
+
+            if (cached_freq != freq && (((int)freq % 10) != 0)
                     && (((int)freq % 100) != 55))
             {
                 rs->doppler = 1;
                 rig_debug(RIG_DEBUG_VERBOSE,
                           "%s(%d): potential doppler detected because old freq %f != new && new freq has 1Hz or such values\n",
-                          __func__, __LINE__, cachep->freqMainA);
+                          __func__, __LINE__, cached_freq);
             }
 
             freq += rs->offset_vfoa;
         }
         else if (vfo == RIG_VFO_B || vfo == RIG_VFO_SUB || (vfo == RIG_VFO_CURR
-                 && rs->current_vfo == RIG_VFO_B))
+                 && routing.current_vfo == RIG_VFO_B))
         {
-            if (cachep->freqMainB != freq && ((int)freq % 10) != 0
+            rig_get_cache_freq(rig, RIG_VFO_B, &cached_freq, NULL);
+
+            if (cached_freq != freq && ((int)freq % 10) != 0
                     && (((int)freq % 100) != 55))
             {
                 rs->doppler = 1;
                 rig_debug(RIG_DEBUG_VERBOSE,
                           "%s(%d): potential doppler detected because old freq %f != new && new freq has 1Hz or such values\n",
-                          __func__, __LINE__, cachep->freqMainB);
+                          __func__, __LINE__, cached_freq);
             }
 
             freq += rs->offset_vfob;
@@ -2263,8 +2341,8 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    vfo_save = rs->current_vfo;
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    vfo_save = rig_get_current_vfo_state(rig);
+    vfo = vfo_fixup_current(rig, vfo);
 
     if (vfo == RIG_VFO_CURR)
     {
@@ -2279,7 +2357,7 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
     }
 
     if ((caps->targetable_vfo & RIG_TARGETABLE_FREQ)
-            || vfo == RIG_VFO_CURR || vfo == rs->current_vfo)
+            || vfo == RIG_VFO_CURR || vfo == rig_get_current_vfo_state(rig))
     {
         if (twiddling(rig))
         {
@@ -2366,6 +2444,16 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
         rig_debug(RIG_DEBUG_TRACE, "%s: not a TARGETABLE_FREQ vfo=%s\n", __func__,
                   rig_strvfo(vfo));
 
+        // The ID-5100 cannot report its current A/B side, so an unknown side
+        // cannot be restored after a targeted write.
+        if (rig->caps->rig_model == RIG_MODEL_ID5100 &&
+                (vfo_save == RIG_VFO_CURR || vfo_save == RIG_VFO_NONE))
+        {
+            ELAPSED2;
+            LOCK(0);
+            RETURNFUNC(-RIG_ENTARGET);
+        }
+
         if (!caps->set_vfo)
         {
             ELAPSED2;
@@ -2413,12 +2501,7 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
         // some rigs truncate or round e.g. 1,2,5,10,20,100Hz intervals
         // we'll try this all the time and if it works out OK eliminate the #else
         if (((unsigned long long)freq % 100 != 0 // only need to do if < 100Hz interval
-                || freq > 100e6)  // or if we are in the VHF and up range
-#if 0
-                // do we need to only do this when cache is turned on? 2020-07-02 W9MDB
-                && cachep->timeout_ms > 0
-#endif
-           )
+                || freq > 100e6))  // or if we are in the VHF and up range
         {
             // some rigs we can skip this check for speed sake
             if (rs->rig_model == RIG_MODEL_MALACHITE)
@@ -2457,7 +2540,7 @@ int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
     }
 
     // update our current freq too
-    if (vfo == RIG_VFO_CURR || vfo == rs->current_vfo) { rs->current_freq = freq_new; }
+    if (vfo == RIG_VFO_CURR || vfo == rig_get_current_vfo_state(rig)) { rs->current_freq = freq_new; }
 
     rig_set_cache_freq(rig, vfo, freq_new);
 
@@ -2499,15 +2582,16 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
 #endif
 {
     const struct rig_caps *caps;
-    struct rig_cache *cachep;
     struct rig_state *rs;
     int retcode;
     vfo_t curr_vfo;
     rmode_t mode;
     pbwidth_t width;
     int curr_band;
-    int use_cache = 0;
+    int cache_timeout_ms;
+    bool use_cache;
     static int last_band = -1;
+    struct rig_cache_routing_snapshot routing;
 
     if (CHECK_RIG_ARG(rig))
     {
@@ -2516,7 +2600,7 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
     }
 
     rs = STATE(rig);
-    cachep = CACHE(rig);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     ENTERFUNC;
 #if BUILTINFUNC
@@ -2541,31 +2625,34 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
     rig_cache_show(rig, __func__, __LINE__);
 
 
-    curr_vfo = rs->current_vfo; // save vfo for restore later
+    curr_vfo = routing.current_vfo; // save vfo for restore later
 
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    vfo = vfo_fixup_current(rig, vfo);
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s(%d) vfo=%s, curr_vfo=%s\n", __FILE__, __LINE__,
               rig_strvfo(vfo), rig_strvfo(curr_vfo));
 
-    if (MUTEX_CHECK(&morse_mutex))
-    {
-        use_cache = 1;
-    }
+    /* morse_busy is a hint that the port may be busy - this reduces
+     *   the chance that we get stalled on the api_mutex.
+     *   But it still may happen(just not very often.)
+     * It is copied to use_cache so the value is consistent throughout, and
+     *   in case we ever need to add other conditions.
+     */
+    use_cache = morse_busy_load(rs);
 
     if (vfo == RIG_VFO_CURR) { vfo = curr_vfo; }
 
     // we ignore get_freq for the uplink VFO for gpredict to behave better
     if ((rs->uplink == 1 && vfo == RIG_VFO_SUB)
             || (rs->uplink == 2 && vfo == RIG_VFO_MAIN)
-            || (vfo == RIG_VFO_TX && cachep->ptt == 0)
+            || (vfo == RIG_VFO_TX && routing.ptt == 0)
             || use_cache)
     {
         rig_debug(RIG_DEBUG_TRACE, "%s: uplink=%d, ignoring get_freq\n", __func__,
                   rs->uplink);
         rig_debug(RIG_DEBUG_TRACE, "%s: split=%d, satmode=%d, tx_vfo=%s\n", __func__,
-                  cachep->split, cachep->satmode,
-                  rig_strvfo(rs->tx_vfo));
+                  routing.split, routing.satmode,
+                  rig_strvfo(routing.tx_vfo));
         // always return the cached freq for this clause
         int cache_ms_freq, cache_ms_mode, cache_ms_width;
         rig_get_cache(rig, vfo, freq, &cache_ms_freq, &mode, &cache_ms_mode, &width,
@@ -2576,13 +2663,14 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
 
     rig_cache_show(rig, __func__, __LINE__);
     LOCK(1);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     rig_debug(RIG_DEBUG_CACHE, "%s: depth=%d\n", __func__, rs->depth);
 
     // there are some rigs that can't get VFOA freq while VFOB is transmitting
     // so we'll return the cached VFOA freq for them
     // should we use the cached ptt maybe? No -- we have to be 100% sure we're in PTT to ignore this request
-    if ((vfo == RIG_VFO_A || vfo == RIG_VFO_MAIN) && cachep->split &&
+    if ((vfo == RIG_VFO_A || vfo == RIG_VFO_MAIN) && routing.split &&
             (rig->caps->rig_model == RIG_MODEL_FTDX101D
              || rig->caps->rig_model == RIG_MODEL_IC910))
     {
@@ -2603,7 +2691,7 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
             rig_debug(RIG_DEBUG_TRACE,
                       "%s: split is on so returning VFOA last known freq\n",
                       __func__);
-            *freq = cachep->freqMainA;
+            rig_get_cache_freq(rig, RIG_VFO_A, freq, NULL);
             ELAPSED2;
             LOCK(0);
             RETURNFUNC(RIG_OK);
@@ -2613,6 +2701,7 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
     int cache_ms_freq, cache_ms_mode, cache_ms_width;
     rig_get_cache(rig, vfo, freq, &cache_ms_freq, &mode, &cache_ms_mode, &width,
                   &cache_ms_width);
+    cache_timeout_ms = rig_get_cache_timeout_ms(rig, HAMLIB_CACHE_ALL);
     //rig_debug(RIG_DEBUG_TRACE, "%s: cache check1 age=%dms\n", __func__, cache_ms_freq);
 
     rig_cache_show(rig, __func__, __LINE__);
@@ -2622,8 +2711,8 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
     int wsjtx_special = ((long) * freq % 100) == 55 || ((long) * freq % 100) == 56;
     int rig_special = rig->caps->rig_model == RIG_MODEL_IC9100;
 
-    if (!rig_special && !wsjtx_special && *freq != 0 && (cache_ms_freq < cachep->timeout_ms
-                                         || (cachep->timeout_ms == HAMLIB_CACHE_ALWAYS
+    if (!rig_special && !wsjtx_special && *freq != 0 && (cache_ms_freq < cache_timeout_ms
+                                         || (cache_timeout_ms == HAMLIB_CACHE_ALWAYS
                                                  || rs->use_cached_freq)))
     {
         rig_debug(RIG_DEBUG_TRACE,
@@ -2657,14 +2746,14 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
     // If we're in vfo_mode then rigctld will do any VFO swapping we need
     // If we detected doppler we skip the frequency check to make timing more consistent for relay control
     if ((caps->targetable_vfo & RIG_TARGETABLE_FREQ)
-            || vfo == RIG_VFO_CURR || vfo == rs->current_vfo
+            || vfo == RIG_VFO_CURR || vfo == rig_get_current_vfo_state(rig)
             || (rs->vfo_opt == 1 && rig->caps->rig_model == RIG_MODEL_NETRIGCTL
                 && rs->doppler == 0))
     {
         // If rig does not have set_vfo we need to change vfo
         if (vfo == RIG_VFO_CURR && caps->set_vfo == NULL)
         {
-            vfo = vfo_fixup(rig, RIG_VFO_A, cachep->split);
+            vfo = vfo_fixup_current(rig, RIG_VFO_A);
             rig_debug(RIG_DEBUG_TRACE, "%s: no set_vfo so vfo=%s\n", __func__,
                       rig_strvfo(vfo));
         }
@@ -2691,25 +2780,22 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
     {
         int rc2;
 
+        // The ID-5100 cannot report its current A/B side, so an unknown side
+        // cannot be restored after a targeted read.
+        if (rig->caps->rig_model == RIG_MODEL_ID5100 &&
+                (curr_vfo == RIG_VFO_CURR || curr_vfo == RIG_VFO_NONE))
+        {
+            ELAPSED2;
+            LOCK(0);
+            RETURNFUNC(-RIG_ENTARGET);
+        }
+
         if (!caps->set_vfo)
         {
             ELAPSED2;
             LOCK(0);
             RETURNFUNC(-RIG_ENAVAIL);
         }
-
-#if 1 // this seems redundant as we ask for freq a few lines below
-        HAMLIB_TRACE;
-        retcode = caps->get_freq(rig, vfo, freq);
-
-        if (retcode != RIG_OK)
-        {
-            ELAPSED2;
-            LOCK(0);
-            RETURNFUNC(retcode);
-        }
-
-#endif
 
         retcode = caps->set_vfo(rig, vfo);
 
@@ -2749,7 +2835,7 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
     }
 
     if (retcode == RIG_OK
-            && (vfo == RIG_VFO_CURR || vfo == rs->current_vfo))
+            && (vfo == RIG_VFO_CURR || vfo == rig_get_current_vfo_state(rig)))
     {
         rs->current_freq = *freq;
     }
@@ -2772,12 +2858,14 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
     }
 
     // we only want to look for band change on main vfo for now
-    if (*freq != 0 && (rs->current_vfo == RIG_VFO_A
-                       || rs->current_vfo == RIG_VFO_MAIN))
+    rig_get_cache_routing_snapshot(rig, &routing);
+
+    if (*freq != 0 && (routing.current_vfo == RIG_VFO_A
+                       || routing.current_vfo == RIG_VFO_MAIN))
     {
         curr_band = rig_get_band(rig, *freq, -1);
 
-        if (rs->tx_vfo == vfo && curr_band != last_band)
+        if (routing.tx_vfo == vfo && curr_band != last_band)
         {
             rig_debug(RIG_DEBUG_VERBOSE, "%s: band changing to %s\n", __func__,
                       rig_get_band_str(rig, curr_band, 0));
@@ -2815,6 +2903,28 @@ int HAMLIB_API rig_get_freqs(RIG *rig, freq_t *freqA, freq_t freqB)
     return (-RIG_ENIMPL);
 }
 
+static int mode_satisfies_request(rmode_t requested, rmode_t current)
+{
+    if (requested == current)
+    {
+        return 1;
+    }
+
+    if (requested == RIG_MODE_PKTUSB)
+    {
+        return current == RIG_MODE_USBD1 || current == RIG_MODE_USBD2
+               || current == RIG_MODE_USBD3;
+    }
+
+    if (requested == RIG_MODE_PKTLSB)
+    {
+        return current == RIG_MODE_LSBD1 || current == RIG_MODE_LSBD2
+               || current == RIG_MODE_LSBD3;
+    }
+
+    return 0;
+}
+
 
 /**
  * \brief set the mode of the target VFO
@@ -2838,10 +2948,9 @@ int HAMLIB_API rig_get_freqs(RIG *rig, freq_t *freqA, freq_t freqB)
 int HAMLIB_API rig_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
 {
     const struct rig_caps *caps;
-    struct rig_state *rs;
+    struct rig_cache_routing_snapshot routing;
     int retcode;
     int locked_mode;
-    struct rig_cache *cachep;
 
     if (CHECK_RIG_ARG(rig))
     {
@@ -2849,17 +2958,15 @@ int HAMLIB_API rig_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
         return -RIG_EINVAL;
     }
 
-    rs = STATE(rig);
-    cachep = CACHE(rig);
-
     ENTERFUNC;
     ELAPSED1;
     LOCK(1);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     rig_debug(RIG_DEBUG_VERBOSE,
               "%s called, vfo=%s, mode=%s, width=%d, curr_vfo=%s\n", __func__,
               rig_strvfo(vfo), rig_strrmode(mode), (int)width,
-              rig_strvfo(rs->current_vfo));
+              rig_strvfo(routing.current_vfo));
 
     rig_get_lock_mode(rig, &locked_mode);
 
@@ -2871,7 +2978,7 @@ int HAMLIB_API rig_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
     }
 
     // do not mess with mode while PTT is on
-    if (cachep->ptt)
+    if (routing.ptt)
     {
         rig_debug(RIG_DEBUG_VERBOSE, "%s PTT on so set_mode ignored\n", __func__);
         ELAPSED2;
@@ -2890,7 +2997,7 @@ int HAMLIB_API rig_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
 
     if (vfo == RIG_VFO_CURR)
     {
-        vfo = rs->current_vfo;
+        vfo = routing.current_vfo;
     }
 
     if (mode == RIG_MODE_NONE)
@@ -2900,37 +3007,37 @@ int HAMLIB_API rig_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
         rig_get_mode(rig, vfo, &mode, &twidth);
     }
 
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    vfo = vfo_fixup_current(rig, vfo);
 
-    // if we're not asking for bandwidth and the mode is already set we don't need to do it
-    // this will prevent flashing on some rigs like the TS-870
-    if (caps->get_mode && width == RIG_PASSBAND_NOCHANGE)
+    // Resolve a generic packet request against a specific DATA profile before setting it.
+    if (caps->get_mode && (width == RIG_PASSBAND_NOCHANGE
+                           || mode == RIG_MODE_PKTUSB || mode == RIG_MODE_PKTLSB)
+            && ((caps->targetable_vfo & RIG_TARGETABLE_MODE)
+                || vfo == rig_get_current_vfo_state(rig)))
     {
         rmode_t mode_curr;
         pbwidth_t width_curr;
         retcode = caps->get_mode(rig, vfo, &mode_curr, &width_curr);
 
-        // For Icom rigs we may need to force the filter so we always set mode
-#if 0
-        // This should not be necessary anymore with the new filter method for Icom rigs
-        // Hopefully fixes issue https://github.com/Hamlib/Hamlib/issues/1580
-        if (retcode == RIG_OK && mode == mode_curr
-                && RIG_ICOM != RIG_BACKEND_NUM(rig->caps->rig_model))
-#else
-        if (retcode == RIG_OK && mode == mode_curr)
-#endif
+        if (retcode == RIG_OK && mode_satisfies_request(mode, mode_curr))
         {
-            rig_debug(RIG_DEBUG_VERBOSE,
-                      "%s: mode already %s and bw change not requested\n", __func__,
-                      rig_strrmode(mode));
-            ELAPSED2;
-            LOCK(0);
-            RETURNFUNC(RIG_OK);
+            mode = mode_curr;
+
+            if (width == RIG_PASSBAND_NOCHANGE)
+            {
+                rig_set_cache_mode(rig, vfo, mode_curr, width_curr);
+                rig_debug(RIG_DEBUG_VERBOSE,
+                          "%s: mode already %s and bw change not requested\n", __func__,
+                          rig_strrmode(mode_curr));
+                ELAPSED2;
+                LOCK(0);
+                RETURNFUNC(RIG_OK);
+            }
         }
     }
 
     if ((caps->targetable_vfo & RIG_TARGETABLE_MODE)
-            || vfo == rs->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->set_mode(rig, vfo, mode, width);
@@ -2944,7 +3051,7 @@ int HAMLIB_API rig_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
 
         // If the rig does not support targetable mode, only set mode on an unselected if it is changing
         // to avoid unnecessary VFO swapping
-        if (vfo != rs->current_vfo)
+        if (vfo != rig_get_current_vfo_state(rig))
         {
             freq_t cache_freq;
             rmode_t cache_mode;
@@ -2954,7 +3061,7 @@ int HAMLIB_API rig_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
             rig_get_cache(rig, vfo, &cache_freq, &cache_ms_freq, &cache_mode,
                           &cache_ms_mode, &cache_width, &cache_ms_width);
 
-            if (cache_mode == mode)
+            if (cache_mode == mode && width == RIG_PASSBAND_NOCHANGE)
             {
                 rig_debug(RIG_DEBUG_TRACE, "%s: mode not changing, so ignoring\n",
                           __func__);
@@ -2974,7 +3081,7 @@ int HAMLIB_API rig_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
             RETURNFUNC(-RIG_ENAVAIL);
         }
 
-        curr_vfo = rs->current_vfo;
+        curr_vfo = rig_get_current_vfo_state(rig);
         rig_debug(RIG_DEBUG_VERBOSE, "%s(%d): curr_vfo=%s, vfo=%s\n", __func__,
                   __LINE__, rig_strvfo(curr_vfo), rig_strvfo(vfo));
         HAMLIB_TRACE;
@@ -2987,7 +3094,37 @@ int HAMLIB_API rig_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
             RETURNFUNC(retcode);
         }
 
-        retcode = caps->set_mode(rig, vfo, mode, width);
+        int skip_set_mode = 0;
+
+        if (caps->get_mode && (width == RIG_PASSBAND_NOCHANGE
+                               || mode == RIG_MODE_PKTUSB || mode == RIG_MODE_PKTLSB))
+        {
+            rmode_t mode_curr;
+            pbwidth_t width_curr;
+
+            retcode = caps->get_mode(rig, vfo, &mode_curr, &width_curr);
+
+            if (retcode == RIG_OK && mode_satisfies_request(mode, mode_curr))
+            {
+                mode = mode_curr;
+
+                if (width == RIG_PASSBAND_NOCHANGE)
+                {
+                    width = width_curr;
+                    skip_set_mode = 1;
+                }
+            }
+            else
+            {
+                retcode = RIG_OK;
+            }
+        }
+
+        if (retcode == RIG_OK && !skip_set_mode)
+        {
+            retcode = caps->set_mode(rig, vfo, mode, width);
+        }
+
         /* try and revert even if we had an error above */
         rc2 = caps->set_vfo(rig, curr_vfo);
 
@@ -3044,10 +3181,10 @@ int HAMLIB_API rig_get_mode(RIG *rig,
     const struct rig_caps *caps;
     struct rig_state *rs;
     int retcode;
-    int use_cache = 0;
+    bool use_cache;
+    int cache_timeout_ms;
     freq_t freq;
     vfo_t curr_vfo;
-    struct rig_cache *cachep;
 
     if (CHECK_RIG_ARG(rig))
     {
@@ -3066,7 +3203,6 @@ int HAMLIB_API rig_get_mode(RIG *rig,
 
     caps = rig->caps;
     rs = STATE(rig);
-    cachep = CACHE(rig);
 
     if (caps->get_mode == NULL)
     {
@@ -3074,8 +3210,8 @@ int HAMLIB_API rig_get_mode(RIG *rig,
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = rs->current_vfo;
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    curr_vfo = rig_get_current_vfo_state(rig);
+    vfo = vfo_fixup_current(rig, vfo);
 
     if (vfo == RIG_VFO_CURR) { vfo = curr_vfo; }
 
@@ -3084,18 +3220,16 @@ int HAMLIB_API rig_get_mode(RIG *rig,
     int cache_ms_freq, cache_ms_mode, cache_ms_width;
     rig_get_cache(rig, vfo, &freq, &cache_ms_freq, mode, &cache_ms_mode, width,
                   &cache_ms_width);
+    cache_timeout_ms = rig_get_cache_timeout_ms(rig, HAMLIB_CACHE_ALL);
     rig_debug(RIG_DEBUG_TRACE, "%s: %s cache check age=%dms\n", __func__,
               rig_strvfo(vfo), cache_ms_mode);
 
     rig_cache_show(rig, __func__, __LINE__);
 
-    if (MUTEX_CHECK(&morse_mutex))
-    {
-        use_cache = 1;
-    }
+    // See comments in rig_get_freq
+    use_cache = morse_busy_load(rs) || (rs->use_cached_mode != 0);
 
-    if (cachep->timeout_ms == HAMLIB_CACHE_ALWAYS
-            || rs->use_cached_mode || use_cache)
+    if (cache_timeout_ms == HAMLIB_CACHE_ALWAYS || use_cache)
     {
         rig_debug(RIG_DEBUG_TRACE, "%s: cache hit age mode=%dms, width=%dms\n",
                   __func__, cache_ms_mode, cache_ms_width);
@@ -3104,8 +3238,8 @@ int HAMLIB_API rig_get_mode(RIG *rig,
         RETURNFUNC(RIG_OK);
     }
 
-    if ((*mode != RIG_MODE_NONE && cache_ms_mode < cachep->timeout_ms)
-            && cache_ms_width < cachep->timeout_ms)
+    if ((*mode != RIG_MODE_NONE && cache_ms_mode < cache_timeout_ms)
+            && cache_ms_width < cache_timeout_ms)
     {
         rig_debug(RIG_DEBUG_TRACE, "%s: cache hit age mode=%dms, width=%dms\n",
                   __func__, cache_ms_mode, cache_ms_width);
@@ -3123,7 +3257,7 @@ int HAMLIB_API rig_get_mode(RIG *rig,
 
     if ((caps->targetable_vfo & RIG_TARGETABLE_MODE)
             || vfo == RIG_VFO_CURR
-            || vfo == rs->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->get_mode(rig, vfo, mode, width);
@@ -3169,7 +3303,7 @@ int HAMLIB_API rig_get_mode(RIG *rig,
     }
 
     if (retcode == RIG_OK
-            && (vfo == RIG_VFO_CURR || vfo == rs->current_vfo))
+            && (vfo == RIG_VFO_CURR || vfo == rig_get_current_vfo_state(rig)))
     {
         rig_debug(RIG_DEBUG_TRACE, "%s(%d): debug\n", __func__, __LINE__);
         rs->current_mode = *mode;
@@ -3177,13 +3311,21 @@ int HAMLIB_API rig_get_mode(RIG *rig,
         rig_cache_show(rig, __func__, __LINE__);
     }
 
-    if (*width == RIG_PASSBAND_NORMAL && *mode != RIG_MODE_NONE)
+    if (retcode == RIG_OK && *width == RIG_PASSBAND_NORMAL
+            && *mode != RIG_MODE_NONE)
     {
         rig_debug(RIG_DEBUG_TRACE, "%s(%d): debug\n", __func__, __LINE__);
         *width = rig_passband_normal(rig, *mode);
     }
 
-    rig_set_cache_mode(rig, vfo, *mode, *width);
+    if (retcode == RIG_OK)
+    {
+        rig_set_cache_mode(rig, vfo, *mode, *width);
+    }
+    else
+    {
+        rig_invalidate_cache_mode(rig, vfo);
+    }
     rig_cache_show(rig, __func__, __LINE__);
 
     LOCK(0);
@@ -3207,7 +3349,6 @@ int HAMLIB_API rig_get_mode(RIG *rig,
 pbwidth_t HAMLIB_API rig_passband_normal(RIG *rig, rmode_t mode)
 {
     const struct rig_state *rs;
-    int i;
 
     if (!rig)
     {
@@ -3224,7 +3365,7 @@ pbwidth_t HAMLIB_API rig_passband_normal(RIG *rig, rmode_t mode)
 
     if (mode == RIG_MODE_RTTYR) { mode = RIG_MODE_RTTY; }
 
-    for (i = 0; i < HAMLIB_FLTLSTSIZ && rs->filters[i].modes; i++)
+    for (int i = 0; i < HAMLIB_FLTLSTSIZ && rs->filters[i].modes; i++)
     {
         if (rs->filters[i].modes & mode)
         {
@@ -3259,7 +3400,6 @@ pbwidth_t HAMLIB_API rig_passband_narrow(RIG *rig, rmode_t mode)
 {
     const struct rig_state *rs;
     pbwidth_t normal;
-    int i;
 
     if (!rig)
     {
@@ -3271,7 +3411,7 @@ pbwidth_t HAMLIB_API rig_passband_narrow(RIG *rig, rmode_t mode)
 
     rs = STATE(rig);
 
-    for (i = 0; i < HAMLIB_FLTLSTSIZ - 1 && rs->filters[i].modes; i++)
+    for (int i = 0; i < HAMLIB_FLTLSTSIZ - 1 && rs->filters[i].modes; i++)
     {
         if (rs->filters[i].modes & mode)
         {
@@ -3312,7 +3452,6 @@ pbwidth_t HAMLIB_API rig_passband_wide(RIG *rig, rmode_t mode)
 {
     const struct rig_state *rs;
     pbwidth_t normal;
-    int i;
 
     if (!rig)
     {
@@ -3324,7 +3463,7 @@ pbwidth_t HAMLIB_API rig_passband_wide(RIG *rig, rmode_t mode)
 
     rs = STATE(rig);
 
-    for (i = 0; i < HAMLIB_FLTLSTSIZ - 1 && rs->filters[i].modes; i++)
+    for (int i = 0; i < HAMLIB_FLTLSTSIZ - 1 && rs->filters[i].modes; i++)
     {
         if (rs->filters[i].modes & mode)
         {
@@ -3371,8 +3510,6 @@ int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
 #endif
 {
     const struct rig_caps *caps;
-    struct rig_cache *cachep;
-    struct rig_state *rs;
     int retcode;
     freq_t curr_freq;
     vfo_t curr_vfo = RIG_VFO_CURR, tmp_vfo;
@@ -3382,9 +3519,6 @@ int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
         rig_debug(RIG_DEBUG_ERR, "%s: rig or rig->caps is null\n", __func__);
         return -RIG_EINVAL;
     }
-
-    rs = STATE(rig);
-    cachep = CACHE(rig);
 
     ELAPSED1;
     ENTERFUNC;
@@ -3401,7 +3535,7 @@ int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
                   __func__, rig_strvfo(vfo));
     }
 
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    vfo = vfo_fixup_current(rig, vfo);
 
     if (vfo == RIG_VFO_CURR)
     {
@@ -3409,7 +3543,7 @@ int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
         RETURNFUNC(RIG_OK);
     }
 
-    if (rig->caps->get_vfo)
+    if (rig_has_get_vfo(rig))
     {
         retcode = rig_get_vfo(rig, &curr_vfo);
 
@@ -3419,10 +3553,10 @@ int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
                       rigerror(retcode));
         }
 
-        if (curr_vfo == vfo) { RETURNFUNC(RIG_OK); }
+        if (retcode == RIG_OK && curr_vfo == vfo) { RETURNFUNC(RIG_OK); }
     }
 
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    vfo = vfo_fixup_current(rig, vfo);
 
     caps = rig->caps;
 
@@ -3441,20 +3575,18 @@ int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
             RIG_OK); // would be better as error but other software won't handle errors
     }
 
-    HAMLIB_TRACE;
-    vfo_t vfo_save = rs->current_vfo;
-
     LOCK(1);
+    HAMLIB_TRACE;
+    vfo_t vfo_save = rig_get_current_vfo_state(rig);
 
-    if (vfo != RIG_VFO_CURR) { rs->current_vfo = vfo; }
+    if (vfo != RIG_VFO_CURR) { rig_set_current_vfo_state(rig, vfo); }
 
     retcode = caps->set_vfo(rig, vfo);
 
     if (retcode == RIG_OK)
     {
-        vfo = rs->current_vfo; // vfo may change in the rig backend
-        cachep->vfo = vfo;
-        elapsed_ms(&cachep->time_vfo, HAMLIB_ELAPSED_SET);
+        vfo = rig_get_current_vfo_state(rig); // vfo may change in the rig backend
+        rig_observe_current_vfo(rig, vfo);
         rig_debug(RIG_DEBUG_TRACE, "%s: rs->current_vfo=%s\n", __func__,
                   rig_strvfo(vfo));
     }
@@ -3462,7 +3594,7 @@ int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
     {
         rig_debug(RIG_DEBUG_ERR, "%s: set_vfo %s failed with '%.10000s'\n", __func__,
                   rig_strvfo(vfo), rigerror(retcode));
-        rs->current_vfo = vfo_save;
+        rig_set_current_vfo_state(rig, vfo_save);
     }
 
     // we need to update our internal freq to avoid getting detected as twiddling
@@ -3482,7 +3614,7 @@ int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
         rig_set_cache_freq(rig, RIG_VFO_ALL, (freq_t)0);
     }
 
-    if (vfo != rs->current_vfo && rig_get_vfo(rig, &tmp_vfo) == -RIG_ENAVAIL)
+    if (vfo != rig_get_current_vfo_state(rig) && rig_get_vfo(rig, &tmp_vfo) == -RIG_ENAVAIL)
     {
         rig_debug(RIG_DEBUG_TRACE,
                   "%s: Expiring all cache due to VFO change and no get_vfo\n", __func__);
@@ -3492,7 +3624,7 @@ int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
 
     rig_debug(RIG_DEBUG_TRACE, "%s: returning %d, vfo=%s, curr_vfo=%s\n", __func__,
               retcode,
-              rig_strvfo(vfo), rig_strvfo(rs->current_vfo));
+              rig_strvfo(vfo), rig_strvfo(rig_get_current_vfo_state(rig)));
     ELAPSED2;
     LOCK(0);
     RETURNFUNC(retcode);
@@ -3516,12 +3648,12 @@ int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
  */
 int HAMLIB_API rig_get_vfo(RIG *rig, vfo_t *vfo)
 {
-    const struct rig_caps *caps;
-    struct rig_cache *cachep;
     struct rig_state *rs;
     int retcode = -RIG_EINTERNAL;
     int cache_ms;
-    int use_cache = 0;
+    int cache_timeout_ms;
+    bool use_cache;
+    vfo_t result_vfo;
 
     if (CHECK_RIG_ARG(rig) || !vfo)
     {
@@ -3532,31 +3664,27 @@ int HAMLIB_API rig_get_vfo(RIG *rig, vfo_t *vfo)
     ENTERFUNC;
     ELAPSED1;
 
-    caps = rig->caps;
     rs = STATE(rig);
-    cachep = CACHE(rig);
 
 //    if (caps->get_vfo == NULL && RIG_ICOM != RIG_BACKEND_NUM(rig->caps->rig_model))
-    if (caps->get_vfo == NULL)
+    if (!rig_has_get_vfo(rig))
     {
         rig_debug(RIG_DEBUG_WARN, "%s: no get_vfo\n", __func__);
         ELAPSED2;
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    cache_ms = elapsed_ms(&cachep->time_vfo, HAMLIB_ELAPSED_GET);
+    rig_get_cached_vfo(rig, &result_vfo, &cache_ms, &cache_timeout_ms);
     //rig_debug(RIG_DEBUG_TRACE, "%s: cache check age=%dms\n", __func__, cache_ms);
 
-    if (MUTEX_CHECK(&morse_mutex))
-    {
-        use_cache = 1;
-    }
+    // See comments in rig_get_freq
+    use_cache = morse_busy_load(rs);
 
-    if (cache_ms < cachep->timeout_ms || use_cache)
+    if (cache_ms < cache_timeout_ms || use_cache)
     {
-        *vfo = cachep->vfo;
         rig_debug(RIG_DEBUG_TRACE, "%s: cache hit age=%dms, vfo=%s\n", __func__,
-                  cache_ms, rig_strvfo(*vfo));
+                  cache_ms, rig_strvfo(result_vfo));
+        *vfo = result_vfo;
         ELAPSED2;
         RETURNFUNC(RIG_OK);
     }
@@ -3568,27 +3696,31 @@ int HAMLIB_API rig_get_vfo(RIG *rig, vfo_t *vfo)
     HAMLIB_TRACE;
     LOCK(1);
 
-    if (rig->caps->get_vfo)
+    if (!rig_has_get_vfo(rig))
     {
-        retcode = rig->caps->get_vfo(rig, vfo);
+        // The refusal came in while this caller waited for the lock
+        retcode = -RIG_ENAVAIL;
+    }
+    else
+    {
+        retcode = rig->caps->get_vfo(rig, &result_vfo);
 
         if (retcode == RIG_OK)
         {
-            rs->current_vfo = *vfo;
-            cachep->vfo = *vfo;
-            //cache_ms = elapsed_ms(&cachep->time_vfo, HAMLIB_ELAPSED_SET);
+            rig_observe_current_vfo(rig, result_vfo);
+            *vfo = result_vfo;
         }
-        else
+        else if (retcode == -RIG_ENAVAIL
+                 && RIG_ICOM == RIG_BACKEND_NUM(rig->caps->rig_model))
         {
-            if (RIG_ICOM == RIG_BACKEND_NUM(rig->caps->rig_model))
-            {
-                rig->caps->get_vfo = NULL;
-                *vfo = RIG_VFO_A;
-                LOCK(0);
-                RETURNFUNC(RIG_OK);
-            }
-
-            //cache_ms = elapsed_ms(&cachep->time_vfo, HAMLIB_ELAPSED_INVALIDATE);
+            /* icom_get_vfo() found the rig lacks 07 D2; a refusal in standby
+               or a timeout goes to the caller.  rig_caps is one static per
+               model, shared by every rig opened from it, so remember this
+               on the handle */
+            no_get_vfo_set(rig);
+            *vfo = RIG_VFO_A;
+            LOCK(0);
+            RETURNFUNC(RIG_OK);
         }
     }
 
@@ -3623,7 +3755,6 @@ int HAMLIB_API rig_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
     const struct rig_caps *caps;
     struct rig_state *rs;
     hamlib_port_t *rp, *pttp;
-    struct rig_cache *cachep;
     int retcode = RIG_OK;
 
     if (CHECK_RIG_ARG(rig))
@@ -3637,7 +3768,6 @@ int HAMLIB_API rig_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
 
     caps = rig->caps;
     rs = STATE(rig);
-    cachep = CACHE(rig);
     rp = RIGPORT(rig);
     pttp = PTTPORT(rig);
 
@@ -3662,7 +3792,7 @@ int HAMLIB_API rig_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
 
         if ((caps->targetable_vfo & RIG_TARGETABLE_PTT)
                 || vfo == RIG_VFO_CURR
-                || vfo == rs->current_vfo)
+                || vfo == rig_get_current_vfo_state(rig))
         {
             int retry = 3;
             ptt_t tptt;
@@ -3683,7 +3813,7 @@ int HAMLIB_API rig_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
                 hl_usleep(50 * 1000); // give PTT a chance to do its thing
 
                 // don't use the cached value and check to see if it worked
-                elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_INVALIDATE);
+                rig_invalidate_cache_ptt(rig);
 
                 tptt = -1;
                 // IC-9700 is failing on get_ptt right after set_ptt in split mode
@@ -3717,7 +3847,7 @@ int HAMLIB_API rig_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
                 RETURNFUNC(-RIG_ENAVAIL);
             }
 
-            curr_vfo = rs->current_vfo;
+            curr_vfo = rig_get_current_vfo_state(rig);
             HAMLIB_TRACE;
             backend_num = RIG_BACKEND_NUM(rig->caps->rig_model);
 
@@ -3924,8 +4054,7 @@ int HAMLIB_API rig_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
     // is requested on a rig that can't change freq on a transmitting VFO
     if (ptt != RIG_PTT_ON) { hl_usleep(50 * 1000); }
 
-    cachep->ptt = ptt;
-    elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
+    rig_set_cache_ptt(rig, ptt);
 
     if (retcode != RIG_OK) { rig_debug(RIG_DEBUG_ERR, "%s: Return code=%d\n", __func__, retcode); }
 
@@ -3956,11 +4085,11 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
     const struct rig_caps *caps;
     struct rig_state *rs;
     hamlib_port_t *rp, *pttp;
-    struct rig_cache *cachep;
     int retcode = RIG_OK;
     int status;
     vfo_t curr_vfo;
     int cache_ms;
+    int cache_timeout_ms;
     int targetable_ptt = 0;
     int backend_num;
 
@@ -3971,7 +4100,6 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
     }
 
     rs = STATE(rig);
-    cachep = CACHE(rig);
     rp = RIGPORT(rig);
     pttp = PTTPORT(rig);
 
@@ -3984,13 +4112,12 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
         RETURNFUNC(-RIG_EINVAL);
     }
 
-    cache_ms = elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_GET);
+    rig_get_cache_ptt(rig, ptt, &cache_ms, &cache_timeout_ms);
     rig_debug(RIG_DEBUG_TRACE, "%s: cache check age=%dms\n", __func__, cache_ms);
 
-    if (cache_ms < cachep->timeout_ms)
+    if (cache_ms < cache_timeout_ms)
     {
         rig_debug(RIG_DEBUG_TRACE, "%s: cache hit age=%dms\n", __func__, cache_ms);
-        *ptt = cachep->ptt;
         ELAPSED2;
         RETURNFUNC(RIG_OK);
     }
@@ -4017,15 +4144,14 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
 
         if ((caps->targetable_vfo & RIG_TARGETABLE_PTT)
                 || vfo == RIG_VFO_CURR
-                || vfo == rs->current_vfo)
+                || vfo == rig_get_current_vfo_state(rig))
         {
             HAMLIB_TRACE;
             retcode = caps->get_ptt(rig, vfo, ptt);
 
             if (retcode == RIG_OK)
             {
-                cachep->ptt = *ptt;
-                elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
+                rig_set_cache_ptt(rig, *ptt);
             }
 
             ELAPSED2;
@@ -4040,7 +4166,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
             RETURNFUNC(-RIG_ENAVAIL);
         }
 
-        curr_vfo = rs->current_vfo;
+        curr_vfo = rig_get_current_vfo_state(rig);
         HAMLIB_TRACE;
         backend_num = RIG_BACKEND_NUM(rig->caps->rig_model);
 
@@ -4078,8 +4204,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
             {
                 /* Return the first error code */
                 retcode = rc2;
-                cachep->ptt = *ptt;
-                elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
+                rig_set_cache_ptt(rig, *ptt);
             }
         }
 
@@ -4096,8 +4221,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
 
             if (retcode == RIG_OK)
             {
-                elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
-                cachep->ptt = *ptt;
+                rig_set_cache_ptt(rig, *ptt);
             }
 
             LOCK(0);
@@ -4119,8 +4243,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
             *ptt = status ? RIG_PTT_ON : RIG_PTT_OFF;
         }
 
-        cachep->ptt = *ptt;
-        elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
+        rig_set_cache_ptt(rig, *ptt);
         ELAPSED2;
         LOCK(0);
         RETURNFUNC(retcode);
@@ -4134,8 +4257,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
 
             if (retcode == RIG_OK)
             {
-                elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
-                cachep->ptt = *ptt;
+                rig_set_cache_ptt(rig, *ptt);
             }
 
             ELAPSED2;
@@ -4157,8 +4279,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
             *ptt = status ? RIG_PTT_ON : RIG_PTT_OFF;
         }
 
-        cachep->ptt = *ptt;
-        elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
+        rig_set_cache_ptt(rig, *ptt);
         ELAPSED2;
         LOCK(0);
         RETURNFUNC(retcode);
@@ -4171,8 +4292,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
 
             if (retcode == RIG_OK)
             {
-                elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
-                cachep->ptt = *ptt;
+                rig_set_cache_ptt(rig, *ptt);
             }
 
             ELAPSED2;
@@ -4184,8 +4304,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
 
         if (retcode == RIG_OK)
         {
-            elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
-            cachep->ptt = *ptt;
+            rig_set_cache_ptt(rig, *ptt);
         }
 
         ELAPSED2;
@@ -4200,8 +4319,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
 
             if (retcode == RIG_OK)
             {
-                elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
-                cachep->ptt = *ptt;
+                rig_set_cache_ptt(rig, *ptt);
             }
 
             ELAPSED2;
@@ -4213,8 +4331,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
 
         if (retcode == RIG_OK)
         {
-            elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
-            cachep->ptt = *ptt;
+            rig_set_cache_ptt(rig, *ptt);
         }
 
         ELAPSED2;
@@ -4230,8 +4347,7 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
 
             if (retcode == RIG_OK)
             {
-                elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
-                cachep->ptt = *ptt;
+                rig_set_cache_ptt(rig, *ptt);
             }
 
             ELAPSED2;
@@ -4239,8 +4355,13 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
             RETURNFUNC(retcode);
         }
 
-        elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
         retcode = gpio_ptt_get(pttp, ptt);
+
+        if (retcode == RIG_OK)
+        {
+            rig_set_cache_ptt(rig, *ptt);
+        }
+
         ELAPSED2;
         LOCK(0);
         RETURNFUNC(retcode);
@@ -4256,7 +4377,6 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
         RETURNFUNC(-RIG_EINVAL);
     }
 
-    elapsed_ms(&cachep->time_ptt, HAMLIB_ELAPSED_SET);
     ELAPSED2;
     LOCK(0);
     RETURNFUNC(RIG_OK);
@@ -4279,7 +4399,6 @@ int HAMLIB_API rig_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
 int HAMLIB_API rig_get_dcd(RIG *rig, vfo_t vfo, dcd_t *dcd)
 {
     const struct rig_caps *caps;
-    struct rig_state *rs;
     hamlib_port_t *dcdp;
     int retcode, rc2, status;
     vfo_t curr_vfo;
@@ -4300,7 +4419,6 @@ int HAMLIB_API rig_get_dcd(RIG *rig, vfo_t vfo, dcd_t *dcd)
     }
 
     caps = rig->caps;
-    rs = STATE(rig);
     dcdp = DCDPORT(rig);
 
     switch (dcdp->type.dcd)
@@ -4313,7 +4431,7 @@ int HAMLIB_API rig_get_dcd(RIG *rig, vfo_t vfo, dcd_t *dcd)
         }
 
         if (vfo == RIG_VFO_CURR
-                || vfo == rs->current_vfo)
+                || vfo == rig_get_current_vfo_state(rig))
         {
             HAMLIB_TRACE;
             retcode = caps->get_dcd(rig, vfo, dcd);
@@ -4327,7 +4445,7 @@ int HAMLIB_API rig_get_dcd(RIG *rig, vfo_t vfo, dcd_t *dcd)
             RETURNFUNC(-RIG_ENAVAIL);
         }
 
-        curr_vfo = rs->current_vfo;
+        curr_vfo = rig_get_current_vfo_state(rig);
         HAMLIB_TRACE;
         retcode = caps->set_vfo(rig, vfo);
 
@@ -4435,7 +4553,7 @@ int HAMLIB_API rig_set_rptr_shift(RIG *rig, vfo_t vfo, rptr_shift_t rptr_shift)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->set_rptr_shift(rig, vfo, rptr_shift);
@@ -4449,7 +4567,7 @@ int HAMLIB_API rig_set_rptr_shift(RIG *rig, vfo_t vfo, rptr_shift_t rptr_shift)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -4519,7 +4637,7 @@ int HAMLIB_API rig_get_rptr_shift(RIG *rig, vfo_t vfo, rptr_shift_t *rptr_shift)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->get_rptr_shift(rig, vfo, rptr_shift);
@@ -4533,7 +4651,7 @@ int HAMLIB_API rig_get_rptr_shift(RIG *rig, vfo_t vfo, rptr_shift_t *rptr_shift)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -4597,7 +4715,7 @@ int HAMLIB_API rig_set_rptr_offs(RIG *rig, vfo_t vfo, shortfreq_t rptr_offs)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->set_rptr_offs(rig, vfo, rptr_offs);
@@ -4611,7 +4729,7 @@ int HAMLIB_API rig_set_rptr_offs(RIG *rig, vfo_t vfo, shortfreq_t rptr_offs)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -4680,7 +4798,7 @@ int HAMLIB_API rig_get_rptr_offs(RIG *rig, vfo_t vfo, shortfreq_t *rptr_offs)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->get_rptr_offs(rig, vfo, rptr_offs);
@@ -4694,7 +4812,7 @@ int HAMLIB_API rig_get_rptr_offs(RIG *rig, vfo_t vfo, shortfreq_t *rptr_offs)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -4736,8 +4854,7 @@ int HAMLIB_API rig_get_rptr_offs(RIG *rig, vfo_t vfo, shortfreq_t *rptr_offs)
 int HAMLIB_API rig_set_split_freq(RIG *rig, vfo_t vfo, freq_t tx_freq)
 {
     const struct rig_caps *caps;
-    const struct rig_state *rs;
-    struct rig_cache *cachep;
+    struct rig_cache_routing_snapshot routing;
     int retcode, rc2;
     vfo_t curr_vfo, tx_vfo;
     freq_t tfreq = 0;
@@ -4751,22 +4868,21 @@ int HAMLIB_API rig_set_split_freq(RIG *rig, vfo_t vfo, freq_t tx_freq)
     ENTERFUNC2;
     ELAPSED1;
 
-    rs = STATE(rig);
     caps = rig->caps;
-    cachep = CACHE(rig);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s called vfo=%s, curr_vfo=%s, tx_freq=%.0f\n",
               __func__,
-              rig_strvfo(vfo), rig_strvfo(rs->current_vfo), tx_freq);
+              rig_strvfo(vfo), rig_strvfo(routing.current_vfo), tx_freq);
 
     // Always use the previously selected TX VFO for split. The targeted VFO will have no effect.
-    tx_vfo = rs->tx_vfo;
+    tx_vfo = routing.tx_vfo;
 
-    if (cachep->split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
+    if (routing.split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
             || tx_vfo == RIG_VFO_CURR)
     {
         // Turn split on if not enabled already
-        retcode = rig_set_split_vfo(rig, rs->current_vfo, RIG_SPLIT_ON, vfo_fixup(rig,
+        retcode = rig_set_split_vfo(rig, routing.current_vfo, RIG_SPLIT_ON, vfo_fixup(rig,
                                     RIG_VFO_OTHER, RIG_SPLIT_OFF));
 
         if (retcode != RIG_OK)
@@ -4779,13 +4895,17 @@ int HAMLIB_API rig_set_split_freq(RIG *rig, vfo_t vfo, freq_t tx_freq)
     }
 
     // TX VFO may change after enabling split
-    tx_vfo = rs->tx_vfo;
+    rig_get_cache_routing_snapshot(rig, &routing);
+    tx_vfo = routing.tx_vfo;
 
-    rig_get_freq(rig, tx_vfo, &tfreq);
-
-    if (tfreq == tx_freq)
+    // While transmitting, setting the TX frequency again can drop PTT on the
+    // band check in rig_set_freq() or stall on rigs that refuse it during TX
+    if (routing.ptt != RIG_PTT_OFF
+            && rig_get_freq(rig, tx_vfo, &tfreq) == RIG_OK
+            && tfreq == tx_freq)
     {
-        rig_debug(RIG_DEBUG_TRACE, "%s: freq set not needed\n", __func__);
+        rig_debug(RIG_DEBUG_TRACE, "%s: TX freq already set while transmitting\n",
+                  __func__);
         ELAPSED2;
         RETURNFUNC2(RIG_OK);
     }
@@ -4833,8 +4953,8 @@ int HAMLIB_API rig_set_split_freq(RIG *rig, vfo_t vfo, freq_t tx_freq)
     }
 
     // Assisted mode: Swap VFOs and try either set_split_freq or set_freq
-    curr_vfo = rs->current_vfo;
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    curr_vfo = routing.current_vfo;
+    vfo = vfo_fixup_current(rig, vfo);
 
     if (caps->set_vfo)
     {
@@ -4926,8 +5046,7 @@ int HAMLIB_API rig_set_split_freq(RIG *rig, vfo_t vfo, freq_t tx_freq)
 int HAMLIB_API rig_get_split_freq(RIG *rig, vfo_t vfo, freq_t *tx_freq)
 {
     const struct rig_caps *caps;
-    const struct rig_state *rs;
-    struct rig_cache *cachep;
+    struct rig_cache_routing_snapshot routing;
     int retcode = -RIG_EPROTO, rc2;
     vfo_t tx_vfo;
 
@@ -4947,13 +5066,12 @@ int HAMLIB_API rig_get_split_freq(RIG *rig, vfo_t vfo, freq_t *tx_freq)
     }
 
     caps = rig->caps;
-    rs = STATE(rig);
-    cachep = CACHE(rig);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     // Always use the previously selected TX VFO for split. The targeted VFO will have no effect.
-    tx_vfo = rs->tx_vfo;
+    tx_vfo = routing.tx_vfo;
 
-    if (cachep->split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
+    if (routing.split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
             || tx_vfo == RIG_VFO_CURR)
     {
         // Split frequency not available if split is off
@@ -4993,7 +5111,7 @@ int HAMLIB_API rig_get_split_freq(RIG *rig, vfo_t vfo, freq_t *tx_freq)
     }
 
     // Assisted mode: Swap VFOs and try either get_split_freq or get_freq
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    vfo = vfo_fixup_current(rig, vfo);
 
     if (caps->set_vfo)
     {
@@ -5106,8 +5224,7 @@ int HAMLIB_API rig_set_split_mode(RIG *rig,
                                   pbwidth_t tx_width)
 {
     const struct rig_caps *caps;
-    const struct rig_state *rs;
-    struct rig_cache *cachep;
+    struct rig_cache_routing_snapshot routing;
     int retcode, rc2;
     vfo_t curr_vfo, tx_vfo, rx_vfo;
     freq_t cache_freq;
@@ -5125,17 +5242,16 @@ int HAMLIB_API rig_set_split_mode(RIG *rig,
     ENTERFUNC;
 
     caps = rig->caps;
-    rs = STATE(rig);
-    cachep = CACHE(rig);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     // Always use the previously selected TX VFO for split. The targeted VFO will have no effect.
-    tx_vfo = rs->tx_vfo;
+    tx_vfo = routing.tx_vfo;
 
-    if (cachep->split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
+    if (routing.split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
             || tx_vfo == RIG_VFO_CURR)
     {
         // Turn split on if not enabled already
-        retcode = rig_set_split_vfo(rig, rs->current_vfo, RIG_SPLIT_ON, vfo_fixup(rig,
+        retcode = rig_set_split_vfo(rig, routing.current_vfo, RIG_SPLIT_ON, vfo_fixup(rig,
                                     RIG_VFO_OTHER, RIG_SPLIT_OFF));
 
         if (retcode != RIG_OK)
@@ -5148,10 +5264,11 @@ int HAMLIB_API rig_set_split_mode(RIG *rig,
     }
 
     // TX VFO may change after enabling split
-    tx_vfo = rs->tx_vfo;
+    rig_get_cache_routing_snapshot(rig, &routing);
+    tx_vfo = routing.tx_vfo;
 
     // do not mess with mode while PTT is on
-    if (cachep->ptt)
+    if (routing.ptt)
     {
         rig_debug(RIG_DEBUG_VERBOSE, "%s PTT on so set_split_mode ignored\n", __func__);
         ELAPSED2;
@@ -5181,7 +5298,7 @@ int HAMLIB_API rig_set_split_mode(RIG *rig,
         RETURNFUNC(retcode);
     }
 
-    curr_vfo = rs->current_vfo;
+    curr_vfo = routing.current_vfo;
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s: curr_vfo=%s, tx_vfo=%s\n", __func__,
               rig_strvfo(curr_vfo), rig_strvfo(tx_vfo));
@@ -5191,14 +5308,8 @@ int HAMLIB_API rig_set_split_mode(RIG *rig,
                            || (rig->caps->rig_model == RIG_MODEL_NETRIGCTL)))
     {
         HAMLIB_TRACE;
-        retcode = caps->set_mode(rig, tx_vfo, tx_mode, tx_width);
+        retcode = rig_set_mode(rig, tx_vfo, tx_mode, tx_width);
         ELAPSED2;
-
-        if (retcode == RIG_OK)
-        {
-            rig_set_cache_mode(rig, tx_vfo, tx_mode, tx_width);
-        }
-
         RETURNFUNC(retcode);
     }
 
@@ -5342,8 +5453,7 @@ int HAMLIB_API rig_get_split_mode(RIG *rig, vfo_t vfo, rmode_t *tx_mode,
                                   pbwidth_t *tx_width)
 {
     const struct rig_caps *caps;
-    const struct rig_state *rs;
-    struct rig_cache *cachep;
+    struct rig_cache_routing_snapshot routing;
     int retcode, rc2;
     vfo_t curr_vfo, tx_vfo;
 
@@ -5363,13 +5473,12 @@ int HAMLIB_API rig_get_split_mode(RIG *rig, vfo_t vfo, rmode_t *tx_mode,
     }
 
     caps = rig->caps;
-    rs = STATE(rig);
-    cachep = CACHE(rig);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     // Always use the previously selected TX VFO for split. The targeted VFO will have no effect.
-    tx_vfo = rs->tx_vfo;
+    tx_vfo = routing.tx_vfo;
 
-    if (cachep->split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
+    if (routing.split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
             || tx_vfo == RIG_VFO_CURR)
     {
         // Split mode and filter width are not available if split is off
@@ -5410,7 +5519,7 @@ int HAMLIB_API rig_get_split_mode(RIG *rig, vfo_t vfo, rmode_t *tx_mode,
     }
 
     // Assisted mode: Swap VFOs and try either get_split_mode or get_mode
-    curr_vfo = rs->current_vfo;
+    curr_vfo = routing.current_vfo;
 
     if (caps->set_vfo)
     {
@@ -5509,9 +5618,8 @@ int HAMLIB_API rig_set_split_freq_mode(RIG *rig,
                                        pbwidth_t tx_width)
 {
     const struct rig_caps *caps;
-    const struct rig_state *rs;
     vfo_t tx_vfo;
-    struct rig_cache *cachep;
+    struct rig_cache_routing_snapshot routing;
     int retcode;
 
     if (CHECK_RIG_ARG(rig))
@@ -5524,17 +5632,16 @@ int HAMLIB_API rig_set_split_freq_mode(RIG *rig,
     ENTERFUNC;
 
     caps = rig->caps;
-    rs = STATE(rig);
-    cachep = CACHE(rig);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     // Always use the previously selected TX VFO for split. The targeted VFO will have no effect.
-    tx_vfo = rs->tx_vfo;
+    tx_vfo = routing.tx_vfo;
 
-    if (cachep->split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
+    if (routing.split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
             || tx_vfo == RIG_VFO_CURR)
     {
         // Turn split on if not enabled already
-        retcode = rig_set_split_vfo(rig, rs->current_vfo, RIG_SPLIT_ON, vfo_fixup(rig,
+        retcode = rig_set_split_vfo(rig, routing.current_vfo, RIG_SPLIT_ON, vfo_fixup(rig,
                                     RIG_VFO_OTHER, RIG_SPLIT_OFF));
 
         if (retcode != RIG_OK)
@@ -5547,9 +5654,10 @@ int HAMLIB_API rig_set_split_freq_mode(RIG *rig,
     }
 
     // TX VFO may change after enabling split
-    tx_vfo = rs->tx_vfo;
+    rig_get_cache_routing_snapshot(rig, &routing);
+    tx_vfo = routing.tx_vfo;
 
-    vfo = vfo_fixup(rig, RIG_VFO_TX, cachep->split); // get the TX VFO
+    vfo = vfo_fixup_current(rig, RIG_VFO_TX); // get the TX VFO
     rig_debug(RIG_DEBUG_VERBOSE,
               "%s: vfo=%s, tx_freq=%.0f, tx_mode=%s, tx_width=%d\n", __func__,
               rig_strvfo(vfo), tx_freq, rig_strrmode(tx_mode), (int)tx_width);
@@ -5651,8 +5759,7 @@ int HAMLIB_API rig_get_split_freq_mode(RIG *rig,
                                        pbwidth_t *tx_width)
 {
     const struct rig_caps *caps;
-    const struct rig_state *rs;
-    struct rig_cache *cachep;
+    struct rig_cache_routing_snapshot routing;
     vfo_t tx_vfo;
     int retcode;
 
@@ -5672,13 +5779,12 @@ int HAMLIB_API rig_get_split_freq_mode(RIG *rig,
     }
 
     caps = rig->caps;
-    rs = STATE(rig);
-    cachep = CACHE(rig);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     // Always use the previously selected TX VFO for split. The targeted VFO will have no effect.
-    tx_vfo = rs->tx_vfo;
+    tx_vfo = routing.tx_vfo;
 
-    if (cachep->split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
+    if (routing.split == RIG_SPLIT_OFF || tx_vfo == RIG_VFO_NONE
             || tx_vfo == RIG_VFO_CURR)
     {
         // Split frequency, mode and filter width are not available if split is off
@@ -5738,10 +5844,9 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
                                  vfo_t tx_vfo)
 {
     const struct rig_caps *caps;
-    struct rig_cache *cachep;
     int retcode;
-    struct rig_state *rs;
     vfo_t curr_vfo;
+    struct rig_cache_routing_snapshot routing;
 
     if (CHECK_RIG_ARG(rig))
     {
@@ -5750,14 +5855,13 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
     }
 
     caps = rig->caps;
-    rs = STATE(rig);
-    cachep = CACHE(rig);
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     ELAPSED1;
     ENTERFUNC;
     rig_debug(RIG_DEBUG_VERBOSE,
               "%s: rx_vfo=%s, split=%d, tx_vfo=%s, cache.split=%d\n", __func__,
-              rig_strvfo(rx_vfo), split, rig_strvfo(tx_vfo), cachep->split);
+              rig_strvfo(rx_vfo), split, rig_strvfo(tx_vfo), routing.split);
 
     if (caps->set_split_vfo == NULL)
     {
@@ -5765,7 +5869,7 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    if (cachep->ptt)
+    if (routing.ptt)
     {
         rig_debug(RIG_DEBUG_WARN, "%s: cannot execute when PTT is on\n", __func__);
         ELAPSED2;
@@ -5783,8 +5887,9 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
     {
         if (tx_vfo == RIG_VFO_CURR)
         {
-            tx_vfo = rs->current_vfo;
-            rx_vfo = vfo_fixup(rig, RIG_VFO_OTHER, split);
+            tx_vfo = routing.current_vfo;
+            rx_vfo = vfo_fixup_from_snapshot(
+                rig, RIG_VFO_OTHER, split, &routing, __func__, __LINE__);
         }
 
         // Fix up only special cases to allow ambiguous parameters
@@ -5809,8 +5914,10 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
                 break;
 
             default:
-                tx_vfo = rs->current_vfo;
-                rx_vfo = vfo_fixup(rig, RIG_VFO_OTHER, split);
+                tx_vfo = routing.current_vfo;
+                rx_vfo = vfo_fixup_from_snapshot(
+                    rig, RIG_VFO_OTHER, split, &routing,
+                    __func__, __LINE__);
                 break;
             }
         }
@@ -5843,8 +5950,10 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
             break;
         }
 
-        rx_vfo = vfo_fixup(rig, rx_vfo, split);
-        tx_vfo = vfo_fixup(rig, tx_vfo, split);
+        rx_vfo = vfo_fixup_from_snapshot(
+            rig, rx_vfo, split, &routing, __func__, __LINE__);
+        tx_vfo = vfo_fixup_from_snapshot(
+            rig, tx_vfo, split, &routing, __func__, __LINE__);
 
         rig_debug(RIG_DEBUG_VERBOSE, "%s: final rx_vfo=%s, tx_vfo=%s, split=%d\n",
                   __func__,
@@ -5858,13 +5967,14 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
             && (!(caps->rig_model == RIG_MODEL_NETRIGCTL)))
     {
         rig_set_vfo(rig, rx_vfo);
+        rig_get_cache_routing_snapshot(rig, &routing);
     }
 
     // Check if RX VFO is the currently active VFO and we don't need to change the VFO
-    if (rx_vfo == RIG_VFO_CURR || rx_vfo == rs->current_vfo)
+    if (rx_vfo == RIG_VFO_CURR || rx_vfo == routing.current_vfo)
     {
         // for non-targetable VFOs we will not set split again
-        if (cachep->split == split && cachep->split_vfo == tx_vfo)
+        if (routing.split == split && routing.split_vfo == tx_vfo)
         {
             rig_debug(RIG_DEBUG_VERBOSE, "%s(%d): split already on, ignoring\n", __func__,
                       __LINE__);
@@ -5876,23 +5986,12 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
 
         if (retcode == RIG_OK)
         {
-            // Only update cache on success
-            rs->rx_vfo = rs->current_vfo;
-            cachep->split = split;
-
-            if (split == RIG_SPLIT_OFF)
-            {
-                rs->tx_vfo = rs->current_vfo;
-                cachep->split_vfo = rs->current_vfo;
-            }
-            else
-            {
-                rs->tx_vfo = tx_vfo;
-                cachep->split_vfo = tx_vfo;
-            }
+            vfo_t published_tx_vfo = split == RIG_SPLIT_OFF
+                                      ? routing.current_vfo : tx_vfo;
+            rig_set_split_routing_state(
+                rig, split, routing.current_vfo, published_tx_vfo);
         }
 
-        elapsed_ms(&cachep->time_split, HAMLIB_ELAPSED_SET);
         ELAPSED2;
         RETURNFUNC(retcode);
     }
@@ -5905,7 +6004,7 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = rs->current_vfo;
+    curr_vfo = routing.current_vfo;
     HAMLIB_TRACE;
 
     if (!(caps->targetable_vfo & RIG_TARGETABLE_FREQ))
@@ -5936,33 +6035,32 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
 
     if (retcode == RIG_OK)
     {
-        // Only update cache on success
-        cachep->split = split;
+        vfo_t published_rx_vfo;
+        vfo_t published_tx_vfo;
 
         if (split == RIG_SPLIT_OFF)
         {
             if (caps->targetable_vfo & RIG_TARGETABLE_FREQ)
             {
-                rs->rx_vfo = rx_vfo;
-                rs->tx_vfo = rx_vfo;
-                cachep->split_vfo = rx_vfo;
+                published_rx_vfo = rx_vfo;
             }
             else
             {
-                rs->rx_vfo = rs->current_vfo;
-                rs->tx_vfo = rs->current_vfo;
-                cachep->split_vfo = rs->current_vfo;
+                published_rx_vfo = routing.current_vfo;
             }
+
+            published_tx_vfo = published_rx_vfo;
         }
         else
         {
-            rs->rx_vfo = rx_vfo;
-            rs->tx_vfo = tx_vfo;
-            cachep->split_vfo = tx_vfo;
+            published_rx_vfo = rx_vfo;
+            published_tx_vfo = tx_vfo;
         }
+
+        rig_set_split_routing_state(
+            rig, split, published_rx_vfo, published_tx_vfo);
     }
 
-    elapsed_ms(&cachep->time_split, HAMLIB_ELAPSED_SET);
     ELAPSED2;
     RETURNFUNC(retcode);
 }
@@ -5990,10 +6088,10 @@ int HAMLIB_API rig_get_split_vfo(RIG *rig,
 {
     const struct rig_caps *caps;
     struct rig_state *rs;
-    struct rig_cache *cachep;
     int retcode;
     int cache_ms;
-    int use_cache = 0;
+    int cache_timeout_ms;
+    bool use_cache;
 
     if (CHECK_RIG_ARG(rig))
     {
@@ -6014,31 +6112,24 @@ int HAMLIB_API rig_get_split_vfo(RIG *rig,
 
     caps = rig->caps;
     rs = STATE(rig);
-    cachep = CACHE(rig);
 
-    if (MUTEX_CHECK(&morse_mutex))
-    {
-        use_cache = 1;
-    }
+    // See comments in rig_get_freq
+    use_cache = morse_busy_load(rs);
+    rig_get_cache_split(rig, split, tx_vfo, &cache_ms, &cache_timeout_ms);
 
     if (caps->get_split_vfo == NULL || use_cache)
     {
         rig_debug(RIG_DEBUG_TRACE, "%s: ?get_split_vfo=%d use_cache=%d\n", __func__,
                   caps->get_split_vfo != NULL, use_cache);
         // if we can't get the vfo we will return whatever we have cached
-        *split = cachep->split;
-        *tx_vfo = cachep->split_vfo;
         ELAPSED2;
         RETURNFUNC(RIG_OK);
     }
 
-    cache_ms = elapsed_ms(&cachep->time_split, HAMLIB_ELAPSED_GET);
     rig_debug(RIG_DEBUG_TRACE, "%s: cache check age=%dms\n", __func__, cache_ms);
 
-    if (cache_ms < cachep->timeout_ms)
+    if (cache_ms < cache_timeout_ms)
     {
-        *split = cachep->split;
-        *tx_vfo = cachep->split_vfo;
         rig_debug(RIG_DEBUG_TRACE, "%s: cache hit age=%dms, split=%d, tx_vfo=%s\n",
                   __func__, cache_ms, *split, rig_strvfo(*tx_vfo));
         ELAPSED2;
@@ -6054,13 +6145,13 @@ int HAMLIB_API rig_get_split_vfo(RIG *rig,
 
     if (retcode == RIG_OK)
     {
-        // Only update cache on success
-        rs->tx_vfo = *tx_vfo;
-        cachep->split = *split;
-        cachep->split_vfo = *tx_vfo;
-        elapsed_ms(&cachep->time_split, HAMLIB_ELAPSED_SET);
+        struct rig_cache_routing_snapshot routing;
+
+        rig_get_cache_routing_snapshot(rig, &routing);
+        rig_set_split_routing_state(
+            rig, *split, routing.rx_vfo, *tx_vfo);
         rig_debug(RIG_DEBUG_TRACE, "%s(%d): cache.split=%d\n", __func__, __LINE__,
-                  cachep->split);
+                  *split);
     }
 
     ELAPSED2;
@@ -6105,7 +6196,7 @@ int HAMLIB_API rig_set_rit(RIG *rig, vfo_t vfo, shortfreq_t rit)
 
     if ((caps->targetable_vfo & RIG_TARGETABLE_RITXIT)
             || vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->set_rit(rig, vfo, rit);
@@ -6117,7 +6208,7 @@ int HAMLIB_API rig_set_rit(RIG *rig, vfo_t vfo, shortfreq_t rit)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -6182,7 +6273,7 @@ int HAMLIB_API rig_get_rit(RIG *rig, vfo_t vfo, shortfreq_t *rit)
 
     if ((caps->targetable_vfo & RIG_TARGETABLE_RITXIT)
             || vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->get_rit(rig, vfo, rit);
@@ -6194,7 +6285,7 @@ int HAMLIB_API rig_get_rit(RIG *rig, vfo_t vfo, shortfreq_t *rit)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -6255,7 +6346,7 @@ int HAMLIB_API rig_set_xit(RIG *rig, vfo_t vfo, shortfreq_t xit)
 
     if ((caps->targetable_vfo & RIG_TARGETABLE_RITXIT)
             || vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->set_xit(rig, vfo, xit);
@@ -6267,7 +6358,7 @@ int HAMLIB_API rig_set_xit(RIG *rig, vfo_t vfo, shortfreq_t xit)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -6332,7 +6423,7 @@ int HAMLIB_API rig_get_xit(RIG *rig, vfo_t vfo, shortfreq_t *xit)
 
     if ((caps->targetable_vfo & RIG_TARGETABLE_RITXIT)
             || vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->get_xit(rig, vfo, xit);
@@ -6344,7 +6435,7 @@ int HAMLIB_API rig_get_xit(RIG *rig, vfo_t vfo, shortfreq_t *xit)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -6404,7 +6495,7 @@ int HAMLIB_API rig_set_ts(RIG *rig, vfo_t vfo, shortfreq_t ts)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->set_ts(rig, vfo, ts);
@@ -6416,7 +6507,7 @@ int HAMLIB_API rig_set_ts(RIG *rig, vfo_t vfo, shortfreq_t ts)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -6481,7 +6572,7 @@ int HAMLIB_API rig_get_ts(RIG *rig, vfo_t vfo, shortfreq_t *ts)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->get_ts(rig, vfo, ts);
@@ -6493,7 +6584,7 @@ int HAMLIB_API rig_get_ts(RIG *rig, vfo_t vfo, shortfreq_t *ts)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -6559,7 +6650,7 @@ int HAMLIB_API rig_set_ant(RIG *rig, vfo_t vfo, ant_t ant, value_t option)
 
     if ((caps->targetable_vfo & RIG_TARGETABLE_ANT)
             || vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->set_ant(rig, vfo, ant, option);
@@ -6571,7 +6662,7 @@ int HAMLIB_API rig_set_ant(RIG *rig, vfo_t vfo, ant_t ant, value_t option)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -6653,7 +6744,7 @@ int HAMLIB_API rig_get_ant(RIG *rig, vfo_t vfo, ant_t ant, value_t *option,
 
     if ((caps->targetable_vfo & RIG_TARGETABLE_ANT)
             || vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         HAMLIB_TRACE;
         retcode = caps->get_ant(rig, vfo, ant, option, ant_curr, ant_tx, ant_rx);
@@ -6665,7 +6756,7 @@ int HAMLIB_API rig_get_ant(RIG *rig, vfo_t vfo, ant_t ant, value_t *option,
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -6851,7 +6942,6 @@ int HAMLIB_API rig_mW2power(RIG *rig,
 shortfreq_t HAMLIB_API rig_get_resolution(RIG *rig, rmode_t mode)
 {
     const struct rig_state *rs;
-    int i;
 
     if (!rig || !rig->caps || !mode)
     {
@@ -6863,7 +6953,7 @@ shortfreq_t HAMLIB_API rig_get_resolution(RIG *rig, rmode_t mode)
 
     rs = STATE(rig);
 
-    for (i = 0; i < HAMLIB_TSLSTSIZ && rs->tuning_steps[i].ts; i++)
+    for (int i = 0; i < HAMLIB_TSLSTSIZ && rs->tuning_steps[i].ts; i++)
     {
         if (rs->tuning_steps[i].modes & mode)
         {
@@ -7155,9 +7245,16 @@ int HAMLIB_API rig_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         retcode = caps->vfo_op(rig, vfo, op);
+
+        if (retcode == RIG_OK
+                && (op == RIG_OP_TOGGLE || op == RIG_OP_XCHG))
+        {
+            rig_invalidate_cache_vfo(rig);
+        }
+
         ELAPSED2;
         RETURNFUNC(retcode);
     }
@@ -7169,7 +7266,7 @@ int HAMLIB_API rig_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -7188,6 +7285,11 @@ int HAMLIB_API rig_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
     {
         /* Return the first error code */
         retcode = rc2;
+    }
+
+    if (retcode == RIG_OK)
+    {
+        rig_set_current_vfo_state(rig, curr_vfo);
     }
 
     ELAPSED2;
@@ -7267,7 +7369,7 @@ int HAMLIB_API rig_scan(RIG *rig, vfo_t vfo, scan_t scan, int ch)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         retcode = caps->scan(rig, vfo, scan, ch);
         RETURNFUNC(retcode);
@@ -7278,7 +7380,7 @@ int HAMLIB_API rig_scan(RIG *rig, vfo_t vfo, scan_t scan, int ch)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -7343,7 +7445,7 @@ int HAMLIB_API rig_send_dtmf(RIG *rig, vfo_t vfo, const char *digits)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         retcode = caps->send_dtmf(rig, vfo, digits);
         RETURNFUNC(retcode);
@@ -7354,7 +7456,7 @@ int HAMLIB_API rig_send_dtmf(RIG *rig, vfo_t vfo, const char *digits)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -7420,7 +7522,7 @@ int HAMLIB_API rig_recv_dtmf(RIG *rig, vfo_t vfo, char *digits, int *length)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         retcode = caps->recv_dtmf(rig, vfo, digits, length);
         RETURNFUNC(retcode);
@@ -7431,7 +7533,7 @@ int HAMLIB_API rig_recv_dtmf(RIG *rig, vfo_t vfo, char *digits, int *length)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -7515,7 +7617,7 @@ int HAMLIB_API rig_send_morse(RIG *rig, vfo_t vfo, const char *msg)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == rs->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
 #if 0
         LOCK(1);
@@ -7532,7 +7634,7 @@ int HAMLIB_API rig_send_morse(RIG *rig, vfo_t vfo, const char *msg)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = rs->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     retcode = caps->set_vfo(rig, vfo);
 
     if (retcode != RIG_OK)
@@ -7593,7 +7695,7 @@ int HAMLIB_API rig_stop_morse(RIG *rig, vfo_t vfo)
 
     LOCK(1);
     if (vfo == RIG_VFO_CURR
-            || vfo == rs->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         retcode = caps->stop_morse(rig, vfo);
         LOCK(0); 
@@ -7606,7 +7708,7 @@ int HAMLIB_API rig_stop_morse(RIG *rig, vfo_t vfo)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = rs->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -7651,7 +7753,7 @@ static int wait_morse_ptt(RIG *rig, vfo_t vfo)
         int retval;
         rig_debug(RIG_DEBUG_TRACE, "%s: loop#%d until ptt=0, ptt=%d\n", __func__, loops,
                   pttStatus);
-        elapsed_ms(&CACHE(rig)->time_ptt, HAMLIB_ELAPSED_INVALIDATE);
+        rig_invalidate_cache_ptt(rig);
         HAMLIB_TRACE;
         retval = rig_get_ptt(rig, vfo, &pttStatus);
 
@@ -7699,7 +7801,7 @@ int HAMLIB_API rig_wait_morse(RIG *rig, vfo_t vfo)
 
     LOCK(1);
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         retcode = wait_morse_ptt(rig, vfo);
         LOCK(0);
@@ -7712,7 +7814,7 @@ int HAMLIB_API rig_wait_morse(RIG *rig, vfo_t vfo)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -7774,7 +7876,7 @@ int HAMLIB_API rig_send_voice_mem(RIG *rig, vfo_t vfo, int ch)
     }
 
     if (vfo == RIG_VFO_CURR
-            || vfo == STATE(rig)->current_vfo)
+            || vfo == rig_get_current_vfo_state(rig))
     {
         retcode = caps->send_voice_mem(rig, vfo, ch);
         RETURNFUNC(retcode);
@@ -7785,7 +7887,7 @@ int HAMLIB_API rig_send_voice_mem(RIG *rig, vfo_t vfo, int ch)
         RETURNFUNC(-RIG_ENAVAIL);
     }
 
-    curr_vfo = STATE(rig)->current_vfo;
+    curr_vfo = rig_get_current_vfo_state(rig);
     HAMLIB_TRACE;
     retcode = caps->set_vfo(rig, vfo);
 
@@ -7863,14 +7965,12 @@ const freq_range_t *HAMLIB_API rig_get_range(const freq_range_t *range_list,
         freq_t freq,
         rmode_t mode)
 {
-    int i;
-
     if (range_list == NULL)
     {
         return (NULL);
     }
 
-    for (i = 0; i < HAMLIB_FRQRANGESIZ; i++)
+    for (int i = 0; i < HAMLIB_FRQRANGESIZ; i++)
     {
         if (range_list[i].startf == 0 && range_list[i].endf == 0)
         {
@@ -7982,11 +8082,10 @@ static unsigned long crcTable[256];
 static unsigned long gen_crc(unsigned char *p, size_t n)
 {
     unsigned long crc = 0xfffffffful;
-    size_t i;
 
     if (crcTable[0] == 0) { make_crc_table(crcTable); }
 
-    for (i = 0; i < n; i++)
+    for (size_t i = 0; i < n; i++)
     {
         crc = crcTable[*p++ ^ (crc & 0xff)] ^ (crc >> 8);
     }
@@ -8012,7 +8111,6 @@ int HAMLIB_API rig_get_rig_info(RIG *rig, char *response, int max_response_len)
     int satmode;
     int ret;
     int rxa, txa, rxb, txb;
-    struct rig_cache *cachep;
 
     if (CHECK_RIG_ARG(rig) || !response)
     {
@@ -8020,14 +8118,12 @@ int HAMLIB_API rig_get_rig_info(RIG *rig, char *response, int max_response_len)
         return -RIG_EINVAL;
     }
 
-    cachep = CACHE(rig);
-
     response[0] = 0;
     ELAPSED1;
     ENTERFUNC2;
 
-    vfoA = vfo_fixup(rig, RIG_VFO_A, cachep->split);
-    vfoB = vfo_fixup(rig, RIG_VFO_B, cachep->split);
+    vfoA = vfo_fixup_current(rig, RIG_VFO_A);
+    vfoB = vfo_fixup_current(rig, RIG_VFO_B);
     ret = rig_get_vfo_info(rig, vfoA, &freqA, &modeA, &widthA, &split, &satmode);
 
     if (ret != RIG_OK)
@@ -8112,7 +8208,8 @@ int HAMLIB_API rig_get_vfo_info(RIG *rig, vfo_t vfo, freq_t *freq,
                                 rmode_t *mode, pbwidth_t *width, split_t *split, int *satmode)
 {
     int retval;
-    struct rig_cache *cachep;
+    struct rig_cache_snapshot snapshot;
+    struct rig_cache_routing_snapshot routing;
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s called vfo=%s\n", __func__, rig_strvfo(vfo));
 
@@ -8122,14 +8219,12 @@ int HAMLIB_API rig_get_vfo_info(RIG *rig, vfo_t vfo, freq_t *freq,
         return -RIG_EINVAL;
     }
 
-    cachep = CACHE(rig);
-
     ELAPSED1;
     ENTERFUNC;
 
-    //if (vfo == RIG_VFO_CURR) { vfo = STATE(rig)->current_vfo; }
+    //if (vfo == RIG_VFO_CURR) { vfo = rig_get_current_vfo_state(rig); }
 
-    vfo = vfo_fixup(rig, vfo, cachep->split);
+    vfo = vfo_fixup_current(rig, vfo);
     // we can't use the cached values as some clients may only call this function
     // like Log4OM which mostly does polling
     HAMLIB_TRACE;
@@ -8142,8 +8237,9 @@ int HAMLIB_API rig_get_vfo_info(RIG *rig, vfo_t vfo, freq_t *freq,
                              RIG_VFO_SUB_A);
     int allTheTimeB = (vfo & (RIG_VFO_B | RIG_VFO_SUB))
                       && (rig->caps->targetable_vfo & RIG_TARGETABLE_MODE);
+    rig_get_cache_snapshot(rig, &snapshot);
     int justOnceB = (vfo & (RIG_VFO_B | RIG_VFO_SUB))
-                    && (cachep->modeMainB == RIG_MODE_NONE);
+                    && (snapshot.modeMainB == RIG_MODE_NONE);
 
     if (allTheTimeA || allTheTimeB || justOnceB)
     {
@@ -8158,11 +8254,12 @@ int HAMLIB_API rig_get_vfo_info(RIG *rig, vfo_t vfo, freq_t *freq,
     }
     else // we'll just us VFOA so we don't swap vfos -- freq is what's important
     {
-        *mode = cachep->modeMainA;
-        *width = cachep->widthMainA;
+        *mode = snapshot.modeMainA;
+        *width = snapshot.widthMainA;
     }
 
-    *satmode = cachep->satmode;
+    rig_get_cache_routing_snapshot(rig, &routing);
+    *satmode = routing.satmode;
     // we should only need to ask for VFO_CURR to minimize display swapping
     HAMLIB_TRACE;
     vfo_t tx_vfo;
@@ -8467,10 +8564,17 @@ void rig_lock(RIG *rig, int lock)
 
 #define MAX_FRAME_LENGTH 1024
 
-static int async_data_handler_start(RIG *rig)
+static int start_pthread(pthread_t *thread, void *(*routine)(void *), void *arg)
+{
+    return pthread_create(thread, NULL, routine, arg);
+}
+
+int rig_async_data_handler_start(RIG *rig,
+                                 hamlib_thread_start_t thread_start)
 {
     struct rig_state *rs = STATE(rig);
     async_data_handler_priv_data *async_data_handler_priv;
+    int status;
 
     ENTERFUNC;
 
@@ -8484,39 +8588,53 @@ static int async_data_handler_start(RIG *rig)
 
     sleep(2);  // give other things a chance to finish opening up the rig
 
-    rs->async_data_handler_thread_run = 1;
+    status = port_prepare_async(RIGPORT(rig));
+
+    if (status < 0)
+    {
+        RETURNFUNC(status);
+    }
+
     rs->async_data_handler_priv_data = calloc(1,
                                        sizeof(async_data_handler_priv_data));
 
     if (rs->async_data_handler_priv_data == NULL)
     {
+        port_cleanup_async(RIGPORT(rig));
         RETURNFUNC(-RIG_ENOMEM);
     }
 
     async_data_handler_priv = (async_data_handler_priv_data *)
                               rs->async_data_handler_priv_data;
     async_data_handler_priv->args.rig = rig;
-    int err = pthread_create(&async_data_handler_priv->thread_id, NULL,
-                             async_data_handler, &async_data_handler_priv->args);
+    // Raised before the thread exists, so this write does not race the thread
+    RIGPORT(rig)->asyncio = 1;
+    rs->async_data_handler_thread_run = 1;
+    int err = thread_start(&async_data_handler_priv->thread_id,
+                           async_data_handler, &async_data_handler_priv->args);
 
     if (err)
     {
+        rs->async_data_handler_thread_run = 0;
+        free(rs->async_data_handler_priv_data);
+        rs->async_data_handler_priv_data = NULL;
+        port_cleanup_async(RIGPORT(rig));
         rig_debug(RIG_DEBUG_ERR, "%s: pthread_create error: %s\n", __func__,
-                  strerror(errno));
+                  strerror(err));
         RETURNFUNC(-RIG_EINTERNAL);
     }
 
     RETURNFUNC(RIG_OK);
 }
 
-static int morse_data_handler_start(RIG *rig)
+int rig_morse_data_handler_start(RIG *rig,
+                                 hamlib_thread_start_t thread_start)
 {
     struct rig_state *rs = STATE(rig);
     morse_data_handler_priv_data *morse_data_handler_priv;
 
     ENTERFUNC;
 
-    rs->morse_data_handler_thread_run = 1;
     rs->morse_data_handler_priv_data = calloc(1,
                                        sizeof(morse_data_handler_priv_data));
 
@@ -8524,6 +8642,21 @@ static int morse_data_handler_start(RIG *rig)
     {
         RETURNFUNC(-RIG_ENOMEM);
     }
+
+    // Created here, not in the thread, as rig_open() may return before the thread runs
+    if (rs->fifo_morse == NULL)
+    {
+        rs->fifo_morse = calloc(1, sizeof(FIFO_RIG));
+
+        if (rs->fifo_morse == NULL)
+        {
+            free(rs->morse_data_handler_priv_data);
+            rs->morse_data_handler_priv_data = NULL;
+            RETURNFUNC(-RIG_ENOMEM);
+        }
+    }
+
+    initFIFO(rs->fifo_morse);
 
     morse_data_handler_priv = (morse_data_handler_priv_data *)
                               rs->morse_data_handler_priv_data;
@@ -8534,13 +8667,19 @@ static int morse_data_handler_start(RIG *rig)
     morse_data_handler_priv->keyspd = keyspd.i;
     rig_debug(RIG_DEBUG_VERBOSE, "%s(%d): keyspd=%d\n", __func__, __LINE__,
               keyspd.i);
-    int err = pthread_create(&morse_data_handler_priv->thread_id, NULL,
-                             morse_data_handler, &morse_data_handler_priv->args);
+    rs->morse_data_handler_thread_run = 1;
+    int err = thread_start(&morse_data_handler_priv->thread_id,
+                           morse_data_handler, &morse_data_handler_priv->args);
 
     if (err)
     {
+        rs->morse_data_handler_thread_run = 0;
+        free(rs->morse_data_handler_priv_data);
+        rs->morse_data_handler_priv_data = NULL;
+        free(rs->fifo_morse);
+        rs->fifo_morse = NULL;
         rig_debug(RIG_DEBUG_ERR, "%s: pthread_create error: %s\n", __func__,
-                  strerror(errno));
+                  strerror(err));
         RETURNFUNC(-RIG_EINTERNAL);
     }
 
@@ -8572,7 +8711,7 @@ static int async_data_handler_stop(RIG *rig)
             if (err)
             {
                 rig_debug(RIG_DEBUG_ERR, "%s: pthread_join error: %s\n", __func__,
-                          strerror(errno));
+                          strerror(err));
                 // just ignore the error
             }
 
@@ -8583,7 +8722,7 @@ static int async_data_handler_stop(RIG *rig)
         rs->async_data_handler_priv_data = NULL;
     }
 
-
+    port_cleanup_async(RIGPORT(rig));
     RETURNFUNC(RIG_OK);
 }
 
@@ -8627,7 +8766,7 @@ static int morse_data_handler_stop(RIG *rig)
             if (err)
             {
                 rig_debug(RIG_DEBUG_ERR, "%s: pthread_join error: %s\n", __func__,
-                          strerror(errno));
+                          strerror(err));
                 // just ignore the error
             }
 
@@ -8740,19 +8879,11 @@ static void *morse_data_handler(void *arg)
     struct morse_data_handler_args_s *args =
         (struct morse_data_handler_args_s *) arg;
     RIG *rig = args->rig;
-    const struct rig_state *rs = STATE(rig);
+    struct rig_state *rs = STATE(rig);
     int result;
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s: Starting morse data handler thread\n",
               __func__);
-
-    if (STATE(rig)->fifo_morse == NULL)
-    {
-        // Can't use rs-> 'cuz it's const
-        STATE(rig)->fifo_morse = calloc(1, sizeof(FIFO_RIG));
-    }
-
-    initFIFO(rs->fifo_morse);
 
     char *c;
     int qsize = rig->caps->morse_qsize; // if backend overrides qsize
@@ -8776,6 +8907,13 @@ static void *morse_data_handler(void *arg)
             }
 
             d = hl_pop(rs->fifo_morse);
+
+            // rig_stop_morse() may have emptied the queue since the peek
+            if (d < 0)
+            {
+                break;
+            }
+
             c[n] = (char) d;
         }
 
@@ -8830,9 +8968,10 @@ static void *morse_data_handler(void *arg)
             if (strlen(c) > 0)
             {
                 int nloops = 10;
-                MUTEX_LOCK(morse_mutex); // wait until the write is idle
 
-		        rig_lock(rig, 1);
+                morse_busy_store(rs, true);
+                rig_lock(rig, 1);        // Do the actual lockout
+
                 do
                 {
                     result = rig->caps->send_morse(rig, RIG_VFO_CURR, c);
@@ -8852,13 +8991,12 @@ static void *morse_data_handler(void *arg)
                     }
 
                     //wait_morse_ptt(rig, RIG_VFO_CURR);
-                    nloops--;
 
                 }
-                while (result != RIG_OK && STATE(rig)->fifo_morse->flush == 0 && --nloops > 0);
-		rig_lock(rig,0);
+                while (result != RIG_OK && rs->fifo_morse->flush == 0 && --nloops > 0);
 
-                MUTEX_UNLOCK(morse_mutex);
+                rig_lock(rig, 0);
+                morse_busy_store(rs, false);
 
                 if (nloops == 0)
                 {
@@ -8871,11 +9009,12 @@ static void *morse_data_handler(void *arg)
         hl_usleep(100 * 1000);
     }
 
-    free(STATE(rig)->fifo_morse);
+    free(rs->fifo_morse);
+    rs->fifo_morse = NULL;
     free(c);
-    STATE(rig)->fifo_morse = NULL;
+
     pthread_exit(NULL);
-    return NULL;
+    return NULL;             // May get a warning if pthread_exit() has [[noreturn]]
 }
 
 
@@ -8927,6 +9066,11 @@ HAMLIB_EXPORT(int) rig_send_raw(RIG *rig, const unsigned char *send,
 
     ELAPSED1;
 
+    if (reply != NULL && reply_len < 1)
+    {
+        RETURNFUNC(-RIG_EINVAL);
+    }
+
     rig_debug(RIG_DEBUG_VERBOSE, "%s: writing %d bytes\n", __func__, send_len);
 
     set_transaction_active(rig);
@@ -8951,7 +9095,26 @@ HAMLIB_EXPORT(int) rig_send_raw(RIG *rig, const unsigned char *send,
 
     if (reply)
     {
-        unsigned char buf[200];
+        unsigned char stack_buf[200];
+        unsigned char *buf = stack_buf;
+        /* Detect terminated replies that fill the caller's buffer. */
+        size_t buf_len = (size_t)reply_len + 1;
+        int buffer_allocated = 0;
+
+        if (buf_len > sizeof(stack_buf))
+        {
+            buf = malloc(buf_len);
+
+            if (buf == NULL)
+            {
+                rig_flush_force(rp, 1);
+                set_transaction_inactive(rig);
+                ELAPSED2;
+                RETURNFUNC(-RIG_ENOMEM);
+            }
+
+            buffer_allocated = 1;
+        }
 
         if (simulate)
         {
@@ -8979,13 +9142,13 @@ HAMLIB_EXPORT(int) rig_send_raw(RIG *rig, const unsigned char *send,
             else if (*term == 0xfd) // then we want an Icom frame
             {
                 rig_debug(RIG_DEBUG_VERBOSE, "%s: reading icom frame\n", __func__);
-                retval = read_icom_frame(rp, buf, sizeof(buf));
+                retval = read_icom_frame(rp, buf, reply_len);
             }
             else // we'll assume the provided terminator works
             {
                 rig_debug(RIG_DEBUG_VERBOSE, "%s: reading frame terminated by 0x%x\n", __func__,
                           *term);
-                retval = read_string(rp, buf, sizeof(buf), (const char *)term,
+                retval = read_string(rp, buf, buf_len, (const char *)term,
                                      1, 0, 1);
             }
 
@@ -8994,6 +9157,8 @@ HAMLIB_EXPORT(int) rig_send_raw(RIG *rig, const unsigned char *send,
                 rig_debug(RIG_DEBUG_ERR, "%s: read_string, result=%d\n", __func__, retval);
                 rig_flush_force(rp, 1);
                 set_transaction_inactive(rig);
+
+                if (buffer_allocated) { free(buf); }
                 ELAPSED2;
                 RETURNFUNC(retval);
             }
@@ -9006,12 +9171,16 @@ HAMLIB_EXPORT(int) rig_send_raw(RIG *rig, const unsigned char *send,
                           __func__, reply_len, nbytes);
                 rig_flush_force(rp, 1);
                 set_transaction_inactive(rig);
+
+                if (buffer_allocated) { free(buf); }
                 ELAPSED2;
                 RETURNFUNC(-RIG_EINVAL);
             }
         }
 
-        memcpy(reply, buf, reply_len - 1);
+        memcpy(reply, buf, nbytes);
+
+        if (buffer_allocated) { free(buf); }
     }
     else
     {
@@ -9121,7 +9290,7 @@ HAMLIB_EXPORT(void *) rig_data_pointer(RIG *rig, rig_ptrx_t idx)
         return DCDPORT(rig);
 
     case RIG_PTRX_CACHE:
-        return CACHE(rig);
+        return rig->cache_addr;
 
     case RIG_PTRX_STATE:
         return STATE(rig);

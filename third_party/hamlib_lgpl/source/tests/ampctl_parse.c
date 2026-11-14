@@ -79,9 +79,6 @@ extern int read_history();
 
 static pthread_mutex_t amp_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-#define STR1(S) #S
-#define STR(S) STR1(S)
-
 #define MAXNAMSIZ 32
 #define MAXNBOPT 100    /* max number of different options */
 #define MAXARGSZ 127
@@ -302,8 +299,6 @@ void hash_delete_all()
  */
 static void rp_getline(const char *s)
 {
-    int i;
-
     /* free allocated memory and set pointers to NULL */
     if (input_line)
     {
@@ -319,7 +314,7 @@ static void rp_getline(const char *s)
     /* cmd, arg1, arg2, arg3, arg4, arg5, arg6
      * arg5 and arg 6 are currently unused.
      */
-    for (i = 0; i < 7; i++)
+    for (int i = 0; i < 7; i++)
     {
         parsed_input[i] = NULL;
     }
@@ -334,9 +329,7 @@ static void rp_getline(const char *s)
  */
 char parse_arg(const char *arg)
 {
-    int i;
-
-    for (i = 0; test_list[i].cmd != 0; i++)
+    for (int i = 0; test_list[i].cmd != 0; i++)
     {
         if (!strncmp(arg, test_list[i].name, MAXNAMSIZ))
         {
@@ -365,7 +358,7 @@ static int scanfc(FILE *fin, const char *format, void *p)
             }
 
             rig_debug(RIG_DEBUG_ERR, "fscanf: %s\n", strerror(errno));
-            rig_debug(RIG_DEBUG_ERR, "fscanf: parsing '%s' with '%s'\n", (char *)p, format);
+            rig_debug(RIG_DEBUG_ERR, "fscanf: failed with format '%s'\n", format);
         }
 
         return ret;
@@ -407,11 +400,15 @@ static int next_word(char *buffer, int argc, char *argv[], int newline)
 
     if (reading_stdin)
     {
+        char stdin_format[32];
+        SNPRINTF(stdin_format, sizeof(stdin_format), " %%c%%%d[^ \t\n#]",
+                 MAXARGSZ - 1);
+
         do
         {
             do
             {
-                ret = scanf(" %c%" STR(MAXARGSZ) "[^ \t\n#]", &c, &buffer[1]);
+                ret = scanf(stdin_format, &c, &buffer[1]);
             }
             while (EINTR == ret);
 
@@ -1467,11 +1464,9 @@ void version()
 
 void usage_amp(FILE *fout)
 {
-    int i;
-
     fprintf(fout, "Commands (some may not be available for this amplifier):\n");
 
-    for (i = 0; test_list[i].cmd != 0; i++)
+    for (int i = 0; test_list[i].cmd != 0; i++)
     {
         int nbspaces;
         fprintf(fout,
@@ -2499,17 +2494,24 @@ declare_proto_amp(send_cmd)
 
     if (send_cmd_term == -1 || backend_num == -1)
     {
-        const char *p = arg1, *pp = NULL;
+        const char *p = arg1;
         int i;
 
-        for (i = 0; i < BUFSZ - 1 && p != pp; i++)
+        for (i = 0; i < BUFSZ - 1 && *p == '\\'; i++)
         {
-            pp = p + 1;
-            bufcmd[i] = strtol(p + 1, (char **) &p, 0);
+            char *end;
+
+            bufcmd[i] = strtol(p + 1, &end, 0);
+            if (end == p + 1)
+            {
+                break;
+            }
+
+            p = end;
         }
 
         /* must save length to allow 0x00 to be sent as part of a command */
-        cmd_len = i - 1;
+        cmd_len = i;
 
         /* no End Of Message chars */
         eom_buf[0] = '\0';

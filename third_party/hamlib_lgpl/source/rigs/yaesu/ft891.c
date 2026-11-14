@@ -37,6 +37,7 @@
 #include "newcat.h"
 #include "yaesu.h"
 #include "ft891.h"
+#include "misc.h"
 
 /* Prototypes */
 static int ft891_init(RIG *rig);
@@ -201,7 +202,7 @@ struct rig_caps ft891_caps =
     .str_cal =            FT891_STR_CAL,
     .chan_list =          {
         {   1,  99, RIG_MTYPE_MEM,  NEWCAT_MEM_CAP },
-        {   1,      5, RIG_MTYPE_VOICE },
+        {   1,  5,  RIG_MTYPE_VOICE },
         {   1,  5,  RIG_MTYPE_MORSE },
         RIG_CHAN_END,
     },
@@ -347,6 +348,7 @@ struct rig_caps ft891_caps =
     .get_clock =          newcat_get_clock,
     .scan =               newcat_scan,
     .send_voice_mem =     newcat_send_voice_mem,
+    .stop_voice_mem =     newcat_stop_voice_mem,
     .morse_qsize =        50,
     .hamlib_check_rig_caps = HAMLIB_CHECK_RIG_CAPS
 };
@@ -639,6 +641,6 @@ static int ft891_init(RIG *rig)
 
     if (ret != RIG_OK) { return ret; }
 
-    STATE(rig)->current_vfo = RIG_VFO_A;
+    rig_set_current_vfo_state(rig, RIG_VFO_A);
     return RIG_OK;
 }

@@ -130,22 +130,19 @@ struct newcat_priv_caps
  */
 struct newcat_priv_data
 {
-    char                cmd_str[NEWCAT_DATA_LEN];       /* command string buffer */
-    char
-    ret_data[NEWCAT_DATA_LEN];      /* returned data--max value, most are less */
-    int
-    current_mem;                    /* private memory channel number */
-    int
-    rig_id;                         /* rig id from CAT Command ID; */
-    int trn_state;  /* AI state found at startup */
-    int fast_set_commands; /* do not check for ACK/NAK; needed for high throughput > 100 commands/s */
-    int width_frequency; /* found at startup */
+    char cmd_str[NEWCAT_DATA_LEN]; /* command string buffer */
+    char ret_data[NEWCAT_DATA_LEN];/* returned data--max value, most are less */
+    int current_mem;               /* private memory channel number */
+    int rig_id;                    /* rig id from CAT Command ID; */
+    int trn_state;                 /* AI state found at startup */
+    int fast_set_commands;         /* do not check for ACK/NAK; needed for high throughput > 100 commands/s */
+    int width_frequency;           /* found at startup */
     struct timespec cache_start;
     char last_if_response[NEWCAT_DATA_LEN];
-    int poweron; /* to prevent powering on more than once */
-    int question_mark_response_means_rejected; /* the question mark response has multiple meanings */
-    char front_rear_status; /* e.g. FTDX5000 EX103 status */
-    int split_st_command_missing; /* is ST command gone?  assume not until proven otherwise */
+    char front_rear_status;        /* e.g. FTDX5000 EX103 status */
+    bool poweron;                  /* to prevent powering on more than once */
+    bool split_st_command_missing; /* is ST command gone?  assume not until proven otherwise */
+    bool question_mark_response_means_rejected; /* the question mark response has multiple meanings */
     int band_index;
     /* FTX-1 specific fields - per-rig instance storage */
     int ftx1_head_type;          /* FTX1_HEAD_FIELD_BATTERY/12V/SPA1/UNKNOWN */
@@ -155,9 +152,6 @@ struct newcat_priv_data
     vfo_t ftx1_tx_vfo;           /* TX VFO for virtual split */
     int ftx1_cache_fix_needed;   /* 1 if Main cache needs restoration */
     freq_t ftx1_cache_fix_freq;  /* Saved Main freq for cache restoration */
-    int ftx1_clar_cached;        /* 1 if RX/TX CLAR states have been cached */
-    char ftx1_rx_clar_on;        /* Cached RX CLAR enable: '0' or '1' */
-    char ftx1_tx_clar_on;        /* Cached TX CLAR enable: '0' or '1' */
     int ftx1_in_memory_mode;     /* 1 if driver knows the Main-side is in Memory mode (VM011) */
 };
 
@@ -267,6 +261,7 @@ int newcat_get_ext_level(RIG *rig, vfo_t vfo, hamlib_token_t token, value_t *val
 
 int newcat_send_morse(RIG *rig, vfo_t vfo, const char *msg);
 int newcat_send_voice_mem(RIG *rig, vfo_t vfo, int ch);
+int newcat_stop_voice_mem(RIG *rig, vfo_t vfo);
 int newcat_set_clock(RIG *rig, int year, int month, int day, int hour, int min,
                      int sec, double msec, int utc_offset);
 int newcat_get_clock(RIG *rig, int *year, int *month, int *day, int *hour,

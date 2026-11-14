@@ -26,10 +26,34 @@
 #define RIGCTL_PARSE_H
 
 #include <stdio.h>
+#include <pthread.h>
 #include "hamlib/rig.h"
 
 #define RIGCTL_PARSE_END 1
 #define RIGCTL_PARSE_ERROR 2
+
+struct rigctld_client_pool;
+
+/* Data that ties each thread to a connection
+ * Serves as the initial thread data, then as the state info for individual
+ *   connections
+ */
+struct handle_data
+{
+    RIG *rig;
+    int sock;
+    struct sockaddr_storage cli_addr;
+    socklen_t clilen;
+    int vfo_mode;
+    int use_password;
+    int is_passwordOK;
+    unsigned int auth_failures;
+    struct rigctld_client_pool *client_pool;
+    int client_slot;
+    int client_id;      /* Identifies the connection owning a stream */
+};
+
+extern pthread_key_t thread_data_key;
 
 /*
  * external prototype
@@ -51,9 +75,15 @@ int print_conf_list(const struct confparams *cfp, rig_ptr_t data);
 int print_conf_list2(const struct confparams *cfp, rig_ptr_t data);
 int set_conf(RIG *my_rig, char *conf_parms);
 
+void rigctl_parse_init(void);
+int rigctld_password_configure(const char *password,
+                               char secret[HAMLIB_SECRET_LENGTH + 1]);
+int rigctld_password_is_enabled(void);
+int rigctl_refresh_powerstat(RIG *rig);
 typedef void (*sync_cb_t)(int);
-int rigctl_parse(RIG *my_rig, FILE *fin, FILE *fout, char *argv[], int argc, sync_cb_t sync_cb,
-                 int interactive, int prompt, int * vfo_mode, char send_cmd_term,
-                 int * ext_resp_ptr, char * resp_sep_ptr, int use_password);
+int rigctl_parse(RIG *my_rig, FILE *fin, FILE *fout, char *argv[], int argc,
+                 sync_cb_t sync_cb,
+                 int interactive, int prompt, int *vfo_mode, char send_cmd_term,
+                 int *ext_resp_ptr, char *resp_sep_ptr, int use_password);
 
 #endif  /* RIGCTL_PARSE_H */

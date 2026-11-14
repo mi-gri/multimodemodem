@@ -25,6 +25,7 @@
 #include "hamlib/config.h"
 
 #include <stddef.h>
+#include <stdbool.h>
 
 #include "hamlib/rig.h"
 #include "hamlib/rig_state.h"
@@ -43,21 +44,15 @@
 #define ICOM_IS_ID4100 rig_is_model(rig, RIG_MODEL_ID4100)
 #define ICOM_IS_ID5100 rig_is_model(rig, RIG_MODEL_ID5100)
 
-#define ICOM_IS_SECONDARY_VFO(vfo) ((vfo) & (RIG_VFO_B | RIG_VFO_SUB | RIG_VFO_SUB_B | RIG_VFO_MAIN_B))
-#define ICOM_GET_VFO_NUMBER(vfo) (ICOM_IS_SECONDARY_VFO(vfo) ? 0x01 : 0x00)
-
 #define ICOM_MAX_SPECTRUM_FREQ_RANGES 20
 
 /*
  * defines used by comp_cal_str in rig.c
  * STR_CAL_LENGTH is the length of the S Meter calibration table
  * STR_CAL_S0 is the value in dB of the lowest value (not even in table)
- * MULTIB_SUBCMD allows the dsp rigs ie pro models to use multibyte subcommands for all the extra
- * parameters and levels.
  */
 #define STR_CAL_LENGTH 16
 #define STR_CAL_S0 (-54)
-#define MULTIB_SUBCMD
 
 /*
  * minimal channel caps.
@@ -95,6 +90,11 @@ struct ts_sc_list
     shortfreq_t ts; /* tuning step */
     unsigned char sc;   /* sub command */
 };
+
+int icom_ts_to_sc(const struct ts_sc_list *list, shortfreq_t ts,
+                  unsigned char *sc);
+int icom_sc_to_ts(const struct ts_sc_list *list, unsigned char sc,
+                  shortfreq_t *ts);
 
 /**
  * \brief Pipelined tuning state data structure.
@@ -253,15 +253,18 @@ struct icom_priv_caps
     struct icom_agc_level agc_levels[HAMLIB_MAX_AGC_LEVELS + 1]; /*!< Icom rig-specific AGC levels, the last entry should have level -1 */
     struct icom_spectrum_scope_caps spectrum_scope_caps; /*!< Icom spectrum scope capabilities, if supported by the rig. Main/Sub scopes in Icom rigs have the same caps. */
     struct icom_spectrum_edge_frequency_range spectrum_edge_frequency_ranges[ICOM_MAX_SPECTRUM_FREQ_RANGES]; /*!< Icom spectrum scope edge frequencies, if supported by the rig. Last entry should have zeros in all fields. */
-    struct cmdparams *extcmds;  /*!< Pointer to extended operations array */
-    int dualwatch_split;        /*!< Rig supports dual watch for split ops -- e.g. ID-5100 */
-    int x25x26_always;          /*!< Rig should use 0x25 and 0x26 commands always */
-    int x25x26_possibly;        /*!< Rig might support 0x25 and 0x26 commands if the firmware is upgraded */
-    int x1cx03_always;          /*!< Rig should use 0x1C 0x03 command for getting TX frequency */
-    int x1cx03_possibly;        /*!< Rig might support 0x1C 0x03 command if the firmware is upgraded TODO: is this added by FW upgrade ever? */
-    int x1ax03_supported;       /*!< Rig supports setting/getting filter width */
-    int mode_with_filter;       /*!< Rig mode commands include filter selection */
-    int data_mode_supported;    /*!< Rig supports data mode flag */
+    const struct cmdparams *extcmds;  /*!< Pointer to extended operations array */
+    bool dualwatch_split;       /*!< Rig supports dual watch for split ops -- e.g. ID-5100 */
+    bool x25x26_always;         /*!< Rig should use 0x25 and 0x26 commands always */
+    bool x25x26_possibly;       /*!< Rig might support 0x25 and 0x26 commands if the firmware is upgraded */
+    bool x1cx03_always;         /*!< Rig should use 0x1C 0x03 command for getting TX frequency */
+    bool x1cx03_possibly;       /*!< Rig might support 0x1C 0x03 command if the firmware is upgraded TODO: is this added by FW upgrade ever? */
+    bool x1ax03_supported;      /*!< Rig supports setting/getting filter width */
+    bool power_status_read_not_supported; /*!< Rig rejects a bare 0x18 read;
+                                    power state is inferred from whether the rig
+                                    answers a frequency read at all */
+    bool mode_with_filter;      /*!< Rig mode commands include filter selection */
+    bool data_mode_supported;   /*!< Rig supports data mode flag */
     int fm_filters[3];          /*!< For models with FIL1/2/3 for FM low-to-high fixed filters -- IC7300/9700 */
     const struct icom_clock_cmds *clock_cmds; /*!< Pointer to clock ops commands */
 };
@@ -310,24 +313,40 @@ struct icom_priv_data
     int filter_usb;          /*!< Filter number to use for USB/LSB when setting mode */
     int filter_cw;           /*!< Filter number to use for CW/CWR when setting mode */
     int filter_fm;           /*!< Filter number to use for CW/CWR when setting mode */
+    void *netsession;        /*!< Icom network session (network models only); when
+                                  set, CI-V frames are tunneled over the LAN protocol */
+    char net_username[24];   /*!< Network protocol login (network models only) */
+    char net_password[24];   /*!< Network protocol password (network models only) */
+    int  net_control_port;   /*!< Network protocol control port (0 = default) */
+    int  net_iq_mode;        /*!< Present stereo RX audio as an I/Q stream */
+    int  net_rx_codec;       /*!< RX audio codec wire byte (0 = model default) */
+    int  net_tx_codec;       /*!< TX audio codec wire byte (0 = model default) */
+    int  net_sample_rate;    /*!< Network audio sample rate in Hz (0 = default) */
+    int  net_rx_latency;     /*!< RX reorder window in ms (0 = in-order, no retransmits) */
+    int  net_tx_latency;     /*!< TX audio jitter-buffer length in ms (0 = default) */
+    int  net_tx_enable;      /*!< Open a TX audio session (0 = RX only) */
+    int  net_tx_frame_ms;    /*!< TX audio wire-frame duration in ms */
+    int  net_radio_index;    /*!< Radio to select from the advertised list,
+                                  -1 = select by name instead */
+    char net_radio_name[33]; /*!< Radio name to select, empty = use the
+                                  model's own name */
+    int  net_liveness_timeout; /*!< Silence (ms) before the session is declared
+                                    lost; 0 disables the check */
+    int  net_auto_reconnect;   /*!< Re-establish a lost session in the background */
+    const void *net_model;   /*!< Per-model icom_network_model descriptor */
+    int g90_af_quirk;        /*!< Opt-in G90 AF reply encoding workaround */
 };
 
 extern const struct ts_sc_list r8500_ts_sc_list[];
-extern const struct ts_sc_list r8600_ts_sc_list[];
 extern const struct ts_sc_list ic737_ts_sc_list[];
 extern const struct ts_sc_list r75_ts_sc_list[];
 extern const struct ts_sc_list r7100_ts_sc_list[];
 extern const struct ts_sc_list r9000_ts_sc_list[];
 extern const struct ts_sc_list r9500_ts_sc_list[];
-extern const struct ts_sc_list ic756_ts_sc_list[];
 extern const struct ts_sc_list ic756pro_ts_sc_list[];
-extern const struct ts_sc_list ic705_ts_sc_list[];
 extern const struct ts_sc_list ic706_ts_sc_list[];
-extern const struct ts_sc_list ic7000_ts_sc_list[];
 extern const struct ts_sc_list ic7100_ts_sc_list[];
 extern const struct ts_sc_list ic7200_ts_sc_list[];
-extern const struct ts_sc_list ic7300_ts_sc_list[];
-extern const struct ts_sc_list ic9700_ts_sc_list[];
 extern const struct ts_sc_list ic910_ts_sc_list[];
 extern const struct ts_sc_list ic718_ts_sc_list[];
 extern const struct ts_sc_list x108g_ts_sc_list[];
@@ -448,6 +467,7 @@ extern const struct confparams icom_ext_levels[];
 extern const struct confparams icom_ext_funcs[];
 extern const struct confparams icom_ext_parms[];
 extern const struct cmdparams icom_ext_cmds[];
+extern const cal_table_float_t icom_default_swr_cal;
 
 extern struct rig_caps ic703_caps;
 extern struct rig_caps ic705_caps;
@@ -474,6 +494,25 @@ extern struct rig_caps ic756pro3_caps;
 extern struct rig_caps ic751_caps;
 extern struct rig_caps ic7600_caps; // need to modify targetable_vfo depending on response to 0x25 cmd
 extern struct rig_caps ic7610_caps;
+extern struct rig_caps ic7610net_caps;
+/* Derives ic7610net_caps from ic7610_caps; call before registering it. */
+extern void ic7610net_init_caps(void);
+extern struct rig_caps ic9700net_caps;
+/* Derives ic9700net_caps from ic9700_caps; call before registering it. */
+extern void ic9700net_init_caps(void);
+extern struct rig_caps ic705net_caps;
+/* Derives ic705net_caps from ic705_caps; call before registering it. */
+extern void ic705net_init_caps(void);
+extern struct rig_caps ic905net_caps;
+/* Derives ic905net_caps from ic905_caps; call before registering it. */
+extern void ic905net_init_caps(void);
+extern struct rig_caps ic7760net_caps;
+/* Derives ic7760net_caps from ic7760_caps; call before registering it. */
+extern void ic7760net_init_caps(void);
+extern struct rig_caps ic7300mk2net_caps;
+/* Derives ic7300mk2net_caps from ic7300mk2_caps; call before registering it. */
+extern void ic7300mk2net_init_caps(void);
+
 extern struct rig_caps ic761_caps;
 extern struct rig_caps ic765_caps;
 extern struct rig_caps ic7700_caps;
@@ -553,7 +592,8 @@ extern struct rig_caps icr30_caps;
 #define RIG_IS_IC575 (STATE(rig)->rig_model == RIG_MODEL_IC575)
 #define RIG_IS_IC7000 (STATE(rig)->rig_model == RIG_MODEL_IC7000)
 #define RIG_IS_IC703 (STATE(rig)->rig_model == RIG_MODEL_IC703)
-#define RIG_IS_IC705 (STATE(rig)->rig_model == RIG_MODEL_IC705)
+#define RIG_IS_IC705 (STATE(rig)->rig_model == RIG_MODEL_IC705 \
+                      || STATE(rig)->rig_model == RIG_MODEL_IC705NET)
 #define RIG_IS_IC706 (STATE(rig)->rig_model == RIG_MODEL_IC706)
 #define RIG_IS_IC706MKII (STATE(rig)->rig_model == RIG_MODEL_IC706MKII)
 #define RIG_IS_IC706MKIIG (STATE(rig)->rig_model == RIG_MODEL_IC706MKIIG)
@@ -566,7 +606,8 @@ extern struct rig_caps icr30_caps;
 #define RIG_IS_IC728 (STATE(rig)->rig_model == RIG_MODEL_IC728)
 #define RIG_IS_IC729 (STATE(rig)->rig_model == RIG_MODEL_IC729)
 #define RIG_IS_IC7300 (STATE(rig)->rig_model == RIG_MODEL_IC7300)
-#define RIG_IS_IC7300MK2 (STATE(rig)->rig_model == RIG_MODEL_IC7300MK2)
+#define RIG_IS_IC7300MK2 (STATE(rig)->rig_model == RIG_MODEL_IC7300MK2 \
+                          || STATE(rig)->rig_model == RIG_MODEL_IC7300MK2NET)
 #define RIG_IS_IC731 (STATE(rig)->rig_model == RIG_MODEL_IC731)
 #define RIG_IS_IC735 (STATE(rig)->rig_model == RIG_MODEL_IC735)
 #define RIG_IS_IC736 (STATE(rig)->rig_model == RIG_MODEL_IC736)
@@ -583,7 +624,10 @@ extern struct rig_caps icr30_caps;
 #define RIG_IS_IC756PROIII (STATE(rig)->rig_model == RIG_MODEL_IC756PROIII)
 #define RIG_IS_IC7600 (STATE(rig)->rig_model == RIG_MODEL_IC7600)
 #define RIG_IS_IC761 (STATE(rig)->rig_model == RIG_MODEL_IC761)
-#define RIG_IS_IC7610 (STATE(rig)->rig_model == RIG_MODEL_IC7610)
+#define RIG_IS_IC7610 (STATE(rig)->rig_model == RIG_MODEL_IC7610 \
+                       || STATE(rig)->rig_model == RIG_MODEL_IC7610NET)
+#define RIG_IS_IC7760 (STATE(rig)->rig_model == RIG_MODEL_IC7760 \
+                       || STATE(rig)->rig_model == RIG_MODEL_IC7760NET)
 #define RIG_IS_IC765 (STATE(rig)->rig_model == RIG_MODEL_IC765)
 #define RIG_IS_IC7700 (STATE(rig)->rig_model == RIG_MODEL_IC7700)
 #define RIG_IS_IC775 (STATE(rig)->rig_model == RIG_MODEL_IC775)
@@ -594,12 +638,14 @@ extern struct rig_caps icr30_caps;
 #define RIG_IS_IC820 (STATE(rig)->rig_model == RIG_MODEL_IC820)
 #define RIG_IS_IC821 (STATE(rig)->rig_model == RIG_MODEL_IC821)
 #define RIG_IS_IC821H (STATE(rig)->rig_model == RIG_MODEL_IC821H)
-#define RIG_IS_IC905 (STATE(rig)->rig_model == RIG_MODEL_IC905)
+#define RIG_IS_IC905 (STATE(rig)->rig_model == RIG_MODEL_IC905 \
+                      || STATE(rig)->rig_model == RIG_MODEL_IC905NET)
 #define RIG_IS_IC910 (STATE(rig)->rig_model == RIG_MODEL_IC910)
 #define RIG_IS_IC9100 (STATE(rig)->rig_model == RIG_MODEL_IC9100)
 #define RIG_IS_IC92D (STATE(rig)->rig_model == RIG_MODEL_IC92D)
 #define RIG_IS_IC970 (STATE(rig)->rig_model == RIG_MODEL_IC970)
-#define RIG_IS_IC9700 (STATE(rig)->rig_model == RIG_MODEL_IC9700)
+#define RIG_IS_IC9700 (STATE(rig)->rig_model == RIG_MODEL_IC9700 \
+                       || STATE(rig)->rig_model == RIG_MODEL_IC9700NET)
 #define RIG_IS_IC8101 (STATE(rig)->rig_model == RIG_MODEL_ICF8101)
 #define RIG_IS_ICID1 (STATE(rig)->rig_model == RIG_MODEL_ICID1)
 #define RIG_IS_ICM700PRO (STATE(rig)->rig_model == RIG_MODEL_IC_M700PRO)

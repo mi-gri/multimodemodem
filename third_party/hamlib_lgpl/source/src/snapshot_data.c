@@ -21,8 +21,10 @@ static int snapshot_serialize_rig(cJSON *rig_node, RIG *rig)
 {
     cJSON *node;
     char buf[1024];
-    struct rig_cache *cachep = CACHE(rig);
     struct rig_state *rs = STATE(rig);
+    struct rig_cache_routing_snapshot routing;
+
+    rig_get_cache_routing_snapshot(rig, &routing);
 
     cJSON *id_node = cJSON_CreateObject();
     cJSON_AddStringToObject(id_node, "model", rig->caps->model_name);
@@ -33,6 +35,14 @@ static int snapshot_serialize_rig(cJSON *rig_node, RIG *rig)
 
     node = cJSON_AddStringToObject(rig_node, "status",
                                    rig_strcommstatus(rs->comm_status));
+
+    if (node == NULL)
+    {
+        goto error;
+    }
+
+    node = cJSON_AddStringToObject(rig_node, "statusReason",
+                                   rig_strcommreason(rs->comm_reason));
 
     if (node == NULL)
     {
@@ -55,7 +65,7 @@ static int snapshot_serialize_rig(cJSON *rig_node, RIG *rig)
     }
 
     node = cJSON_AddBoolToObject(rig_node, "split",
-                                 cachep->split == RIG_SPLIT_ON ? 1 : 0);
+                                 routing.split == RIG_SPLIT_ON ? 1 : 0);
 
     if (node == NULL)
     {
@@ -63,7 +73,7 @@ static int snapshot_serialize_rig(cJSON *rig_node, RIG *rig)
     }
 
     node = cJSON_AddStringToObject(rig_node, "splitVfo",
-                                   rig_strvfo(cachep->split_vfo));
+                                   rig_strvfo(routing.split_vfo));
 
     if (node == NULL)
     {
@@ -71,7 +81,7 @@ static int snapshot_serialize_rig(cJSON *rig_node, RIG *rig)
     }
 
     node = cJSON_AddBoolToObject(rig_node, "satMode",
-                                 cachep->satmode ? 1 : 0);
+                                 routing.satmode ? 1 : 0);
 
     if (node == NULL)
     {
@@ -82,7 +92,8 @@ static int snapshot_serialize_rig(cJSON *rig_node, RIG *rig)
     char *p;
     cJSON *modes_array = cJSON_CreateArray();
 
-    for (p = strtok(buf, " "); p; p = strtok(NULL, " "))
+    char *saveptr = NULL;
+    for (p = strtok_r(buf, " ", &saveptr); p; p = strtok_r(NULL, " ", &saveptr))
     {
         if (strlen(buf) > 0)
         {
@@ -110,13 +121,10 @@ static int snapshot_serialize_vfo(cJSON *vfo_node, RIG *rig, vfo_t vfo)
     //rmode_t modes[MAX_MODES];
     pbwidth_t width;
     ptt_t ptt;
-    split_t split;
-    vfo_t split_vfo;
     int result;
     int is_rx, is_tx;
     cJSON *node;
-    struct rig_cache *cachep = CACHE(rig);
-    struct rig_state *rs = STATE(rig);
+    struct rig_cache_routing_snapshot routing;
 
     // TODO: This data should match rig_get_info command response
 
@@ -154,14 +162,17 @@ static int snapshot_serialize_vfo(cJSON *vfo_node, RIG *rig, vfo_t vfo)
         }
     }
 
-    split = cachep->split;
-    split_vfo = cachep->split_vfo;
+    rig_get_cache_routing_snapshot(rig, &routing);
 
-    is_rx = (split == RIG_SPLIT_OFF && vfo == rs->current_vfo)
-            || (split == RIG_SPLIT_ON && vfo != split_vfo);
-    is_tx = (split == RIG_SPLIT_OFF && vfo == rs->current_vfo)
-            || (split == RIG_SPLIT_ON && vfo == split_vfo);
-    ptt = cachep->ptt && is_tx;
+    is_rx = (routing.split == RIG_SPLIT_OFF
+             && vfo == routing.current_vfo)
+            || (routing.split == RIG_SPLIT_ON
+                && vfo != routing.split_vfo);
+    is_tx = (routing.split == RIG_SPLIT_OFF
+             && vfo == routing.current_vfo)
+            || (routing.split == RIG_SPLIT_ON
+                && vfo == routing.split_vfo);
+    ptt = routing.ptt && is_tx;
 
     if (is_tx)
     {

@@ -118,7 +118,7 @@ extern int ic7800_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val);
 static int ic785x_set_level(RIG *rig, vfo_t vfo, setting_t level, value_t val);
 static int ic785x_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val);
 
-static struct cmdparams ic785x_extcmds[] =
+static const struct cmdparams ic785x_extcmds[] =
 {
     { {.s = RIG_PARM_BEEP}, CMD_PARAM_TYPE_PARM, C_CTL_MEM, S_MEM_PARM, SC_MOD_RW, 2, {0x01, 0x04}, CMD_DAT_BOL, 1 },
     { {.s = RIG_PARM_BACKLIGHT}, CMD_PARAM_TYPE_PARM, C_CTL_MEM, S_MEM_PARM, SC_MOD_RW, 2, {0x00, 0x76}, CMD_DAT_LVL, 2 },
@@ -244,7 +244,8 @@ static struct icom_priv_caps ic785x_priv_caps =
     .x1ax03_supported = 1,
     .mode_with_filter = 1,
     .data_mode_supported = 1,
-    .clock_cmds = &ic785x_clock_cmds
+    .clock_cmds = &ic785x_clock_cmds,
+    .power_status_read_not_supported = 1
 };
 
 struct rig_caps ic785x_caps =

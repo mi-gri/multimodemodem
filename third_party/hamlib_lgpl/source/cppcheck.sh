@@ -36,6 +36,7 @@ SUPPRESS="\
 --suppress=*:extra/gnuradio/wfm.h \
 --suppress=*:extra/gnuradio/gnuradio.cc \
 --suppress=missingIncludeSystem \
+--suppress=uninitMemberVarNoCtor:*.h \
 "
 
 #CHECK="\

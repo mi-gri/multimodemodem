@@ -26,6 +26,7 @@
 
 //#include <hamlib/rig.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 __BEGIN_DECLS
 
@@ -106,7 +107,7 @@ struct rig_state {
      */
 
     int transaction_active;    /*!< set to 1 to inform the async reader thread that a synchronous command transaction is waiting for a response, otherwise 0 */
-    vfo_t current_vfo;  /*!< VFO currently set */
+    vfo_t current_vfo;  /*!< ABI mirror; direct reads are not synchronized. */
     int vfo_list;       /*!< Complete list of VFO for this rig */
     int comm_state;     /*!< Comm port state, opened/closed. */
     rig_ptr_t priv;     /*!< Pointer to private rig state data. */
@@ -118,7 +119,7 @@ struct rig_state {
     rmode_t current_mode;       /*!< Mode currently set */
     //rmode_t current_modeB;      /*!< Mode currently set VFOB */
     pbwidth_t current_width;    /*!< Passband width currently set */
-    vfo_t tx_vfo;               /*!< Tx VFO currently set */
+    vfo_t tx_vfo;               /*!< ABI mirror; direct reads are not synchronized. */
     rmode_t mode_list;              /*!< Complete list of modes for this rig */
     // mode_list is used by some
     // so anything added to this structure must be below here
@@ -145,7 +146,7 @@ struct rig_state {
     unsigned char disable_yaesu_bandselect; /*!< Disables Yaesu band select logic */
     int twiddle_rit;            /*!< Suppresses VFOB reading (cached value used) so RIT control can be used */
     int twiddle_state;          /*!< keeps track of twiddle status */
-    vfo_t rx_vfo;               /*!< Rx VFO currently set */
+    vfo_t rx_vfo;               /*!< ABI mirror; direct reads are not synchronized. */
 
     volatile unsigned int snapshot_packet_sequence_number;  /*!< Sequence number for JSON output. */
 
@@ -237,6 +238,31 @@ struct rig_state {
     int freq_skip; /*!< allow frequency skip for gpredict RX/TX freq set */
     client_t client;        /*!< Client application of the library. */
     pthread_mutex_t api_mutex;      /*!< Lock for any API entry. */
+    bool morse_busy;                /*!< Advisory to use cache when morse_handler is busy */
+    void *stream_state;             /*!< Opaque pointer to streaming subsystem state */
+    unsigned int stream_time_stale_coarse_ms;     /*!< Default staleness threshold for
+                                                       accuracy downgrade (0 = built-in) */
+    unsigned int stream_time_stale_invalidate_ms; /*!< Default staleness threshold for
+                                                       time invalidation (0 = built-in) */
+    unsigned int stream_transport_buffer_ms;            /*!< Default transport buffer as ms of
+                                                    stream data (0 = built-in 250 ms) */
+    unsigned int stream_transport_buffer_bytes;         /*!< Default transport buffer explicit
+                                                    bytes (0 = derive from rate) */
+    unsigned int stream_metadata_refresh_ms;   /*!< Default metadata refresh cadence in
+                                                    ms (0 = built-in) */
+    unsigned int stream_metadata_interval_ms;  /*!< Default metadata change-poll interval
+                                                    in ms (0 = built-in) */
+    int stream_source_id;                      /*!< Stream source ID carried in every
+                                                    stream packet (-1 = derive from static
+                                                    configuration, 0 = emit unset) */
+    unsigned int stream_keepalive_timeout_s;   /*!< Seconds of stream silence before the
+                                                    server drops a client (0 = built-in) */
+    unsigned int stream_keepalive_interval_s;  /*!< Stream keepalive ping interval in
+                                                    seconds (0 = built-in) */
+    int stream_resample_quality;               /*!< Stream resampler quality:
+                                                    RIG_RESAMPLE_* + 1, so 0 =
+                                                    built-in default (medium) */
+    rig_comm_reason_t comm_reason;          /*!< Why comm_status last changed */
 // New rig_state items go before this line ============================================
 };
 

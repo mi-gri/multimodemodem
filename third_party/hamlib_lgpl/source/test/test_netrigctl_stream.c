@@ -1,0 +1,4671 @@
+/*
+ *  Hamlib netrigctl streaming tests
+ *  Copyright (c) 2026 by Mikael Nousiainen OH3BHX
+ *
+ *   This library is free software; you can redistribute it and/or
+ *   modify it under the terms of the GNU Lesser General Public
+ *   License as published by the Free Software Foundation; either
+ *   version 2.1 of the License, or (at your option) any later version.
+ *
+ *   This library is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *   Lesser General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Lesser General Public
+ *   License along with this library; if not, write to the Free Software
+ *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ */
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
+
+/* Integration tests for netrigctl streaming over network to rigctld. */
+/* Spawns a subprocess rigctld with dummy backend for end-to-end testing. */
+
+#ifdef HAVE_CONFIG_H
+#  include "hamlib/config.h"
+#endif
+
+#include "acutest.h"
+#include "test_debug.h"
+
+#ifdef _WIN32
+
+/* These tests drive a real rigctld child through fork()/execlp(), which
+ * Windows does not provide, so the suite does not run there. The netrigctl
+ * client code it exercises is also covered by test_rigctld_stream, which is
+ * portable. */
+static void test_requires_posix_host(void)
+{
+    TEST_MSG("netrigctl streaming tests need fork(); skipped on this host");
+    TEST_CHECK(1);
+}
+
+TEST_LIST =
+{
+    { "requires_posix_host", test_requires_posix_host },
+    { NULL, NULL }
+};
+
+#else
+
+#include <hamlib/rig.h>
+/* Socket headers come from stream_proto.h, which picks the right set for the
+ * host; do not include them directly. */
+#include "../src/stream.h"
+#include "../src/stream_net.h"
+#include "../src/iofunc.h"
+#include "../src/stream_proto.h"
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <math.h>
+#include <pthread.h>
+
+
+/* --- Subprocess rigctld management --- */
+
+struct rigctld_proc
+{
+    pid_t pid;
+    int port;
+    int idle;
+    int model;
+    int trace;
+    const char *rig_path;
+    const char *password;
+    int (*after_fork)(void *data);
+    void (*after_fork_cleanup)(void *data);
+    void *after_fork_data;
+    char log_path[64];
+};
+
+
+/* Find an available TCP port by binding to port 0. */
+static int find_free_port(void)
+{
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+
+    if (sock < 0)
+    {
+        return -1;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+
+    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    {
+        close(sock);
+        return -1;
+    }
+
+    if (getsockname(sock, (struct sockaddr *)&addr, &addrlen) < 0)
+    {
+        close(sock);
+        return -1;
+    }
+
+    int port = ntohs(addr.sin_port);
+    close(sock);
+    return port;
+}
+
+
+struct tcp_pause_proxy
+{
+    pthread_t thread;
+    pthread_mutex_t mutex;
+    int listen_sock;
+    int client_sock;
+    int upstream_sock;
+    int port;
+    int upstream_port;
+    int pause_stream_close;
+    int thread_started;
+    int thread_running;
+    int stop;
+    int commands_seen;
+    int close_response_held;
+    int close_response_released;
+    int release_close_response;
+    int command_during_close;
+};
+
+
+static void socket_disable_sigpipe(int sock)
+{
+#ifdef SO_NOSIGPIPE
+    int value = 1;
+    setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &value, sizeof(value));
+#else
+    (void)sock;
+#endif
+}
+
+
+static ssize_t socket_send(int sock, const void *buf, size_t len)
+{
+#ifdef MSG_NOSIGNAL
+    return send(sock, buf, len, MSG_NOSIGNAL);
+#else
+    return send(sock, buf, len, 0);
+#endif
+}
+
+
+static int proxy_send_all(int sock, const void *buf, size_t len)
+{
+    const unsigned char *p = buf;
+
+    while (len > 0)
+    {
+        ssize_t n = socket_send(sock, p, len);
+
+        if (n <= 0)
+        {
+            return -1;
+        }
+
+        p += n;
+        len -= (size_t)n;
+    }
+
+    return 0;
+}
+
+
+static void proxy_count_commands(struct tcp_pause_proxy *proxy,
+                                 const char *buf, size_t len)
+{
+    int count = 0;
+
+    for (size_t i = 0; i < len; i++)
+    {
+        if (buf[i] == '\n')
+        {
+            count++;
+        }
+    }
+
+    pthread_mutex_lock(&proxy->mutex);
+    proxy->commands_seen += count;
+    pthread_mutex_unlock(&proxy->mutex);
+}
+
+
+static int proxy_buffer_contains(const char *buf, size_t len,
+                                 const char *needle, size_t needle_len)
+{
+    if (needle_len > len)
+    {
+        return 0;
+    }
+
+    for (size_t i = 0; i <= len - needle_len; i++)
+    {
+        if (memcmp(buf + i, needle, needle_len) == 0)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+
+static int proxy_response_complete(const char *buf, size_t len)
+{
+    size_t line_start = 0;
+
+    for (size_t i = 0; i < len; i++)
+    {
+        if (buf[i] != '\n')
+        {
+            continue;
+        }
+
+        if (i - line_start >= 5
+                && memcmp(buf + line_start, "RPRT ", 5) == 0)
+        {
+            return 1;
+        }
+
+        line_start = i + 1;
+    }
+
+    return 0;
+}
+
+
+static void *tcp_pause_proxy_thread(void *arg)
+{
+    struct tcp_pause_proxy *proxy = arg;
+    struct sockaddr_in upstream_addr;
+    char command_line[4096];
+    char held_response[8192];
+    char pending_command[8192];
+    size_t command_line_len = 0;
+    size_t held_len = 0;
+    size_t pending_len = 0;
+    int client_sock = -1;
+    int upstream_sock = -1;
+    int close_pending = 0;
+    int close_response_complete = 0;
+
+    client_sock = accept(proxy->listen_sock, NULL, NULL);
+
+    if (client_sock < 0)
+    {
+        goto cleanup;
+    }
+
+    socket_disable_sigpipe(client_sock);
+    pthread_mutex_lock(&proxy->mutex);
+    proxy->client_sock = client_sock;
+    int stop = proxy->stop;
+    pthread_mutex_unlock(&proxy->mutex);
+
+    if (stop)
+    {
+        goto cleanup;
+    }
+
+    upstream_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (upstream_sock < 0)
+    {
+        goto cleanup;
+    }
+
+    socket_disable_sigpipe(upstream_sock);
+    pthread_mutex_lock(&proxy->mutex);
+    proxy->upstream_sock = upstream_sock;
+    pthread_mutex_unlock(&proxy->mutex);
+
+    memset(&upstream_addr, 0, sizeof(upstream_addr));
+    upstream_addr.sin_family = AF_INET;
+    upstream_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    upstream_addr.sin_port = htons(proxy->upstream_port);
+
+    if (connect(upstream_sock, (struct sockaddr *)&upstream_addr,
+                sizeof(upstream_addr)) < 0)
+    {
+        goto cleanup;
+    }
+
+    while (1)
+    {
+        fd_set readfds;
+        struct timeval tv = { 0, 50000 };
+        int maxfd = client_sock > upstream_sock ? client_sock : upstream_sock;
+        int should_stop;
+        int release;
+
+        pthread_mutex_lock(&proxy->mutex);
+        should_stop = proxy->stop;
+        release = proxy->release_close_response;
+        pthread_mutex_unlock(&proxy->mutex);
+
+        if (should_stop)
+        {
+            break;
+        }
+
+        if (close_pending && close_response_complete && release)
+        {
+            if (proxy_send_all(client_sock, held_response, held_len) < 0)
+            {
+                break;
+            }
+
+            if (pending_len > 0
+                    && proxy_send_all(upstream_sock, pending_command,
+                                      pending_len) < 0)
+            {
+                break;
+            }
+
+            close_pending = 0;
+            close_response_complete = 0;
+            held_len = 0;
+            pending_len = 0;
+
+            pthread_mutex_lock(&proxy->mutex);
+            proxy->close_response_released = 1;
+            pthread_mutex_unlock(&proxy->mutex);
+        }
+
+        FD_ZERO(&readfds);
+        FD_SET(client_sock, &readfds);
+
+        if (!close_response_complete)
+        {
+            FD_SET(upstream_sock, &readfds);
+        }
+
+        if (select(maxfd + 1, &readfds, NULL, NULL, &tv) < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+
+            break;
+        }
+
+        if (FD_ISSET(client_sock, &readfds))
+        {
+            char buf[4096];
+            ssize_t n = recv(client_sock, buf, sizeof(buf), 0);
+
+            if (n <= 0)
+            {
+                break;
+            }
+
+            proxy_count_commands(proxy, buf, (size_t)n);
+
+            if (close_pending)
+            {
+                size_t room = sizeof(pending_command) - pending_len;
+
+                if ((size_t)n > room)
+                {
+                    break;
+                }
+
+                memcpy(pending_command + pending_len, buf, (size_t)n);
+                pending_len += (size_t)n;
+
+                pthread_mutex_lock(&proxy->mutex);
+                proxy->command_during_close = 1;
+                pthread_mutex_unlock(&proxy->mutex);
+            }
+            else
+            {
+                size_t forward_len = (size_t)n;
+
+                for (size_t i = 0; i < (size_t)n; i++)
+                {
+                    if (command_line_len < sizeof(command_line))
+                    {
+                        command_line[command_line_len++] = buf[i];
+                    }
+
+                    if (buf[i] == '\n')
+                    {
+                        if (proxy->pause_stream_close
+                                && proxy_buffer_contains(command_line,
+                                                         command_line_len,
+                                                         "\\stream_close", 13))
+                        {
+                            size_t remainder = (size_t)n - i - 1;
+                            close_pending = 1;
+                            forward_len = i + 1;
+
+                            pthread_mutex_lock(&proxy->mutex);
+
+                            if (remainder > 0)
+                            {
+                                proxy->command_during_close = 1;
+                            }
+
+                            pthread_mutex_unlock(&proxy->mutex);
+
+                            if (remainder > 0)
+                            {
+                                size_t room = sizeof(pending_command)
+                                              - pending_len;
+
+                                if (remainder > room)
+                                {
+                                    goto cleanup;
+                                }
+
+                                memcpy(pending_command + pending_len,
+                                       buf + i + 1, remainder);
+                                pending_len += remainder;
+                            }
+
+                            command_line_len = 0;
+                            break;
+                        }
+
+                        command_line_len = 0;
+                    }
+                }
+
+                if (proxy_send_all(upstream_sock, buf, forward_len) < 0)
+                {
+                    break;
+                }
+            }
+        }
+
+        if (FD_ISSET(upstream_sock, &readfds))
+        {
+            char buf[4096];
+            ssize_t n = recv(upstream_sock, buf, sizeof(buf), 0);
+
+            if (n <= 0)
+            {
+                break;
+            }
+
+            if (close_pending)
+            {
+                size_t room = sizeof(held_response) - held_len;
+
+                if ((size_t)n > room)
+                {
+                    break;
+                }
+
+                memcpy(held_response + held_len, buf, (size_t)n);
+                held_len += (size_t)n;
+
+                if (proxy_response_complete(held_response, held_len))
+                {
+                    close_response_complete = 1;
+                    pthread_mutex_lock(&proxy->mutex);
+                    proxy->close_response_held = 1;
+                    pthread_mutex_unlock(&proxy->mutex);
+                }
+            }
+            else if (proxy_send_all(client_sock, buf, (size_t)n) < 0)
+            {
+                break;
+            }
+        }
+    }
+
+cleanup:
+    pthread_mutex_lock(&proxy->mutex);
+
+    if (client_sock >= 0)
+    {
+        close(client_sock);
+        proxy->client_sock = -1;
+    }
+
+    if (upstream_sock >= 0)
+    {
+        close(upstream_sock);
+        proxy->upstream_sock = -1;
+    }
+
+    proxy->thread_running = 0;
+    pthread_mutex_unlock(&proxy->mutex);
+    return NULL;
+}
+
+
+static int tcp_pause_proxy_init(struct tcp_pause_proxy *proxy,
+                                int upstream_port,
+                                int pause_stream_close)
+{
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+    int reuse = 1;
+
+    memset(proxy, 0, sizeof(*proxy));
+    proxy->listen_sock = -1;
+    proxy->client_sock = -1;
+    proxy->upstream_sock = -1;
+    proxy->upstream_port = upstream_port;
+    proxy->pause_stream_close = pause_stream_close;
+
+    if (pthread_mutex_init(&proxy->mutex, NULL) != 0)
+    {
+        return -1;
+    }
+
+    proxy->listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (proxy->listen_sock < 0)
+    {
+        pthread_mutex_destroy(&proxy->mutex);
+        return -1;
+    }
+
+    int fd_flags = fcntl(proxy->listen_sock, F_GETFD);
+
+    if (fd_flags < 0
+            || fcntl(proxy->listen_sock, F_SETFD,
+                     fd_flags | FD_CLOEXEC) < 0)
+    {
+        close(proxy->listen_sock);
+        pthread_mutex_destroy(&proxy->mutex);
+        return -1;
+    }
+
+    setsockopt(proxy->listen_sock, SOL_SOCKET, SO_REUSEADDR, &reuse,
+               sizeof(reuse));
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+
+    if (bind(proxy->listen_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0
+            || getsockname(proxy->listen_sock, (struct sockaddr *)&addr,
+                           &addrlen) < 0
+            || listen(proxy->listen_sock, 2) < 0)
+    {
+        close(proxy->listen_sock);
+        pthread_mutex_destroy(&proxy->mutex);
+        return -1;
+    }
+
+    proxy->port = ntohs(addr.sin_port);
+    return 0;
+}
+
+
+static void tcp_pause_proxy_wake_accept(struct tcp_pause_proxy *proxy)
+{
+    struct sockaddr_in addr;
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sock < 0)
+    {
+        return;
+    }
+
+    socket_disable_sigpipe(sock);
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = htons(proxy->port);
+    connect(sock, (struct sockaddr *)&addr, sizeof(addr));
+    close(sock);
+}
+
+
+static void tcp_pause_proxy_stop_thread(struct tcp_pause_proxy *proxy)
+{
+    int thread_started;
+    int wake_accept;
+
+    pthread_mutex_lock(&proxy->mutex);
+    thread_started = proxy->thread_started;
+
+    if (!thread_started)
+    {
+        pthread_mutex_unlock(&proxy->mutex);
+        return;
+    }
+
+    proxy->stop = 1;
+    wake_accept = proxy->thread_running && proxy->client_sock < 0;
+
+    if (proxy->client_sock >= 0)
+    {
+        shutdown(proxy->client_sock, SHUT_RDWR);
+    }
+
+    if (proxy->upstream_sock >= 0)
+    {
+        shutdown(proxy->upstream_sock, SHUT_RDWR);
+    }
+
+    pthread_mutex_unlock(&proxy->mutex);
+
+    if (wake_accept)
+    {
+        tcp_pause_proxy_wake_accept(proxy);
+    }
+
+    pthread_join(proxy->thread, NULL);
+    pthread_mutex_lock(&proxy->mutex);
+    proxy->thread_started = 0;
+    proxy->client_sock = -1;
+    proxy->upstream_sock = -1;
+    pthread_mutex_unlock(&proxy->mutex);
+}
+
+
+static int tcp_pause_proxy_start_thread(void *data)
+{
+    struct tcp_pause_proxy *proxy = data;
+
+    pthread_mutex_lock(&proxy->mutex);
+
+    if (proxy->thread_started)
+    {
+        pthread_mutex_unlock(&proxy->mutex);
+        return -1;
+    }
+
+    proxy->stop = 0;
+    proxy->commands_seen = 0;
+    proxy->close_response_held = 0;
+    proxy->close_response_released = 0;
+    proxy->release_close_response = 0;
+    proxy->command_during_close = 0;
+    proxy->thread_started = 1;
+    proxy->thread_running = 1;
+    pthread_mutex_unlock(&proxy->mutex);
+
+    if (pthread_create(&proxy->thread, NULL, tcp_pause_proxy_thread, proxy) != 0)
+    {
+        pthread_mutex_lock(&proxy->mutex);
+        proxy->thread_started = 0;
+        proxy->thread_running = 0;
+        pthread_mutex_unlock(&proxy->mutex);
+        return -1;
+    }
+
+    return 0;
+}
+
+
+static void tcp_pause_proxy_cleanup_thread(void *data)
+{
+    tcp_pause_proxy_stop_thread(data);
+}
+
+
+static int tcp_pause_proxy_value(struct tcp_pause_proxy *proxy, int *value)
+{
+    pthread_mutex_lock(&proxy->mutex);
+    int result = *value;
+    pthread_mutex_unlock(&proxy->mutex);
+    return result;
+}
+
+
+static int tcp_pause_proxy_wait(struct tcp_pause_proxy *proxy, int *value,
+                                int timeout_ms)
+{
+    for (int elapsed = 0; elapsed < timeout_ms; elapsed += 10)
+    {
+        if (tcp_pause_proxy_value(proxy, value))
+        {
+            return 0;
+        }
+
+        usleep(10000);
+    }
+
+    return -1;
+}
+
+
+static int tcp_pause_proxy_remained_quiet(struct tcp_pause_proxy *proxy,
+        int command_count, int timeout_ms)
+{
+    for (int elapsed = 0; elapsed < timeout_ms; elapsed += 10)
+    {
+        int forbidden;
+
+        pthread_mutex_lock(&proxy->mutex);
+        forbidden = proxy->command_during_close
+                    || proxy->commands_seen != command_count;
+        pthread_mutex_unlock(&proxy->mutex);
+
+        if (forbidden)
+        {
+            return 0;
+        }
+
+        usleep(10000);
+    }
+
+    return 1;
+}
+
+
+static void tcp_pause_proxy_release(struct tcp_pause_proxy *proxy)
+{
+    pthread_mutex_lock(&proxy->mutex);
+    proxy->release_close_response = 1;
+    pthread_mutex_unlock(&proxy->mutex);
+}
+
+
+static void tcp_pause_proxy_destroy(struct tcp_pause_proxy *proxy)
+{
+    tcp_pause_proxy_release(proxy);
+    tcp_pause_proxy_stop_thread(proxy);
+
+    if (proxy->listen_sock >= 0)
+    {
+        close(proxy->listen_sock);
+        proxy->listen_sock = -1;
+    }
+
+    pthread_mutex_destroy(&proxy->mutex);
+}
+
+
+/* Wait until rigctld is accepting TCP connections. */
+static int wait_for_rigctld(int port, int timeout_ms)
+{
+    int elapsed = 0;
+
+    while (elapsed < timeout_ms)
+    {
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in addr;
+
+        if (sock < 0)
+        {
+            return -1;
+        }
+
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        addr.sin_port = htons(port);
+
+        if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) == 0)
+        {
+            close(sock);
+            return 0;
+        }
+
+        close(sock);
+        usleep(50000);  /* 50ms */
+        elapsed += 50;
+    }
+
+    return -1;
+}
+
+
+/* Find the rigctld binary — check build tree first, then PATH. */
+static const char *find_rigctld(void)
+{
+    if (access("../tests/rigctld", X_OK) == 0)
+    {
+        return "../tests/rigctld";
+    }
+
+    if (access("./tests/rigctld", X_OK) == 0)
+    {
+        return "./tests/rigctld";
+    }
+
+    /* Try absolute path from build directory */
+    if (access("tests/rigctld", X_OK) == 0)
+    {
+        return "tests/rigctld";
+    }
+
+    return "rigctld";  /* Fallback to PATH */
+}
+
+
+/* Start rigctld; source_id_opt, when non-NULL, is passed as
+ * --stream-source-id. A proc->port already > 0 is reused (daemon restart on
+ * the same port), otherwise a free port is picked. set_conf_opt, when
+ * non-NULL, is passed to the daemon as --set-conf (e.g.
+ * "stream_mode=counter" for the dummy's deterministic byte pattern). */
+static void dump_rigctld_log(const char *path);
+
+/* The last daemon started, for failure diagnostics in open_netrigctl(). */
+static struct rigctld_proc *last_rigctld_proc;
+
+/* Report whether the daemon child is still running; reap and describe it
+ * when it is not. */
+static int rigctld_alive(struct rigctld_proc *proc)
+{
+    int st = 0;
+    pid_t r = waitpid(proc->pid, &st, WNOHANG);
+
+    if (r == 0)
+    {
+        return 1;
+    }
+
+    fprintf(stderr, "rigctld pid %d died at startup (%s %d)\n",
+            (int)proc->pid,
+            WIFEXITED(st) ? "exit" : "signal",
+            WIFEXITED(st) ? WEXITSTATUS(st) : WTERMSIG(st));
+    proc->pid = -1;
+    return 0;
+}
+
+static int start_rigctld_once(struct rigctld_proc *proc,
+                              const char *source_id_opt,
+                              const char *set_conf_opt);
+
+/* find_free_port() closes the probe socket before rigctld binds the port,
+ * so another process on a busy CI runner can steal it in between and the
+ * daemon exits on the bind failure — observed as a connect that breaks
+ * mid-handshake followed by connection-refused. Verify the child survived
+ * startup and retry on a fresh port (unless the caller pinned one). */
+static int start_rigctld_opt(struct rigctld_proc *proc,
+                             const char *source_id_opt,
+                             const char *set_conf_opt)
+{
+    int pinned = proc->port > 0;
+
+    for (int attempt = 0; attempt < 3; attempt++)
+    {
+        if (start_rigctld_once(proc, source_id_opt, set_conf_opt) == 0
+                && rigctld_alive(proc))
+        {
+            last_rigctld_proc = proc;
+            return 0;
+        }
+
+        if (proc->pid > 0)
+        {
+            kill(proc->pid, SIGTERM);
+            waitpid(proc->pid, NULL, 0);
+            proc->pid = -1;
+        }
+
+        if (proc->after_fork_cleanup)
+        {
+            proc->after_fork_cleanup(proc->after_fork_data);
+        }
+
+        dump_rigctld_log(proc->log_path);
+        unlink(proc->log_path);
+
+        if (!pinned)
+        {
+            proc->port = 0;  /* pick a fresh port next round */
+        }
+
+        /* A pinned port keeps its number and is retried as it is: the usual
+         * reason a restart on the same port fails is the previous daemon
+         * still letting go of it, which the next attempt resolves. */
+    }
+
+    return -1;
+}
+
+static int start_rigctld_once(struct rigctld_proc *proc,
+                              const char *source_id_opt,
+                              const char *set_conf_opt)
+{
+    const char *rigctld_path;
+    char model_str[16];
+    char port_str[16];
+
+    if (proc->port <= 0)
+    {
+        proc->port = find_free_port();
+    }
+
+    if (proc->port < 0)
+    {
+        return -1;
+    }
+
+    rigctld_path = find_rigctld();
+    snprintf(model_str, sizeof(model_str), "%d",
+             proc->model > 0 ? proc->model : 1);
+    snprintf(port_str, sizeof(port_str), "%d", proc->port);
+    snprintf(proc->log_path, sizeof(proc->log_path),
+             "rigctld-%d.log", proc->port);
+
+    proc->pid = fork();
+
+    if (proc->pid < 0)
+    {
+        return -1;
+    }
+
+    /* Child daemon verbosity: -vvv (WARN) so dropped subscribes and
+     * events (token/IP validation) leave a trace the parent can dump
+     * when a test fails; RIG_TEST_DEBUG raises it to TRACE like the
+     * suite itself (see test_debug.h). */
+    const char *verbosity = proc->trace || getenv("RIG_TEST_DEBUG")
+                            ? "-vvvvv" : "-vvv";
+
+    if (proc->pid == 0)
+    {
+        char *child_argv[24];
+        int child_argc = 0;
+
+        /* Child: silence stdout, but capture stderr in a per-daemon log;
+         * /dev/null for stderr made failures undiagnosable. On redirect
+         * failure the inherited stream simply stays in place. */
+        if (freopen("/dev/null", "w", stdout) == NULL) {}
+
+        if (freopen(proc->log_path, "w", stderr) == NULL)
+        {
+            if (freopen("/dev/null", "w", stderr) == NULL) {}
+        }
+
+        child_argv[child_argc++] = (char *)"rigctld";
+        child_argv[child_argc++] = (char *)"-m";
+        child_argv[child_argc++] = model_str;
+        child_argv[child_argc++] = (char *)"-t";
+        child_argv[child_argc++] = port_str;
+        child_argv[child_argc++] = (char *)verbosity;
+
+        if (proc->rig_path)
+        {
+            child_argv[child_argc++] = (char *)"-r";
+            child_argv[child_argc++] = (char *)proc->rig_path;
+        }
+
+        if (proc->password)
+        {
+            child_argv[child_argc++] = (char *)"-A";
+            child_argv[child_argc++] = (char *)proc->password;
+        }
+
+        if (proc->idle)
+        {
+            child_argv[child_argc++] = (char *)"-R";
+        }
+
+        if (source_id_opt)
+        {
+            child_argv[child_argc++] = (char *)"--stream-source-id";
+            child_argv[child_argc++] = (char *)source_id_opt;
+        }
+
+        if (set_conf_opt)
+        {
+            child_argv[child_argc++] = (char *)"--set-conf";
+            child_argv[child_argc++] = (char *)set_conf_opt;
+        }
+
+        child_argv[child_argc] = NULL;
+        execvp(rigctld_path, child_argv);
+        _exit(127);
+    }
+
+    if (proc->after_fork
+            && proc->after_fork(proc->after_fork_data) < 0)
+    {
+        kill(proc->pid, SIGTERM);
+        waitpid(proc->pid, NULL, 0);
+        proc->pid = -1;
+        return -1;
+    }
+
+    /* Parent: wait for rigctld to start */
+    if (wait_for_rigctld(proc->port, 5000) < 0)
+    {
+        kill(proc->pid, SIGTERM);
+        waitpid(proc->pid, NULL, 0);
+        proc->pid = -1;
+        return -1;
+    }
+
+    return 0;
+}
+
+
+static int start_rigctld(struct rigctld_proc *proc)
+{
+    return start_rigctld_opt(proc, NULL, NULL);
+}
+
+
+static int start_idle_rigctld(struct rigctld_proc *proc)
+{
+    proc->idle = 1;
+    return start_rigctld_opt(proc, NULL, NULL);
+}
+
+
+/* Replay the daemon's captured stderr into ours so a CI log shows why a
+ * subscribe or event was dropped; silent when the daemon logged nothing. */
+static void dump_rigctld_log(const char *path)
+{
+    FILE *fp = fopen(path, "r");
+    char line[512];
+    int banner = 0;
+
+    if (!fp)
+    {
+        return;
+    }
+
+    while (fgets(line, sizeof(line), fp))
+    {
+        if (!banner)
+        {
+            fprintf(stderr, "--- rigctld stderr (%s) ---\n", path);
+            banner = 1;
+        }
+
+        fputs(line, stderr);
+    }
+
+    if (banner)
+    {
+        fprintf(stderr, "--- end rigctld stderr ---\n");
+    }
+
+    fclose(fp);
+}
+
+
+static int count_log_occurrences(const char *path, const char *needle)
+{
+    FILE *fp = fopen(path, "r");
+    char line[1024];
+    int count = 0;
+
+    if (!fp)
+    {
+        return 0;
+    }
+
+    while (fgets(line, sizeof(line), fp))
+    {
+        if (strstr(line, needle))
+        {
+            count++;
+        }
+    }
+
+    fclose(fp);
+    return count;
+}
+
+
+static int wait_for_log_occurrences(const char *path, const char *needle,
+                                    int minimum, int timeout_ms)
+{
+    for (int elapsed = 0; elapsed < timeout_ms; elapsed += 10)
+    {
+        if (count_log_occurrences(path, needle) >= minimum)
+        {
+            return 0;
+        }
+
+        usleep(10000);
+    }
+
+    return -1;
+}
+
+
+static void stop_rigctld(struct rigctld_proc *proc)
+{
+    if (proc->pid > 0)
+    {
+        int status = 0;
+
+        kill(proc->pid, SIGTERM);
+        waitpid(proc->pid, &status, 0);
+        proc->pid = 0;
+
+        /* A daemon that died before our SIGTERM stays a zombie until the
+         * waitpid above, which then reports the original death status: a
+         * crash shows up here even though the kill() still succeeded. */
+        if (WIFSIGNALED(status) && WTERMSIG(status) != SIGTERM)
+        {
+            fprintf(stderr, "stop_rigctld: rigctld died on signal %d\n",
+                    WTERMSIG(status));
+        }
+        else if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+        {
+            fprintf(stderr, "stop_rigctld: rigctld exited with code %d\n",
+                    WEXITSTATUS(status));
+        }
+    }
+
+    if (proc->log_path[0] != '\0')
+    {
+        dump_rigctld_log(proc->log_path);
+        unlink(proc->log_path);
+        proc->log_path[0] = '\0';
+    }
+}
+
+
+/* Open a netrigctl RIG connected to the subprocess rigctld. */
+static RIG *open_netrigctl(int port)
+{
+    /* A freshly spawned rigctld can stall for hundreds of ms on a loaded
+     * CI runner between accepting the TCP connection and serving it, which
+     * makes a single rig_open attempt time out and fail the whole test.
+     * Retry a few times before declaring the daemon unusable. */
+    for (int attempt = 0; attempt < 3; attempt++)
+    {
+        RIG *rig;
+        char pathname[64];
+
+        if (attempt > 0)
+        {
+            fprintf(stderr, "open_netrigctl: retrying (attempt %d)\n",
+                    attempt + 1);
+            usleep(250000);
+        }
+
+        rig = rig_init(RIG_MODEL_NETRIGCTL);
+
+        if (!rig)
+        {
+            return NULL;
+        }
+
+        snprintf(pathname, sizeof(pathname), "127.0.0.1:%d", port);
+        rig_set_conf(rig, rig_token_lookup(rig, "rig_pathname"), pathname);
+
+        if (rig_open(rig) == RIG_OK)
+        {
+            return rig;
+        }
+
+        rig_cleanup(rig);
+    }
+
+    /* All attempts failed: say why, if the daemon can tell us. */
+    if (last_rigctld_proc)
+    {
+        if (last_rigctld_proc->pid > 0)
+        {
+            rigctld_alive(last_rigctld_proc);
+        }
+
+        dump_rigctld_log(last_rigctld_proc->log_path);
+    }
+
+    return NULL;
+}
+
+
+static int authenticate_netrigctl(RIG *rig, const char *password)
+{
+    char secret[HAMLIB_SECRET_LENGTH + 1];
+
+    rig_password_generate_secret(password, secret);
+    int ret = rig_password(rig, secret);
+    memset(secret, 0, sizeof(secret));
+    return ret;
+}
+
+
+/* Helper: find a stream_caps entry by type, return pointer or NULL. */
+/* The relayed advertisement is published as SESSION caps (netrigctl
+ * never writes rig->caps), so lookups go through the public served view:
+ * rig_stream_caps_at() returns it verbatim for pre-derived entries. */
+static const struct rig_stream_caps *find_caps_by_type(
+    RIG *rig,
+    rig_stream_type_t type)
+{
+    int count = rig_stream_caps_count(rig);
+
+    for (int i = 0; i < count; i++)
+    {
+        const struct rig_stream_caps *e = rig_stream_caps_at(rig, i);
+
+        if (e && e->type == type)
+        {
+            return e;
+        }
+    }
+
+    return NULL;
+}
+
+
+/* Helper: check if a specific rate appears in the sample_rates array. */
+static int has_rate(const int *rates, int rate)
+{
+    for (int i = 0; i < HAMLIB_MAX_STREAM_RATES && rates[i] != 0; i++)
+    {
+        if (rates[i] == rate)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+
+static int send_all(int sock, const void *buf, size_t len);
+static int raw_control_connect(int port);
+static int raw_control_read(int sock, char *response, size_t response_size,
+                            int timeout_ms);
+static int raw_control_command(int sock, const char *command, char *response,
+                               size_t response_size);
+
+
+/* --- Tests --- */
+
+
+/* Startup capability probes must remain usable before authentication without
+ * consuming the failure budget or closing the model-2 client connection. */
+void test_password_startup_and_stream_caps(void)
+{
+    static const char password[] = "integration-test-password";
+    struct rigctld_proc upstream = {0};
+    struct rigctld_proc frontend = {0};
+    struct tcp_pause_proxy proxy;
+    char proxy_path[64];
+    RIG *rig = NULL;
+    freq_t freq = 0;
+    int baseline_commands;
+    int preauth_commands;
+    int ret;
+
+    if (start_rigctld(&upstream) < 0)
+    {
+        TEST_CHECK_(0, "could not start upstream rigctld");
+        return;
+    }
+
+    if (tcp_pause_proxy_init(&proxy, upstream.port, 0) < 0)
+    {
+        TEST_CHECK_(0, "could not initialize upstream transaction proxy");
+        stop_rigctld(&upstream);
+        return;
+    }
+
+    snprintf(proxy_path, sizeof(proxy_path), "127.0.0.1:%d", proxy.port);
+    frontend.model = RIG_MODEL_NETRIGCTL;
+    frontend.rig_path = proxy_path;
+    frontend.password = password;
+    frontend.after_fork = tcp_pause_proxy_start_thread;
+    frontend.after_fork_cleanup = tcp_pause_proxy_cleanup_thread;
+    frontend.after_fork_data = &proxy;
+
+    if (start_rigctld(&frontend) < 0)
+    {
+        TEST_CHECK_(0, "could not start password-protected chained rigctld");
+        tcp_pause_proxy_destroy(&proxy);
+        stop_rigctld(&upstream);
+        return;
+    }
+
+    baseline_commands = tcp_pause_proxy_value(&proxy, &proxy.commands_seen);
+    rig = open_netrigctl(frontend.port);
+    TEST_CHECK(rig != NULL);
+
+    if (!rig)
+    {
+        goto cleanup;
+    }
+
+    TEST_CHECK(rig_stream_caps_count(rig) == 4);
+    TEST_MSG("pre-authentication stream capability discovery returned %d entries",
+             rig_stream_caps_count(rig));
+
+    rig_set_cache_timeout_ms(rig, HAMLIB_CACHE_ALL, 0);
+    ret = rig_get_freq(rig, RIG_VFO_CURR, &freq);
+    TEST_CHECK(ret == -RIG_ESECURITY);
+    TEST_MSG("protected read before authentication returned %d", ret);
+
+    preauth_commands = tcp_pause_proxy_value(&proxy, &proxy.commands_seen);
+    TEST_CHECK(preauth_commands - baseline_commands == 0);
+    TEST_MSG("unauthenticated startup and read sent %d upstream commands",
+             preauth_commands - baseline_commands);
+
+    ret = authenticate_netrigctl(rig, password);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("password authentication returned %d", ret);
+
+    for (int elapsed = 0; elapsed < 2000; elapsed += 10)
+    {
+        if (tcp_pause_proxy_value(&proxy, &proxy.commands_seen)
+                > baseline_commands)
+        {
+            break;
+        }
+
+        usleep(10000);
+    }
+
+    TEST_CHECK(tcp_pause_proxy_value(&proxy, &proxy.commands_seen)
+               > baseline_commands);
+    TEST_MSG("authentication did not trigger the upstream power refresh");
+
+    TEST_CHECK(rig_stream_caps_count(rig) == 4);
+    TEST_MSG("post-authentication stream capability view returned %d entries",
+             rig_stream_caps_count(rig));
+
+    rig_set_cache_timeout_ms(rig, HAMLIB_CACHE_ALL, 0);
+    ret = rig_get_freq(rig, RIG_VFO_CURR, &freq);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("protected read after authentication returned %d", ret);
+
+cleanup:
+
+    if (rig)
+    {
+        rig_close(rig);
+        rig_cleanup(rig);
+    }
+
+    tcp_pause_proxy_destroy(&proxy);
+    stop_rigctld(&frontend);
+    stop_rigctld(&upstream);
+}
+
+
+static void check_connection_power_refresh(int use_password)
+{
+    static const char password[] = "power-refresh-password";
+    struct rigctld_proc upstream = {0};
+    struct rigctld_proc frontend = {0};
+    char upstream_path[64];
+    char password_command[HAMLIB_SECRET_LENGTH + 16];
+    char response[256];
+    char secret[HAMLIB_SECRET_LENGTH + 1];
+    RIG *frontend_client = NULL;
+    RIG *upstream_client = NULL;
+    int raw_sock = -1;
+    int ret;
+
+    if (start_rigctld(&upstream) < 0)
+    {
+        TEST_CHECK_(0, "could not start upstream rigctld");
+        return;
+    }
+
+    snprintf(upstream_path, sizeof(upstream_path), "127.0.0.1:%d",
+             upstream.port);
+    frontend.model = RIG_MODEL_NETRIGCTL;
+    frontend.rig_path = upstream_path;
+    frontend.password = use_password ? password : NULL;
+
+    if (start_rigctld(&frontend) < 0)
+    {
+        TEST_CHECK_(0, "could not start chained rigctld");
+        stop_rigctld(&upstream);
+        return;
+    }
+
+    frontend_client = open_netrigctl(frontend.port);
+    TEST_CHECK(frontend_client != NULL);
+
+    if (!frontend_client)
+    {
+        goto cleanup;
+    }
+
+    if (use_password)
+    {
+        ret = authenticate_netrigctl(frontend_client, password);
+        TEST_CHECK(ret == RIG_OK);
+
+        if (ret != RIG_OK)
+        {
+            goto cleanup;
+        }
+    }
+
+    ret = rig_set_powerstat(frontend_client, RIG_POWER_OFF);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("setting the chained daemon power cache OFF returned %d", ret);
+    rig_close(frontend_client);
+    rig_cleanup(frontend_client);
+    frontend_client = NULL;
+
+    upstream_client = open_netrigctl(upstream.port);
+    TEST_CHECK(upstream_client != NULL);
+
+    if (!upstream_client)
+    {
+        goto cleanup;
+    }
+
+    ret = rig_set_powerstat(upstream_client, RIG_POWER_ON);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("restoring upstream power behind the chained daemon returned %d",
+             ret);
+    rig_close(upstream_client);
+    rig_cleanup(upstream_client);
+    upstream_client = NULL;
+
+    raw_sock = raw_control_connect(frontend.port);
+    TEST_CHECK(raw_sock >= 0);
+
+    if (raw_sock < 0)
+    {
+        goto cleanup;
+    }
+
+    if (use_password)
+    {
+        ret = send_all(raw_sock, "\\get_freq\n", 10);
+        TEST_CHECK(ret == 0);
+
+        if (ret < 0)
+        {
+            goto cleanup;
+        }
+
+        ret = raw_control_read(raw_sock, response, sizeof(response), 5000);
+        TEST_CHECK(ret > 0);
+
+        if (ret < 0)
+        {
+            goto cleanup;
+        }
+
+        TEST_CHECK(strstr(response, "RPRT -19") != NULL);
+        TEST_MSG("unauthenticated read response was %s", response);
+
+        rig_password_generate_secret(password, secret);
+        snprintf(password_command, sizeof(password_command),
+                 "\\password %s\n", secret);
+        memset(secret, 0, sizeof(secret));
+        ret = send_all(raw_sock, password_command, strlen(password_command));
+        TEST_CHECK(ret == 0);
+        memset(password_command, 0, sizeof(password_command));
+
+        if (ret < 0)
+        {
+            goto cleanup;
+        }
+
+        ret = raw_control_read(raw_sock, response, sizeof(response), 5000);
+        TEST_CHECK(ret > 0);
+
+        if (ret < 0)
+        {
+            goto cleanup;
+        }
+
+        TEST_CHECK(strstr(response, "RPRT 0") != NULL);
+        TEST_MSG("password response was %s", response);
+    }
+
+    ret = send_all(raw_sock, "\\get_freq\n", 10);
+    TEST_CHECK(ret == 0);
+
+    if (ret < 0)
+    {
+        goto cleanup;
+    }
+
+    ret = raw_control_read(raw_sock, response, sizeof(response), 5000);
+    TEST_CHECK(ret > 0);
+
+    if (ret < 0)
+    {
+        goto cleanup;
+    }
+
+    TEST_CHECK(strstr(response, "RPRT -") == NULL);
+    TEST_MSG("first authorized command after upstream recovery returned %s",
+             response);
+
+    if (use_password)
+    {
+        ret = raw_control_command(raw_sock, "\\set_powerstat 0\n", response,
+                                  sizeof(response));
+        TEST_CHECK(ret > 0);
+
+        if (ret < 0)
+        {
+            goto cleanup;
+        }
+
+        TEST_CHECK(strstr(response, "RPRT 0") != NULL);
+        TEST_MSG("setting power OFF before reauthentication returned %s",
+                 response);
+
+        upstream_client = open_netrigctl(upstream.port);
+        TEST_CHECK(upstream_client != NULL);
+
+        if (!upstream_client)
+        {
+            goto cleanup;
+        }
+
+        ret = rig_set_powerstat(upstream_client, RIG_POWER_ON);
+        TEST_CHECK(ret == RIG_OK);
+        TEST_MSG("restoring upstream power before reauthentication returned %d",
+                 ret);
+        rig_close(upstream_client);
+        rig_cleanup(upstream_client);
+        upstream_client = NULL;
+
+        ret = raw_control_command(raw_sock, "\\password invalid\n", response,
+                                  sizeof(response));
+        TEST_CHECK(ret > 0);
+
+        if (ret < 0)
+        {
+            goto cleanup;
+        }
+
+        TEST_CHECK(strstr(response, "RPRT -19") != NULL);
+        TEST_MSG("incorrect password response was %s", response);
+
+        rig_password_generate_secret(password, secret);
+        snprintf(password_command, sizeof(password_command),
+                 "\\password %s\n", secret);
+        memset(secret, 0, sizeof(secret));
+        ret = raw_control_command(raw_sock, password_command, response,
+                                  sizeof(response));
+        memset(password_command, 0, sizeof(password_command));
+        TEST_CHECK(ret > 0);
+
+        if (ret < 0)
+        {
+            goto cleanup;
+        }
+
+        TEST_CHECK(strstr(response, "RPRT 0") != NULL);
+        TEST_MSG("reauthentication response was %s", response);
+
+        ret = raw_control_command(raw_sock, "\\get_freq\n", response,
+                                  sizeof(response));
+        TEST_CHECK(ret > 0);
+
+        if (ret < 0)
+        {
+            goto cleanup;
+        }
+
+        TEST_CHECK(strstr(response, "RPRT -") == NULL);
+        TEST_MSG("first command after reauthentication returned %s", response);
+    }
+
+cleanup:
+
+    if (frontend_client)
+    {
+        rig_close(frontend_client);
+        rig_cleanup(frontend_client);
+    }
+
+    if (upstream_client)
+    {
+        rig_close(upstream_client);
+        rig_cleanup(upstream_client);
+    }
+
+    if (raw_sock >= 0)
+    {
+        close(raw_sock);
+    }
+
+    stop_rigctld(&frontend);
+    stop_rigctld(&upstream);
+}
+
+
+void test_connection_power_refresh(void)
+{
+    check_connection_power_refresh(0);
+}
+
+
+void test_authenticated_connection_power_refresh(void)
+{
+    check_connection_power_refresh(1);
+}
+
+
+/* Verify all 4 stream types are discovered with correct format bitmasks,
+ * sample rates, channel lists, and max_streams values matching the
+ * dummy backend's rig_caps. */
+void test_caps_discovery_all_types(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    /* Count total discovered caps through the served view: the relayed
+     * advertisement lives in session caps, never in rig->caps. */
+    int total_caps = rig_stream_caps_count(rig);
+
+    TEST_CHECK(total_caps == 4);
+    TEST_MSG("Expected 4 stream caps, got %d", total_caps);
+
+    /* --- AUDIO_RX --- */
+    const struct rig_stream_caps *arx = find_caps_by_type(rig,
+                                        RIG_STREAM_TYPE_AUDIO_RX);
+    TEST_CHECK(arx != NULL);
+    TEST_MSG("AUDIO_RX caps must be present");
+
+    if (arx)
+    {
+        /* Documented dummy AUDIO_RX format bitmask:
+         * S8(1<<0) | U8(1<<1) | S16(1<<2) | F32(1<<3) | OPUS(1<<4)
+         * = 0x1F — OPUS is the dummy's fabricated test codec, relayed
+         * through both views. */
+        const rig_stream_format_t expected_audio_fmts = 0x1F;
+
+        TEST_CHECK(arx->formats == expected_audio_fmts);
+        TEST_MSG("AUDIO_RX formats: got 0x%x, expected 0x%x",
+                 arx->formats, expected_audio_fmts);
+
+        /* Exact sample rates: 8000, 16000, 24000, 48000, 96000 */
+        TEST_CHECK(has_rate(arx->sample_rates, 8000));
+        TEST_MSG("AUDIO_RX must support 8000 Hz");
+        TEST_CHECK(has_rate(arx->sample_rates, 16000));
+        TEST_MSG("AUDIO_RX must support 16000 Hz");
+        TEST_CHECK(has_rate(arx->sample_rates, 24000));
+        TEST_MSG("AUDIO_RX must support 24000 Hz");
+        TEST_CHECK(has_rate(arx->sample_rates, 48000));
+        TEST_MSG("AUDIO_RX must support 48000 Hz");
+        TEST_CHECK(has_rate(arx->sample_rates, 96000));
+        TEST_MSG("AUDIO_RX must support 96000 Hz");
+
+        /* Allowed channel counts */
+        TEST_CHECK(arx->channels[0] == 1 && arx->channels[1] == 2
+                   && arx->channels[2] == 0);
+        TEST_MSG("AUDIO_RX channels: got %d,%d",
+                 arx->channels[0], arx->channels[1]);
+
+        /* Max concurrent streams */
+        TEST_CHECK(arx->max_streams == 4);
+        TEST_MSG("AUDIO_RX max_streams: got %d, expected 4",
+                 arx->max_streams);
+
+        /* The server relays its native (hardware) view — the
+         * dummy is PCM_F32-native plus the fabricated OPUS codec — and
+         * the frontend serves the entry verbatim (pre-derived
+         * passthrough, no re-derivation). */
+        TEST_CHECK(arx->native_formats == (RIG_STREAM_FORMAT_PCM_F32
+                                           | RIG_STREAM_FORMAT_OPUS));
+        TEST_MSG("AUDIO_RX native_formats: got 0x%x",
+                 arx->native_formats);
+        TEST_CHECK(has_rate(arx->native_sample_rates, 8000));
+        TEST_CHECK(has_rate(arx->native_sample_rates, 96000));
+        TEST_CHECK(!has_rate(arx->native_sample_rates, 44100));
+        TEST_MSG("44100 must not be in the native rate list");
+        TEST_CHECK(arx->native_channels[0] == 1
+                   && arx->native_channels[1] == 2
+                   && arx->native_channels[2] == 0);
+    }
+
+    /* --- AUDIO_TX --- */
+    const struct rig_stream_caps *atx = find_caps_by_type(rig,
+                                        RIG_STREAM_TYPE_AUDIO_TX);
+    TEST_CHECK(atx != NULL);
+    TEST_MSG("AUDIO_TX caps must be present");
+
+    if (atx)
+    {
+        /* AUDIO_TX carries the fabricated OPUS codec too (symmetric with
+         * AUDIO_RX): 0x1F */
+        const rig_stream_format_t expected_audio_fmts = 0x1F;
+
+        TEST_CHECK(atx->formats == expected_audio_fmts);
+        TEST_MSG("AUDIO_TX formats: got 0x%x, expected 0x%x",
+                 atx->formats, expected_audio_fmts);
+
+        TEST_CHECK(has_rate(atx->sample_rates, 8000));
+        TEST_CHECK(has_rate(atx->sample_rates, 48000));
+        TEST_CHECK(has_rate(atx->sample_rates, 96000));
+
+        TEST_CHECK(atx->channels[0] == 1 && atx->channels[1] == 2
+                   && atx->channels[2] == 0);
+        TEST_CHECK(atx->max_streams == 4);
+
+        /* caps_flags and the TX horizon relay through the wire line too:
+         * without them a remote client could not discover timed TX. */
+        TEST_CHECK(atx->caps_flags == (RIG_STREAM_CAP_TIMED_TX_COARSE
+                                       | RIG_STREAM_CAP_TIMED_TX_SAMPLE
+                                       | RIG_STREAM_CAP_BURST_PTT));
+        TEST_MSG("relayed AUDIO_TX caps_flags = 0x%llx",
+                 (unsigned long long)atx->caps_flags);
+        TEST_CHECK(atx->tx_schedule_horizon_ms == 30000);
+        TEST_MSG("relayed AUDIO_TX horizon = %d",
+                 atx->tx_schedule_horizon_ms);
+    }
+
+    /* --- IQ_RX --- */
+    const struct rig_stream_caps *iqrx = find_caps_by_type(rig,
+                                         RIG_STREAM_TYPE_IQ_RX);
+    TEST_CHECK(iqrx != NULL);
+    TEST_MSG("IQ_RX caps must be present");
+
+    if (iqrx)
+    {
+        /* Documented dummy IQ format bitmask:
+         * CS8(1<<16) | CU8(1<<17) | CS16(1<<18) | CF32(1<<19)
+         * = 0x10000+0x20000+0x40000+0x80000 = 0xF0000 */
+        const rig_stream_format_t expected_iq_fmts = 0xF0000;
+
+        TEST_CHECK(iqrx->formats == expected_iq_fmts);
+        TEST_MSG("IQ_RX formats: got 0x%x, expected 0x%x",
+                 iqrx->formats, expected_iq_fmts);
+
+        TEST_CHECK(has_rate(iqrx->sample_rates, 24000));
+        TEST_CHECK(has_rate(iqrx->sample_rates, 48000));
+        TEST_CHECK(has_rate(iqrx->sample_rates, 96000));
+        TEST_CHECK(has_rate(iqrx->sample_rates, 192000));
+        TEST_MSG("IQ_RX must support 192000 Hz");
+
+        TEST_CHECK(iqrx->channels[0] == 1 && iqrx->channels[3] == 4
+                   && iqrx->channels[4] == 0);
+        TEST_CHECK(iqrx->max_streams == 4);
+    }
+
+    /* --- IQ_TX --- */
+    const struct rig_stream_caps *iqtx = find_caps_by_type(rig,
+                                         RIG_STREAM_TYPE_IQ_TX);
+    TEST_CHECK(iqtx != NULL);
+    TEST_MSG("IQ_TX caps must be present");
+
+    if (iqtx)
+    {
+        /* Same documented dummy IQ bitmask as IQ_RX: 0xF0000 */
+        const rig_stream_format_t expected_iq_fmts = 0xF0000;
+
+        TEST_CHECK(iqtx->formats == expected_iq_fmts);
+        TEST_MSG("IQ_TX formats: got 0x%x, expected 0x%x",
+                 iqtx->formats, expected_iq_fmts);
+
+        TEST_CHECK(has_rate(iqtx->sample_rates, 24000));
+        TEST_CHECK(has_rate(iqtx->sample_rates, 192000));
+
+        TEST_CHECK(iqtx->channels[0] == 1 && iqtx->channels[3] == 4
+                   && iqtx->channels[4] == 0);
+        TEST_CHECK(iqtx->max_streams == 4);
+
+        /* Relayed native view — the dummy is IQ_CF32-native. */
+        TEST_CHECK(iqtx->native_formats == RIG_STREAM_FORMAT_IQ_CF32);
+        TEST_MSG("IQ_TX native_formats: got 0x%x, expected 0x%x",
+                 iqtx->native_formats, RIG_STREAM_FORMAT_IQ_CF32);
+        TEST_CHECK(has_rate(iqtx->native_sample_rates, 192000));
+        TEST_CHECK(iqtx->native_channels[0] == 1
+                   && iqtx->native_channels[3] == 4
+                   && iqtx->native_channels[4] == 0);
+    }
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Open and close a TX stream.
+ * Verify session fields and that backend_priv is NULL after close. */
+void test_open_close_tx(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_TX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("rig_stream_open TX returned %d", ret);
+    TEST_CHECK(stream != NULL);
+
+    if (ret == RIG_OK && stream)
+    {
+        /* Verify session was allocated and populated */
+        TEST_CHECK(stream->backend_priv != NULL);
+        TEST_MSG("backend_priv must be set after open");
+
+        struct rig_stream_net_session *sess =
+            (struct rig_stream_net_session *)stream->backend_priv;
+        TEST_CHECK(sess->udp_sock >= 0);
+        TEST_MSG("udp_sock=%d, must be >= 0", sess->udp_sock);
+        TEST_CHECK(sess->remote_stream_id >= 0);
+        TEST_MSG("remote_stream_id=%d, must be >= 0", sess->remote_stream_id);
+        TEST_CHECK(sess->remote_udp_port > 0);
+        TEST_MSG("remote_udp_port=%d, must be > 0", sess->remote_udp_port);
+        TEST_CHECK(sess->remote_udp_port <= 65535);
+        TEST_MSG("remote_udp_port=%d, must be <= 65535",
+                 sess->remote_udp_port);
+
+        /* TX streams run the receive thread too, to collect PONG and async
+         * write-status frames from the server. */
+        TEST_CHECK(sess->rx_running == 1);
+        TEST_MSG("TX stream must run the receive thread for write-status frames");
+
+        /* Initial TX state */
+        TEST_CHECK(sess->tx_seq == 0);
+        TEST_MSG("tx_seq must be 0 before any writes");
+        TEST_CHECK(sess->tx_timestamp == 0);
+        TEST_MSG("tx_timestamp must be 0 before any writes");
+
+        /* Close and verify cleanup */
+        ret = rig_stream_close(rig, stream);
+        TEST_CHECK(ret == RIG_OK);
+        TEST_MSG("rig_stream_close returned %d", ret);
+    }
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Bypass netrigctl_transaction's input flush so a leftover close RPRT
+ * cannot be hidden before the next command's response is checked. */
+static void check_close_response_consumed(RIG *rig)
+{
+    hamlib_port_t *port = RIGPORT(rig);
+    char response[256];
+    const char command[] = "+\\get_freq\n";
+    TEST_ASSERT(write_block(port, (const unsigned char *)command,
+                            strlen(command)) == RIG_OK);
+    TEST_ASSERT(read_string(port, (unsigned char *)response, sizeof(response),
+                            "\n", 1, 0, 1) > 0);
+    TEST_CHECK(strncmp(response, "get_freq:", 9) == 0);
+    TEST_MSG("expected next command header, got %s", response);
+    TEST_ASSERT(read_string(port, (unsigned char *)response, sizeof(response),
+                            "\n", 1, 0, 1) > 0);
+    TEST_CHECK(strncmp(response, "Frequency:", 10) == 0);
+    TEST_ASSERT(read_string(port, (unsigned char *)response, sizeof(response),
+                            "\n", 1, 0, 1) > 0);
+    TEST_CHECK(strcmp(response, "RPRT 0\n") == 0);
+}
+
+void test_close_response_and_cleanup(void)
+{
+    struct rigctld_proc proc = {0};
+    TEST_ASSERT(start_rigctld(&proc) == 0);
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+    struct rig_stream_config *cfg = rig_stream_config_alloc();
+    TEST_ASSERT(cfg != NULL);
+    cfg->type = RIG_STREAM_TYPE_AUDIO_TX;
+    cfg->format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg->sample_rate = 48000;
+    cfg->channels = 1;
+
+    for (int fail = 0; fail < 2; ++fail)
+    {
+        rig_stream_t *stream = NULL;
+        TEST_ASSERT(rig_stream_open(rig, cfg, &stream) == RIG_OK);
+        struct rig_stream_net_session *session = stream->backend_priv;
+        int udp_fd = session->udp_sock;
+        int remote_id = session->remote_stream_id;
+
+        if (fail)
+        {
+            session->remote_stream_id = -1;
+        }
+
+        TEST_CHECK(rig_stream_close(rig, stream)
+                   == (fail ? -RIG_EINVAL : RIG_OK));
+        stream = NULL;
+        int so_type;
+        socklen_t so_len = sizeof(so_type);
+        TEST_CHECK(getsockopt(udp_fd, SOL_SOCKET, SO_TYPE,
+                              (char *)&so_type, &so_len) < 0);
+        check_close_response_consumed(rig);
+
+        if (fail)
+        {
+            hamlib_port_t *port = RIGPORT(rig);
+            char command[64], response[256];
+            snprintf(command, sizeof(command), "+\\stream_close %d\n", remote_id);
+            TEST_ASSERT(write_block(port, (const unsigned char *)command,
+                                    strlen(command)) == RIG_OK);
+            TEST_ASSERT(read_string(port, (unsigned char *)response,
+                                    sizeof(response), "\n", 1, 0, 1) > 0);
+            TEST_CHECK(strncmp(response, "stream_close:", 13) == 0);
+            TEST_ASSERT(read_string(port, (unsigned char *)response,
+                                    sizeof(response), "\n", 1, 0, 1) > 0);
+            TEST_CHECK(strcmp(response, "RPRT 0\n") == 0);
+        }
+    }
+
+    rig_stream_t *stream = NULL;
+    TEST_ASSERT(rig_stream_open(rig, cfg, &stream) == RIG_OK);
+    TEST_CHECK(rig_stream_close(rig, stream) == RIG_OK);
+    rig_stream_config_free(cfg);
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+/* Open and close an RX stream.
+ * Verify the SUBSCRIBE handshake completed and RX thread is running. */
+void test_open_close_rx(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_RX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("rig_stream_open RX returned %d", ret);
+    TEST_CHECK(stream != NULL);
+
+    if (ret == RIG_OK && stream)
+    {
+        TEST_CHECK(stream->backend_priv != NULL);
+
+        struct rig_stream_net_session *sess =
+            (struct rig_stream_net_session *)stream->backend_priv;
+
+        /* RX stream must have receiver thread running */
+        TEST_CHECK(sess->rx_running == 1);
+        TEST_MSG("RX stream must have rx_running == 1");
+
+        TEST_CHECK(sess->udp_sock >= 0);
+        TEST_CHECK(sess->remote_stream_id >= 0);
+        TEST_CHECK(sess->remote_udp_port > 0);
+
+        /* Close and verify cleanup */
+        ret = rig_stream_close(rig, stream);
+        TEST_CHECK(ret == RIG_OK);
+        TEST_MSG("rig_stream_close RX returned %d", ret);
+    }
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Write multiple TX frames and verify seq/timestamp advance correctly.
+ * 480 samples of S16LE mono = 960 bytes per frame. */
+void test_write_tx_multi(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_TX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_ASSERT(stream != NULL);
+
+    struct rig_stream_net_session *sess =
+        (struct rig_stream_net_session *)stream->backend_priv;
+    TEST_ASSERT(sess != NULL);
+
+    /* Verify initial state */
+    TEST_CHECK(sess->tx_seq == 0);
+    TEST_CHECK(sess->tx_timestamp == 0);
+
+    /* Prepare 480 samples of S16LE mono = 960 bytes.
+     * Each sample is 2 bytes, so 960 / 2 / 1 channel = 480 samples. */
+    int16_t samples[480];
+
+    for (int i = 0; i < 480; i++)
+    {
+        samples[i] = (int16_t)(i & 0x7FFF);
+    }
+
+    /* Write 3 frames */
+    for (int frame = 0; frame < 3; frame++)
+    {
+        size_t written = 0;
+        ret = rig_stream_write(rig, stream, samples, sizeof(samples),
+                               &written, 1000, NULL);
+        TEST_CHECK(ret == RIG_OK);
+        TEST_MSG("frame %d: rig_stream_write returned %d", frame, ret);
+        TEST_CHECK(written == sizeof(samples));
+        TEST_MSG("frame %d: written=%zu, expected %zu",
+                 frame, written, sizeof(samples));
+    }
+
+    /* After 3 writes: seq=3, timestamp=3*480=1440 */
+    TEST_CHECK(sess->tx_seq == 3);
+    TEST_MSG("tx_seq: got %u, expected 3", sess->tx_seq);
+    TEST_CHECK(sess->tx_timestamp == 1440);
+    TEST_MSG("tx_timestamp: got %llu, expected 1440",
+             (unsigned long long)sess->tx_timestamp);
+
+    /* Write one more with different size: 240 samples = 480 bytes */
+    int16_t half_frame[240];
+
+    for (int i = 0; i < 240; i++)
+    {
+        half_frame[i] = (int16_t)(i & 0x7FFF);
+    }
+
+    size_t written = 0;
+    ret = rig_stream_write(rig, stream, half_frame, sizeof(half_frame),
+                           &written, 1000, NULL);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_CHECK(written == sizeof(half_frame));
+    TEST_MSG("half frame: written=%zu, expected %zu",
+             written, sizeof(half_frame));
+
+    /* After 4th write: seq=4, timestamp=1440+240=1680 */
+    TEST_CHECK(sess->tx_seq == 4);
+    TEST_MSG("tx_seq: got %u, expected 4", sess->tx_seq);
+    TEST_CHECK(sess->tx_timestamp == 1680);
+    TEST_MSG("tx_timestamp: got %llu, expected 1680",
+             (unsigned long long)sess->tx_timestamp);
+
+    ret = rig_stream_close(rig, stream);
+    TEST_CHECK(ret == RIG_OK);
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Open an AUDIO_TX stream of 48 kHz float through rigctld. */
+static rig_stream_t *open_tx_f32(RIG *rig, int channels)
+{
+    struct rig_stream_config cfg;
+    rig_stream_t *stream = NULL;
+
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);
+    cfg.type = RIG_STREAM_TYPE_AUDIO_TX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_F32;
+    cfg.sample_rate = 48000;
+    cfg.channels = channels;
+
+    return rig_stream_open(rig, &cfg, &stream) == RIG_OK ? stream : NULL;
+}
+
+/* A write is not limited to one datagram: 20 ms of stereo float is 7680 bytes,
+ * several times the payload budget, and is sent whole as consecutive datagrams
+ * of whole sample frames, with the timestamp advancing by every sample. */
+void test_write_tx_larger_than_payload(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    rig_stream_t *stream = open_tx_f32(rig, 2);
+    TEST_ASSERT(stream != NULL);
+
+    struct rig_stream_net_session *sess =
+        (struct rig_stream_net_session *)stream->backend_priv;
+    TEST_ASSERT(sess != NULL);
+
+    float samples[960 * 2];
+    memset(samples, 0, sizeof(samples));
+
+    size_t frame = 2 * sizeof(float);
+    size_t budget = (size_t)rig_stream_get_max_payload(stream);
+    budget -= budget % frame;
+    TEST_ASSERT_(budget > 0 && budget < sizeof(samples),
+                 "budget %zu must be below the %zu-byte write", budget,
+                 sizeof(samples));
+    unsigned expect_seq = (unsigned)((sizeof(samples) + budget - 1) / budget);
+
+    size_t written = 0;
+    int ret = rig_stream_write(rig, stream, samples, sizeof(samples), &written,
+                               1000, NULL);
+    TEST_CHECK_(ret == RIG_OK, "rig_stream_write returned %d", ret);
+    TEST_CHECK_(written == sizeof(samples), "written=%zu, expected %zu",
+                written, sizeof(samples));
+    TEST_CHECK_(sess->tx_seq == expect_seq, "tx_seq=%u, expected %u datagrams",
+                sess->tx_seq, expect_seq);
+    TEST_CHECK_(sess->tx_timestamp == 960, "tx_timestamp=%llu, expected 960",
+                (unsigned long long)sess->tx_timestamp);
+
+    rig_stream_close(rig, stream);
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+/* A timed burst larger than one datagram keeps its target: it travels on the
+ * first datagram (with SOB, and EOB on the last), so the server still sees the
+ * burst start late and reports it. */
+void test_tx_timed_burst_split_keeps_target(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    rig_stream_t *stream = open_tx_f32(rig, 2);
+    TEST_ASSERT(stream != NULL);
+
+    struct rig_stream_write_info winfo;
+    memset(&winfo, 0, sizeof(winfo));
+    winfo.time_valid = 1;
+    winfo.seconds = (int64_t)time(NULL) - 2;
+    winfo.flags = RIG_STREAM_TIME_FLAG_SOB | RIG_STREAM_TIME_FLAG_EOB;
+
+    float samples[960 * 2];
+    memset(samples, 0, sizeof(samples));
+    size_t written = 0;
+    TEST_CHECK(rig_stream_write(rig, stream, samples, sizeof(samples),
+                                &written, 1000, &winfo) == RIG_OK);
+    TEST_CHECK_(written == sizeof(samples), "written=%zu", written);
+
+    struct rig_stream_write_status ev;
+    memset(&ev, 0, sizeof(ev));
+    int rc = rig_stream_wait_write_status(rig, stream, &ev, 3000);
+
+    TEST_CHECK_(rc == RIG_OK, "wait_write_status rc=%d (target lost?)", rc);
+
+    if (rc == RIG_OK)
+    {
+        TEST_CHECK_(ev.event == RIG_STREAM_WRITE_EVENT_LATE,
+                    "event=%u (expected LATE)", ev.event);
+    }
+
+    rig_stream_close(rig, stream);
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* End-to-end write-status: a past-scheduled TX burst makes the server's dummy
+ * backend detect a late burst, which must travel back as a WRITE_STATUS frame
+ * and surface at the client's rig_stream_wait_write_status(). */
+void test_tx_write_status_e2e(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);
+    cfg.type = RIG_STREAM_TYPE_AUDIO_TX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    TEST_ASSERT(rig_stream_open(rig, &cfg, &stream) == RIG_OK);
+    TEST_ASSERT(stream != NULL);
+
+    /* Schedule the burst 2 s in the past so the server's dummy scheduler flags
+     * it late (CLOCK_REALTIME seconds, matching the dummy's clock source). */
+    struct rig_stream_write_info winfo;
+    memset(&winfo, 0, sizeof(winfo));
+    winfo.time_valid = 1;
+    winfo.seconds = (int64_t)time(NULL) - 2;
+    winfo.picoseconds = 0;
+    winfo.flags = RIG_STREAM_TIME_FLAG_SOB | RIG_STREAM_TIME_FLAG_EOB;
+
+    int16_t samples[480];
+    memset(samples, 0, sizeof(samples));
+    size_t written = 0;
+    TEST_CHECK(rig_stream_write(rig, stream, samples, sizeof(samples),
+                                &written, 1000, &winfo) == RIG_OK);
+
+    /* Block until the late-burst event arrives over the wire (or time out). */
+    struct rig_stream_write_status ev;
+    memset(&ev, 0, sizeof(ev));
+    int rc = rig_stream_wait_write_status(rig, stream, &ev, 3000);
+
+    TEST_CHECK_(rc == RIG_OK, "wait_write_status rc=%d (no event over the wire)",
+                rc);
+
+    if (rc == RIG_OK)
+    {
+        TEST_CHECK_(ev.event == RIG_STREAM_WRITE_EVENT_LATE,
+                    "event=%u (expected LATE)", ev.event);
+        TEST_CHECK_(ev.flags & RIG_STREAM_WRITE_STATUS_REMOTE,
+                    "REMOTE flag not set on a server-reported event");
+    }
+
+    rig_stream_close(rig, stream);
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* End-to-end UNDERRUN: a single plain burst is consumed by the server's dummy
+ * backend, which then starves — the resulting UNDERRUN must travel back as a
+ * WRITE_STATUS frame and surface (marked REMOTE) at the client. Proves a second
+ * event type flows over the full wire path. */
+void test_tx_underrun_e2e(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);
+    cfg.type = RIG_STREAM_TYPE_AUDIO_TX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    TEST_ASSERT(rig_stream_open(rig, &cfg, &stream) == RIG_OK);
+
+    int16_t samples[480];
+    memset(samples, 0, sizeof(samples));
+    size_t written = 0;
+    TEST_CHECK(rig_stream_write(rig, stream, samples, sizeof(samples),
+                                &written, 1000, NULL) == RIG_OK);
+
+    int got_underrun = 0;
+
+    for (int i = 0; i < 6 && !got_underrun; i++)
+    {
+        struct rig_stream_write_status ev;
+        memset(&ev, 0, sizeof(ev));
+
+        if (rig_stream_wait_write_status(rig, stream, &ev, 700) != RIG_OK)
+        {
+            continue;
+        }
+
+        if (ev.event == RIG_STREAM_WRITE_EVENT_UNDERRUN)
+        {
+            got_underrun = 1;
+            TEST_CHECK_(ev.flags & RIG_STREAM_WRITE_STATUS_REMOTE,
+                        "REMOTE flag not set on a server-reported event");
+        }
+    }
+
+    TEST_CHECK_(got_underrun, "no UNDERRUN event arrived over the wire");
+
+    rig_stream_close(rig, stream);
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* RX data path: open AUDIO_RX stream and verify actual audio data arrives.
+ * The dummy backend generates a sine wave, so we must receive non-zero
+ * samples within a reasonable timeout. */
+void test_rx_data_received(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_RX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("rig_stream_open RX returned %d", ret);
+    TEST_ASSERT(stream != NULL);
+
+    /* Retry loop: allow up to 3 seconds for data to arrive.
+     * The dummy backend generates data at real-time rate. The path is:
+     * dummy generator → ringbuf → rigctld feeder → UDP → client rx_thread
+     * → ringbuf → rig_stream_read. */
+    int16_t buf[480];  /* 10ms at 48kHz mono */
+    size_t bytes_read = 0;
+    int got_data = 0;
+    int attempts = 0;
+    int max_attempts = 15;  /* 15 * 200ms = 3 seconds */
+
+    while (attempts < max_attempts)
+    {
+        memset(buf, 0, sizeof(buf));
+        bytes_read = 0;
+        ret = rig_stream_read(rig, stream, buf, sizeof(buf),
+                              &bytes_read, 200, NULL);
+
+        if (ret == RIG_OK && bytes_read > 0)
+        {
+            got_data = 1;
+            break;
+        }
+
+        attempts++;
+    }
+
+    TEST_CHECK(got_data == 1);
+    TEST_MSG("Must receive RX data within 3 seconds (got %d bytes after %d attempts)",
+             (int)bytes_read, attempts + 1);
+
+    if (got_data)
+    {
+        TEST_CHECK(bytes_read > 0);
+        TEST_MSG("bytes_read=%zu, must be > 0", bytes_read);
+
+        /* Dummy sine wave should produce non-zero samples.
+         * Check that not all samples are zero. */
+        int nonzero_count = 0;
+        int sample_count = (int)(bytes_read / sizeof(int16_t));
+
+        for (int i = 0; i < sample_count; i++)
+        {
+            if (buf[i] != 0)
+            {
+                nonzero_count++;
+            }
+        }
+
+        TEST_CHECK(nonzero_count > 0);
+        TEST_MSG("Received %d samples, %d non-zero (sine wave data expected)",
+                 sample_count, nonzero_count);
+    }
+
+    ret = rig_stream_close(rig, stream);
+    TEST_CHECK(ret == RIG_OK);
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Server-side conversion E2E: a PCM_S16 open against the PCM_F32-native
+ * dummy. The client must report the server's
+ * conversion stages, deliver (converted) data, refuse the same config
+ * under require_native with -RIG_ENAVAIL, and report a native stream for
+ * the PCM_F32 form. Format conversion needs no resampler, so this holds
+ * with and without HAVE_SAMPLERATE on either end. */
+void test_rx_converted_stream_e2e(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_RX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("rig_stream_open RX returned %d", ret);
+    TEST_ASSERT(stream != NULL);
+
+    /* The server-reported indicator: format converted, nothing else. */
+    int conv = rig_stream_get_conversions(stream);
+    TEST_CHECK(conv == RIG_STREAM_CONV_FORMAT);
+    TEST_MSG("conversions: got 0x%x, expected 0x%x",
+             conv, RIG_STREAM_CONV_FORMAT);
+
+    /* Converted data must actually flow. */
+    int16_t buf[480];
+    size_t bytes_read = 0;
+    int got_data = 0;
+
+    for (int attempts = 0; attempts < 15; attempts++)
+    {
+        bytes_read = 0;
+        ret = rig_stream_read(rig, stream, buf, sizeof(buf),
+                              &bytes_read, 200, NULL);
+
+        if (ret == RIG_OK && bytes_read > 0)
+        {
+            got_data = 1;
+            break;
+        }
+    }
+
+    TEST_CHECK(got_data == 1);
+    TEST_MSG("must receive converted RX data within 3 seconds");
+
+    ret = rig_stream_close(rig, stream);
+    TEST_CHECK(ret == RIG_OK);
+
+    /* require_native on the convertible config is refused... */
+    cfg.require_native = RIG_STREAM_CONV_ALL;
+    stream = NULL;
+    ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == -RIG_ENAVAIL);
+    TEST_MSG("require_native open: got %d, expected %d", ret, -RIG_ENAVAIL);
+    TEST_CHECK(stream == NULL);
+
+    /* ...and so is naming just the stage this request needs, which crosses
+     * the wire by name for the server to enforce. */
+    cfg.require_native = RIG_STREAM_CONV_FORMAT;
+    stream = NULL;
+    ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == -RIG_ENAVAIL);
+    TEST_MSG("FORMAT demand: got %d, expected %d", ret, -RIG_ENAVAIL);
+    TEST_CHECK(stream == NULL);
+
+    /* Demanding only the stages it does not need serves the conversion:
+     * the relay case — native rate, frontend format conversion. */
+    cfg.require_native = RIG_STREAM_CONV_RATE | RIG_STREAM_CONV_CHANNELS;
+    stream = NULL;
+    ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("rate+channels demand returned %d", ret);
+
+    if (stream)
+    {
+        TEST_CHECK(rig_stream_get_conversions(stream)
+                   == RIG_STREAM_CONV_FORMAT);
+        rig_stream_close(rig, stream);
+        stream = NULL;
+    }
+
+    /* ...while its native form succeeds and reports a native stream. */
+    cfg.require_native = RIG_STREAM_CONV_ALL;
+    cfg.format = RIG_STREAM_FORMAT_PCM_F32;
+    ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("native require_native open returned %d", ret);
+
+    if (stream)
+    {
+        TEST_CHECK(rig_stream_get_conversions(stream) == RIG_STREAM_CONV_NONE);
+        rig_stream_close(rig, stream);
+    }
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Full-system codec passthrough: the dummy's fabricated OPUS codec in
+ * counter mode, consumed through the COMPLETE client stack — dummy
+ * generator → server ring → rigctld feeder → UDP → netrigctl ring →
+ * rig_stream_read(). Requested exactly (native format/rate/channels)
+ * the bytes must arrive unaltered (continuous counter), labeled native
+ * (conversions = 0); requested not-exactly (a rate a raw format would
+ * reach by resampling) the open must fail outright with -RIG_EINVAL. */
+void test_rx_codec_passthrough_e2e(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld_opt(&proc, NULL, "stream_mode=counter") < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    /* This test admits no loss at all -- every sample index must follow the
+     * last -- so give the receive socket room for the whole run rather than
+     * relying on the host's default. The reader below only comes back every
+     * 200 ms while the server sends in real time, and a datagram dropped for
+     * want of buffer space would read here as a broken counter. */
+    rig_set_conf(rig, rig_token_lookup(rig, "stream_transport_buffer_bytes"),
+                 "4194304");
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_RX;
+    cfg.format = RIG_STREAM_FORMAT_OPUS;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("codec open returned %d", ret);
+    TEST_ASSERT(stream != NULL);
+
+    TEST_CHECK(rig_stream_get_conversions(stream) == RIG_STREAM_CONV_NONE);
+
+    /* Frame semantics through the FULL stack: every read returns exactly
+     * one codec frame (16..256 bytes), the byte counter is continuous
+     * ACROSS frames, and the per-frame start index (from the wire
+     * timestamp) advances by the fabricated 480-sample duration. The
+     * duration itself is not carried on the wire, so the client reports
+     * codec_frame_samples = 0 (accepted asymmetry). */
+    unsigned char buf[2048];
+    int frames_got = 0, altered = 0, size_bad = 0;
+    uint8_t expected = 0;
+    int have_expected = 0;
+    uint64_t prev_index = 0;
+    int index_bad = 0;
+
+    for (int attempts = 0; attempts < 40 && frames_got < 10; attempts++)
+    {
+        size_t bytes_read = 0;
+        struct rig_stream_read_info info;
+        ret = rig_stream_read(rig, stream, buf, sizeof(buf),
+                              &bytes_read, 200, &info);
+
+        if (ret != RIG_OK || bytes_read == 0)
+        {
+            continue;
+        }
+
+        if (bytes_read < 16 || bytes_read > 256)
+        {
+            size_bad++;
+        }
+
+        if (!have_expected)
+        {
+            expected = buf[0];
+            have_expected = 1;
+        }
+
+        for (size_t i = 0; i < bytes_read; i++)
+        {
+            if (buf[i] != expected++)
+            {
+                altered++;
+                expected = (uint8_t)(buf[i] + 1);
+            }
+        }
+
+        if (frames_got > 0 && info.sample_index != prev_index + 480)
+        {
+            index_bad++;
+        }
+
+        prev_index = info.sample_index;
+        TEST_CHECK(info.codec_frame_samples == 0);
+        frames_got++;
+    }
+
+    TEST_CHECK(frames_got >= 10);
+    TEST_MSG("got %d codec frames, expected >= 10", frames_got);
+    TEST_CHECK(size_bad == 0);
+    TEST_MSG("%d frames outside the fabricated 16..256 size range",
+             size_bad);
+    TEST_CHECK(altered == 0);
+    TEST_MSG("%d codec bytes altered in transit", altered);
+    TEST_CHECK(index_bad == 0);
+    TEST_MSG("%d frames with a start index not advancing by 480",
+             index_bad);
+
+    rig_stream_close(rig, stream);
+
+    /* Not exactly native: refused outright, never converted. */
+    cfg.sample_rate = 44100;
+    stream = NULL;
+    ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == -RIG_EINVAL);
+    TEST_MSG("codec at 44100: got %d, expected %d", ret, -RIG_EINVAL);
+    TEST_CHECK(stream == NULL);
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Channel forwarding E2E: netrigctl must forward channels= on
+ * \stream_open — without it the server defaults to mono and serves
+ * mislabeled data. The dummy generates stereo with R = L/2 exactly, so
+ * verifying that relation on received pairs proves the server really
+ * opened a 2-channel stream (consecutive mono samples of a sine would
+ * fail it). */
+void test_rx_stereo_channels_forwarded(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_RX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_F32;
+    cfg.sample_rate = 48000;
+    cfg.channels = 2;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("stereo open returned %d", ret);
+    TEST_ASSERT(stream != NULL);
+
+    /* Native format/rate, 2 channels within the native 1-2 range. */
+    TEST_CHECK(rig_stream_get_conversions(stream) == RIG_STREAM_CONV_NONE);
+
+    float buf[960];  /* 480 stereo frames */
+    size_t bytes_read = 0;
+    int got_data = 0;
+
+    for (int attempts = 0; attempts < 15; attempts++)
+    {
+        bytes_read = 0;
+        ret = rig_stream_read(rig, stream, buf, sizeof(buf),
+                              &bytes_read, 200, NULL);
+
+        if (ret == RIG_OK && bytes_read >= 2 * sizeof(float))
+        {
+            got_data = 1;
+            break;
+        }
+    }
+
+    TEST_CHECK(got_data == 1);
+    TEST_MSG("must receive stereo data within 3 seconds");
+
+    if (got_data)
+    {
+        TEST_CHECK(bytes_read % (2 * sizeof(float)) == 0);
+        TEST_MSG("read %lu bytes, expected whole stereo frames",
+                 (unsigned long)bytes_read);
+
+        int pairs = (int)(bytes_read / (2 * sizeof(float)));
+        int significant = 0, bad = 0;
+
+        for (int i = 0; i < pairs; i++)
+        {
+            float l = buf[2 * i], r = buf[2 * i + 1];
+
+            if (fabsf(l) > 0.05f)
+            {
+                significant++;
+
+                if (fabsf(r - 0.5f * l) > 0.01f)
+                {
+                    bad++;
+                }
+            }
+        }
+
+        TEST_CHECK(significant > 0);
+        TEST_MSG("no significant samples in %d pairs", pairs);
+        TEST_CHECK(bad == 0);
+        TEST_MSG("%d of %d significant pairs violate R = L/2 "
+                 "(server likely opened mono)", bad, significant);
+    }
+
+    rig_stream_close(rig, stream);
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Coherent multichannel I/Q E2E: 4 channels — native for the dummy — must
+ * survive the whole wire (channels= forwarding plus the server-side kv
+ * range accepting more than stereo). */
+void test_rx_iq_multichannel_e2e(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_IQ_RX;
+    cfg.format = RIG_STREAM_FORMAT_IQ_CF32;
+    cfg.sample_rate = 96000;
+    cfg.channels = 4;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("4-channel IQ open returned %d", ret);
+    TEST_ASSERT(stream != NULL);
+
+    TEST_CHECK(rig_stream_get_conversions(stream) == RIG_STREAM_CONV_NONE);
+
+    /* One 4-channel CF32 frame is 32 bytes. */
+    const size_t frame = 4 * 8;
+    unsigned char buf[240 * 32];
+    size_t bytes_read = 0;
+    int got_data = 0;
+
+    for (int attempts = 0; attempts < 15; attempts++)
+    {
+        bytes_read = 0;
+        ret = rig_stream_read(rig, stream, buf, sizeof(buf),
+                              &bytes_read, 200, NULL);
+
+        if (ret == RIG_OK && bytes_read > 0)
+        {
+            got_data = 1;
+            break;
+        }
+    }
+
+    TEST_CHECK(got_data == 1);
+    TEST_MSG("must receive 4-channel IQ data within 3 seconds");
+
+    if (got_data)
+    {
+        TEST_CHECK(bytes_read % frame == 0);
+        TEST_MSG("read %lu bytes, expected whole 32-byte frames",
+                 (unsigned long)bytes_read);
+    }
+
+    rig_stream_close(rig, stream);
+
+    /* Delegated resolution is membership in the relayed effective list:
+     * a count past the advertised maximum is refused locally, without a
+     * server round-trip. */
+    rig_stream_t *bad = NULL;
+    cfg.channels = 5;
+    ret = rig_stream_open(rig, &cfg, &bad);
+    TEST_CHECK(ret == -RIG_EINVAL);
+    TEST_MSG("5-channel open: got %d, expected %d", ret, -RIG_EINVAL);
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+#ifdef HAVE_SAMPLERATE
+/* Server-side resampling E2E: 44100 Hz is in the relayed effective list but not
+ * native to the dummy, so the SERVER resamples and the client accepts by
+ * list membership (delegated resolution — no local resampler involved).
+ * Client and server share this build, so HAVE_SAMPLERATE here implies the
+ * server advertises the widened list. */
+void test_rx_resampled_stream_e2e(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_RX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_F32;
+    cfg.sample_rate = 44100;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("rig_stream_open 44100 returned %d", ret);
+    TEST_ASSERT(stream != NULL);
+
+    int conv = rig_stream_get_conversions(stream);
+    TEST_CHECK(conv == RIG_STREAM_CONV_RATE);
+    TEST_MSG("conversions: got 0x%x, expected 0x%x",
+             conv, RIG_STREAM_CONV_RATE);
+
+    float buf[441];  /* 10ms at 44.1kHz mono */
+    size_t bytes_read = 0;
+    int got_data = 0;
+
+    for (int attempts = 0; attempts < 15; attempts++)
+    {
+        bytes_read = 0;
+        ret = rig_stream_read(rig, stream, buf, sizeof(buf),
+                              &bytes_read, 200, NULL);
+
+        if (ret == RIG_OK && bytes_read > 0)
+        {
+            got_data = 1;
+            break;
+        }
+    }
+
+    TEST_CHECK(got_data == 1);
+    TEST_MSG("must receive resampled RX data within 3 seconds");
+
+    rig_stream_close(rig, stream);
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+#endif /* HAVE_SAMPLERATE */
+
+
+/* RX data path: read multiple frames and verify ongoing data flow. */
+void test_rx_continuous_data(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_RX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_ASSERT(stream != NULL);
+
+    /* Wait for data to start flowing -- for the data itself, not for a
+     * stretch of wall clock, as the RX tests below do. */
+    {
+        int16_t warm[480];
+        size_t warm_read = 0;
+        int warmed = 0;
+        int i;
+
+        for (i = 0; i < 15 && !warmed; i++)
+        {
+            if (rig_stream_read(rig, stream, warm, sizeof(warm), &warm_read,
+                                200, NULL) == RIG_OK && warm_read > 0)
+            {
+                warmed = 1;
+            }
+        }
+
+        TEST_CHECK_(warmed, "no data within 3 s of opening the stream");
+    }
+
+    /* Read 5 consecutive frames */
+    int successful_reads = 0;
+    size_t total_bytes = 0;
+    int16_t buf[480];
+
+    for (int i = 0; i < 5; i++)
+    {
+        size_t bytes_read = 0;
+        ret = rig_stream_read(rig, stream, buf, sizeof(buf),
+                              &bytes_read, 500, NULL);
+
+        if (ret == RIG_OK && bytes_read > 0)
+        {
+            successful_reads++;
+            total_bytes += bytes_read;
+        }
+    }
+
+    TEST_CHECK(successful_reads >= 3);
+    TEST_MSG("Got %d/5 successful reads (expect >= 3)", successful_reads);
+    TEST_CHECK(total_bytes > 0);
+    TEST_MSG("total_bytes=%zu across %d reads", total_bytes, successful_reads);
+
+    ret = rig_stream_close(rig, stream);
+    TEST_CHECK(ret == RIG_OK);
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Opening a stream with a sample rate not in the caps must fail. */
+void test_open_unsupported_rate(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_TX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 500000; /* above the largest native rate: outside the
+                               * effective set even with the resampler (44.1k
+                               * would now be served via conversion) */
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret != RIG_OK);
+    TEST_MSG("rig_stream_open with unsupported rate returned %d (expected error)",
+             ret);
+    TEST_CHECK(stream == NULL);
+    TEST_MSG("stream must be NULL on failure");
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Opening a stream with a format not in the caps must fail. */
+void test_open_unsupported_format(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    /* Try opening AUDIO_TX with an IQ format — that shouldn't work */
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_TX;
+    cfg.format = RIG_STREAM_FORMAT_IQ_CS16;  /* IQ format for audio type */
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret != RIG_OK);
+    TEST_MSG("rig_stream_open with IQ format on audio type returned %d "
+             "(expected error)", ret);
+    TEST_CHECK(stream == NULL);
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Verify that re-opening a stream after close works (no resource leak). */
+void test_open_close_reopen(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_TX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    /* First open/close cycle */
+    rig_stream_t *stream1 = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream1);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("First open returned %d", ret);
+    TEST_ASSERT(stream1 != NULL);
+
+    int first_stream_id = -1;
+
+    {
+        struct rig_stream_net_session *sess =
+            (struct rig_stream_net_session *)stream1->backend_priv;
+        TEST_ASSERT(sess != NULL);
+        first_stream_id = sess->remote_stream_id;
+    }
+
+    ret = rig_stream_close(rig, stream1);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("First close returned %d", ret);
+
+    /* Second open/close cycle */
+    rig_stream_t *stream2 = NULL;
+    ret = rig_stream_open(rig, &cfg, &stream2);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("Second open returned %d", ret);
+    TEST_ASSERT(stream2 != NULL);
+
+    {
+        struct rig_stream_net_session *sess =
+            (struct rig_stream_net_session *)stream2->backend_priv;
+        TEST_ASSERT(sess != NULL);
+
+        /* Second stream should get a different stream_id from rigctld */
+        TEST_CHECK(sess->remote_stream_id != first_stream_id);
+        TEST_MSG("Second stream_id=%d must differ from first=%d",
+                 sess->remote_stream_id, first_stream_id);
+
+        TEST_CHECK(sess->udp_sock >= 0);
+        TEST_CHECK(sess->remote_udp_port > 0);
+
+        /* Fresh session: tx_seq must be 0 */
+        TEST_CHECK(sess->tx_seq == 0);
+    }
+
+    ret = rig_stream_close(rig, stream2);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("Second close returned %d", ret);
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* Pause an RX stream, verify reads return timeout, then resume and
+ * verify data flows again. */
+void test_rx_pause_resume(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_RX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_ASSERT(stream != NULL);
+
+    /* Wait for data to start flowing */
+    int16_t buf[480];
+    size_t bytes_read = 0;
+    int got_data = 0;
+
+    for (int i = 0; i < 15; i++)
+    {
+        ret = rig_stream_read(rig, stream, buf, sizeof(buf),
+                              &bytes_read, 200, NULL);
+
+        if (ret == RIG_OK && bytes_read > 0)
+        {
+            got_data = 1;
+            break;
+        }
+    }
+
+    TEST_CHECK(got_data == 1);
+    TEST_MSG("Must receive data before testing pause");
+
+    /* Pause the stream */
+    ret = rig_stream_pause(rig, stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("rig_stream_pause returned %d", ret);
+    TEST_CHECK(stream->paused == 1);
+
+    /* When paused, reads must return timeout */
+    bytes_read = 0;
+    ret = rig_stream_read(rig, stream, buf, sizeof(buf),
+                          &bytes_read, 200, NULL);
+    TEST_CHECK(ret == -RIG_ETIMEOUT);
+    TEST_MSG("Paused read returned %d (expected -%d)", ret, RIG_ETIMEOUT);
+    TEST_CHECK(bytes_read == 0);
+    TEST_MSG("Paused read bytes_read=%zu (expected 0)", bytes_read);
+
+    /* Resume the stream */
+    ret = rig_stream_resume(rig, stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("rig_stream_resume returned %d", ret);
+    TEST_CHECK(stream->paused == 0);
+
+    /* After resume, data should flow again */
+    got_data = 0;
+
+    for (int i = 0; i < 15; i++)
+    {
+        bytes_read = 0;
+        ret = rig_stream_read(rig, stream, buf, sizeof(buf),
+                              &bytes_read, 200, NULL);
+
+        if (ret == RIG_OK && bytes_read > 0)
+        {
+            got_data = 1;
+            break;
+        }
+    }
+
+    TEST_CHECK(got_data == 1);
+    TEST_MSG("Must receive data after resume");
+
+    ret = rig_stream_close(rig, stream);
+    TEST_CHECK(ret == RIG_OK);
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* --- Test list --- */
+
+/* e2e: server-side dummy anchors travel as embedded TIME blocks and feed
+ * the client's anchor ring — the enriched read reports capture time. */
+void test_rx_capture_time_propagates(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_RX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    TEST_ASSERT(rig_stream_open(rig, &cfg, &stream) == RIG_OK);
+    TEST_ASSERT(stream != NULL);
+
+    struct rig_stream_read_info info;
+    int16_t buf[960];
+    size_t got = 0;
+    int valid = 0;
+
+    for (int i = 0; i < 25 && !valid; i++)
+    {
+        if (rig_stream_read(rig, stream, buf, sizeof(buf), &got, 200,
+                            &info) == RIG_OK && got > 0)
+        {
+            valid = info.time_valid;
+        }
+    }
+
+    TEST_CHECK_(valid, "capture time never propagated to the client");
+
+    if (valid)
+    {
+        TEST_CHECK_(info.time_source == RIG_STREAM_TIME_SRC_HOST,
+                    "source=%u", info.time_source);
+        TEST_CHECK_(info.seconds > 1577836800LL
+                    && info.seconds < 4102444800LL,
+                    "seconds=%lld", (long long)info.seconds);
+    }
+
+    rig_stream_close(rig, stream);
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* e2e: flush on a netrigctl TX stream must forward \stream_drain to the
+ * daemon, which drains the real backend's TX path. The frontend default only
+ * polls the local ring buffer — a no-op for netrigctl TX, which bypasses the
+ * ring buffer via stream_write — so netrigctl must override stream_drain. */
+void test_tx_flush_forwards(void)
+{
+    struct rigctld_proc proc = {0};
+
+    if (start_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start rigctld");
+        return;
+    }
+
+    RIG *rig = open_netrigctl(proc.port);
+    TEST_ASSERT(rig != NULL);
+
+    /* netrigctl must wire a flush override, not fall back to the local
+     * ring-buffer poll (which never drains the remote radio's TX FIFO). */
+    TEST_CHECK(rig->caps->stream_drain != NULL);
+    TEST_MSG("netrigctl should implement stream_drain to forward to the daemon");
+
+    struct rig_stream_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.struct_size = sizeof(cfg);  /* same-build config */
+    cfg.type = RIG_STREAM_TYPE_AUDIO_TX;
+    cfg.format = RIG_STREAM_FORMAT_PCM_S16;
+    cfg.sample_rate = 48000;
+    cfg.channels = 1;
+
+    rig_stream_t *stream = NULL;
+    int ret = rig_stream_open(rig, &cfg, &stream);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_ASSERT(stream != NULL);
+
+    /* Queue a frame of TX samples */
+    int16_t samples[480];
+
+    for (int i = 0; i < 480; i++)
+    {
+        samples[i] = (int16_t)(i & 0x7FFF);
+    }
+
+    size_t written = 0;
+    ret = rig_stream_write(rig, stream, samples, sizeof(samples),
+                           &written, 1000, NULL);
+    TEST_CHECK(ret == RIG_OK);
+
+    /* Flush must succeed end-to-end: the forward reaches the daemon, which
+     * dispatches \stream_drain to the real backend's rig_stream_drain. A bad
+     * command or stream id would surface here as a non-OK return. */
+    ret = rig_stream_drain(rig, stream, 1000);
+    TEST_CHECK(ret == RIG_OK);
+    TEST_MSG("rig_stream_drain returned %d (expected RIG_OK)", ret);
+
+    ret = rig_stream_close(rig, stream);
+    TEST_CHECK(ret == RIG_OK);
+
+    rig_close(rig);
+    rig_cleanup(rig);
+    stop_rigctld(&proc);
+}
+
+
+/* --- Code-based RX packet-processing tests (no subprocess) ---
+ * These feed crafted packets straight to rig_stream_net_process_packet so
+ * the client's seq/loss accounting is exercised deterministically. */
+
+/* Bare S16 mono stream (2 bytes/frame) + minimal session. */
+static void wb_setup(struct rig_stream *s, struct rig_stream_net_session *sess)
+{
+    memset(s, 0, sizeof(*s));
+    TEST_ASSERT(stream_ringbuf_init(&s->ringbuf, 4096) == 0);
+    stream_write_event_init(s);
+    s->config.format = RIG_STREAM_FORMAT_PCM_S16;
+    s->config.channels = 1;
+    s->config.sample_rate = 48000;
+    s->frame_bytes = 2;
+    s->active = 1;
+    s->type = RIG_STREAM_TYPE_AUDIO_RX;
+
+    memset(sess, 0, sizeof(*sess));
+    sess->remote_stream_id = 7;
+    sess->subscribe_token = 0xABCD1234;
+    sess->rx_first = 1;
+    sess->stream = s;
+    s->backend_priv = sess;
+}
+
+static size_t wb_data(unsigned char *buf, uint32_t seq, uint64_t ts, int frames,
+                      const struct rig_stream_net_session *sess)
+{
+    struct rig_stream_packet_header hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.version = RIG_STREAM_PROTOCOL_VERSION;
+    hdr.type = RIG_STREAM_TYPE_AUDIO_RX;
+    hdr.stream_id = (uint16_t)sess->remote_stream_id;
+    hdr.subscribe_token = sess->subscribe_token;
+    hdr.seq = seq;
+    hdr.timestamp = ts;
+    hdr.sample_rate = 48000;
+    hdr.format = RIG_STREAM_FMT_ID_PCM_S16;
+    hdr.channels = 1;
+    hdr.payload_len = (uint16_t)(frames * 2);
+    stream_packet_header_pack(&hdr, buf);
+    memset(buf + RIG_STREAM_HEADER_SIZE, 0x11, (size_t)frames * 2);
+    return RIG_STREAM_HEADER_SIZE + (size_t)frames * 2;
+}
+
+static size_t wb_meta(unsigned char *buf, uint32_t seq, uint64_t ts,
+                      const struct rig_stream_net_session *sess)
+{
+    struct rig_stream_packet_header hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.version = RIG_STREAM_PROTOCOL_VERSION;
+    hdr.type = RIG_STREAM_TYPE_AUDIO_RX;
+    hdr.stream_id = (uint16_t)sess->remote_stream_id;
+    hdr.subscribe_token = sess->subscribe_token;
+    hdr.seq = seq;
+    hdr.timestamp = ts;
+    hdr.control = RIG_STREAM_CTRL_METADATA;
+    hdr.payload_len = RIG_STREAM_METADATA_WIRE_SIZE;
+    stream_packet_header_pack(&hdr, buf);
+
+    struct rig_stream_metadata meta;
+    memset(&meta, 0, sizeof(meta));
+    meta.field_mask = RIG_STREAM_META_VFO_FREQ | RIG_STREAM_META_PTT;
+    meta.vfo_freq = 14074000;
+    stream_metadata_pack(&meta, buf + RIG_STREAM_HEADER_SIZE);
+    return RIG_STREAM_HEADER_SIZE + RIG_STREAM_METADATA_WIRE_SIZE;
+}
+
+static size_t wb_ctrl(unsigned char *buf, uint16_t control,
+                      const struct rig_stream_net_session *sess)
+{
+    struct rig_stream_packet_header hdr;
+    stream_control_header_init(&hdr, RIG_STREAM_TYPE_AUDIO_RX,
+                               (uint16_t)sess->remote_stream_id,
+                               sess->subscribe_token, control);
+    stream_packet_header_pack(&hdr, buf);
+    return RIG_STREAM_HEADER_SIZE;
+}
+
+static size_t wb_write_status(unsigned char *buf, uint32_t seq, uint16_t event,
+                              uint64_t sample_index,
+                              const struct rig_stream_net_session *sess)
+{
+    struct rig_stream_packet_header hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.version = RIG_STREAM_PROTOCOL_VERSION;
+    hdr.type = RIG_STREAM_TYPE_AUDIO_TX;
+    hdr.stream_id = (uint16_t)sess->remote_stream_id;
+    hdr.subscribe_token = sess->subscribe_token;
+    hdr.seq = seq;
+    hdr.timestamp = sample_index;   /* sample_index rides the header */
+    hdr.control = RIG_STREAM_CTRL_WRITE_STATUS;
+    hdr.payload_len = RIG_STREAM_WRITE_STATUS_WIRE_SIZE;
+    stream_packet_header_pack(&hdr, buf);
+
+    struct rig_stream_write_status st;
+    memset(&st, 0, sizeof(st));
+    st.event = event;
+    stream_write_status_pack(&st, buf + RIG_STREAM_HEADER_SIZE);
+    return RIG_STREAM_HEADER_SIZE + RIG_STREAM_WRITE_STATUS_WIRE_SIZE;
+}
+
+/* A header claiming more payload than the datagram carries must be rejected
+ * (the payload_len <= received-body bound) without ingesting anything, so no
+ * out-of-bounds read of the payload or time/metadata sub-blocks can occur. */
+void test_rx_overlong_payload_len_rejected(void)
+{
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+    wb_setup(&s, &sess);
+
+    unsigned char buf[256];
+
+    struct rig_stream_packet_header hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.version = RIG_STREAM_PROTOCOL_VERSION;
+    hdr.type = RIG_STREAM_TYPE_AUDIO_RX;
+    hdr.stream_id = (uint16_t)sess.remote_stream_id;
+    hdr.subscribe_token = sess.subscribe_token;
+    hdr.sample_rate = 48000;
+    hdr.format = RIG_STREAM_FMT_ID_PCM_S16;
+    hdr.channels = 1;
+    hdr.payload_len = 1000;   /* lie: claim far more than is present */
+    stream_packet_header_pack(&hdr, buf);
+
+    /* Only 20 payload bytes were actually received. */
+    size_t received = RIG_STREAM_HEADER_SIZE + 20;
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s, buf, received) == -1);
+    TEST_CHECK(stream_ringbuf_available(&s.ringbuf) == 0);
+
+    stream_ringbuf_destroy(&s.ringbuf);
+}
+
+/* A metadata frame between two data packets consumes a seq value on the
+ * wire; the client must account for it and NOT report app-link loss. */
+void test_rx_metadata_no_false_link_loss(void)
+{
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+    wb_setup(&s, &sess);
+
+    unsigned char buf[256];
+
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s,
+               buf, wb_data(buf, 0, 0, 10, &sess)) == 0);
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s,
+               buf, wb_meta(buf, 1, 10, &sess)) == 0);
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s,
+               buf, wb_data(buf, 2, 10, 10, &sess)) == 0);
+
+    TEST_CHECK_(s.link_loss == 0, "link_loss=%u (expected 0)", s.link_loss);
+    TEST_CHECK(s.dropped_samples_link == 0);
+    /* Both data packets' 40 bytes reached the ring buffer. */
+    TEST_CHECK_(stream_ringbuf_available(&s.ringbuf) == 40,
+                "avail=%zu (expected 40)", stream_ringbuf_available(&s.ringbuf));
+
+    stream_ringbuf_destroy(&s.ringbuf);
+}
+
+/* The RX path drops any datagram whose source IP is not the negotiated server
+ * (rig_stream_net_source_ip_equal is that decision, checked in
+ * recv_from_server before token/stream_id). Tested directly because the
+ * localhost harness cannot route a spoofed source address portably. Port is
+ * intentionally ignored — a server may send data from a different source port
+ * than the control port. */
+void test_source_ip_equal_decision(void)
+{
+    struct sockaddr_in a, b;
+    memset(&a, 0, sizeof(a));
+    memset(&b, 0, sizeof(b));
+    a.sin_family = AF_INET;
+    b.sin_family = AF_INET;
+
+    /* Same IP, different ports -> kept. */
+    a.sin_addr.s_addr = htonl(0x7f000001);  /* 127.0.0.1 */
+    a.sin_port = htons(5000);
+    b.sin_addr.s_addr = htonl(0x7f000001);
+    b.sin_port = htons(6000);
+    TEST_CHECK(rig_stream_net_source_ip_equal((struct sockaddr *)&a,
+               (struct sockaddr *)&b) == 1);
+
+    /* Different IP -> dropped. */
+    b.sin_addr.s_addr = htonl(0x7f000002);  /* 127.0.0.2 */
+    TEST_CHECK(rig_stream_net_source_ip_equal((struct sockaddr *)&a,
+               (struct sockaddr *)&b) == 0);
+
+    /* Different address family -> dropped. */
+    struct sockaddr_in6 a6, b6;
+    memset(&a6, 0, sizeof(a6));
+    memset(&b6, 0, sizeof(b6));
+    a6.sin6_family = AF_INET6;
+    b6.sin6_family = AF_INET6;
+    TEST_CHECK(rig_stream_net_source_ip_equal((struct sockaddr *)&a6,
+               (struct sockaddr *)&b) == 0);
+
+    /* Same IPv6 (both ::) -> kept; one bit different -> dropped. */
+    TEST_CHECK(rig_stream_net_source_ip_equal((struct sockaddr *)&a6,
+               (struct sockaddr *)&b6) == 1);
+    b6.sin6_addr.s6_addr[15] = 1;  /* ::1 */
+    TEST_CHECK(rig_stream_net_source_ip_equal((struct sockaddr *)&a6,
+               (struct sockaddr *)&b6) == 0);
+}
+
+/* The subscribe_token is the client-side anti-hijack authenticator: a data
+ * frame bearing the wrong token must be dropped without reaching the ring or
+ * advancing seq accounting, and must not desync a subsequent valid frame. */
+void test_rx_wrong_token_rejected(void)
+{
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+    wb_setup(&s, &sess);
+
+    unsigned char buf[256];
+
+    /* Stamp a mismatching token, then restore the session's expected token so
+     * process_packet compares the frame's wrong token against the real one. */
+    uint32_t good = sess.subscribe_token;
+    sess.subscribe_token = good ^ 0x1u;
+    size_t len = wb_data(buf, 0, 0, 10, &sess);
+    sess.subscribe_token = good;
+
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s, buf, len) == -1);
+    TEST_CHECK_(stream_ringbuf_available(&s.ringbuf) == 0,
+                "avail=%zu (expected 0)", stream_ringbuf_available(&s.ringbuf));
+
+    /* A following good frame is still accepted; the drop did not desync. */
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s,
+               buf, wb_data(buf, 0, 0, 10, &sess)) == 0);
+    TEST_CHECK_(s.link_loss == 0, "link_loss=%u (expected 0)", s.link_loss);
+    TEST_CHECK_(stream_ringbuf_available(&s.ringbuf) == 20,
+                "avail=%zu (expected 20)", stream_ringbuf_available(&s.ringbuf));
+
+    stream_ringbuf_destroy(&s.ringbuf);
+}
+
+/* A re-sent SUBSCRIBE_ACK mid-stream (seq=0) must not be misread as data. */
+void test_rx_ack_no_false_link_loss(void)
+{
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+    wb_setup(&s, &sess);
+
+    unsigned char buf[256];
+
+    rig_stream_net_process_packet(&sess, &s, buf, wb_data(buf, 0, 0, 10, &sess));
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s,
+               buf, wb_ctrl(buf, RIG_STREAM_CTRL_SUBSCRIBE_ACK, &sess)) == 0);
+    rig_stream_net_process_packet(&sess, &s, buf, wb_data(buf, 1, 10, 10, &sess));
+
+    TEST_CHECK_(s.link_loss == 0, "link_loss=%u (expected 0)", s.link_loss);
+
+    stream_ringbuf_destroy(&s.ringbuf);
+}
+
+/* Regression: a genuinely lost data packet (seq gap) is still counted. */
+void test_rx_real_gap_counts_link_loss(void)
+{
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+    wb_setup(&s, &sess);
+
+    unsigned char buf[256];
+
+    rig_stream_net_process_packet(&sess, &s, buf, wb_data(buf, 0, 0, 10, &sess));
+    /* seq=2 skips seq=1 — a lost 10-frame data packet spanning ts 10..20. */
+    rig_stream_net_process_packet(&sess, &s, buf, wb_data(buf, 2, 20, 10, &sess));
+
+    TEST_CHECK_(s.link_loss == 1, "link_loss=%u (expected 1)", s.link_loss);
+    TEST_CHECK_(s.dropped_samples_link == 10,
+                "dropped_samples_link=%llu (expected 10)",
+                (unsigned long long)s.dropped_samples_link);
+
+    stream_ringbuf_destroy(&s.ringbuf);
+}
+
+/* A reserved ERROR frame must be dropped, never written as sample data,
+ * and must not disturb seq accounting. */
+void test_rx_error_frame_dropped(void)
+{
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+    wb_setup(&s, &sess);
+
+    unsigned char buf[256];
+
+    rig_stream_net_process_packet(&sess, &s, buf, wb_data(buf, 0, 0, 10, &sess));
+    size_t avail_before = stream_ringbuf_available(&s.ringbuf);
+
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s,
+               buf, wb_ctrl(buf, RIG_STREAM_CTRL_ERROR, &sess)) == 0);
+
+    rig_stream_net_process_packet(&sess, &s, buf, wb_data(buf, 1, 10, 10, &sess));
+
+    TEST_CHECK_(s.link_loss == 0, "link_loss=%u (expected 0)", s.link_loss);
+    /* Only the two data packets (2×20 B) reached the ring; ERROR wrote nothing. */
+    TEST_CHECK_(stream_ringbuf_available(&s.ringbuf) == avail_before + 20,
+                "avail=%zu (expected %zu)",
+                stream_ringbuf_available(&s.ringbuf), avail_before + 20);
+
+    stream_ringbuf_destroy(&s.ringbuf);
+}
+
+static size_t wb_error(unsigned char *buf, int32_t rig_error, uint32_t reason,
+                       uint16_t version,
+                       const struct rig_stream_net_session *sess)
+{
+    struct rig_stream_packet_header hdr;
+    stream_control_header_init(&hdr, RIG_STREAM_TYPE_AUDIO_RX,
+                               (uint16_t)sess->remote_stream_id,
+                               sess->subscribe_token, RIG_STREAM_CTRL_ERROR);
+    hdr.payload_len = RIG_STREAM_ERROR_WIRE_SIZE;
+    stream_packet_header_pack(&hdr, buf);
+    stream_error_block_pack(rig_error, reason, buf + RIG_STREAM_HEADER_SIZE);
+    /* overwrite the version to exercise an unknown one */
+    buf[RIG_STREAM_HEADER_SIZE] = (uint8_t)(version >> 8);
+    buf[RIG_STREAM_HEADER_SIZE + 1] = (uint8_t)version;
+    return RIG_STREAM_HEADER_SIZE + RIG_STREAM_ERROR_WIRE_SIZE;
+}
+
+/* An ERROR frame from the server fails the local stream with the server's
+ * reason: data already received stays readable, nothing is written by the
+ * frame itself, repeats change nothing, and an unknown version is ignored. */
+void test_rx_error_frame_fails_stream(void)
+{
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+    unsigned char buf[256];
+    unsigned char out[64];
+    wb_setup(&s, &sess);
+
+    rig_stream_net_process_packet(&sess, &s, buf, wb_data(buf, 0, 0, 10, &sess));
+
+    /* Unknown block version: not understood, so not acted on. */
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s, buf,
+               wb_error(buf, -RIG_EIO, RIG_COMM_REASON_SOCKET_ERROR, 99,
+                        &sess)) == 0);
+    TEST_CHECK(!stream_is_failed(&s));
+
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s, buf,
+               wb_error(buf, -RIG_EIO, RIG_COMM_REASON_LINK_TIMEOUT,
+                        RIG_STREAM_ERROR_BLOCK_VERSION, &sess)) == 0);
+    TEST_CHECK(stream_is_failed(&s));
+    TEST_CHECK_(s.fail_reason == RIG_COMM_REASON_LINK_TIMEOUT,
+                "fail_reason=%u", s.fail_reason);
+
+    /* A repeat (the server re-sends on every PING) keeps the first reason. */
+    rig_stream_net_process_packet(&sess, &s, buf,
+                                  wb_error(buf, -RIG_EIO,
+                                           RIG_COMM_REASON_PEER_DISCONNECT,
+                                           RIG_STREAM_ERROR_BLOCK_VERSION, &sess));
+    TEST_CHECK(s.fail_reason == RIG_COMM_REASON_LINK_TIMEOUT);
+
+    /* The 20 bytes received before the failure are still there, and only
+     * those: the ERROR payload never reached the ring. */
+    TEST_CHECK(stream_ringbuf_available(&s.ringbuf) == 20);
+    TEST_CHECK(stream_ringbuf_read(&s.ringbuf, out, sizeof(out), 50) == 20);
+    TEST_CHECK(stream_ringbuf_read(&s.ringbuf, out, sizeof(out), 50) == 0);
+    TEST_CHECK(s.link_loss == 0);
+
+    stream_write_event_destroy(&s);
+    stream_ringbuf_destroy(&s.ringbuf);
+}
+
+/* Data still in flight when the ERROR frame arrives is taken in no further:
+ * the application drains what came before the failure and then reads -RIG_EIO
+ * for good, instead of a late datagram making a read succeed again. Nor is the
+ * late data accounted -- a seq gap after the failure is not a link loss. */
+void test_rx_data_after_error_frame_ignored(void)
+{
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+    unsigned char buf[256];
+    unsigned char out[64];
+    wb_setup(&s, &sess);
+
+    rig_stream_net_process_packet(&sess, &s, buf, wb_data(buf, 0, 0, 10, &sess));
+    rig_stream_net_process_packet(&sess, &s, buf,
+                                  wb_error(buf, -RIG_EIO,
+                                           RIG_COMM_REASON_LINK_TIMEOUT,
+                                           RIG_STREAM_ERROR_BLOCK_VERSION, &sess));
+    TEST_ASSERT(stream_is_failed(&s));
+
+    /* seq 3 skips 1 and 2: counted as link loss if it were taken in. */
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s, buf,
+               wb_data(buf, 3, 30, 10, &sess)) == 0);
+
+    TEST_CHECK_(stream_ringbuf_available(&s.ringbuf) == 20,
+                "avail=%zu (expected the 20 bytes from before the failure)",
+                stream_ringbuf_available(&s.ringbuf));
+    TEST_CHECK_(s.link_loss == 0, "link_loss=%u", s.link_loss);
+
+    TEST_CHECK(stream_ringbuf_read(&s.ringbuf, out, sizeof(out), 50) == 20);
+    TEST_CHECK(stream_ringbuf_read(&s.ringbuf, out, sizeof(out), 50) == 0);
+
+    stream_write_event_destroy(&s);
+    stream_ringbuf_destroy(&s.ringbuf);
+}
+
+/* A received WRITE_STATUS frame must surface through
+ * rig_stream_wait_write_status() (marked REMOTE), bump the matching remote_*
+ * stat, and not disturb seq accounting or write sample data. */
+void test_rx_write_status_frame(void)
+{
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+    RIG *rig = rig_init(RIG_MODEL_DUMMY);
+    wb_setup(&s, &sess);
+    s.type = RIG_STREAM_TYPE_AUDIO_TX;   /* write-status events are TX-only */
+
+    TEST_ASSERT(rig != NULL);
+
+    unsigned char buf[256];
+
+    rig_stream_net_process_packet(&sess, &s, buf, wb_data(buf, 0, 0, 10, &sess));
+    size_t avail_before = stream_ringbuf_available(&s.ringbuf);
+
+    TEST_CHECK(rig_stream_net_process_packet(&sess, &s,
+               buf, wb_write_status(buf, 1, RIG_STREAM_WRITE_EVENT_OVERRUN,
+                                    4242, &sess)) == 0);
+
+    rig_stream_net_process_packet(&sess, &s, buf, wb_data(buf, 2, 10, 10, &sess));
+
+    /* No false link loss; the status frame wrote nothing to the ring. */
+    TEST_CHECK_(s.link_loss == 0, "link_loss=%u (expected 0)", s.link_loss);
+    TEST_CHECK_(stream_ringbuf_available(&s.ringbuf) == avail_before + 20,
+                "avail=%zu (expected %zu)",
+                stream_ringbuf_available(&s.ringbuf), avail_before + 20);
+
+    /* Remote overrun surfaces through the remote_* stat and the event API. */
+    TEST_CHECK_(s.remote_overruns == 1, "remote_overruns=%u", s.remote_overruns);
+
+    struct rig_stream_write_status out;
+    memset(&out, 0, sizeof(out));
+    TEST_CHECK(rig_stream_wait_write_status(rig, &s, &out, 0) == RIG_OK);
+    TEST_CHECK(out.event == RIG_STREAM_WRITE_EVENT_OVERRUN);
+    TEST_CHECK(out.sample_index == 4242);
+    TEST_CHECK(out.flags & RIG_STREAM_WRITE_STATUS_REMOTE);
+    TEST_CHECK(rig_stream_wait_write_status(rig, &s, &out, 0) == -RIG_ETIMEOUT);
+
+    stream_write_event_destroy(&s);
+    stream_ringbuf_destroy(&s.ringbuf);
+    rig_cleanup(rig);
+}
+
+
+/* --- Subscribe handshake against an unreliable link (no subprocess) ---
+ * UDP may drop the SUBSCRIBE or its ACK, and an unrelated control frame may
+ * reach the client before the ACK. A stand-in server reproduces both. */
+
+struct sub_server
+{
+    int sock;
+    int port;
+    int drop_first;         /* answer nothing to the first SUBSCRIBE */
+    int pong_before_ack;    /* emit a PONG ahead of the ACK */
+    HAMLIB_ATOMIC int subscribes_seen;   /* the server thread writes it */
+    HAMLIB_ATOMIC int stop;
+    pthread_t thread;
+};
+
+
+static void *sub_server_thread(void *arg)
+{
+    struct sub_server *srv = (struct sub_server *)arg;
+
+    while (!srv->stop)
+    {
+        fd_set fds;
+        struct timeval tv = { 0, 50000 };  /* 50ms, so stop is seen promptly */
+
+        FD_ZERO(&fds);
+        FD_SET(srv->sock, &fds);
+
+        if (select(srv->sock + 1, &fds, NULL, NULL, &tv) <= 0)
+        {
+            continue;
+        }
+
+        unsigned char buf[RIG_STREAM_MAX_DATAGRAM];
+        struct sockaddr_storage from;
+        socklen_t from_len = sizeof(from);
+        ssize_t n = recvfrom(srv->sock, buf, sizeof(buf), 0,
+                             (struct sockaddr *)&from, &from_len);
+        struct rig_stream_packet_header hdr;
+
+        if (n < RIG_STREAM_HEADER_SIZE
+                || stream_packet_header_unpack(buf, (size_t)n, &hdr) != 0
+                || !(hdr.control & RIG_STREAM_CTRL_SUBSCRIBE))
+        {
+            continue;
+        }
+
+        srv->subscribes_seen++;
+
+        if (srv->drop_first && srv->subscribes_seen == 1)
+        {
+            continue;
+        }
+
+        unsigned char reply[RIG_STREAM_HEADER_SIZE];
+        struct rig_stream_packet_header rhdr;
+
+        if (srv->pong_before_ack)
+        {
+            stream_control_header_init(&rhdr, hdr.type, hdr.stream_id,
+                                       hdr.subscribe_token,
+                                       RIG_STREAM_CTRL_PONG);
+            stream_packet_header_pack(&rhdr, reply);
+            sendto(srv->sock, reply, sizeof(reply), 0,
+                   (struct sockaddr *)&from, from_len);
+        }
+
+        stream_control_header_init(&rhdr, hdr.type, hdr.stream_id,
+                                   hdr.subscribe_token,
+                                   RIG_STREAM_CTRL_SUBSCRIBE_ACK);
+        stream_packet_header_pack(&rhdr, reply);
+        sendto(srv->sock, reply, sizeof(reply), 0,
+               (struct sockaddr *)&from, from_len);
+    }
+
+    return NULL;
+}
+
+
+/* Bind the stand-in server and run it. Behaviour flags must already be set. */
+static int sub_server_start(struct sub_server *srv)
+{
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+
+    srv->sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (srv->sock < 0)
+    {
+        return -1;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+
+    if (bind(srv->sock, (struct sockaddr *)&addr, sizeof(addr)) < 0
+            || getsockname(srv->sock, (struct sockaddr *)&addr, &addrlen) < 0)
+    {
+        close(srv->sock);
+        return -1;
+    }
+
+    srv->port = ntohs(addr.sin_port);
+
+    if (pthread_create(&srv->thread, NULL, sub_server_thread, srv) != 0)
+    {
+        close(srv->sock);
+        return -1;
+    }
+
+    return 0;
+}
+
+
+static void sub_server_stop(struct sub_server *srv)
+{
+    srv->stop = 1;
+    pthread_join(srv->thread, NULL);
+    close(srv->sock);
+}
+
+
+/* Client session whose peer is the stand-in server. */
+static int sub_session_init(struct rig_stream *s,
+                            struct rig_stream_net_session *sess,
+                            int server_port)
+{
+    struct sockaddr_in local;
+
+    wb_setup(s, sess);
+
+    sess->udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (sess->udp_sock < 0)
+    {
+        return -1;
+    }
+
+    memset(&local, 0, sizeof(local));
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    local.sin_port = 0;
+
+    if (bind(sess->udp_sock, (struct sockaddr *)&local, sizeof(local)) < 0)
+    {
+        close(sess->udp_sock);
+        return -1;
+    }
+
+    struct sockaddr_in *peer = (struct sockaddr_in *)&sess->server_addr;
+
+    memset(peer, 0, sizeof(*peer));
+    peer->sin_family = AF_INET;
+    peer->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    peer->sin_port = htons((uint16_t)server_port);
+    sess->server_addr_len = sizeof(*peer);
+
+    return 0;
+}
+
+
+static void sub_session_cleanup(struct rig_stream *s,
+                                struct rig_stream_net_session *sess)
+{
+    close(sess->udp_sock);
+    stream_write_event_destroy(s);
+    stream_ringbuf_destroy(&s->ringbuf);
+}
+
+
+/* A dropped SUBSCRIBE must not fail the open: the client retransmits within
+ * its budget and the second attempt is answered. */
+void test_subscribe_retransmits_after_loss(void)
+{
+    struct sub_server srv;
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+
+    memset(&srv, 0, sizeof(srv));
+    srv.drop_first = 1;
+    TEST_ASSERT(sub_server_start(&srv) == 0);
+    TEST_ASSERT(sub_session_init(&s, &sess, srv.port) == 0);
+
+    TEST_CHECK(rig_stream_net_subscribe(&sess, &s, 3000) == 0);
+    TEST_MSG("subscribe failed although the retry would have been answered");
+
+    TEST_CHECK(srv.subscribes_seen >= 2);
+    TEST_MSG("server saw %d SUBSCRIBE packets, expected a retransmission",
+             srv.subscribes_seen);
+
+    sub_session_cleanup(&s, &sess);
+    sub_server_stop(&srv);
+}
+
+
+/* An unrelated control frame arriving before the ACK must be discarded, not
+ * taken as a failed handshake. */
+void test_subscribe_ignores_non_ack_first(void)
+{
+    struct sub_server srv;
+    struct rig_stream s;
+    struct rig_stream_net_session sess;
+
+    memset(&srv, 0, sizeof(srv));
+    srv.pong_before_ack = 1;
+    TEST_ASSERT(sub_server_start(&srv) == 0);
+    TEST_ASSERT(sub_session_init(&s, &sess, srv.port) == 0);
+
+    TEST_CHECK(rig_stream_net_subscribe(&sess, &s, 3000) == 0);
+    TEST_MSG("subscribe failed on a PONG preceding the ACK");
+
+    sub_session_cleanup(&s, &sess);
+    sub_server_stop(&srv);
+}
+
+
+/* Open a stream over a raw TCP control connection and return the source_id
+ * reported in the \stream_open response (-1 on any failure). */
+static int query_source_id_once(int port)
+{
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sock < 0)
+    {
+        return -1;
+    }
+
+    socket_disable_sigpipe(sock);
+    struct sockaddr_in addr;
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = htons(port);
+
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    {
+        close(sock);
+        return -1;
+    }
+
+    const char *cmd = "+\\stream_open AUDIO_RX PCM_S16 48000\n";
+
+    if (socket_send(sock, cmd, strlen(cmd)) != (ssize_t)strlen(cmd))
+    {
+        close(sock);
+        return -1;
+    }
+
+    char buf[1024] = "";
+    size_t total = 0;
+
+    while (total < sizeof(buf) - 1 && strstr(buf, "RPRT") == NULL)
+    {
+        fd_set fds;
+        struct timeval tv = { 3, 0 };
+        FD_ZERO(&fds);
+        FD_SET(sock, &fds);
+
+        if (select(sock + 1, &fds, NULL, NULL, &tv) <= 0)
+        {
+            break;
+        }
+
+        ssize_t n = recv(sock, buf + total, sizeof(buf) - 1 - total, 0);
+
+        if (n <= 0)
+        {
+            break;
+        }
+
+        total += (size_t)n;
+        buf[total] = '\0';
+    }
+
+    close(sock);
+
+    int source_id = -1;
+    const char *p = strstr(buf, "source_id: ");
+
+    if (p && sscanf(p, "source_id: %d", &source_id) == 1)
+    {
+        return source_id;
+    }
+
+    return -1;
+}
+
+
+/* A daemon that has only just begun listening may leave the first connection
+ * unanswered on a busy machine, so allow the query a few attempts before
+ * reporting the ID as unavailable. */
+static int query_source_id_raw(int port)
+{
+    int attempt;
+
+    for (attempt = 0; attempt < 3; attempt++)
+    {
+        int source_id = query_source_id_once(port);
+
+        if (source_id >= 0)
+        {
+            return source_id;
+        }
+
+        usleep(100000);  /* 100ms */
+    }
+
+    return -1;
+}
+
+
+struct raw_stream_connection
+{
+    int tcp_sock;
+    int udp_sock;
+};
+
+
+static int send_all(int sock, const void *buf, size_t len)
+{
+    const unsigned char *p = buf;
+
+    while (len > 0)
+    {
+        ssize_t n = socket_send(sock, p, len);
+
+        if (n <= 0)
+        {
+            return -1;
+        }
+
+        p += n;
+        len -= (size_t)n;
+    }
+
+    return 0;
+}
+
+
+static int raw_control_connect(int port)
+{
+    struct sockaddr_in addr;
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sock < 0)
+    {
+        return -1;
+    }
+
+    socket_disable_sigpipe(sock);
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = htons(port);
+
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    {
+        close(sock);
+        return -1;
+    }
+
+    return sock;
+}
+
+
+static int raw_control_read(int sock, char *response, size_t response_size,
+                            int timeout_ms)
+{
+    size_t total = 0;
+
+    while (total < response_size - 1)
+    {
+        fd_set fds;
+        struct timeval tv;
+        ssize_t n;
+
+        FD_ZERO(&fds);
+        FD_SET(sock, &fds);
+        tv.tv_sec = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+        if (select(sock + 1, &fds, NULL, NULL, &tv) <= 0)
+        {
+            return -1;
+        }
+
+        n = recv(sock, response + total, response_size - 1 - total, 0);
+
+        if (n <= 0)
+        {
+            return -1;
+        }
+
+        total += (size_t)n;
+        response[total] = '\0';
+
+        if (memchr(response, '\n', total))
+        {
+            return (int)total;
+        }
+    }
+
+    return (int)total;
+}
+
+
+static int raw_control_command(int sock, const char *command, char *response,
+                               size_t response_size)
+{
+    if (send_all(sock, command, strlen(command)) < 0)
+    {
+        return -1;
+    }
+
+    return raw_control_read(sock, response, response_size, 5000);
+}
+
+
+static int raw_stream_open_once(int port, struct raw_stream_connection *conn)
+{
+    struct sockaddr_in addr;
+    const char *cmd = "+\\stream_open AUDIO_RX PCM_S16 48000\n";
+    char response[1024] = "";
+    size_t total = 0;
+    int stream_id = -1;
+    int udp_port = -1;
+    unsigned int subscribe_token = 0;
+
+    conn->tcp_sock = -1;
+    conn->udp_sock = -1;
+    conn->tcp_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (conn->tcp_sock < 0)
+    {
+        return -1;
+    }
+
+    socket_disable_sigpipe(conn->tcp_sock);
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = htons(port);
+
+    if (connect(conn->tcp_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0
+            || send_all(conn->tcp_sock, cmd, strlen(cmd)) < 0)
+    {
+        goto fail;
+    }
+
+    while (total < sizeof(response) - 1 && strstr(response, "RPRT") == NULL)
+    {
+        fd_set fds;
+        struct timeval tv = { 3, 0 };
+        FD_ZERO(&fds);
+        FD_SET(conn->tcp_sock, &fds);
+
+        if (select(conn->tcp_sock + 1, &fds, NULL, NULL, &tv) <= 0)
+        {
+            goto fail;
+        }
+
+        ssize_t n = recv(conn->tcp_sock, response + total,
+                         sizeof(response) - 1 - total, 0);
+
+        if (n <= 0)
+        {
+            goto fail;
+        }
+
+        total += (size_t)n;
+        response[total] = '\0';
+    }
+
+    const char *id_line = strstr(response, "stream_id: ");
+    const char *port_line = strstr(response, "udp_port: ");
+    const char *token_line = strstr(response, "subscribe_token: ");
+
+    if (!strstr(response, "RPRT 0") || !id_line || !port_line || !token_line
+            || sscanf(id_line, "stream_id: %d", &stream_id) != 1
+            || sscanf(port_line, "udp_port: %d", &udp_port) != 1
+            || sscanf(token_line, "subscribe_token: %u", &subscribe_token) != 1)
+    {
+        goto fail;
+    }
+
+    conn->udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (conn->udp_sock < 0)
+    {
+        goto fail;
+    }
+
+    unsigned char packet[RIG_STREAM_HEADER_SIZE];
+    struct rig_stream_packet_header hdr;
+    stream_control_header_init(&hdr, RIG_STREAM_TYPE_AUDIO_RX,
+                               (uint16_t)stream_id, subscribe_token,
+                               RIG_STREAM_CTRL_SUBSCRIBE);
+    stream_packet_header_pack(&hdr, packet);
+    addr.sin_port = htons((uint16_t)udp_port);
+
+    if (sendto(conn->udp_sock, packet, sizeof(packet), 0,
+               (struct sockaddr *)&addr, sizeof(addr)) != (ssize_t)sizeof(packet))
+    {
+        goto fail;
+    }
+
+    fd_set fds;
+    struct timeval tv = { 3, 0 };
+    FD_ZERO(&fds);
+    FD_SET(conn->udp_sock, &fds);
+
+    if (select(conn->udp_sock + 1, &fds, NULL, NULL, &tv) <= 0)
+    {
+        goto fail;
+    }
+
+    ssize_t n = recv(conn->udp_sock, packet, sizeof(packet), 0);
+
+    if (n < RIG_STREAM_HEADER_SIZE
+            || stream_packet_header_unpack(packet, (size_t)n, &hdr) != 0
+            || hdr.stream_id != stream_id
+            || hdr.subscribe_token != subscribe_token
+            || !(hdr.control & RIG_STREAM_CTRL_SUBSCRIBE_ACK))
+    {
+        goto fail;
+    }
+
+    return 0;
+
+fail:
+
+    if (conn->udp_sock >= 0)
+    {
+        close(conn->udp_sock);
+        conn->udp_sock = -1;
+    }
+
+    if (conn->tcp_sock >= 0)
+    {
+        close(conn->tcp_sock);
+        conn->tcp_sock = -1;
+    }
+
+    return -1;
+}
+
+
+static int raw_stream_open(int port, struct raw_stream_connection *conn)
+{
+    for (int attempt = 0; attempt < 3; attempt++)
+    {
+        if (raw_stream_open_once(port, conn) == 0)
+        {
+            return 0;
+        }
+
+        usleep(100000);
+    }
+
+    return -1;
+}
+
+
+/* In idle mode the last control disconnect closes the backend rig. A live RX
+ * feeder must be joined before that close, even when the client never sends
+ * stream_close. */
+void test_idle_abrupt_disconnect_closes_stream(void)
+{
+    struct rigctld_proc proc = {0};
+    struct raw_stream_connection first = { -1, -1 };
+    struct raw_stream_connection reopened = { -1, -1 };
+
+    if (start_idle_rigctld(&proc) < 0)
+    {
+        TEST_CHECK_(0, "could not start idle rigctld");
+        return;
+    }
+
+    int opened = raw_stream_open(proc.port, &first);
+    TEST_CHECK(opened == 0);
+
+    if (opened < 0)
+    {
+        stop_rigctld(&proc);
+        return;
+    }
+
+    /* Drop the control session without a stream_close command. */
+    close(first.tcp_sock);
+    close(first.udp_sock);
+    usleep(250000);
+
+    TEST_CHECK(rigctld_alive(&proc));
+    opened = raw_stream_open(proc.port, &reopened);
+    TEST_CHECK(opened == 0);
+
+    if (reopened.tcp_sock >= 0)
+    {
+        close(reopened.tcp_sock);
+    }
+
+    if (reopened.udp_sock >= 0)
+    {
+        close(reopened.udp_sock);
+    }
+
+    usleep(250000);
+    stop_rigctld(&proc);
+}
+
+
+/* Disconnect cleanup transacts on the shared model-2 control socket. Holding
+ * its stream_close response makes any concurrent command observable at the
+ * proxy before cleanup can finish. */
+void test_disconnect_stream_close_serialized(void)
+{
+    struct rigctld_proc upstream = {0};
+    struct rigctld_proc frontend = {0};
+    struct tcp_pause_proxy proxy;
+    struct raw_stream_connection first = { -1, -1 };
+    char proxy_path[64];
+    char response[256];
+    const char *get_freq = "\\get_freq\n";
+    const char *get_freq_log = "rigctl_parse: cmd=get_freq handle=";
+    int second_sock = -1;
+    int command_count;
+    int parsed_commands;
+    int n;
+
+    if (start_rigctld(&upstream) < 0)
+    {
+        TEST_CHECK_(0, "could not start upstream rigctld");
+        return;
+    }
+
+    if (tcp_pause_proxy_init(&proxy, upstream.port, 1) < 0)
+    {
+        TEST_CHECK_(0, "could not initialize pause proxy");
+        stop_rigctld(&upstream);
+        return;
+    }
+
+    snprintf(proxy_path, sizeof(proxy_path), "127.0.0.1:%d", proxy.port);
+    frontend.model = RIG_MODEL_NETRIGCTL;
+    frontend.trace = 1;
+    frontend.rig_path = proxy_path;
+    frontend.after_fork = tcp_pause_proxy_start_thread;
+    frontend.after_fork_cleanup = tcp_pause_proxy_cleanup_thread;
+    frontend.after_fork_data = &proxy;
+
+    if (start_rigctld_opt(&frontend, NULL, "cache_timeout=0") < 0)
+    {
+        TEST_CHECK_(0, "could not start chained rigctld");
+        goto cleanup;
+    }
+
+    if (raw_stream_open(frontend.port, &first) < 0)
+    {
+        TEST_CHECK_(0, "could not open stream through chained rigctld");
+        goto cleanup;
+    }
+
+    second_sock = raw_control_connect(frontend.port);
+    TEST_CHECK(second_sock >= 0);
+
+    if (second_sock < 0
+            || send_all(second_sock, get_freq, strlen(get_freq)) < 0)
+    {
+        TEST_CHECK_(0, "could not send second client warm-up command");
+        goto cleanup;
+    }
+
+    n = raw_control_read(second_sock, response, sizeof(response), 5000);
+    TEST_CHECK(n > 0);
+    TEST_MSG("second client warm-up command did not receive a response");
+
+    if (n <= 0 || strstr(response, "RPRT -"))
+    {
+        TEST_CHECK_(0, "second client warm-up response was %s",
+                    n > 0 ? response : "unavailable");
+        goto cleanup;
+    }
+
+    TEST_CHECK(wait_for_log_occurrences(frontend.log_path, get_freq_log,
+                                        1, 2000) == 0);
+    TEST_MSG("second client warm-up command was not observed in the daemon log");
+    parsed_commands = count_log_occurrences(frontend.log_path, get_freq_log);
+
+    close(first.tcp_sock);
+    close(first.udp_sock);
+    first.tcp_sock = -1;
+    first.udp_sock = -1;
+
+    TEST_CHECK(tcp_pause_proxy_wait(&proxy, &proxy.close_response_held,
+                                    5000) == 0);
+    TEST_MSG("disconnect cleanup did not reach a held stream_close response");
+
+    if (!tcp_pause_proxy_value(&proxy, &proxy.close_response_held))
+    {
+        goto cleanup;
+    }
+
+    command_count = tcp_pause_proxy_value(&proxy, &proxy.commands_seen);
+
+    if (send_all(second_sock, get_freq, strlen(get_freq)) < 0)
+    {
+        TEST_CHECK_(0, "could not send second client command");
+        goto cleanup;
+    }
+
+    if (wait_for_log_occurrences(frontend.log_path, get_freq_log,
+                                 parsed_commands + 1, 2000) < 0)
+    {
+        TEST_CHECK_(0, "competing command was not parsed before the mutex wait");
+        goto cleanup;
+    }
+
+    TEST_CHECK(tcp_pause_proxy_remained_quiet(&proxy, command_count,
+            2000));
+    TEST_MSG("competing command reached the proxy during the mutex grace period");
+    TEST_CHECK(!tcp_pause_proxy_value(&proxy, &proxy.command_during_close));
+    TEST_MSG("a second client reached the upstream control socket while "
+             "stream_close cleanup was waiting for its response");
+    TEST_CHECK(tcp_pause_proxy_value(&proxy, &proxy.commands_seen)
+               == command_count);
+    TEST_MSG("upstream command count changed while stream_close was held");
+
+    tcp_pause_proxy_release(&proxy);
+    TEST_CHECK(tcp_pause_proxy_wait(&proxy, &proxy.close_response_released,
+                                    5000) == 0);
+    TEST_MSG("proxy did not release the complete stream_close response");
+
+    n = raw_control_read(second_sock, response, sizeof(response), 5000);
+    TEST_CHECK(n > 0);
+    TEST_MSG("second client did not receive a response after cleanup resumed");
+
+    if (n > 0)
+    {
+        TEST_CHECK(strstr(response, "RPRT -") == NULL);
+        TEST_MSG("second client response was %s", response);
+        TEST_CHECK(tcp_pause_proxy_value(&proxy, &proxy.commands_seen)
+                   > command_count);
+        TEST_MSG("competing command did not reach upstream after cleanup");
+    }
+
+cleanup:
+    tcp_pause_proxy_release(&proxy);
+
+    if (first.tcp_sock >= 0)
+    {
+        close(first.tcp_sock);
+    }
+
+    if (first.udp_sock >= 0)
+    {
+        close(first.udp_sock);
+    }
+
+    if (second_sock >= 0)
+    {
+        close(second_sock);
+    }
+
+    if (tcp_pause_proxy_value(&proxy, &proxy.close_response_held))
+    {
+        tcp_pause_proxy_wait(&proxy, &proxy.close_response_released, 2000);
+    }
+
+    tcp_pause_proxy_destroy(&proxy);
+
+    if (frontend.pid > 0)
+    {
+        stop_rigctld(&frontend);
+    }
+
+    stop_rigctld(&upstream);
+}
+
+
+/* rigctld --stream-source-id stamps the CLI value; without it a stable
+ * derived ID in 0x1000-0xFFFF is used, unchanged across a daemon restart
+ * on the same static configuration. */
+void test_stream_source_id_cli_and_derived(void)
+{
+    struct rigctld_proc proc;
+    memset(&proc, 0, sizeof(proc));
+
+    /* Explicit CLI value */
+    TEST_ASSERT(start_rigctld_opt(&proc, "42", NULL) == 0);
+    int explicit_id = query_source_id_raw(proc.port);
+    stop_rigctld(&proc);
+    TEST_CHECK(explicit_id == 42);
+    TEST_MSG("explicit source_id=%d, expected 42", explicit_id);
+
+    /* Derived default, stable across a restart on the same port */
+    memset(&proc, 0, sizeof(proc));
+    TEST_ASSERT(start_rigctld_opt(&proc, NULL, NULL) == 0);
+    int derived1 = query_source_id_raw(proc.port);
+    stop_rigctld(&proc);
+    TEST_CHECK(derived1 >= 0x1000 && derived1 <= 0xFFFF);
+    TEST_MSG("derived source_id=%d, expected 0x1000-0xFFFF", derived1);
+
+    TEST_ASSERT(start_rigctld_opt(&proc, NULL, NULL) == 0);   /* same proc.port */
+    int derived2 = query_source_id_raw(proc.port);
+    stop_rigctld(&proc);
+    TEST_CHECK(derived2 == derived1);
+    TEST_MSG("derived ID changed across restart: %d != %d",
+             derived2, derived1);
+}
+
+
+TEST_LIST =
+{
+    { "rx_overlong_payload_len_rejected", test_rx_overlong_payload_len_rejected },
+    { "rx_metadata_no_false_link_loss", test_rx_metadata_no_false_link_loss },
+    { "source_ip_equal_decision",       test_source_ip_equal_decision },
+    { "rx_wrong_token_rejected",        test_rx_wrong_token_rejected },
+    { "rx_ack_no_false_link_loss",      test_rx_ack_no_false_link_loss },
+    { "rx_real_gap_counts_link_loss",   test_rx_real_gap_counts_link_loss },
+    { "rx_error_frame_dropped",         test_rx_error_frame_dropped },
+    { "rx_error_frame_fails_stream",    test_rx_error_frame_fails_stream },
+    { "rx_data_after_error_frame_ignored", test_rx_data_after_error_frame_ignored },
+    { "rx_write_status_frame",          test_rx_write_status_frame },
+    { "password_startup_and_stream_caps", test_password_startup_and_stream_caps },
+    { "connection_power_refresh", test_connection_power_refresh },
+    { "authenticated_connection_power_refresh", test_authenticated_connection_power_refresh },
+    { "caps_discovery_all_types",  test_caps_discovery_all_types },
+    { "rx_capture_time_propagates", test_rx_capture_time_propagates },
+    { "open_close_tx",             test_open_close_tx },
+    { "open_close_rx",             test_open_close_rx },
+    { "close_response_and_cleanup", test_close_response_and_cleanup },
+    { "write_tx_multi",            test_write_tx_multi },
+    { "write_tx_larger_than_payload", test_write_tx_larger_than_payload },
+    { "tx_timed_burst_split_keeps_target", test_tx_timed_burst_split_keeps_target },
+    { "tx_write_status_e2e",       test_tx_write_status_e2e },
+    { "tx_underrun_e2e",           test_tx_underrun_e2e },
+    { "rx_data_received",          test_rx_data_received },
+    { "rx_converted_stream_e2e",   test_rx_converted_stream_e2e },
+    { "rx_codec_passthrough_e2e",  test_rx_codec_passthrough_e2e },
+    { "rx_stereo_channels_forwarded", test_rx_stereo_channels_forwarded },
+    { "rx_iq_multichannel_e2e",    test_rx_iq_multichannel_e2e },
+#ifdef HAVE_SAMPLERATE
+    { "rx_resampled_stream_e2e",   test_rx_resampled_stream_e2e },
+#endif
+    { "rx_continuous_data",        test_rx_continuous_data },
+    { "open_unsupported_rate",     test_open_unsupported_rate },
+    { "open_unsupported_format",   test_open_unsupported_format },
+    { "open_close_reopen",         test_open_close_reopen },
+    { "rx_pause_resume",           test_rx_pause_resume },
+    { "tx_flush_forwards",         test_tx_flush_forwards },
+    { "idle_abrupt_disconnect_closes_stream", test_idle_abrupt_disconnect_closes_stream },
+    { "disconnect_stream_close_serialized", test_disconnect_stream_close_serialized },
+    { "stream_source_id_cli_and_derived", test_stream_source_id_cli_and_derived },
+    { "subscribe_retransmits_after_loss", test_subscribe_retransmits_after_loss },
+    { "subscribe_ignores_non_ack_first", test_subscribe_ignores_non_ack_first },
+    { NULL, NULL }
+};
+
+#endif  /* _WIN32 */
