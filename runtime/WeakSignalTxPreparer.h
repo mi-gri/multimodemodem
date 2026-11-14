@@ -5,6 +5,7 @@
 #include "../modems/q65/tx/Q65Transmitter.h"
 #include "../modems/msk144/tx/Msk144Transmitter.h"
 #include "../modems/js8/tx/Js8Transmitter.h"
+#include "../modems/wspr/tx/WsprTransmitter.h"
 #include <atomic>
 #include <functional>
 #include <memory>
@@ -46,6 +47,11 @@ public:
                 return std::make_unique<Q65Transmitter>(message, sampleRate, period, submode, hz, std::move(cancelled));
             }, std::move(done));
         }
+    }
+    void prepareWspr(const QString &message, int sampleRate, double hz, Completion done) {
+        submit([=](std::function<bool()> cancelled) {
+            return std::make_unique<WsprTransmitter>(message, sampleRate, hz, std::move(cancelled));
+        }, std::move(done));
     }
     void prepareJs8(const QVector<Js8Message::Frame> &frames, Js8Mode::Submode submode, int sampleRate,
                     double hz, Completion done) {

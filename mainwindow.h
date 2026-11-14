@@ -702,6 +702,11 @@ private slots:
     void setupWsprDisplayPage();
     void setupWsprPage();
     void applyWaterfallRangeForMode(const QString &modeName);
+    QStringList wsprTxMessages(QString *error = nullptr) const;
+    void wsprPlanNextPeriod();
+    void wsprArmPeriod(qint64 periodStartMs);
+    void wsprStopBeacon(const QString &reason);
+    void updateWsprTxAvailability();
     void handleWsprDecoded(const QVector<WsprSpot> &spots, const QDateTime &periodUtc, int milliseconds);
     void clearWsprTable();
     void applyJs8Settings();
@@ -2229,6 +2234,14 @@ private:
     QWidget *m_pageWsprSettings = nullptr;
     QTableWidget *m_tableWspr = nullptr;
     QLabel *m_lblWsprStatus = nullptr;
+    QCheckBox *m_chkWsprTx = nullptr;
+    QSpinBox *m_spinWsprTxPercent = nullptr;
+    QSpinBox *m_spinWsprTxHz = nullptr;
+    QComboBox *m_cmbWsprPower = nullptr;
+    QLabel *m_lblWsprTxStatus = nullptr;
+    QTimer m_wsprTxTimer;
+    qint64 m_wsprLastTxPeriodMs = -1;
+    int m_wsprMessageIndex = 0;
 
     // JS8
     struct Js8Activity

@@ -12771,6 +12771,7 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
         m_waterfallWidget->setPaletteName(m_settings.waterfallPalette);
     }
     if (ui != nullptr && ui->cmbMode != nullptr) applyWaterfallRangeForMode(ui->cmbMode->currentText());
+    updateWsprTxAvailability();   // callsign, locator or Auto mode may have changed
     if (m_cmbWaterfallPalette != nullptr) {
         const int paletteIndex = m_cmbWaterfallPalette->findData(m_settings.waterfallPalette);
         m_cmbWaterfallPalette->setCurrentIndex(paletteIndex >= 0 ? paletteIndex : 0);
@@ -14325,6 +14326,8 @@ void MainWindow::applyWaterfallRangeForMode(const QString &modeName)
 
 void MainWindow::handleModeChanged(const QString &modeName)
 {
+    if (!WsprMode::isMode(modeName) && m_chkWsprTx != nullptr && m_chkWsprTx->isChecked())
+        wsprStopBeacon(QStringLiteral("mode changed"));
     restoreTxLevelForContext();
     m_rttySkimmerSpots.clear();
     if (m_waterfallWidget) m_waterfallWidget->clearSkimmer();
@@ -15418,6 +15421,14 @@ void MainWindow::scheduleNativeWeakSignalPeriodTx()
     if (ui == nullptr || ui->cmbMode == nullptr) return;
 
     const QString modeName = ui->cmbMode->currentText();
+    if (WsprMode::isMode(modeName)) {
+        // A WSPR period that could not start on time is not shifted: the
+        // beacon plans the next period itself.
+        m_nativeWeakSignalPreparedModulator.reset();
+        appendLog(QStringLiteral("WSPR TX period missed; the beacon plans the next period."));
+        updateTxControlState();
+        return;
+    }
     const bool msk144 = Msk144Mode::isMode(modeName);
     const bool q65 = Q65Mode::isFamilyMode(modeName);
     const bool js8 = Js8Mode::isMode(modeName);
@@ -15545,7 +15556,8 @@ void MainWindow::handleNativeWeakSignalPeriodTxDue()
     const bool sameFamily =
         (Msk144Mode::isMode(activeMode) && Msk144Mode::isMode(m_nativeWeakSignalTxMode)) ||
         (Q65Mode::isFamilyMode(activeMode) && Q65Mode::isFamilyMode(m_nativeWeakSignalTxMode)) ||
-        (Js8Mode::isMode(activeMode) && Js8Mode::isMode(m_nativeWeakSignalTxMode));
+        (Js8Mode::isMode(activeMode) && Js8Mode::isMode(m_nativeWeakSignalTxMode)) ||
+        (WsprMode::isMode(activeMode) && WsprMode::isMode(m_nativeWeakSignalTxMode));
     if (!sameFamily || m_txRunning || m_offlineAnalysisActive) {
         cancelNativeWeakSignalPeriodTx(QStringLiteral("mode or runtime state changed"));
         return;
@@ -18312,6 +18324,7 @@ void MainWindow::updateFt8AutoModeVisibility()
     }
 
     updateFt8SequencerUi();
+    updateWsprTxAvailability();
 }
 
 void MainWindow::handleFt8AutoCqToggled(bool enabled)
@@ -25935,7 +25948,8 @@ std::unique_ptr<TxModulator> MainWindow::buildCurrentTxModulator(const QString &
             ));
     }
 
-    if (Msk144Mode::isMode(modeName) || Q65Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName))
+    if (Msk144Mode::isMode(modeName) || Q65Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName) ||
+        WsprMode::isMode(modeName))
         return std::move(m_nativeWeakSignalPreparedModulator);
 
     if (Ft8Mode::isFamilyMode(modeName)) {
@@ -26242,7 +26256,9 @@ void MainWindow::updateTxControlState()
         ui->btnTxTone->setText((txBusy || m_nativeWeakSignalTxPending)
                                    ? uiText("button.transport_tx_stop", "■ TX")
                                    : uiText("button.transport_tx", "● TX"));
-        ui->btnTxTone->setEnabled(m_cwKeyReleaseFailed || (!rxOnlyTextMode &&
+        const bool wsprTxActive = WsprMode::isMode(modeName) &&
+            (txBusy || m_nativeWeakSignalTxPending || (m_chkWsprTx != nullptr && m_chkWsprTx->isChecked()));
+        ui->btnTxTone->setEnabled(m_cwKeyReleaseFailed || wsprTxActive || (!rxOnlyTextMode &&
                                   (txBusy || m_nativeWeakSignalTxPending || canStartTx)));
     }
 
@@ -26602,7 +26618,8 @@ void MainWindow::startImageTx()
     const bool msk144Mode = Msk144Mode::isMode(activeModeName);
     const bool q65Mode = Q65Mode::isFamilyMode(activeModeName);
     const bool js8Mode = Js8Mode::isMode(activeModeName);
-    const bool textMode = rttyMode || bpskMode || mfskMode || cwMode || hellMode || ft8Mode || msk144Mode || q65Mode || js8Mode;
+    const bool wsprMode = WsprMode::isMode(activeModeName);
+    const bool textMode = rttyMode || bpskMode || mfskMode || cwMode || hellMode || ft8Mode || msk144Mode || q65Mode || js8Mode || wsprMode;
 
     const bool liveRxRunning = m_rxStartPending || m_rxRunning ||
                                (m_audioEngine != nullptr && m_audioEngine->isRunning());
@@ -26697,6 +26714,8 @@ void MainWindow::startImageTx()
         return;
     }
 
+    // WSPR transmits only as a planned beacon period (wsprArmPeriod).
+    if (wsprMode && !m_nativeWeakSignalTxBoundaryStart) return;
     if ((msk144Mode || q65Mode || js8Mode) && !m_nativeWeakSignalTxBoundaryStart) {
         scheduleNativeWeakSignalPeriodTx();
         return;
@@ -26717,7 +26736,7 @@ void MainWindow::startImageTx()
     const QString textSnapshot = rttyMode && !m_rttyTxOverrideText.isNull() ? m_rttyTxOverrideText :
         textEditor ? textEditor->toPlainText() : QString();
     const auto captureStopGeneration = m_txRequestGeneration;
-    const bool nativeBoundaryStart = (msk144Mode || q65Mode || js8Mode) && m_nativeWeakSignalTxBoundaryStart;
+    const bool nativeBoundaryStart = (msk144Mode || q65Mode || js8Mode || wsprMode) && m_nativeWeakSignalTxBoundaryStart;
     const qint64 nativeBoundaryUtcMs = m_nativeWeakSignalTxBoundaryUtcMs;
     const auto nativeWaveform = std::make_shared<std::unique_ptr<TxModulator>>();
     if (nativeBoundaryStart) *nativeWaveform = std::move(m_nativeWeakSignalPreparedModulator);
@@ -27639,6 +27658,11 @@ void MainWindow::finishPttTest()
 void MainWindow::txToneTest()
 {
     if (m_cwKeyReleaseFailed) { stopImageTx(); return; }
+    if (ui != nullptr && ui->cmbMode != nullptr && WsprMode::isMode(ui->cmbMode->currentText())) {
+        // WSPR: the TX button stops the beacon (and a running transmission).
+        wsprStopBeacon(QStringLiteral("operator TX button"));
+        return;
+    }
     if (m_nativeWeakSignalTxPending) {
         cancelNativeWeakSignalPeriodTx(QStringLiteral("operator TX toggle"));
         return;
