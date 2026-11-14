@@ -18661,8 +18661,9 @@ Ft8FullAutoCqCandidate MainWindow::buildFt8FullAutoCqCandidate(const Ft8RxDecode
     candidate.call = ft8CqCallsignFromMessage(parsed).trimmed().toUpper();
     if (candidate.call.isEmpty() || FtDecodedText::callMatches(candidate.call, myCall)) return candidate;
 
-    if (isFtCallBlacklisted(candidate.call)) {
-        candidate.priorityText = QStringLiteral("blacklisted");
+    const QString autoFilterReason = ftAutoQsoFilterReason(candidate.call);
+    if (!autoFilterReason.isEmpty()) {
+        candidate.priorityText = autoFilterReason;
         return candidate;
     }
 
@@ -18888,6 +18889,13 @@ bool MainWindow::startFt8FullAutoQsoFromCandidate(const Ft8FullAutoCqCandidate &
     const QString grid = candidate.grid.trimmed().left(4).toUpper();
     if (call.isEmpty() || isFtCallBlacklisted(call) || FtDecodedText::callMatches(call, stationCallsign())) {
         return false;
+    }
+    if (!fromCqWorkList) {
+        const QString filterReason = ftAutoQsoFilterReason(call);
+        if (!filterReason.isEmpty()) {
+            traceFtAutomation("qso.start_rejected", filterReason, {{"candidate_call", call}}, true);
+            return false;
+        }
     }
 
     if (!fromCqWorkList && m_chkFt8AutoLog != nullptr && !m_chkFt8AutoLog->isChecked()) {
@@ -20903,6 +20911,23 @@ bool MainWindow::isFtCallBlacklisted(const QString &call) const
     return false;
 }
 
+QString MainWindow::ftAutoQsoFilterReason(const QString &call) const
+{
+    if (call.trimmed().isEmpty()) return QString();
+    if (isFtCallBlacklisted(call)) return QStringLiteral("blacklisted");
+    const QStringList hiddenContinents = FtDecodeFilter::continentList(m_settings.ftDecodeFilterContinentList);
+    const bool countries = m_settings.ftDecodeFilterCountries;
+    if ((!countries && hiddenContinents.isEmpty()) || isFtCallWatched(call)) return QString();
+    const CtyCountryFile::LookupResult cty = CtyCountryFile::instance().lookupCallsign(call);
+    if (!cty.valid) return QString();
+    if (countries && FtDecodeFilter::hiddenByCountry(cty.entity.primaryPrefix,
+                                                     FtDecodeFilter::countryPrefixList(m_settings.ftDecodeFilterCountryList)))
+        return QStringLiteral("country filter %1 (%2)").arg(cty.entity.primaryPrefix, cty.entity.name);
+    if (FtDecodeFilter::hiddenByContinent(cty.entity.continent, hiddenContinents))
+        return QStringLiteral("continent filter %1").arg(cty.entity.continent);
+    return QString();
+}
+
 bool MainWindow::isFtCallWatched(const QString &call) const
 {
     const QString normalized = normalizeFtFilterCall(call);
@@ -21221,12 +21246,20 @@ void MainWindow::handleFt8DecodeReady(const Ft8RxDecoder::Decode &decode)
         rememberFt8AudioActivity(decode, primaryCallForDisplay);
     }
 
-    if (!presentationOnly) considerFt8CallerForQueue(decode, blacklistedDecode);
+    // Decode filter (hidden countries/continents) also keeps automation away.
+    QString autoFilterReason = blacklistedDecode ? QStringLiteral("blacklisted") : QString();
+    if (autoFilterReason.isEmpty() && !presentationOnly) {
+        const QString filterCall = !workedCall.isEmpty() ? workedCall : parsed.senderCall;
+        autoFilterReason = ftAutoQsoFilterReason(filterCall);
+    }
+    const bool autoExcluded = !autoFilterReason.isEmpty();
 
-    if (!presentationOnly && blacklistedDecode && cqMessage && canCollectFt8FullAutoCqs())
-        traceFtAutomation("candidate.reject","blacklisted",{{"candidate_call",workedCall},{"rx_message",decode.message},{"rx_slot_utc_ms",decode.slotStartUtcMs}},true);
+    if (!presentationOnly) considerFt8CallerForQueue(decode, autoExcluded);
+
+    if (!presentationOnly && autoExcluded && cqMessage && canCollectFt8FullAutoCqs())
+        traceFtAutomation("candidate.reject",autoFilterReason,{{"candidate_call",workedCall},{"rx_message",decode.message},{"rx_slot_utc_ms",decode.slotStartUtcMs}},true);
     bool fullAutoStartedFromThisDecode = false;
-    if (!presentationOnly && !blacklistedDecode && cqMessage) {
+    if (!presentationOnly && !autoExcluded && cqMessage) {
         if (!primaryStatus.isEmpty()) {
             fullAutoStartedFromThisDecode = tryStartFt8FullAutoQso(decode, primaryStatus);
         } else {

@@ -1494,6 +1494,9 @@ private:
                                      const QString &dxCall = QString()) const;
     void refreshFt8DecodeWorkedHighlights();
     bool isFtCallBlacklisted(const QString &call) const;
+    // Why Auto QSO must not work @p call: blacklist, or the decode filter's
+    // hidden countries/continents (watched stations exempt); empty if allowed.
+    QString ftAutoQsoFilterReason(const QString &call) const;
     bool isFtCallWatched(const QString &call) const;
 
     /**
