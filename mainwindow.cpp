@@ -1522,6 +1522,10 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
     m_settings.load();
+    // "CQ retry" means "a CQ series is running" (it turns itself off at the
+    // end). A series never survives a restart, and a box that starts checked
+    // could only be clicked off, never on.
+    m_settings.ft8CqRepeat = false;
     m_rxUiAudioDispatcher->setObjectName("rx-ui");m_dspAudioDispatcher->setObjectName("rx-dsp");
     if(m_settings.sessionDiagnosticsEnabled && !SessionDiagnostics::instance().enabled())SessionDiagnostics::instance().start(m_settings.sessionDiagnosticsFolder);
     SessionDiagnostics::instance().settings(m_settings);
