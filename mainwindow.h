@@ -704,6 +704,7 @@ private slots:
     void applyWaterfallRangeForMode(const QString &modeName);
     double waterfallRowSecondsForMode(const QString &modeName) const;
     void updateWaterfallSpeedControl();
+    void applyRigPassbandForWaterfall();
     QStringList wsprTxMessages(QString *error = nullptr) const;
     void wsprPlanNextPeriod();
     void wsprArmPeriod(qint64 periodStartMs);

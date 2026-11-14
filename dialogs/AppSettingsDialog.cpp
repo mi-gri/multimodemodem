@@ -1787,7 +1787,7 @@ QWidget *AppSettingsDialog::makeAppearancePage()
     for (int hz : {3000, 3500, 4000, 4500, 5000}) m_comboWaterfallMaxHz->addItem(QStringLiteral("%1 Hz").arg(hz), hz);
     const int maxIndex = m_comboWaterfallMaxHz->findData(m_initialSettings.waterfallMaxHz);
     m_comboWaterfallMaxHz->setCurrentIndex(maxIndex >= 0 ? maxIndex : 0);
-    m_comboWaterfallMaxHz->setToolTip(L(QStringLiteral("Upper edge of the waterfall. Set it to the receive passband of the rig (FTX-1: 4000 Hz). WSPR always shows 1200-1800 Hz.")));
+    m_comboWaterfallMaxHz->setToolTip(L(QStringLiteral("Upper edge of the waterfall and receive passband of the rig in SSB/DATA (set by CAT on connect and on change; CW, RTTY, AM and FM keep their own filters). FTX-1: up to 4000 Hz. WSPR always shows 1200-1800 Hz.")));
     waterfallGrid->addWidget(new QLabel(L(QStringLiteral("Upper edge")), waterfallGroup), 0, 0);
     waterfallGrid->addWidget(m_comboWaterfallMaxHz, 0, 1);
     layout->addWidget(waterfallGroup);

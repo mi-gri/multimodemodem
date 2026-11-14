@@ -82,6 +82,10 @@ public slots:
     void pollNow();
     bool setPtt(bool enabled);
     bool setFrequencyHz(double frequencyHz);
+    // Receive passband of SSB/DATA modes (USB, LSB, PKTUSB, PKTLSB) to the
+    // waterfall's upper edge; CW, RTTY, AM and FM keep their own filters.
+    // The width the rig reports afterwards is published as receiverFilterChanged.
+    bool setDataPassbandHz(int widthHz);
     // Prepare/restore the temporary CAT frequency transaction used by FT4/FT8
     // Split Operation. operation is "rig" or "fake_it"; rfShiftHz is the
     // 500 Hz-quantized dial correction that keeps TX audio in 1500..2000 Hz.

@@ -777,13 +777,13 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
  'Waterfall':('Waterfall','Waterfall','Chute d’eau','Wasserfall','Fossefall','Vodopád'),
  'Upper edge':('Upper edge','Limite superiore','Limite haute','Obere Grenze','Øvre grense','Horní mez'),
- 'Upper edge of the waterfall. Set it to the receive passband of the rig (FTX-1: 4000 Hz). WSPR always shows 1200-1800 Hz.':(
-  'Upper edge of the waterfall. Set it to the receive passband of the rig (FTX-1: 4000 Hz). WSPR always shows 1200-1800 Hz.',
-  'Limite superiore del waterfall. Impostala sulla banda passante in ricezione dell\'apparato (FTX-1: 4000 Hz). WSPR mostra sempre 1200-1800 Hz.',
-  'Limite haute de la chute d’eau. Réglez-la sur la bande passante de réception du poste (FTX-1 : 4000 Hz). WSPR affiche toujours 1200-1800 Hz.',
-  'Obere Grenze des Wasserfalls. Auf die Empfangsbandbreite des Funkgeräts stellen (FTX-1: 4000 Hz). WSPR zeigt immer 1200-1800 Hz.',
-  'Øvre grense for fossefallet. Sett den til mottaksbåndbredden til riggen (FTX-1: 4000 Hz). WSPR viser alltid 1200-1800 Hz.',
-  'Horní mez vodopádu. Nastavte ji na přijímací šířku pásma stanice (FTX-1: 4000 Hz). WSPR zobrazuje vždy 1200-1800 Hz.'),
+ 'Upper edge of the waterfall and receive passband of the rig in SSB/DATA (set by CAT on connect and on change; CW, RTTY, AM and FM keep their own filters). FTX-1: up to 4000 Hz. WSPR always shows 1200-1800 Hz.':(
+  'Upper edge of the waterfall and receive passband of the rig in SSB/DATA (set by CAT on connect and on change; CW, RTTY, AM and FM keep their own filters). FTX-1: up to 4000 Hz. WSPR always shows 1200-1800 Hz.',
+  "Limite superiore del waterfall e banda passante in ricezione dell'apparato in SSB/DATA (impostata via CAT alla connessione e a ogni modifica; CW, RTTY, AM e FM mantengono i propri filtri). FTX-1: fino a 4000 Hz. WSPR mostra sempre 1200-1800 Hz.",
+  'Limite haute de la chute d’eau et bande passante de réception du poste en SSB/DATA (réglée par CAT à la connexion et à chaque changement ; CW, RTTY, AM et FM gardent leurs propres filtres). FTX-1 : jusqu’à 4000 Hz. WSPR affiche toujours 1200-1800 Hz.',
+  'Obere Grenze des Wasserfalls und Empfangsbandbreite des Funkgeräts in SSB/DATA (per CAT beim Verbinden und bei Änderung gesetzt; CW, RTTY, AM und FM behalten ihre eigenen Filter). FTX-1: bis 4000 Hz. WSPR zeigt immer 1200-1800 Hz.',
+  'Øvre grense for fossefallet og mottaksbåndbredden til riggen i SSB/DATA (settes via CAT ved tilkobling og ved endring; CW, RTTY, AM og FM beholder sine egne filtre). FTX-1: opptil 4000 Hz. WSPR viser alltid 1200-1800 Hz.',
+  'Horní mez vodopádu a přijímací šířka pásma stanice v SSB/DATA (nastaví se přes CAT při připojení a při změně; CW, RTTY, AM a FM si ponechají vlastní filtry). FTX-1: až 4000 Hz. WSPR zobrazuje vždy 1200-1800 Hz.'),
 }.items()})
 
 # WSPR beacon TX.

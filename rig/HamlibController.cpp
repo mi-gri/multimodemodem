@@ -833,6 +833,40 @@ void HamlibController::pollTxMeters()
 #endif
 }
 
+bool HamlibController::setDataPassbandHz(int widthHz)
+{
+    SessionDiagnostics::instance().record("cat.setDataPassbandHz", {{"width_hz", widthHz}});
+#ifndef M3_WITH_HAMLIB
+    Q_UNUSED(widthHz)
+    return false;
+#else
+    if (widthHz <= 0 || m_rig == nullptr || m_config.readOnlyTest || m_ftSplitTxActive ||
+        isHamRadioDeluxeModel(m_config.rigModel)) return false;
+    RIG *rig = static_cast<RIG *>(m_rig);
+    rmode_t mode = RIG_MODE_NONE;
+    pbwidth_t width = 0;
+    if (rig_get_mode(rig, RIG_VFO_CURR, &mode, &width) != RIG_OK) return false;
+    const bool dataOrSsb = mode == RIG_MODE_USB || mode == RIG_MODE_LSB ||
+                           mode == RIG_MODE_PKTUSB || mode == RIG_MODE_PKTLSB;
+    const QString modeName = QString::fromLatin1(rig_strrmode(mode)).trimmed().toUpper();
+    if (!dataOrSsb) {
+        SessionDiagnostics::instance().record("cat.setDataPassbandHz.skipped", {{"mode", modeName}});
+        return false;
+    }
+    const int ret = rig_set_mode(rig, RIG_VFO_CURR, mode, static_cast<pbwidth_t>(widthHz));
+    if (ret != RIG_OK) {
+        emitError(QStringLiteral("Hamlib could not set the receive passband to %1 Hz: %2")
+                      .arg(widthHz).arg(QString::fromLocal8Bit(rigerror(ret))));
+        return false;
+    }
+    rmode_t readMode = RIG_MODE_NONE;
+    pbwidth_t readWidth = 0;
+    if (rig_get_mode(rig, RIG_VFO_CURR, &readMode, &readWidth) == RIG_OK && readWidth > 0)
+        emit receiverFilterChanged(modeName, static_cast<int>(readWidth), 1);
+    return true;
+#endif
+}
+
 bool HamlibController::setFrequencyHz(double frequencyHz)
 {
     updateHamlibDiagnostics();

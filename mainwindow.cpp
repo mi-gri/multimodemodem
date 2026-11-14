@@ -10411,7 +10411,15 @@ void MainWindow::setupProcessingConnections()
                 Qt::QueuedConnection);
         connect(m_rigController, &HamlibController::modeChanged,
                 this, [this](const QString &modeName) {
+                    const QString previousMode = m_lastRigModeName;
                     m_lastRigModeName = modeName.trimmed().toUpper();
+                    // Entering an SSB/DATA mode (also from the front panel):
+                    // passband to the waterfall's upper edge once.
+                    static const QStringList dataModes = {QStringLiteral("USB"), QStringLiteral("LSB"),
+                                                          QStringLiteral("PKTUSB"), QStringLiteral("PKTLSB")};
+                    if (!previousMode.isEmpty() && previousMode != m_lastRigModeName &&
+                        dataModes.contains(m_lastRigModeName))
+                        applyRigPassbandForWaterfall();
                     updateRigControlStatusUi();
                     appendLog(m_lastRigModeName.isEmpty()
                                   ? QStringLiteral("CAT mode: unavailable")
@@ -10433,7 +10441,11 @@ void MainWindow::setupProcessingConnections()
         connect(m_rigController, &HamlibController::statusChanged,
                 this, [this](const QString &status) {
                     m_rigStatusMirror = status;
+                    const bool wasConnected = m_rigCatConnected;
                     m_rigCatConnected = status.contains(QStringLiteral("connected"), Qt::CaseInsensitive);
+                    // Once per connection: rig receive passband to the
+                    // waterfall's upper edge (SSB/DATA modes only).
+                    if (m_rigCatConnected && !wasConnected) applyRigPassbandForWaterfall();
                     handleRigStatusChanged(status);
                     appendLog(QStringLiteral("CAT: ") + status);
                 },
@@ -12791,6 +12803,9 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
     }
     if (ui != nullptr && ui->cmbMode != nullptr) applyWaterfallRangeForMode(ui->cmbMode->currentText());
     updateWsprTxAvailability();   // callsign, locator or Auto mode may have changed
+    if (m_rigCatConnected && previousSettings != nullptr &&
+        previousSettings->waterfallMaxHz != m_settings.waterfallMaxHz)
+        applyRigPassbandForWaterfall();   // on connect it is applied by the CAT status handler
     if (m_cmbWaterfallPalette != nullptr) {
         const int paletteIndex = m_cmbWaterfallPalette->findData(m_settings.waterfallPalette);
         m_cmbWaterfallPalette->setCurrentIndex(paletteIndex >= 0 ? paletteIndex : 0);
@@ -14328,6 +14343,16 @@ void MainWindow::finishPendingModeChange()
 // configured upper edge.  The zoom may lengthen the FFT up to a per-mode
 // limit: CW keeps short windows (keying would smear), text modes 16384,
 // the FT/WSPR family 65536.
+void MainWindow::applyRigPassbandForWaterfall()
+{
+    if (m_rigController == nullptr || !m_settings.hamlibCatEnabled) return;
+    const int widthHz = qBound(3000, m_settings.waterfallMaxHz, 5000);
+    appendLog(QStringLiteral("CAT: requesting receive passband %1 Hz for SSB/DATA (waterfall upper edge); the rig's answer follows as \"CAT RX filter\".").arg(widthHz));
+    QMetaObject::invokeMethod(m_rigController, [controller = m_rigController, widthHz]() {
+        controller->setDataPassbandHz(widthHz);
+    }, Qt::QueuedConnection);
+}
+
 void MainWindow::updateWaterfallSpeedControl()
 {
     if (m_spinWaterfallSpeed == nullptr || ui == nullptr || ui->cmbMode == nullptr) return;
