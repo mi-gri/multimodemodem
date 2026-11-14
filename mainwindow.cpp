@@ -10428,6 +10428,8 @@ void MainWindow::setupProcessingConnections()
                 Qt::QueuedConnection);
         connect(m_rigController, &HamlibController::receiverFilterChanged,
                 m_dspEngine, &DspEngine::configureReceiverFilter, Qt::QueuedConnection);
+        connect(m_rigController, &HamlibController::infoMessage,
+                this, [this](const QString &message) { appendLog(message); }, Qt::QueuedConnection);
         connect(m_rigController, &HamlibController::receiverFilterChanged,
                 this, [this](const QString &mode, int width, int source) {
                     const bool changed = width != m_lastRigFilterWidthHz || source != m_lastRigFilterSource;

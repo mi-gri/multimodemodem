@@ -79,6 +79,34 @@ inline int parseAnswer(const QByteArray &answer)
     return ok && v >= 0 && v <= 23 ? v : -1;
 }
 
+/**
+ * DATA SHIFT (menu RADIO SETTING / MODE DATA / 18, CAT "EX010418"): the DATA
+ * filter is centred on this audio frequency, so a passband from 0 Hz to the
+ * waterfall edge needs shift = width / 2 (10 Hz steps, 0..3000 Hz).
+ */
+inline int dataShiftForWidth(int widthHz)
+{
+    const int shift = ((widthHz / 2 + 5) / 10) * 10;
+    return shift < 0 ? 0 : (shift > 3000 ? 3000 : shift);
+}
+
+inline QByteArray dataShiftSetCommand(int shiftHz)
+{
+    return QByteArray("EX010418") + QByteArray::number(shiftHz).rightJustified(4, '0') + ';';
+}
+
+inline QByteArray dataShiftReadCommand() { return QByteArrayLiteral("EX010418;"); }
+
+/** Parses "EX010418nnnn;" -> nnnn Hz, or -1. */
+inline int parseDataShiftAnswer(const QByteArray &answer)
+{
+    const QByteArray a = answer.trimmed();
+    if (a.size() != 13 || !a.startsWith("EX010418") || a.at(12) != ';') return -1;
+    bool ok = false;
+    const int v = a.mid(8, 4).toInt(&ok);
+    return ok && v >= 0 && v <= 3000 ? v : -1;
+}
+
 } // namespace Ftx1Width
 
 #endif // FTX1WIDTH_H

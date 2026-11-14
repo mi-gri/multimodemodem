@@ -98,6 +98,8 @@ public slots:
 signals:
     void statusChanged(const QString &status);
     void errorOccurred(const QString &message);
+    // Informational CAT note for the runtime log (not a status change).
+    void infoMessage(const QString &message);
     void frequencyChanged(double frequencyHz);
     void modeChanged(const QString &modeName);
     // source: 0 unavailable, 1 backend-reported (may be nominal), 2 direct CAT.

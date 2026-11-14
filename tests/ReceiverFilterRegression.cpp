@@ -27,6 +27,13 @@ int main()
     check(Ftx1Width::indexForHz("FM", 4000) == 0 && Ftx1Width::parseAnswer("SH024;") == -1 &&
           Ftx1Width::parseAnswer("?;") == -1 && Ftx1Width::hzForIndex("PKTUSB", 0) == 0,
           "FTX-1 rejects FM, malformed answers and default index");
+    check(Ftx1Width::dataShiftForWidth(4000) == 2000 && Ftx1Width::dataShiftForWidth(3200) == 1600 &&
+          Ftx1Width::dataShiftForWidth(3000) == 1500 && Ftx1Width::dataShiftForWidth(8000) == 3000,
+          "FTX-1 DATA SHIFT is half the width (0 Hz to upper edge)");
+    check(Ftx1Width::dataShiftSetCommand(2000) == "EX0104182000;" &&
+          Ftx1Width::parseDataShiftAnswer("EX0104181500;") == 1500 &&
+          Ftx1Width::parseDataShiftAnswer("EX010418;") == -1 && Ftx1Width::parseDataShiftAnswer("?;") == -1,
+          "FTX-1 DATA SHIFT command and answer");
     Ts890FilterQuery query;
     bool complete = false;
     check(query.command("RTTY") == "SL0;" && query.accept("RTTY", "SL000;", complete) && complete && query.widthHz() == 250,

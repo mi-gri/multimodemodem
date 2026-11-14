@@ -174,6 +174,17 @@ int readFtx1WidthIndex(RIG *rig)
     if (size <= 0 || size >= static_cast<int>(sizeof(reply))) return -1;
     return Ftx1Width::parseAnswer(QByteArray(reinterpret_cast<const char *>(reply), size));
 }
+
+int readFtx1DataShiftHz(RIG *rig)
+{
+    const QByteArray cmd = Ftx1Width::dataShiftReadCommand();
+    unsigned char reply[32] = {};
+    unsigned char terminator[] = {';', 0};
+    const int size = rig_send_raw(rig, reinterpret_cast<const unsigned char *>(cmd.constData()), cmd.size(),
+                                  reply, static_cast<int>(sizeof(reply)), terminator);
+    if (size <= 0 || size >= static_cast<int>(sizeof(reply))) return -1;
+    return Ftx1Width::parseDataShiftAnswer(QByteArray(reinterpret_cast<const char *>(reply), size));
+}
 } // namespace
 #endif
 
@@ -903,8 +914,29 @@ bool HamlibController::setDataPassbandHz(int widthHz)
         m_ftx1WidthHz = Ftx1Width::hzForIndex(modeName, readIndex);
         SessionDiagnostics::instance().record("cat.ftx1.readWidth",
             {{"index", readIndex}, {"width_hz", m_ftx1WidthHz}});
+        bool shiftOk = true;
+        if (Ftx1Width::isDataMode(modeName) && m_ftx1WidthHz > 0) {
+            // The DATA filter is centred on DATA SHIFT; move it so the
+            // passband runs from 0 Hz to the waterfall's upper edge.
+            const int shiftHz = Ftx1Width::dataShiftForWidth(m_ftx1WidthHz);
+            const QByteArray shiftCmd = Ftx1Width::dataShiftSetCommand(shiftHz);
+            const int shiftSent = rig_send_raw(rig, reinterpret_cast<const unsigned char *>(shiftCmd.constData()),
+                                               shiftCmd.size(), nullptr, 0, nullptr);
+            const int readShift = shiftSent < 0 ? -1 : readFtx1DataShiftHz(rig);
+            shiftOk = readShift == shiftHz;
+            SessionDiagnostics::instance().record("cat.ftx1.setDataShift",
+                {{"command", QString::fromLatin1(shiftCmd)}, {"shift_hz", shiftHz},
+                 {"read_hz", readShift}, {"result", shiftSent}});
+            if (readShift >= 0)
+                emit infoMessage(QStringLiteral("CAT: FTX-1 DATA SHIFT %1 Hz: passband %2-%3 Hz")
+                                       .arg(readShift).arg(qMax(0, readShift - m_ftx1WidthHz / 2))
+                                       .arg(readShift + m_ftx1WidthHz / 2));
+            else
+                emitError(QStringLiteral("FTX-1 DATA SHIFT could not be read back after %1")
+                              .arg(QString::fromLatin1(shiftCmd)));
+        }
         emit receiverFilterChanged(modeName, m_ftx1WidthHz, m_ftx1WidthHz > 0 ? 2 : 0);
-        return readIndex == index;
+        return readIndex == index && shiftOk;
     }
     const int ret = rig_set_mode(rig, RIG_VFO_CURR, mode, static_cast<pbwidth_t>(widthHz));
     if (ret != RIG_OK) {
