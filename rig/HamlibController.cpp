@@ -965,9 +965,15 @@ bool HamlibController::setFrequencyHz(double frequencyHz)
         return false;
     }
     if (m_ftSplitTxActive) {
-        emitError(QStringLiteral("CAT frequency change blocked while an FT split TX transaction is active."));
+        // Not lost: the frequency is set as soon as the split TX state is
+        // restored (endFtSplitTx), e.g. after a mode change during TX.
+        m_pendingQsyHz = frequencyHz;
+        SessionDiagnostics::instance().record("cat.setFrequencyHz.deferred", {{"frequency_hz", frequencyHz}});
+        emit infoMessage(QStringLiteral("CAT: QSY to %1 MHz deferred until the FT split TX state is restored.")
+                             .arg(frequencyHz / 1e6, 0, 'f', 6));
         return false;
     }
+    m_pendingQsyHz = 0.0;
 
     if (isHamRadioDeluxeModel(m_config.rigModel)) {
         if (m_hrdSocket == nullptr || m_hrdSocket->state() != QTcpSocket::ConnectedState) {
@@ -1268,6 +1274,7 @@ bool HamlibController::endFtSplitTx()
         if (m_config.catEnabled) pollHrd();
         m_ftSplitRxFrequencyHz = 0.0;
         setStatus(QStringLiteral("CAT connected"));
+        applyPendingQsy();
         return true;
     }
 
@@ -1351,8 +1358,18 @@ bool HamlibController::endFtSplitTx()
     m_lastFrequencyHz = 0.0;
     if (m_config.catEnabled) pollNow();
     setStatus(QStringLiteral("CAT connected"));
+    applyPendingQsy();
     return true;
 #endif
+}
+
+void HamlibController::applyPendingQsy()
+{
+    const double hz = m_pendingQsyHz;
+    m_pendingQsyHz = 0.0;
+    if (hz <= 0.0) return;
+    emit infoMessage(QStringLiteral("CAT: applying deferred QSY to %1 MHz.").arg(hz / 1e6, 0, 'f', 6));
+    setFrequencyHz(hz);
 }
 
 bool HamlibController::setPtt(bool enabled)

@@ -93,7 +93,10 @@ checks = {
     ),
     "Fake It transient CAT frequency is hidden from ordinary CAT polling": (
         "if (m_ftSplitTxActive)" in controller
-        and "CAT frequency change blocked while an FT split TX transaction is active" in controller
+        and ("CAT frequency change blocked while an FT split TX transaction is active" in controller
+             # The QSY is held back (not applied) until endFtSplitTx restored RX.
+             or ("deferred until the FT split TX state is restored" in controller
+                 and "applyPendingQsy();" in controller))
     ),
     "Rig split follows Hamlib/WSJT-X logical VFO abstraction with no non-split fallback": (
         "rig_get_split_vfo" in controller

@@ -152,6 +152,10 @@ private:
     QElapsedTimer m_filterRetryClock;
     QElapsedTimer m_ftx1WidthClock;   // last direct "SH0;" read (FTX-1)
     int m_ftx1WidthHz = 0;
+    // QSY requested while an FT split TX transaction was active (for example a
+    // mode change during TX); applied right after the RX state is restored.
+    double m_pendingQsyHz = 0.0;
+    void applyPendingQsy();
     bool m_lastPtt = false;
     QString m_lastStatus;
     bool m_externalTransmit = false;
