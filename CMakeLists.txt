@@ -1372,13 +1372,13 @@ if(BUILD_TESTING)
     add_executable(m3_receiver_filter_regression
         tests/ReceiverFilterRegression.cpp dsp/WaterfallLeveler.cpp dsp/DspEngine.cpp)
     target_include_directories(m3_receiver_filter_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(m3_receiver_filter_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core)
+    target_link_libraries(m3_receiver_filter_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core "${M3_FFTW3_LIBRARY}")
     add_test(NAME m3_receiver_filter_regression COMMAND m3_receiver_filter_regression)
     add_executable(m3_waterfall_cq_regression
         tests/WaterfallCqRegression.cpp dsp/WaterfallLeveler.cpp dsp/DspEngine.cpp widgets/CqSpots.h
         modems/ft8/FtDecodeFilter.h modems/ft8/FtDecodeColours.h)
     target_include_directories(m3_waterfall_cq_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(m3_waterfall_cq_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Gui)
+    target_link_libraries(m3_waterfall_cq_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Gui "${M3_FFTW3_LIBRARY}")
     add_test(NAME m3_waterfall_cq_regression COMMAND m3_waterfall_cq_regression)
 
     if(UNIX)

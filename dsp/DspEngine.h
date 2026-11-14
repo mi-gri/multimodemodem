@@ -32,6 +32,7 @@ public:
      * @brief Creates the DSP engine.
      */
     explicit DspEngine(QObject *parent = nullptr);
+    ~DspEngine() override;
 
 public slots:
     /**
@@ -131,14 +132,17 @@ private:
     void ensureWindowTable();
 
     /**
-     * @brief Runs an in-place radix-2 FFT.
+     * @brief Real FFT of m_fftInput (FFTW plan cached per length): fills
+     *        m_magnitudeScratch with |X[k]| / N for k = 0 .. N/2 - 1.
      */
-    void fft(QVector<double> &real, QVector<double> &imag);
+    void computeMagnitudes();
+    struct FftPlan;
+    FftPlan *m_fftPlan = nullptr;
 
 private:
     AudioContinuity m_continuity;
     QVector<float> m_windowScratch;
-    QVector<double> m_realScratch, m_imagScratch, m_magnitudeScratch;
+    QVector<double> m_magnitudeScratch;
     QVector<float> m_fifo;
     QVector<double> m_windowTable;
 
