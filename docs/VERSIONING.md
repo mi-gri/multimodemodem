@@ -6,7 +6,9 @@ resources, the UI default title and six Qt Help projects carry the public versio
 
 CMake generates `M3BuildInfo.h` from the distribution workflow number and
 commit. The main window displays `MultiModeModem 0.6.7 — build N`, including after a
-language change. Local builds use build 0. `--version` remains numeric for installer
+language change. Local builds show `dev N (commit)`: N counts builds after a source
+change (`cmake/M3BuildCounter.cmake`, counter in the build folder) and starts again at
+1 when `M3_VERSION.txt` names a new version. `--version` remains numeric for installer
 checks; `--build-info` additionally reports build and commit.
 
 The source revision identifies the source package, independently of the public
