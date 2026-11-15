@@ -14125,13 +14125,23 @@ void MainWindow::selectComboByBackendName(QComboBox *combo, const QString &backe
     }
 }
 
+void MainWindow::updateWeakSignalLiveInputs()
+{
+    // The JS8/Q65/WSPR decoders take audio only while RX runs in their mode.
+    // Called on RX start/stop and on every mode change: a switch with RX
+    // running (QSY plan, operator) left the new decoder deaf (2026-11-15).
+    const bool running = m_rxRunning && !m_offlineAnalysisActive && ui != nullptr && ui->cmbMode != nullptr;
+    const QString mode = running ? ui->cmbMode->currentText() : QString();
+    if (m_q65Decoder) m_q65Decoder->setLiveInputEnabled(running && Q65Mode::isFamilyMode(mode));
+    if (m_wsprDecoder) m_wsprDecoder->setLiveInputEnabled(running && WsprMode::isMode(mode));
+    if (m_js8Decoder) m_js8Decoder->setLiveInputEnabled(running && Js8Mode::isMode(mode));
+}
+
 void MainWindow::setReceiverRunning(bool running)
 {
     m_rxRunning = running;
     scheduleLiveRxConfig();
-    if (m_q65Decoder) m_q65Decoder->setLiveInputEnabled(running && !m_offlineAnalysisActive && Q65Mode::isFamilyMode(ui->cmbMode->currentText()));
-    if (m_wsprDecoder) m_wsprDecoder->setLiveInputEnabled(running && !m_offlineAnalysisActive && WsprMode::isMode(ui->cmbMode->currentText()));
-    if (m_js8Decoder) m_js8Decoder->setLiveInputEnabled(running && !m_offlineAnalysisActive && Js8Mode::isMode(ui->cmbMode->currentText()));
+    updateWeakSignalLiveInputs();
 
     if (!m_rxRunning && !m_txRunning && m_rttyScopeWidget != nullptr) {
         m_rttyScopeWidget->setTrace(QVector<QPointF>(), 0.0, false);
@@ -14780,6 +14790,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
     }
 
     qsyForModeChange(modeName);
+    updateWeakSignalLiveInputs();
     syncRigSideband();
     updateSideTabsForMode(modeName);
     if (ui->sideTabWidget != nullptr && ui->sideTabWidget->tabBar()->count() > 0) {

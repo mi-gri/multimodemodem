@@ -1694,6 +1694,7 @@ private:
      * @brief Applies receiver running/stopped UI state.
      */
     void setReceiverRunning(bool running);
+    void updateWeakSignalLiveInputs();
 
     /**
      * @brief Updates the compact Ready/RX/TX main-state button.

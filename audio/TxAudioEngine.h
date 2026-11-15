@@ -155,6 +155,7 @@ private:
     quint64 m_outputGeneration = 0;
     bool m_running = false;
     bool m_finishedEmitted = false;
+    int m_underruns = 0;   // transient sink underruns during this transmission
     bool m_playbackStarted = false;
     int m_lastTextPosition = -1;
     QTimer m_outputMonitor;

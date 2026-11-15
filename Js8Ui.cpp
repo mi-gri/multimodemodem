@@ -557,6 +557,15 @@ void MainWindow::setupJs8Page()
                 appendLog(s);
         }, Qt::QueuedConnection);
         connect(m_js8Decoder, &Js8Decoder::periodDecoded, this, [this](int count, int submode) {
+            // One line per decoded slot in the runtime log (as FT and WSPR),
+            // so a quiet band and a decoder that never ran can be told apart.
+            const auto sub = static_cast<Js8Mode::Submode>(submode);
+            const int periodS = Js8Mode::parameters(sub).periodSeconds;
+            const qint64 nowS = QDateTime::currentSecsSinceEpoch();
+            const QDateTime slot = QDateTime::fromSecsSinceEpoch((nowS - periodS) / periodS * periodS, Qt::UTC);
+            appendLog(QStringLiteral("JS8 %1 %2 UTC: %3 frame(s)").arg(Js8Mode::submodeName(sub), slot.toString(QStringLiteral("HH:mm:ss"))).arg(count));
+            SessionDiagnostics::instance().record("rx.status", {{"mode", "JS8"}, {"message", QStringLiteral("period decoded")},
+                                                                {"submode", Js8Mode::submodeName(sub)}, {"frames", count}});
             if (m_lblJs8Status != nullptr && submode == int(currentJs8Submode()))
                 m_lblJs8Status->setText(M3I18n::text(QStringLiteral("JS8 %1: %2 frame(s) in the last period"))
                                             .arg(Js8Mode::submodeName(currentJs8Submode()))
@@ -650,6 +659,8 @@ void MainWindow::handleJs8Decode(const Js8Decode &decode)
 {
     SessionDiagnostics::instance().record("rx.message.delivery", {{"mode", "JS8"}, {"message", decode.text},
                                                                   {"snr", decode.snrDb}, {"frequency", decode.frequencyHz}});
+    appendLog(QStringLiteral("JS8 decode: %1 dB DT %2 Freq %3 Hz: %4")
+                  .arg(decode.snrDb).arg(decode.dtSeconds, 0, 'f', 1).arg(qRound(decode.frequencyHz)).arg(decode.text.trimmed()));
     const bool multi = m_chkJs8MultiDecode != nullptr && m_chkJs8MultiDecode->isChecked();
     if (!multi && decode.submode != currentJs8Submode()) return;
     const double tolerance = Js8Mode::parameters(decode.submode).bandwidthHz() / 2.0;

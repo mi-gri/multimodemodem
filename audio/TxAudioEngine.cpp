@@ -76,7 +76,7 @@ bool TxAudioEngine::startOutput(const QString &deviceName, std::unique_ptr<TxMod
     m_sampleRate = modulator->sampleRate();
     m_modulator = std::move(modulator);
     m_totalSamples = 0;
-    m_finishedEmitted = false;
+    m_finishedEmitted = false; m_underruns = 0;
     m_playbackStarted = false;
     m_lastTextPosition = -1;
 
@@ -322,6 +322,19 @@ void TxAudioEngine::checkOutputState()
     }
     const auto failure=m_playbackWatchdog.observe(m_outputProgressClock.elapsed(),produced,processed,source && source->atEnd());
     const bool stalled=failure!=TxPlaybackWatchdog::Failure::None;
+    // An underrun (the sink ran dry for a moment, e.g. all cores busy with a
+    // decode) is not the end of the transmission: the pull-mode sink resumes
+    // with the next buffer.  Only a sink or source that stops advancing (the
+    // watchdog, >= 1.5 s) or a real backend error ends it.  Aborting on every
+    // underrun lost a final 73 after 1.1 s at 97 % CPU (2026-11-15).
+    if (error == AudioNs::UnderrunError && state != AudioNs::StoppedState && !stalled &&
+        !(source && source->atEnd())) {
+        if (m_underruns++ == 0)
+            emit logMessage(QStringLiteral("TX audio underrun after %1 ms (sound card ran dry for a moment, CPU load); transmission continues.")
+                                .arg(processed / 1000));
+        SessionDiagnostics::instance().record("tx.output.underrun", {{"processed_us", double(processed)}, {"pulled", double(produced)}, {"count", m_underruns}});
+        return;
+    }
     if (state == AudioNs::StoppedState || error != AudioNs::NoError || stalled) {
         m_finishedEmitted = true;
         const int errorCode = static_cast<int>(error);

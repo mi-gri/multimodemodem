@@ -4,6 +4,14 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- JS8 and Q65 decoded nothing after a mode switch with RX running (QSY plan or operator): their
+  audio input was only switched on at RX start. It now follows every mode change (also WSPR).
+- JS8 in the runtime log: one line per decoded slot ("JS8 Normal 17:36:00 UTC: 2 frame(s)")
+  and one per decode, as for FT8.
+- TX audio: a short sink underrun (all cores busy with a decode, 85 ms buffer) no longer aborts
+  the transmission; it is logged and playback continues. Only a sink or source that stops
+  advancing (watchdog, 1.5 s) or a real backend error ends it. In the test run this had cut a
+  final 73 after 1.1 s at 97 % CPU.
 - SSTV on the lower sideband: below 10 MHz (or where the frequency list marks the entry "LSB",
   e.g. 3.735 and 7.165 MHz) m³ switches an SSB/DATA rig mode to PKTLSB and back to PKTUSB
   elsewhere and in the other modes; the Data/USB TX route then keys PKTLSB. CW, FM and AM
