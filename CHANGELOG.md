@@ -4,6 +4,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- WSPR beacon: unticking "Transmit as beacon" works like WSJT-X "Enable Tx": a transmission
+  already on air ends normally and nothing new starts; the TX button still stops at once.
+- Waterfall click and tone settings: RTTY and Feld Hell reach up to 4900 Hz (the waterfall
+  goes up to 5000 Hz); clicks above 3500 Hz were ignored. PSK31 stays below 3500 Hz (8 kHz
+  internal rate). Selecting RTTY tones above 3000 Hz logs that the rig's TX filter would cut them.
 - Country data: operating suffixes (/R rover, /P, /M, /QRP, /digit) are never taken as a
   prefix. "/R" was read as Russia: a US rover (W1ABC/R) counted as Russia and the AP noise
   decode "DO3BOX 0W2QAL/R FC14" passed the call check; such decodes are now dropped.

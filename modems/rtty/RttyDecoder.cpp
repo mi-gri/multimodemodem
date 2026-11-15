@@ -188,8 +188,8 @@ void RttyDecoder::setTones(double markHz, double spaceHz)
 
 void RttyDecoder::retuneTones(double markHz, double spaceHz)
 {
-    m_markHz = qBound(100.0, markHz, 3500.0);
-    m_spaceHz = qBound(100.0, spaceHz, 3500.0);
+    m_markHz = qBound(100.0, markHz, 4900.0);    // full-rate filters: up to the waterfall top
+    m_spaceHz = qBound(100.0, spaceHz, 4900.0);
     if (qAbs(m_spaceHz - m_markHz) < 20.0) {
         m_spaceHz = m_markHz + 170.0;
     }

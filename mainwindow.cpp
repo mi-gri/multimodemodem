@@ -6536,7 +6536,7 @@ void MainWindow::setupRttyPage()
     m_spinRttyShiftHz->setSingleStep(5);
     m_spinRttyShiftHz->setSuffix(" Hz");
 
-    m_spinRttyMarkHz->setRange(300, 3500);
+    m_spinRttyMarkHz->setRange(300, 4900);
     m_spinRttyMarkHz->setSingleStep(5);
     m_spinRttyMarkHz->setSuffix(" Hz");
 
@@ -6910,7 +6910,7 @@ void MainWindow::loadRttySettingsToUi()
 
     m_spinRttyBaud->setValue(qBound(10.0, customPreset ? m_settings.rttyBaudRate : preset.baud, 300.0));
     m_spinRttyShiftHz->setValue(qBound(50, customPreset ? m_settings.rttyShiftHz : preset.shiftHz, 1200));
-    m_spinRttyMarkHz->setValue(qBound(300, preset.markHz, 3500));
+    m_spinRttyMarkHz->setValue(qBound(300, preset.markHz, 4900));
     m_chkRttyReverse->setChecked(m_settings.rttyReverse);
     m_chkRttyNarrowFilter->setChecked(m_settings.rttyNarrowFilterEnabled);
     m_chkRttyAfc->setChecked(m_settings.rttyAfcEnabled);
@@ -7382,7 +7382,7 @@ void MainWindow::setupHellPage()
     m_cmbHellVariant->addItem("FSK-105", "FSK105");
 
     m_spinHellToneHz = new QSpinBox(settingsGroup);
-    m_spinHellToneHz->setRange(250, 3500);
+    m_spinHellToneHz->setRange(250, 4900);
     m_spinHellToneHz->setSingleStep(10);
     m_spinHellToneHz->setSuffix(" Hz");
 
@@ -7462,7 +7462,7 @@ void MainWindow::loadHellSettingsToUi()
 
     const int variantIndex = m_cmbHellVariant->findData(m_settings.hellVariant);
     m_cmbHellVariant->setCurrentIndex(variantIndex >= 0 ? variantIndex : 0);
-    m_spinHellToneHz->setValue(qBound(250, m_settings.hellToneHz, 3500));
+    m_spinHellToneHz->setValue(qBound(250, m_settings.hellToneHz, 4900));
     m_spinHellColumnRate->setValue(qBound(2.0, m_settings.hellColumnRate, 80.0));
     m_spinHellBandwidthHz->setValue(qBound(40, m_settings.hellBandwidthHz, 800));
     m_chkHellAfc->setChecked(m_settings.hellAfcEnabled);
@@ -15031,7 +15031,9 @@ void MainWindow::handleWaterfallFrequencyClicked(double frequencyHz, Qt::MouseBu
         return;
     }
 
-    const int roundedHz = qBound(100, static_cast<int>(qRound(frequencyHz)), 3500);
+    // The waterfall reaches up to 5000 Hz (DATA passband); each mode's own
+    // spin box range limits further (PSK31 stays below 3500 Hz).
+    const int roundedHz = qBound(100, static_cast<int>(qRound(frequencyHz)), 4900);
     const QString mode = ui->cmbMode->currentText();
 
     if (Msk144Mode::isMode(mode) && m_spinMsk144RxFreq != nullptr) {
@@ -15080,8 +15082,8 @@ void MainWindow::handleWaterfallFrequencyClicked(double frequencyHz, Qt::MouseBu
         int newMark = clickedSpace ? (roundedHz - shiftHz) : roundedHz;
         newMark = qBound(m_spinRttyMarkHz->minimum(), newMark, m_spinRttyMarkHz->maximum());
 
-        if (newMark + shiftHz > 3500) {
-            newMark = 3500 - shiftHz;
+        if (newMark + shiftHz > 4900) {
+            newMark = 4900 - shiftHz;
         }
 
         const int customIndex = m_cmbRttyPreset->findData(QStringLiteral("CUSTOM"));
@@ -15098,6 +15100,8 @@ void MainWindow::handleWaterfallFrequencyClicked(double frequencyHz, Qt::MouseBu
         appendLog(QString("RTTY tones from waterfall: Mark %1 Hz, Space %2 Hz.")
                       .arg(newMark)
                       .arg(newMark + shiftHz));
+        if (newMark + shiftHz > 3000)
+            appendLog(uiText("rtty_tones_above_tx_passband", "Note: tones above about 3000 Hz are received, but the rig's TX filter would cut them on transmit."));
         return;
     }
 

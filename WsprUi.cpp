@@ -107,7 +107,7 @@ void MainWindow::setupWsprPage()
     txGrid->setContentsMargins(8, 8, 8, 8);
     int row = 0;
     m_chkWsprTx = new QCheckBox(uiText("wspr_tx_beacon", "Transmit as beacon"), txGroup);
-    m_chkWsprTx->setToolTip(uiText("wspr_tx_beacon_tip", "Transmits your WSPR message in randomly chosen 2-minute periods (TX share). Automatic operation: only with Auto mode enabled in Settings; do not leave the station unattended. The TX button stops the beacon."));
+    m_chkWsprTx->setToolTip(uiText("wspr_tx_beacon_tip2", "Transmits your WSPR message in randomly chosen 2-minute slots (TX share). Automatic operation: only with Auto mode enabled in Settings; do not leave the station unattended. Unticking lets a transmission already on air finish (as in WSJT-X); the TX button stops it at once."));
     txGrid->addWidget(m_chkWsprTx, row++, 0, 1, 2);
     m_spinWsprTxPercent = new QSpinBox(txGroup);
     m_spinWsprTxPercent->setRange(0, 100);
@@ -160,7 +160,7 @@ void MainWindow::setupWsprPage()
     connect(m_cmbWsprPower, QOverload<int>::of(&QComboBox::currentIndexChanged), this, persist);
     connect(m_chkWsprTx, &QCheckBox::toggled, this, [this](bool on) {
         if (!on) {
-            wsprStopBeacon(QStringLiteral("beacon switched off"));
+            wsprStopBeacon(QStringLiteral("beacon switched off"), true);
             return;
         }
         QString error;
@@ -343,7 +343,7 @@ void MainWindow::updateWsprTxAvailability()
     }
 }
 
-void MainWindow::wsprStopBeacon(const QString &reason)
+void MainWindow::wsprStopBeacon(const QString &reason, bool finishRunningTx)
 {
     // Unchecking the box arrives here with the box already off.
     const bool wasOn = (m_chkWsprTx != nullptr && m_chkWsprTx->isChecked()) ||
@@ -355,11 +355,15 @@ void MainWindow::wsprStopBeacon(const QString &reason)
     }
     if (m_nativeWeakSignalTxPending && WsprMode::isMode(m_nativeWeakSignalTxMode))
         cancelNativeWeakSignalPeriodTx(reason);
-    const bool transmitting = m_txPreparationPending || m_txRunning ||
-                              (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning());
-    if (transmitting && ui != nullptr && ui->cmbMode != nullptr && WsprMode::isMode(ui->cmbMode->currentText()))
+    const bool onAir = m_txRunning || (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning());
+    const bool transmitting = m_txPreparationPending || onAir;
+    const bool letFinish = finishRunningTx && onAir;   // like WSJT-X "Enable Tx" off
+    if (transmitting && !letFinish && ui != nullptr && ui->cmbMode != nullptr && WsprMode::isMode(ui->cmbMode->currentText()))
         stopImageTx();
-    if (wasOn || transmitting) appendLog(QStringLiteral("WSPR beacon off (%1).").arg(reason));
+    if (letFinish)
+        appendLog(uiText("wspr_beacon_off_finishing", "WSPR beacon off; the current transmission ends normally (the TX button stops it at once)."));
+    else if (wasOn || transmitting)
+        appendLog(QStringLiteral("WSPR beacon off (%1).").arg(reason));
     updateWsprTxAvailability();
     updateTxControlState();
 }

@@ -1037,3 +1037,29 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'FT-landfilter: %1 er ikke et DXCC-prefiks og skjuler ingenting (f.eks. UA9 for asiatisk Russland).',
   'Filtr zemí FT: %1 není prefix DXCC a nic neskrývá (např. UA9 pro asijské Rusko).'),
 }.items()})
+# WSPR beacon off like WSJT-X "Enable Tx": the running transmission finishes.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'wspr_tx_beacon_tip2':(
+  'Transmits your WSPR message in randomly chosen 2-minute slots (TX share). Automatic operation: only with Auto mode enabled in Settings; do not leave the station unattended. Unticking lets a transmission already on air finish (as in WSJT-X); the TX button stops it at once.',
+  'Trasmette il tuo messaggio WSPR in slot di 2 minuti scelti a caso (quota TX). Funzionamento automatico: solo con la modalità Auto attivata nelle impostazioni; non lasciare la stazione incustodita. Togliendo la spunta, una trasmissione già in onda termina normalmente (come in WSJT-X); il pulsante TX la ferma subito.',
+  "Émet votre message WSPR dans des slots de 2 minutes choisis au hasard (part TX). Fonctionnement automatique : seulement avec le mode Auto activé dans les paramètres ; ne laissez pas la station sans surveillance. Décocher laisse finir une émission déjà en cours (comme WSJT-X) ; le bouton TX l'arrête immédiatement.",
+  'Sendet deine WSPR-Nachricht in zufällig gewählten 2-Minuten-Slots (TX-Anteil). Automatikbetrieb: nur mit aktiviertem Auto-Modus in den Einstellungen; die Station nicht unbeaufsichtigt lassen. Ausschalten lässt eine laufende Sendung regulär zu Ende gehen (wie WSJT-X); der TX-Knopf beendet sie sofort.',
+  'Sender WSPR-meldingen din i tilfeldig valgte 2-minutters slotter (TX-andel). Automatisk drift: bare med Auto-modus aktivert i innstillingene; ikke la stasjonen være uten tilsyn. Fjernes haken, fullføres en sending som allerede er i gang (som i WSJT-X); TX-knappen stopper den straks.',
+  'Vysílá vaši zprávu WSPR v náhodně zvolených 2minutových slotech (podíl TX). Automatický provoz: jen se zapnutým režimem Auto v nastavení; nenechávejte stanici bez dozoru. Zrušení zaškrtnutí nechá již probíhající vysílání dokončit (jako WSJT-X); tlačítko TX jej zastaví okamžitě.'),
+ 'wspr_beacon_off_finishing':(
+  'WSPR beacon off; the current transmission ends normally (the TX button stops it at once).',
+  'Beacon WSPR spento; la trasmissione in corso termina normalmente (il pulsante TX la ferma subito).',
+  "Balise WSPR désactivée ; l'émission en cours se termine normalement (le bouton TX l'arrête immédiatement).",
+  'WSPR-Bake aus; die laufende Sendung endet regulär (der TX-Knopf beendet sie sofort).',
+  'WSPR-bake av; sendingen som pågår avsluttes normalt (TX-knappen stopper den straks).',
+  'Maják WSPR vypnut; probíhající vysílání skončí normálně (tlačítko TX jej zastaví okamžitě).'),
+}.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'rtty_tones_above_tx_passband':(
+  "Note: tones above about 3000 Hz are received, but the rig's TX filter would cut them on transmit.",
+  'Nota: i toni sopra circa 3000 Hz vengono ricevuti, ma in trasmissione il filtro TX del rig li taglierebbe.',
+  "Remarque : les tonalités au-dessus d'environ 3000 Hz sont reçues, mais le filtre TX du rig les couperait à l'émission.",
+  'Hinweis: Töne oberhalb von etwa 3000 Hz werden empfangen, beim Senden würde sie aber das TX-Filter des Funkgeräts beschneiden.',
+  'Merk: toner over omtrent 3000 Hz mottas, men riggens TX-filter ville kutte dem ved sending.',
+  'Poznámka: tóny nad asi 3000 Hz se přijímají, ale při vysílání by je TX filtr rigu ořízl.'),
+}.items()})

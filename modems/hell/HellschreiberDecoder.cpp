@@ -188,7 +188,7 @@ void HellschreiberDecoder::setVariant(Variant variant)
 
 void HellschreiberDecoder::setToneHz(double toneHz)
 {
-    m_toneHz = qBound(250.0, toneHz, 3500.0);
+    m_toneHz = qBound(250.0, toneHz, 4900.0);
     if (m_sampleRate > 0) {
         configureForSampleRate(m_sampleRate);
     }

@@ -712,7 +712,10 @@ private slots:
     QStringList wsprTxMessages(QString *error = nullptr) const;
     void wsprPlanNextPeriod();
     void wsprArmPeriod(qint64 periodStartMs);
-    void wsprStopBeacon(const QString &reason);
+    // finishRunningTx: the operator unticked the beacon (WSJT-X "Enable Tx"):
+    // a transmission already on air ends normally, nothing new starts.
+    // Otherwise (TX button, mode/Auto change) TX stops at once.
+    void wsprStopBeacon(const QString &reason, bool finishRunningTx = false);
     void updateWsprTxAvailability();
     void handleWsprDecoded(const QVector<WsprSpot> &spots, const QDateTime &periodUtc, int milliseconds);
     void clearWsprTable();
