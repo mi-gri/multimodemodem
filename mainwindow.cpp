@@ -10579,6 +10579,7 @@ void MainWindow::setupProcessingConnections()
                         dataModes.contains(m_lastRigModeName))
                         applyRigPassbandForWaterfall();
                     updateRigControlStatusUi();
+                    syncRigSideband();   // e.g. LSB wanted but the rig came back in USB
                     appendLog(m_lastRigModeName.isEmpty()
                                   ? QStringLiteral("CAT mode: unavailable")
                                   : QStringLiteral("CAT mode: %1").arg(m_lastRigModeName));
@@ -12664,6 +12665,41 @@ void MainWindow::invokeRigSetFrequency(double frequencyHz)
     }, Qt::QueuedConnection);
 }
 
+bool MainWindow::wantsLowerSideband() const
+{
+    if (ui == nullptr || ui->cmbMode == nullptr || ui->cmbMode->currentText() != SstvDecoder::modeName() ||
+        m_lastRigFrequencyHz <= 0.0) {
+        return false;
+    }
+    // The frequency list decides where it has an entry (3.735 / 7.165 MHz
+    // "LSB"); otherwise the voice band plan: LSB below 10 MHz.
+    for (const M3StandardFrequencies::Entry &e : M3StandardFrequencies::entriesFor(QStringLiteral("SSTV"), QString())) {
+        if (std::fabs(e.hz - m_lastRigFrequencyHz) <= 5000.0)
+            return e.description.contains(QStringLiteral("LSB"), Qt::CaseInsensitive);
+    }
+    return m_lastRigFrequencyHz < 10.0e6;
+}
+
+void MainWindow::syncRigSideband()
+{
+    if (m_rigController == nullptr || !m_settings.hamlibCatEnabled || m_txRunning || m_lastRigPttOn) return;
+    const bool lower = wantsLowerSideband();
+    const QString rigMode = m_lastRigModeName;
+    const bool rigLower = rigMode == QStringLiteral("LSB") || rigMode == QStringLiteral("PKTLSB");
+    const bool rigSsbData = rigLower || rigMode == QStringLiteral("USB") || rigMode == QStringLiteral("PKTUSB");
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    // Ask again only when the wish changed, or the rig still shows the other
+    // sideband after a few seconds (a refused request is not repeated in a loop).
+    const bool changed = m_rigSidebandRequested != (lower ? 1 : 0);
+    const bool mismatch = rigSsbData && rigLower != lower && now - m_rigSidebandRequestMs > 10000;
+    if (!changed && !mismatch) return;
+    m_rigSidebandRequested = lower ? 1 : 0;
+    m_rigSidebandRequestMs = now;
+    QMetaObject::invokeMethod(m_rigController, [controller = m_rigController, lower]() {
+        controller->setDataSideband(lower);
+    }, Qt::QueuedConnection);
+}
+
 bool MainWindow::requestAudioInputStart(const QString &deviceName, int sampleRate)
 {
     if (!m_audioEngine || !m_audioEngine->thread() || !m_audioEngine->thread()->isRunning()) return false;
@@ -13259,6 +13295,7 @@ void MainWindow::handleRigFrequencyChanged(double frequencyHz)
     if (bandFromFrequencyHz(previousFrequencyHz) != bandFromFrequencyHz(frequencyHz)) {
         restoreTxLevelForContext();
     }
+    syncRigSideband();
 
     // The CQ calls stand over audio frequencies: a new dial frequency - another
     // band, a QSY - makes them wrong (as in JTDX).
@@ -14743,6 +14780,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
     }
 
     qsyForModeChange(modeName);
+    syncRigSideband();
     updateSideTabsForMode(modeName);
     if (ui->sideTabWidget != nullptr && ui->sideTabWidget->tabBar()->count() > 0) {
         // Qt 5.15: hiding a tab (Parameter/Contest/Frequencies per mode) leaves

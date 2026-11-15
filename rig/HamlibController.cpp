@@ -880,6 +880,38 @@ void HamlibController::pollTxMeters()
 #endif
 }
 
+bool HamlibController::setDataSideband(bool lower)
+{
+    SessionDiagnostics::instance().record("cat.setDataSideband", {{"lower", lower}});
+    m_lowerSideband = lower;
+#ifndef M3_WITH_HAMLIB
+    return false;
+#else
+    if (m_rig == nullptr || m_config.readOnlyTest || m_ftSplitTxActive || m_lastPtt ||
+        isHamRadioDeluxeModel(m_config.rigModel)) return false;
+    RIG *rig = static_cast<RIG *>(m_rig);
+    rmode_t mode = RIG_MODE_NONE;
+    pbwidth_t width = 0;
+    if (rig_get_mode(rig, RIG_VFO_CURR, &mode, &width) != RIG_OK) return false;
+    rmode_t target = RIG_MODE_NONE;
+    if (lower && (mode == RIG_MODE_USB || mode == RIG_MODE_PKTUSB))
+        target = mode == RIG_MODE_USB ? RIG_MODE_LSB : RIG_MODE_PKTLSB;
+    else if (!lower && (mode == RIG_MODE_LSB || mode == RIG_MODE_PKTLSB))
+        target = mode == RIG_MODE_LSB ? RIG_MODE_USB : RIG_MODE_PKTUSB;
+    if (target == RIG_MODE_NONE) return true;   // already right, or CW/FM/AM: leave it
+    const int ret = rig_set_mode(rig, RIG_VFO_CURR, target, RIG_PASSBAND_NOCHANGE);
+    if (ret != RIG_OK) {
+        emitError(QStringLiteral("Hamlib could not switch to %1: %2")
+                      .arg(QString::fromLatin1(rig_strrmode(target)), QString::fromLocal8Bit(rigerror(ret))));
+        return false;
+    }
+    emit infoMessage(QStringLiteral("CAT: sideband %1 (%2).").arg(lower ? QStringLiteral("LSB") : QStringLiteral("USB"),
+                                                                   QString::fromLatin1(rig_strrmode(target))));
+    pollNow();
+    return true;
+#endif
+}
+
 bool HamlibController::setDataPassbandHz(int widthHz)
 {
     SessionDiagnostics::instance().record("cat.setDataPassbandHz", {{"width_hz", widthHz}});
@@ -1650,15 +1682,16 @@ bool HamlibController::forceUsbMode(bool required)
 
     // Already in USB (snapshot just taken): no mode write, no restore. Saves
     // two CAT round trips before PTT and keeps the receive filter untouched.
-    if (m_havePreTxMode && static_cast<rmode_t>(m_preTxMode) == RIG_MODE_USB) {
+    const rmode_t voiceMode = m_lowerSideband ? RIG_MODE_LSB : RIG_MODE_USB;
+    if (m_havePreTxMode && static_cast<rmode_t>(m_preTxMode) == voiceMode) {
         return true;
     }
 
     int ret = RIG_OK;
     if (splitTx) {
-        ret = rig_set_split_mode(rig, RIG_VFO_CURR, RIG_MODE_USB, kDigitalWidePassbandHz);
+        ret = rig_set_split_mode(rig, RIG_VFO_CURR, voiceMode, kDigitalWidePassbandHz);
     } else {
-        ret = rig_set_mode(rig, RIG_VFO_CURR, RIG_MODE_USB, kDigitalWidePassbandHz);
+        ret = rig_set_mode(rig, RIG_VFO_CURR, voiceMode, kDigitalWidePassbandHz);
     }
     if (ret == RIG_OK) {
         m_txModeChangedByM3 = true;
@@ -1697,6 +1730,8 @@ bool HamlibController::forceDataUsbMode(bool required)
         return false;
     }
 
+    // Lower sideband (SSTV on 80/40 m): the data LSB mode only.
+    const rmode_t lowerModes[] = { RIG_MODE_PKTLSB };
     const rmode_t modes[] = {
         RIG_MODE_PKTUSB,  // Hamlib's generic digital/packet USB mode.
 #ifdef RIG_MODE_USBD1
@@ -1713,14 +1748,18 @@ bool HamlibController::forceDataUsbMode(bool required)
     // Already in a Data/Pkt USB mode (snapshot just taken): no mode write, no
     // restore. Saves two CAT round trips before PTT and keeps the receive
     // filter width untouched (a mode write also resets the width).
+    const rmode_t *modeBegin = m_lowerSideband ? std::begin(lowerModes) : std::begin(modes);
+    const rmode_t *modeEnd = m_lowerSideband ? std::end(lowerModes) : std::end(modes);
     if (m_havePreTxMode) {
-        for (rmode_t mode : modes) {
+        for (const rmode_t *it = modeBegin; it != modeEnd; ++it) {
+            const rmode_t mode = *it;
             if (static_cast<rmode_t>(m_preTxMode) == mode) return true;
         }
     }
 
     QString lastError;
-    for (rmode_t mode : modes) {
+    for (const rmode_t *it = modeBegin; it != modeEnd; ++it) {
+        const rmode_t mode = *it;
         int ret = RIG_OK;
         if (splitTx) {
             ret = rig_set_split_mode(rig, RIG_VFO_CURR, mode, kDigitalWidePassbandHz);

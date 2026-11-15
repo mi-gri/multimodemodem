@@ -1678,6 +1678,12 @@ private:
     void appendRuntimeLogLine(const QString &line);
     void invokeRigConfigureFromSettings();
     void invokeRigSetFrequency(double frequencyHz);
+    // SSTV below 10 MHz (or a frequency-list entry marked "LSB") runs on the
+    // lower sideband; everything else on USB.  Asks the rig only on a change.
+    bool wantsLowerSideband() const;
+    void syncRigSideband();
+    int m_rigSidebandRequested = -1;     // -1 unknown, 0 USB, 1 LSB
+    qint64 m_rigSidebandRequestMs = 0;
 
     QString ftSplitOperationKey() const;
     int ftEffectiveTxAudioFrequency(int logicalFrequencyHz, int *rfShiftHz = nullptr) const;

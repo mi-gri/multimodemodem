@@ -86,6 +86,10 @@ public slots:
     // waterfall's upper edge; CW, RTTY, AM and FM keep their own filters.
     // The width the rig reports afterwards is published as receiverFilterChanged.
     bool setDataPassbandHz(int widthHz);
+    // Lower sideband for modes whose band plan says LSB (SSTV below 10 MHz):
+    // switches an SSB/DATA receive mode between PKTUSB and PKTLSB (CW, FM, AM
+    // stay untouched) and makes the Data/USB TX route use the lower sideband.
+    bool setDataSideband(bool lower);
     // Prepare/restore the temporary CAT frequency transaction used by FT4/FT8
     // Split Operation. operation is "rig" or "fake_it"; rfShiftHz is the
     // 500 Hz-quantized dial correction that keeps TX audio in 1500..2000 Hz.
@@ -185,6 +189,7 @@ private:
     void *m_rig = nullptr;
     bool m_havePreTxMode = false;
     bool m_txModeChangedByM3 = false;
+    bool m_lowerSideband = false;   // setDataSideband()
     qint64 m_preTxMode = 0;
     qint64 m_preTxPassband = 0;
     qint64 m_preTxModeVfo = 0;
