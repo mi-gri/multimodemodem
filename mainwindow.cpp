@@ -3954,6 +3954,10 @@ QString MainWindow::extractCallsignFromText(const QString &text) const
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    if (event != nullptr && m_scrollHellRaster != nullptr && watched == m_scrollHellRaster->viewport() &&
+        (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
+        m_hellPaperWidthTimer.start();
+    }
     if (event != nullptr && watched != nullptr && watched == m_lcdRigReadoutFrequency) {
         if (event->type() == QEvent::Wheel) {
             auto *wheel = static_cast<QWheelEvent *>(event);
@@ -4913,6 +4917,10 @@ void MainWindow::setupTextTerminalPages()
     m_scrollHellRaster->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     m_scrollHellRaster->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_scrollHellRaster->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_scrollHellRaster->viewport()->installEventFilter(this);
+    m_hellPaperWidthTimer.setSingleShot(true);
+    m_hellPaperWidthTimer.setInterval(120);
+    connect(&m_hellPaperWidthTimer, &QTimer::timeout, this, &MainWindow::applyHellPaperWidth);
 
     QWidget *hellQsoPanel = createQsoFormPanel(m_hellDisplayPage, "Hell", &m_hellQsoForm);
 
@@ -10363,6 +10371,8 @@ void MainWindow::setupProcessingConnections()
     connect(m_txAudioEngine, &TxAudioEngine::textPositionChanged, this, [this](int position) {
         if (m_txRunning && m_activeTextTxEditor == m_txtCwTx && m_txtCwTx != nullptr)
             updateTextTxHighlight(0.0, position);
+        else if (!m_hellTxRaster.isNull())
+            paintHellTxColumns(position);   // Hell: position = raster column played
     });
     connect(m_txAudioEngine, &TxAudioEngine::started,
             this, &MainWindow::handleTxStarted);
@@ -12849,6 +12859,7 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
     invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::setColumnRate, m_settings.hellColumnRate);
     invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::setBandwidthHz, static_cast<double>(m_settings.hellBandwidthHz));
     invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::setVerticalScale, m_settings.hellPaperScale);
+    applyHellPaperWidth();
     invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::setFskShiftHz, HellschreiberDecoder::fsk105ShiftHz());
 
     if (m_ft8RxDecoder != nullptr) {
@@ -14643,7 +14654,13 @@ void MainWindow::handleModeChanged(const QString &modeName)
 
     qsyForModeChange(modeName);
     updateSideTabsForMode(modeName);
-
+    if (ui->sideTabWidget != nullptr && ui->sideTabWidget->tabBar()->count() > 0) {
+        // Qt 5.15: hiding a tab (Parameter/Contest/Frequencies per mode) leaves
+        // its old width as a gap until the bar lays out again; setTabText()
+        // forces that layout without changing anything.
+        QTabBar *bar = ui->sideTabWidget->tabBar();
+        bar->setTabText(0, bar->tabText(0));
+    }
 
     updateWaterfallMarkers();
     updateTxPreview();
@@ -16722,6 +16739,36 @@ void MainWindow::updateHellRasterDisplay(const QImage &image)
     }
 }
 
+void MainWindow::applyHellPaperWidth()
+{
+    if (m_hellDecoder == nullptr || m_scrollHellRaster == nullptr || !m_scrollHellRaster->isVisible()) {
+        return;   // a hidden page has no meaningful width; Show triggers again
+    }
+    const int zoom = qBound(1, m_sliderHellPaperScale != nullptr ? m_sliderHellPaperScale->value() : m_settings.hellPaperScale, 12);
+    // Leave room for the vertical scroll bar so it never forces a horizontal one.
+    const int scrollBar = m_scrollHellRaster->style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    const int width = m_scrollHellRaster->viewport()->width() -
+                      (m_scrollHellRaster->verticalScrollBar()->isVisible() ? 0 : scrollBar) - 2;
+    if (width < 40 * zoom) {
+        return;
+    }
+    invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::setPaperColumns, width / zoom);
+}
+
+void MainWindow::paintHellTxColumns(int columns)
+{
+    if (m_hellTxRaster.isNull() || m_hellDecoder == nullptr) {
+        return;
+    }
+    const int width = m_hellTxRaster.width();
+    const int target = qBound(0, columns, width);
+    if (target > m_hellTxColumnsPainted) {
+        invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::appendTransmitRaster,
+                        m_hellTxRaster.copy(m_hellTxColumnsPainted, 0, target - m_hellTxColumnsPainted, m_hellTxRaster.height()));
+        m_hellTxColumnsPainted = target;
+    }
+}
+
 void MainWindow::applyHellSettings()
 {
     if (m_hellDecoder == nullptr ||
@@ -16749,6 +16796,7 @@ void MainWindow::applyHellSettings()
     invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::setColumnRate, columnRate);
     invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::setBandwidthHz, static_cast<double>(bandwidthHz));
     invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::setVerticalScale, paperScale);
+    applyHellPaperWidth();
     invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::setFskShiftHz, HellschreiberDecoder::fsk105ShiftHz());
 
     /* Tone is a waterfall marker and remains session-only per v0.50 policy. */
@@ -27586,9 +27634,11 @@ void MainWindow::handleTxStarted()
             SessionDiagnostics::instance().record("tx.text",{{"mode",mode},{"text",text}});
             appendLog(mode + " TX> " + text.left(96));
             if (m_hellDecoder) {
+                // Painted column by column as the audio is sent (handleTxProgress),
+                // so the paper shows what has actually gone out, also on abort.
                 const auto variant = m_cmbHellVariant ? HellschreiberDecoder::variantFromKey(m_cmbHellVariant->currentData().toString()) : HellschreiberDecoder::Variant::FeldHell;
-                invokeRxDecoder(m_hellDecoder, &HellschreiberDecoder::appendTransmitRaster,
-                    HellschreiberTransmitter::transmitRasterImage(text, variant));
+                m_hellTxRaster = HellschreiberTransmitter::transmitRasterImage(text, variant);
+                m_hellTxColumnsPainted = 0;
             }
         }
         if (editor && editor->toPlainText() == text) beginTextTxHighlight(editor);
@@ -27617,6 +27667,8 @@ void MainWindow::handleTxStarted()
 void MainWindow::handleTxStopped()
 {
     setTxLevelTune(false);
+    m_hellTxRaster = QImage();   // stopped: the paper keeps only what was sent
+    m_hellTxColumnsPainted = 0;
     m_pendingTextTxText.clear();
     m_pendingTextTxMode.clear();
     m_ftTxWorkerRunning = false;
@@ -27750,6 +27802,8 @@ void MainWindow::handleTxFinished()
 void MainWindow::handleTxError(const QString &message)
 {
     setTxLevelTune(false);
+    m_hellTxRaster = QImage();
+    m_hellTxColumnsPainted = 0;
     const FtTxPlan failedFtPlan = m_pendingFt8TxPlan;
     m_pendingTextTxText.clear();
     m_pendingTextTxMode.clear();
@@ -27848,6 +27902,7 @@ void MainWindow::handleTxProgress(double progress)
     if (m_currentTxIsTextMode && m_activeTextTxEditor != m_txtCwTx) {
         updateTextTxHighlight(progress);
     }
+    if (progress >= 1.0) paintHellTxColumns(std::numeric_limits<int>::max());   // finished: all sent
 
     if (!m_currentTxIsTextMode && m_faxImageWidget != nullptr) {
         m_faxImageWidget->setTransmitProgress(progress);

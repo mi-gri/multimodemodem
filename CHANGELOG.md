@@ -4,6 +4,12 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Feld Hell: the paper wraps at the window width (columns = visible width / zoom) instead
+  of 1120 columns, so no horizontal scrolling; on a resize the tape is re-wrapped without
+  losing pixels. TX text is printed column by column as the audio is actually played
+  (not all at once at TX start); after an abort only what was sent stays on the paper.
+- Side tabs: hiding a mode-specific tab (Parameter, Contest) no longer leaves a gap, e.g.
+  between "Betrieb" and "QRZ" after switching from FT8 to SSTV.
 - QSY plan (band scheduler): works in every mode (WSPR added) and switches between
   modes: each entry sets mode, band and rig frequency at its UTC time, without the extra
   QSY of the mode change. One switch "Run QSY plan" replaces the per-mode switch (an

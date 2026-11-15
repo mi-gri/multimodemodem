@@ -257,7 +257,7 @@ void HellschreiberDecoder::appendTransmitRaster(const QImage &raster)
      * advance the paper column; black pixels are drawn in red.
      */
     for (int x = 0; x < columns; ++x) {
-        if (m_column >= kPaperWidth) {
+        if (m_column >= m_paperColumns) {
             finishPaperRow();
         }
 
@@ -434,12 +434,12 @@ void HellschreiberDecoder::writePixel(double level)
         return;
     }
 
-    if (m_column >= kPaperWidth) {
+    if (m_column >= m_paperColumns) {
         finishPaperRow();
     }
 
     const int gray = grayFromLevel(level);
-    const int x = qBound(0, m_column, kPaperWidth - 1);
+    const int x = qBound(0, m_column, m_paperColumns - 1);
     /* Keep the proven Feld Hell RX orientation used by the stable 0.5.33
      * receiver.  The scan order is flipped into the visible 14-row paper cell.
      */
@@ -458,7 +458,7 @@ void HellschreiberDecoder::finishColumn()
     ++m_column;
     ++m_columnsWritten;
 
-    if (m_column >= kPaperWidth) {
+    if (m_column >= m_paperColumns) {
         finishPaperRow();
     }
 
@@ -478,7 +478,7 @@ void HellschreiberDecoder::finishPaperRow()
         const int height = logicalPaperHeight();
         QPainter logicalPainter(&m_logicalImage);
         logicalPainter.drawImage(QPoint(0, -shift), m_logicalImage);
-        logicalPainter.fillRect(0, height - shift, kPaperWidth, shift, Qt::white);
+        logicalPainter.fillRect(0, height - shift, m_paperColumns, shift, Qt::white);
         logicalPainter.end();
         drawLogicalSeparators();
         m_paperRow = kVisibleRows - 1;
@@ -493,7 +493,7 @@ int HellschreiberDecoder::paperZoom() const
 
 int HellschreiberDecoder::paperWidth() const
 {
-    return kPaperWidth * paperZoom();
+    return m_paperColumns * paperZoom();
 }
 
 int HellschreiberDecoder::paperHeight() const
@@ -521,7 +521,7 @@ int HellschreiberDecoder::logicalPaperHeight() const
 
 void HellschreiberDecoder::setPaperPixel(int column, int paperRow, int logicalRow, const QColor &color)
 {
-    const int x = qBound(0, column, kPaperWidth - 1);
+    const int x = qBound(0, column, m_paperColumns - 1);
     const int boundedPaperRow = qBound(0, paperRow, kVisibleRows - 1);
     const int boundedLogicalRow = qBound(0, logicalRow, kLogicalRasterHeight - 1);
     const int logicalY = (boundedPaperRow * (kLogicalRasterHeight + kLineGap)) + boundedLogicalRow;
@@ -553,33 +553,54 @@ void HellschreiberDecoder::setPaperPixel(int column, int paperRow, int logicalRo
 
 void HellschreiberDecoder::rebuildDisplayImageFromLogical()
 {
-    const int zoom = paperZoom();
-    m_image = QImage(paperWidth(), paperHeight(), QImage::Format_RGB32);
-    m_image.fill(Qt::white);
-
     if (m_logicalImage.isNull()) {
+        m_image = QImage(paperWidth(), paperHeight(), QImage::Format_RGB32);
+        m_image.fill(Qt::white);
         return;
     }
+    // Nearest-neighbour scaling: every logical pixel becomes a zoom x zoom
+    // block, exactly as the per-pixel loop did, but in one pass.
+    m_image = m_logicalImage.scaled(paperWidth(), paperHeight(), Qt::IgnoreAspectRatio, Qt::FastTransformation)
+                  .convertToFormat(QImage::Format_RGB32);
+}
 
-    for (int sourceY = 0; sourceY < m_logicalImage.height(); ++sourceY) {
-        const int destY = sourceY * zoom;
-        for (int x = 0; x < kPaperWidth; ++x) {
-            const QColor color = m_logicalImage.pixelColor(x, sourceY);
-            const int destX = x * zoom;
-            for (int dx = 0; dx < zoom; ++dx) {
-                const int xx = destX + dx;
-                if (xx < 0 || xx >= m_image.width()) {
-                    continue;
-                }
-                for (int dy = 0; dy < zoom; ++dy) {
-                    const int yy = destY + dy;
-                    if (yy >= 0 && yy < m_image.height()) {
-                        m_image.setPixelColor(xx, yy, color);
-                    }
-                }
-            }
+void HellschreiberDecoder::setPaperColumns(int columns)
+{
+    const int newColumns = qBound(40, columns, 4000);
+    if (newColumns == m_paperColumns) {
+        return;
+    }
+    const int oldColumns = m_paperColumns;
+    const QImage old = m_logicalImage;
+    const int rowPitch = kLogicalRasterHeight + kLineGap;
+    // The tape is one stream of columns: full rows, then the current row.
+    const qint64 total = old.isNull() ? 0 : qint64(m_paperRow) * oldColumns + qMin(m_column, oldColumns);
+
+    m_paperColumns = newColumns;
+    m_logicalImage = QImage(m_paperColumns, logicalPaperHeight(), QImage::Format_RGB32);
+    m_logicalImage.fill(Qt::white);
+    drawLogicalSeparators();
+
+    qint64 row = total / newColumns;
+    qint64 skip = 0;
+    if (row > kVisibleRows - 1) {   // keep the newest rows
+        skip = (row - (kVisibleRows - 1)) * newColumns;
+        row = kVisibleRows - 1;
+    }
+    for (qint64 i = skip; i < total; ++i) {
+        const int srcRow = int(i / oldColumns), srcX = int(i % oldColumns);
+        const qint64 j = i - skip;
+        const int dstRow = int(j / newColumns), dstX = int(j % newColumns);
+        for (int y = 0; y < kLogicalRasterHeight; ++y) {
+            const QRgb *src = reinterpret_cast<const QRgb *>(old.constScanLine(srcRow * rowPitch + y));
+            QRgb *dst = reinterpret_cast<QRgb *>(m_logicalImage.scanLine(dstRow * rowPitch + y));
+            dst[dstX] = src[srcX];
         }
     }
+    m_paperRow = int(row);
+    m_column = int(total - skip - row * newColumns);
+    rebuildDisplayImageFromLogical();
+    emit imageUpdated(m_image);
 }
 
 void HellschreiberDecoder::drawLogicalSeparators()
@@ -593,14 +614,14 @@ void HellschreiberDecoder::drawLogicalSeparators()
     for (int row = 1; row < kVisibleRows; ++row) {
         const int y = (row * (kLogicalRasterHeight + kLineGap)) - (kLineGap / 2);
         if (y >= 0 && y < m_logicalImage.height()) {
-            painter.drawLine(0, y, kPaperWidth - 1, y);
+            painter.drawLine(0, y, m_paperColumns - 1, y);
         }
     }
 }
 
 void HellschreiberDecoder::resetPaperImage()
 {
-    m_logicalImage = QImage(kPaperWidth, logicalPaperHeight(), QImage::Format_RGB32);
+    m_logicalImage = QImage(m_paperColumns, logicalPaperHeight(), QImage::Format_RGB32);
     m_logicalImage.fill(Qt::white);
     drawLogicalSeparators();
     rebuildDisplayImageFromLogical();

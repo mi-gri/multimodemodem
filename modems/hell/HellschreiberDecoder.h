@@ -122,6 +122,10 @@ public:
      * a display echo only; it does not change the generated audio waveform.
      */
     void appendTransmitRaster(const QImage &raster);
+    // Columns per paper row (clamped 40..4000). Received and sent pixels are
+    // re-wrapped to the new width; the newest rows are kept.
+    void setPaperColumns(int columns);
+    int paperColumns() const { return m_paperColumns; }
 
     /**
      * @brief Sets the FSK-105 mark/space separation in Hz.
@@ -283,7 +287,10 @@ private:
      */
     static constexpr int kLogicalRasterHeight = 14;
     static constexpr int kLineGap = 4;
-    static constexpr int kPaperWidth = 1120;
+    static constexpr int kDefaultPaperColumns = 1120;
+    // Paper columns per row: follows the visible width (setPaperColumns), so
+    // the tape wraps inside the window instead of needing a horizontal scroll.
+    int m_paperColumns = kDefaultPaperColumns;
     static constexpr int kVisibleRows = 6;
 
     int m_verticalScale = 4;

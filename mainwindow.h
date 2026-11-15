@@ -459,6 +459,10 @@ private slots:
      * @brief Displays the Feld Hell paper/preview image with the active scale.
      */
     void updateHellRasterDisplay(const QImage &image);
+    // Paper columns = visible width / zoom, so RX lines wrap in the window.
+    void applyHellPaperWidth();
+    // Puts the Hell TX raster up to this column (already played) on the paper.
+    void paintHellTxColumns(int columns);
 
     /**
      * @brief Clears the received BPSK text buffer.
@@ -1939,6 +1943,9 @@ private:
     QWidget *m_ft8DisplayPage = nullptr;
     QLabel *m_lblHellRaster = nullptr;
     QScrollArea *m_scrollHellRaster = nullptr;
+    QTimer m_hellPaperWidthTimer;      // debounces viewport resizes
+    QImage m_hellTxRaster;             // raster of the Hell TX in progress
+    int m_hellTxColumnsPainted = 0;    // columns of it already on the paper
 
     QGroupBox *m_grpTxImage = nullptr;
     QLabel *m_lblTxImageName = nullptr;

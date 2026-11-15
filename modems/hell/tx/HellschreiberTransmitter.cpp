@@ -384,3 +384,10 @@ bool HellschreiberTransmitter::pixelOn(int column, int row) const
 
     return m_raster.constScanLine(row)[column] < 128;
 }
+
+int HellschreiberTransmitter::textPositionAtSample(qint64 sample) const
+{
+    const double samplesPerColumn = m_samplesPerPixel * kRasterHeight;
+    if (sample <= 0 || samplesPerColumn <= 0.0) return 0;
+    return int(double(sample) / samplesPerColumn);
+}

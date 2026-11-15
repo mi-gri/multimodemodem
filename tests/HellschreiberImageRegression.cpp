@@ -44,9 +44,42 @@ static bool invariants() {
     std::cout << "{\"chunk_reset_rate_zoom_silence\":true}\n";
     return true;
 }
+// The paper follows the window width: re-wrapping keeps every column of the
+// tape in order (the newest rows when they no longer fit) at any zoom.
+static bool inkAt(int column) { return (unsigned(column) * 2654435761u >> 7) & 1; }
+static bool reflow() {
+    HellschreiberDecoder d; d.setVerticalScale(1);
+    const int total = 2500;
+    QImage raster(total, 14, QImage::Format_Grayscale8); raster.fill(255);
+    for (int x = 0; x < total; ++x) if (inkAt(x)) for (int y = 0; y < 14; ++y) raster.scanLine(y)[x] = 0;
+    d.appendTransmitRaster(raster);
+    qint64 first = 0;   // oldest tape column still on the paper
+    auto check = [&](int columns) {
+        const QImage image = d.currentImage();
+        if (image.width() != columns) { std::cout << "width " << image.width() << " != " << columns << "\n"; return false; }
+        const qint64 kept = total - first;
+        const qint64 row = kept / columns;
+        const qint64 skip = row > 5 ? (row - 5) * columns : 0;
+        first += skip;
+        for (qint64 i = first; i < total; ++i) {
+            const qint64 j = i - first;
+            const int x = int(j % columns), y = int(j / columns) * 18 + 6;
+            if ((qGreen(image.pixel(x, y)) < 128) != inkAt(int(i))) { std::cout << "cols " << columns << " i " << i << "\n"; return false; }
+        }
+        return true;
+    };
+    if (!check(1120)) return false;
+    for (int columns : {500, 300, 777, 1120}) { d.setPaperColumns(columns); if (!check(columns)) return false; }
+    d.setPaperColumns(400); d.setVerticalScale(3);
+    if (d.currentImage().width() != 1200 || d.paperColumns() != 400) return false;
+    d.setPaperColumns(10);   // clamped
+    if (d.paperColumns() != 40) return false;
+    std::cout << "{\"paper_reflow\":true}\n";
+    return true;
+}
 int main(int argc,char**argv){QCoreApplication app(argc,argv);bool extended=argc>1;bool pass=true;for(int scenario=0;scenario<(extended?3:1);++scenario)for(bool fsk:{false,true})for(int rate:{44100,48000,96000})for(double snr:{40.,10.,0.}){
  HellschreiberDecoder rx;rx.setVerticalScale(1);if(fsk){rx.setVariant(HellschreiberDecoder::Variant::Fsk105);} double tone=scenario==1?500.:scenario==2?1800.:1000.; double offset=scenario==1?(fsk?8.:25.):scenario==2?(fsk?-8.:-25.):0.; rx.setToneHz(tone); double speed=17.5*14; int pixels=2800; int n=int(std::ceil(pixels*rate/speed)); double phase=0;std::mt19937 gen(63821+scenario*903);std::normal_distribution<double> noise(0,1);double sigma=0.3/std::sqrt(2.)*std::pow(10.,-snr/20.);
  for(int start=0;start<n;){AudioBlock b;b.sampleRate=rate;int count=std::min(1024,n-start);b.samples.resize(count);for(int i=0;i<count;++i){int p=int((start+i)*speed/rate);bool on=bit(p);double freq=tone+offset+(fsk?(on?-27.5:27.5):0.);phase+=6.283185307179586*freq/rate;double amp=fsk||on?.3:0.;double fade=extended?0.65+0.35*std::sin(6.283185307179586*0.3*(start+i)/rate):1.; b.samples[i]=fade*amp*std::sin(phase)+sigma*noise(gen)+(extended?.07*std::sin(6.283185307179586*(tone+650.)*(start+i)/rate):0.);}rx.processAudioBlock(b);start+=count;}
  QImage image=rx.currentImage();double best=1e9;int lag=0;for(int d=-3;d<=5;++d){double sum=0;int count=0;for(int p=280;p<pixels-20;++p){int k=p+d;if(k<0)continue;double ink=(255-qRed(image.pixel(k/14,13-k%14)))/245.;double target=bit(p)?1:0;sum+=(ink-target)*(ink-target);++count;}double rmse=std::sqrt(sum/count);if(rmse<best){best=rmse;lag=d;}}
  pass=pass && std::isfinite(best) && best<0.38; std::cout<<"{\"scenario\":"<<scenario<<",\"fsk\":"<<fsk<<",\"rate\":"<<rate<<",\"snr\":"<<snr<<",\"rmse\":"<<best<<",\"lag\":"<<lag<<"}\n";
-}return pass && invariants()?0:2;}
+}return pass && invariants() && reflow()?0:2;}

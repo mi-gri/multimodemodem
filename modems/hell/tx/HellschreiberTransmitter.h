@@ -32,6 +32,9 @@ public:
                              int displayScale = 4);
 
     int sampleRate() const override;
+    // Raster column being sent at this (played) sample: lets the paper show
+    // the TX column by column in step with the audio.
+    int textPositionAtSample(qint64 sample) const override;
     int generate(float *output, int sampleCount) override;
     bool isFinished() const override;
     double progress() const override;
