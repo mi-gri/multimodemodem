@@ -880,6 +880,55 @@ void HamlibController::pollTxMeters()
 #endif
 }
 
+#ifdef M3_WITH_HAMLIB
+namespace {
+// Modes the rig's Hamlib backend declares in its receive ranges (any rig, no
+// model-specific code). 0 = the backend declares none: try and see.
+rmode_t declaredRigModes(const RIG *rig)
+{
+    rmode_t modes = RIG_MODE_NONE;
+    if (rig == nullptr || rig->caps == nullptr) return modes;
+    for (const freq_range_t *list : {rig->caps->rx_range_list1, rig->caps->rx_range_list2})
+        for (int i = 0; i < HAMLIB_FRQRANGESIZ && !RIG_IS_FRNG_END(list[i]); ++i) modes |= list[i].modes;
+    return modes;
+}
+
+bool isDataSsbMode(rmode_t mode)
+{
+    if (mode == RIG_MODE_PKTUSB || mode == RIG_MODE_PKTLSB) return true;
+#ifdef RIG_MODE_USBD1
+    if (mode == RIG_MODE_USBD1 || mode == RIG_MODE_USBD2 || mode == RIG_MODE_USBD3) return true;
+#endif
+#ifdef RIG_MODE_LSBD1
+    if (mode == RIG_MODE_LSBD1 || mode == RIG_MODE_LSBD2 || mode == RIG_MODE_LSBD3) return true;
+#endif
+    return false;
+}
+
+bool isLowerSsbMode(rmode_t mode)
+{
+    if (mode == RIG_MODE_LSB || mode == RIG_MODE_PKTLSB) return true;
+#ifdef RIG_MODE_LSBD1
+    if (mode == RIG_MODE_LSBD1 || mode == RIG_MODE_LSBD2 || mode == RIG_MODE_LSBD3) return true;
+#endif
+    return false;
+}
+
+// Data modes of one sideband in order of preference (generic Hamlib names first).
+QVector<rmode_t> dataModesFor(bool lower)
+{
+    QVector<rmode_t> out{lower ? RIG_MODE_PKTLSB : RIG_MODE_PKTUSB};
+#ifdef RIG_MODE_USBD1
+    if (!lower) out << RIG_MODE_USBD1 << RIG_MODE_USBD2 << RIG_MODE_USBD3;
+#endif
+#ifdef RIG_MODE_LSBD1
+    if (lower) out << RIG_MODE_LSBD1 << RIG_MODE_LSBD2 << RIG_MODE_LSBD3;
+#endif
+    return out;
+}
+} // namespace
+#endif
+
 bool HamlibController::setDataSideband(bool lower)
 {
     SessionDiagnostics::instance().record("cat.setDataSideband", {{"lower", lower}});
@@ -893,22 +942,30 @@ bool HamlibController::setDataSideband(bool lower)
     rmode_t mode = RIG_MODE_NONE;
     pbwidth_t width = 0;
     if (rig_get_mode(rig, RIG_VFO_CURR, &mode, &width) != RIG_OK) return false;
-    rmode_t target = RIG_MODE_NONE;
-    if (lower && (mode == RIG_MODE_USB || mode == RIG_MODE_PKTUSB))
-        target = mode == RIG_MODE_USB ? RIG_MODE_LSB : RIG_MODE_PKTLSB;
-    else if (!lower && (mode == RIG_MODE_LSB || mode == RIG_MODE_PKTLSB))
-        target = mode == RIG_MODE_LSB ? RIG_MODE_USB : RIG_MODE_PKTUSB;
-    if (target == RIG_MODE_NONE) return true;   // already right, or CW/FM/AM: leave it
-    const int ret = rig_set_mode(rig, RIG_VFO_CURR, target, RIG_PASSBAND_NOCHANGE);
-    if (ret != RIG_OK) {
-        emitError(QStringLiteral("Hamlib could not switch to %1: %2")
-                      .arg(QString::fromLatin1(rig_strrmode(target)), QString::fromLocal8Bit(rigerror(ret))));
-        return false;
+    const bool ssb = mode == RIG_MODE_USB || mode == RIG_MODE_LSB || isDataSsbMode(mode);
+    if (!ssb || isLowerSsbMode(mode) == lower) return true;   // CW/FM/AM, or already right
+
+    // Same kind (data or plain SSB) on the other sideband, among the modes the
+    // rig's backend declares; plain SSB as the last resort for data.
+    const rmode_t declared = declaredRigModes(rig);
+    QVector<rmode_t> candidates = isDataSsbMode(mode) ? dataModesFor(lower) : QVector<rmode_t>{};
+    candidates << (lower ? RIG_MODE_LSB : RIG_MODE_USB);
+    for (const rmode_t target : candidates) {
+        if (declared != RIG_MODE_NONE && !(declared & target)) continue;
+        if (rig_set_mode(rig, RIG_VFO_CURR, target, RIG_PASSBAND_NOCHANGE) == RIG_OK) {
+            m_sidebandUnsupportedReported = false;
+            emit infoMessage(QStringLiteral("CAT: sideband %1 (%2).").arg(lower ? QStringLiteral("LSB") : QStringLiteral("USB"),
+                                                                           QString::fromLatin1(rig_strrmode(target))));
+            pollNow();
+            return true;
+        }
     }
-    emit infoMessage(QStringLiteral("CAT: sideband %1 (%2).").arg(lower ? QStringLiteral("LSB") : QStringLiteral("USB"),
-                                                                   QString::fromLatin1(rig_strrmode(target))));
-    pollNow();
-    return true;
+    if (!m_sidebandUnsupportedReported) {   // once, not on every retry
+        m_sidebandUnsupportedReported = true;
+        emit infoMessage(QStringLiteral("CAT: this rig (Hamlib model %1) accepted no %2 mode; the sideband stays as it is.")
+                             .arg(rig->caps->rig_model).arg(lower ? QStringLiteral("LSB") : QStringLiteral("USB")));
+    }
+    return false;
 #endif
 }
 
@@ -1730,8 +1787,13 @@ bool HamlibController::forceDataUsbMode(bool required)
         return false;
     }
 
-    // Lower sideband (SSTV on 80/40 m): the data LSB mode only.
-    const rmode_t lowerModes[] = { RIG_MODE_PKTLSB };
+    // Lower sideband (SSTV on 80/40 m): the rig's LSB data modes.
+    const rmode_t lowerModes[] = { RIG_MODE_PKTLSB,
+#ifdef RIG_MODE_LSBD1
+        RIG_MODE_LSBD1, RIG_MODE_LSBD2, RIG_MODE_LSBD3,
+#endif
+    };
+    const rmode_t declaredModes = declaredRigModes(rig);
     const rmode_t modes[] = {
         RIG_MODE_PKTUSB,  // Hamlib's generic digital/packet USB mode.
 #ifdef RIG_MODE_USBD1
@@ -1760,6 +1822,10 @@ bool HamlibController::forceDataUsbMode(bool required)
     QString lastError;
     for (const rmode_t *it = modeBegin; it != modeEnd; ++it) {
         const rmode_t mode = *it;
+        // LSB only (new path): skip modes this rig's backend does not offer.
+        // The USB path keeps trying every mode, as before, since some
+        // backends declare their modes incompletely.
+        if (m_lowerSideband && declaredModes != RIG_MODE_NONE && !(declaredModes & mode)) continue;
         int ret = RIG_OK;
         if (splitTx) {
             ret = rig_set_split_mode(rig, RIG_VFO_CURR, mode, kDigitalWidePassbandHz);

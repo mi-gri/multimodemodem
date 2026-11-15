@@ -190,6 +190,7 @@ private:
     bool m_havePreTxMode = false;
     bool m_txModeChangedByM3 = false;
     bool m_lowerSideband = false;   // setDataSideband()
+    bool m_sidebandUnsupportedReported = false;
     qint64 m_preTxMode = 0;
     qint64 m_preTxPassband = 0;
     qint64 m_preTxModeVfo = 0;

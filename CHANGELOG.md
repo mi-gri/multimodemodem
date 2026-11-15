@@ -15,7 +15,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 - SSTV on the lower sideband: below 10 MHz (or where the frequency list marks the entry "LSB",
   e.g. 3.735 and 7.165 MHz) m³ switches an SSB/DATA rig mode to PKTLSB and back to PKTUSB
   elsewhere and in the other modes; the Data/USB TX route then keys PKTLSB. CW, FM and AM
-  rig modes are left alone. The test run had received 80 m SSTV in USB.
+  rig modes are left alone. The test run had received 80 m SSTV in USB. Rig independent: the
+  mode is chosen from what the rig's Hamlib backend declares (PKTLSB, LSB-D1..D3, else plain
+  LSB); a rig without any LSB mode is reported once and left as it is.
 - WEFAX crash fixed (bad_alloc after 3000 free-running lines): completing an image inside the
   line loop (line limit, APT stop, end of signal) cleared the sample buffers, then one sample
   was removed from the empty buffer, corrupting the heap. Regression test
