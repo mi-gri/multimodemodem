@@ -522,6 +522,12 @@ QsoMapWidget::~QsoMapWidget()
 #endif
 }
 
+void QsoMapWidget::countryDataChanged()
+{
+    updateQuickMapModel();
+    update();
+}
+
 void QsoMapWidget::setRecords(const QVector<LogbookEntry> &records)
 {
     m_records = records;
@@ -1572,10 +1578,13 @@ QVector<LogbookEntry> QsoMapWidget::sourceRecordsForBehavior() const
 const MapLocatorIndex &QsoMapWidget::cachedLocatorIndex() const
 {
     const int behavior = static_cast<int>(m_displayBehavior);
-    if (!m_locatorIndex || m_locatorIndexGeneration != m_recordsGeneration || m_locatorIndexBehavior != behavior) {
+    const void *cty = &CtyCountryFile::instance();   // locators are refined with cty.csv data
+    if (!m_locatorIndex || m_locatorIndexGeneration != m_recordsGeneration || m_locatorIndexBehavior != behavior ||
+        m_locatorIndexCty != cty) {
         m_locatorIndex = std::make_shared<MapLocatorIndex>(buildMapLocatorIndex(sourceRecordsForBehavior()));
         m_locatorIndexGeneration = m_recordsGeneration;
         m_locatorIndexBehavior = behavior;
+        m_locatorIndexCty = cty;
     }
     return *m_locatorIndex;
 }
@@ -1583,13 +1592,15 @@ const MapLocatorIndex &QsoMapWidget::cachedLocatorIndex() const
 QVector<LogbookEntry> QsoMapWidget::filteredMapRecords() const
 {
     // Painting, hover tooltips and the marker list ask for this many times;
-    // recompute only when the records or a filter changed.
-    const QString key = QStringLiteral("%1|%2|%3|%4|%5|%6|%7|%8|%9")
+    // recompute only when the records, the country file or a filter changed.
+    // The geo-point cache derives its key from this one.
+    const QString key = QStringLiteral("%1/%10|%2|%3|%4|%5|%6|%7|%8|%9")
         .arg(m_recordsGeneration).arg(static_cast<int>(m_displayBehavior)).arg(m_mapDateScope)
         .arg(m_mapFromDate.toString(Qt::ISODate) + m_mapUntilDate.toString(Qt::ISODate))
         .arg(m_mapUseModeFilter ? m_modeFilter : QString()).arg(m_mapBandFilter.trimmed())
         .arg(m_mapLatestPerGrid).arg(m_mapMaxMarkers)
-        .arg(m_displayBehavior == DisplayBehavior::HeardToday ? QDateTime::currentDateTimeUtc().date().toString(Qt::ISODate) : QString());
+        .arg(m_displayBehavior == DisplayBehavior::HeardToday ? QDateTime::currentDateTimeUtc().date().toString(Qt::ISODate) : QString())
+        .arg(reinterpret_cast<quintptr>(&CtyCountryFile::instance()), 0, 16);
     if (key == m_filteredCacheKey) return m_filteredCache;
     m_filteredCache = filteredMapRecordsUncached();
     m_filteredCacheKey = key;

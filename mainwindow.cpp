@@ -25058,6 +25058,11 @@ void MainWindow::handleCtyUpdateFinished(bool ok, bool updated, const QString &m
         m_settings.ctyLastCheckUtc = QDateTime::currentDateTimeUtc();
         savePersistentSettings();
     }
+    if (updated) {
+        // New country data: show the maps' countries and markers from it now.
+        if (m_ftQsoMapWidget != nullptr) m_ftQsoMapWidget->countryDataChanged();
+        if (m_sstvQsoMapWidget != nullptr) m_sstvQsoMapWidget->countryDataChanged();
+    }
     if (userInitiated) {
         const CtyCountryFile &cty = CtyCountryFile::instance();
         const QString text = ok

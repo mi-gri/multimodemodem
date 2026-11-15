@@ -74,6 +74,9 @@ public:
     QString displayBehaviorName() const;
 
 public slots:
+    // After a cty.csv update: the caches notice the new data set by itself;
+    // this repaints so the visible markers and countries follow at once.
+    void countryDataChanged();
     void resetView();
     void saveMap();
     void printMap();
@@ -161,6 +164,7 @@ private:
     mutable std::shared_ptr<MapLocatorIndex> m_locatorIndex;
     mutable quint64 m_locatorIndexGeneration = 0;
     mutable int m_locatorIndexBehavior = -1;
+    mutable const void *m_locatorIndexCty = nullptr;
     mutable QString m_filteredCacheKey;
     mutable QVector<LogbookEntry> m_filteredCache;
     mutable QString m_workedGridCacheKey;
