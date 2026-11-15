@@ -50,6 +50,7 @@ public:
     {
         bool ok = false;
         bool retry = false;     // network/server trouble, worth another try
+        bool duplicate = false; // rejected because the QSO is already in the log
         QString message;
     };
 
@@ -66,7 +67,8 @@ public:
     static QsoResult parseQsoReply(int httpStatus, const QByteArray &body, bool networkError,
                                    const QString &networkErrorText);
 
-    void uploadQso(const Config &config, const QString &callsign, const QString &adifRecord);
+    // retries=false: a single attempt (re-sending pending QSOs).
+    void uploadQso(const Config &config, const QString &callsign, const QString &adifRecord, bool retries = true);
     void fetchStations(const Config &config);
     void sendRadio(const Config &config, const QString &radio, qint64 frequencyHz,
                    const QString &mode, double watts);
@@ -75,12 +77,13 @@ public:
     void setRetryDelays(const QVector<int> &delaysMs) { m_retryDelaysMs = delaysMs; }
 
 signals:
-    void qsoUploaded(const QString &callsign, bool ok, const QString &message, bool willRetry);
+    void qsoUploaded(const QString &callsign, bool ok, const QString &message, bool willRetry,
+                     const QString &adifRecord, bool duplicate);
     void stationsFetched(bool ok, const QVector<WavelogClient::Station> &stations, const QString &error);
     void radioSent(bool ok, const QString &error);
 
 private:
-    void postQso(const Config &config, const QString &callsign, const QString &adifRecord, int attempt);
+    void postQso(const Config &config, const QString &callsign, const QString &adifRecord, int attempt, bool retries);
     QNetworkReply *postJson(const QUrl &url, const QByteArray &body);
     static QString insecureUrlMessage();
 

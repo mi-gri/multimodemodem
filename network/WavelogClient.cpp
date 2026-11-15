@@ -195,6 +195,9 @@ WavelogClient::QsoResult WavelogClient::parseQsoReply(int httpStatus, const QByt
     }
     result.message = reason.isEmpty() ? QStringLiteral("rejected (HTTP %1, %2)").arg(httpStatus).arg(status)
                                       : reason;
+    // Wavelog: HTTP 201 with adif_errors and "Duplicate for CALL": the QSO is
+    // already in the online log (e.g. an earlier attempt did arrive).
+    result.duplicate = adifErrors > 0 && result.message.contains(QStringLiteral("duplicate"), Qt::CaseInsensitive);
     return result;
 }
 
@@ -211,29 +214,29 @@ QNetworkReply *WavelogClient::postJson(const QUrl &url, const QByteArray &body)
     return m_network.post(request, body);
 }
 
-void WavelogClient::uploadQso(const Config &config, const QString &callsign, const QString &adifRecord)
+void WavelogClient::uploadQso(const Config &config, const QString &callsign, const QString &adifRecord, bool retries)
 {
-    postQso(config, callsign, adifRecord, 0);
+    postQso(config, callsign, adifRecord, 0, retries);
 }
 
-void WavelogClient::postQso(const Config &config, const QString &callsign, const QString &adifRecord, int attempt)
+void WavelogClient::postQso(const Config &config, const QString &callsign, const QString &adifRecord, int attempt, bool retries)
 {
     if (!config.allowInsecureHttp && isInsecureUrl(config.url)) {
-        emit qsoUploaded(callsign, false, insecureUrlMessage(), false);
+        emit qsoUploaded(callsign, false, insecureUrlMessage(), false, adifRecord, false);
         return;
     }
     QNetworkReply *reply = postJson(endpoint(config.url, QStringLiteral("qso")), qsoPayload(config, adifRecord));
-    connect(reply, &QNetworkReply::finished, this, [this, reply, config, callsign, adifRecord, attempt]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, config, callsign, adifRecord, attempt, retries]() {
         reply->deleteLater();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const QsoResult result = parseQsoReply(status, reply->readAll(),
                                                reply->error() != QNetworkReply::NoError, reply->errorString());
-        const bool willRetry = !result.ok && result.retry && attempt < m_retryDelaysMs.size();
-        emit qsoUploaded(callsign, result.ok, result.message, willRetry);
+        const bool willRetry = retries && !result.ok && result.retry && attempt < m_retryDelaysMs.size();
+        emit qsoUploaded(callsign, result.ok, result.message, willRetry, adifRecord, result.duplicate);
         if (willRetry) {
             QPointer<WavelogClient> self(this);
             QTimer::singleShot(m_retryDelaysMs.at(attempt), this, [self, config, callsign, adifRecord, attempt]() {
-                if (self) self->postQso(config, callsign, adifRecord, attempt + 1);
+                if (self) self->postQso(config, callsign, adifRecord, attempt + 1, true);
             });
         }
     });

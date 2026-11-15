@@ -871,6 +871,8 @@ private slots:
     void startCtyUpdate(bool userInitiated);
     void handleCtyUpdateFinished(bool ok, bool updated, const QString &message, bool userInitiated);
     void scheduleWeeklyCtyCheck();
+    // Wavelog/Cloudlog: QSOs whose upload failed live in a second ADIF file.
+    void retryPendingWavelogQsos();
     // A given-up QSO whose RR73/73 arrives later (both reports were exchanged):
     // log it and send the 73 after the current QSO.
     void handleFt8LateFinal(const Ft8RxDecoder::Decode &decode, const QString &senderCall);
@@ -1861,6 +1863,8 @@ private:
     QAction *m_actionRuntimeLog = nullptr;
     class CtyUpdater *m_ctyUpdater = nullptr;
     QAction *m_actionCtyUpdate = nullptr;
+    QTimer *m_wavelogPendingTimer = nullptr;
+    QSet<QString> m_wavelogPendingInFlight;
     QAction *m_actionWhatsThisMode = nullptr;
 
     AudioEngine *m_audioEngine = nullptr;

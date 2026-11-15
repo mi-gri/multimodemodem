@@ -4,6 +4,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Wavelog/Cloudlog: a QSO whose upload fails is kept in a second ADIF file
+  (~/.local/share/MultiModeModem/wavelog_pending.adi, owner-only) from its first failed
+  attempt on, also when Settings lack URL/API key. It is sent again 1 min after start and
+  every 30 min, and removed as soon as an upload succeeds or Wavelog reports it as a
+  duplicate (already online). The file can be imported by hand at any time.
 - Country file: Help -> "Update country file (cty.csv)" downloads the current big CTY
   from country-files.com over verified HTTPS; it replaces the data in use only when it
   parses completely (at least 300 entities, a VER date) and is not older. The copy is

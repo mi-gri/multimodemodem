@@ -717,6 +717,8 @@ add_executable(MultiModeModem
     network/QsoUdpBroadcaster.cpp
     network/WavelogClient.h
     network/WavelogClient.cpp
+    network/WavelogPendingLog.h
+    network/WavelogPendingLog.cpp
     network/PskReporter.cpp
     dxcc/CtyCountryFile.h
     dxcc/CtyCountryFile.cpp
@@ -1217,7 +1219,7 @@ if(BUILD_TESTING)
     target_link_libraries(m3_decode_clipboard PRIVATE ${QT}::Widgets ${QT}::Test)
     add_test(NAME m3_decode_clipboard COMMAND m3_decode_clipboard)
     set_tests_properties(m3_decode_clipboard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 10)
-    add_executable(m3_wavelog_client tests/WavelogClientRegression.cpp network/WavelogClient.cpp)
+    add_executable(m3_wavelog_client tests/WavelogClientRegression.cpp network/WavelogClient.cpp network/WavelogPendingLog.cpp)
     target_include_directories(m3_wavelog_client PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
     target_link_libraries(m3_wavelog_client PRIVATE ${QT}::Core ${QT}::Network)
     add_test(NAME m3_wavelog_client COMMAND m3_wavelog_client)

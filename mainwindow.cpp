@@ -55,6 +55,7 @@
 #include "widgets/RttyScopeWidget.h"
 #include "dxcc/CtyCountryFile.h"
 #include "dxcc/CtyUpdater.h"
+#include "network/WavelogPendingLog.h"
 #include "utils/ProductName.h"
 #include "network/PskReporter.h"
 #include "rig/HamlibController.h"
@@ -3622,15 +3623,41 @@ void MainWindow::setupWavelog()
 {
     m_wavelog = new WavelogClient(this);
     connect(m_wavelog, &WavelogClient::qsoUploaded, this,
-            [this](const QString &callsign, bool ok, const QString &message, bool willRetry) {
+            [this](const QString &callsign, bool ok, const QString &message, bool willRetry,
+                   const QString &adifRecord, bool duplicate) {
+        const QString pendingPath = WavelogPendingLog::defaultPath();
+        if (!willRetry) m_wavelogPendingInFlight.remove(WavelogPendingLog::qsoKey(adifRecord));
         if (ok) {
             appendLog(uiText("wavelog_qso_sent", "Wavelog/Cloudlog: %1 logged.").arg(callsign));
+        } else if (duplicate) {
+            appendLog(uiText("wavelog_qso_duplicate", "Wavelog/Cloudlog: %1 is already in the online log.").arg(callsign));
         } else if (willRetry) {
             appendLog(uiText("wavelog_qso_retry", "Wavelog/Cloudlog: %1 not sent yet (%2); will retry.").arg(callsign, message));
         } else {
             appendLog(uiText("wavelog_qso_failed", "Wavelog/Cloudlog: %1 was saved locally, but the upload failed: %2").arg(callsign, message));
         }
+        QString error;
+        if (ok || duplicate) {
+            if (WavelogPendingLog::remove(pendingPath, adifRecord, &error))
+                appendLog(uiText("wavelog_pending_removed", "Wavelog/Cloudlog: %1 removed from the pending file (%2 left).")
+                              .arg(callsign).arg(WavelogPendingLog::records(pendingPath).size()));
+        } else if (WavelogPendingLog::add(pendingPath, adifRecord, &error)) {
+            appendLog(uiText("wavelog_pending_added", "Wavelog/Cloudlog: %1 kept in %2 for a later upload (%3 pending).")
+                          .arg(callsign, pendingPath).arg(WavelogPendingLog::records(pendingPath).size()));
+        }
+        if (!error.isEmpty())
+            appendLog(uiText("wavelog_pending_error", "Wavelog/Cloudlog: pending file %1 could not be updated: %2").arg(pendingPath, error));
     });
+    // QSOs left from earlier failures: again shortly after start, then every 30 min.
+    m_wavelogPendingTimer = new QTimer(this);
+    m_wavelogPendingTimer->setInterval(30 * 60 * 1000);
+    connect(m_wavelogPendingTimer, &QTimer::timeout, this, &MainWindow::retryPendingWavelogQsos);
+    m_wavelogPendingTimer->start();
+    QTimer::singleShot(60 * 1000, this, &MainWindow::retryPendingWavelogQsos);
+    const int pending = WavelogPendingLog::records(WavelogPendingLog::defaultPath()).size();
+    if (pending > 0)
+        appendLog(uiText("wavelog_pending_startup", "Wavelog/Cloudlog: %1 QSO(s) not yet uploaded, kept in %2.")
+                      .arg(pending).arg(WavelogPendingLog::defaultPath()));
     connect(m_wavelog, &WavelogClient::radioSent, this, [this](bool ok, const QString &error) {
         // Report a failing radio update once, not every few seconds.
         if (ok) {
@@ -3654,11 +3681,39 @@ void MainWindow::uploadLoggedQsoToWavelog(const LogbookEntry &entry)
     config.apiKey = m_settings.wavelogApiKey;
     config.stationId = m_settings.wavelogStationId;
     config.allowInsecureHttp = m_settings.wavelogAllowInsecureHttp;
+    const QString record = AdifLogbook::entryToAdif(entry);
     if (!config.isComplete()) {
         appendLog(uiText("wavelog_incomplete", "Wavelog/Cloudlog: %1 not sent - URL, API key or station location missing in Settings.").arg(entry.callsign));
+        if (WavelogPendingLog::add(WavelogPendingLog::defaultPath(), record))
+            appendLog(uiText("wavelog_pending_added", "Wavelog/Cloudlog: %1 kept in %2 for a later upload (%3 pending).")
+                          .arg(entry.callsign, WavelogPendingLog::defaultPath())
+                          .arg(WavelogPendingLog::records(WavelogPendingLog::defaultPath()).size()));
         return;
     }
-    m_wavelog->uploadQso(config, entry.callsign, AdifLogbook::entryToAdif(entry));
+    m_wavelogPendingInFlight.insert(WavelogPendingLog::qsoKey(record));
+    m_wavelog->uploadQso(config, entry.callsign, record);
+}
+
+void MainWindow::retryPendingWavelogQsos()
+{
+    if (!m_settings.wavelogEnabled || m_wavelog == nullptr) return;
+    WavelogClient::Config config;
+    config.url = m_settings.wavelogUrl;
+    config.apiKey = m_settings.wavelogApiKey;
+    config.stationId = m_settings.wavelogStationId;
+    config.allowInsecureHttp = m_settings.wavelogAllowInsecureHttp;
+    if (!config.isComplete()) return;
+    const QStringList pending = WavelogPendingLog::records(WavelogPendingLog::defaultPath());
+    int started = 0;
+    for (const QString &record : pending) {
+        const QString key = WavelogPendingLog::qsoKey(record);
+        if (m_wavelogPendingInFlight.contains(key)) continue;   // its own retries are still running
+        m_wavelogPendingInFlight.insert(key);
+        m_wavelog->uploadQso(config, WavelogPendingLog::fieldValue(record, QStringLiteral("CALL")), record, false);
+        ++started;
+    }
+    if (started > 0)
+        appendLog(uiText("wavelog_pending_retry", "Wavelog/Cloudlog: sending %1 pending QSO(s) again.").arg(started));
 }
 
 // Radio status as WaveLogGate sends it: on every change of frequency, mode

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Wavelog/Cloudlog API client against a local fake server.
 #include "network/WavelogClient.h"
+#include "network/WavelogPendingLog.h"
+#include <QFile>
+#include <QTemporaryDir>
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -117,6 +120,7 @@ int main(int argc, char **argv)
           "cloudlog created");
     const auto dupe = WavelogClient::parseQsoReply(201, R"({"status":"created","adif_count":1,"adif_errors":1,"messages":["Duplicate for DL1X"]})", false, {});
     check(!dupe.ok && !dupe.retry && dupe.message.contains("Duplicate"), "rejected record reported");
+    check(dupe.duplicate, "duplicate recognised as already in the online log");
     const auto key = WavelogClient::parseQsoReply(401, R"({"status":"failed","reason":"missing or wrong api key"})", true, "x");
     check(!key.ok && !key.retry && key.message.contains("api key"), "wrong key not retried");
     check(WavelogClient::parseQsoReply(0, {}, true, "Connection refused").retry, "network error retried");
@@ -184,6 +188,41 @@ int main(int argc, char **argv)
     client.sendRadio(config, "MultiModeModem", 14074000, "FT8", -1);
     check(waitFor(&client, &WavelogClient::radioSent) && radioOk && server.requests.last().path == "/index.php/api/radio", "radio sent");
 
-    std::cout << "PASS endpoint/payloads/replies/stations/upload+retry/rejection/radio\n";
+    // retries=false (pending re-send): exactly one attempt even on a server error.
+    {
+        int attempts = 0;
+        server.handler = [&attempts](const Request &) -> QPair<int, QByteArray> { ++attempts; return {503, "busy"}; };
+        bool retryFlag = true;
+        QMetaObject::Connection c = QObject::connect(&client, &WavelogClient::qsoUploaded,
+            [&](const QString &, bool, const QString &, bool willRetry) { retryFlag = willRetry; });
+        client.uploadQso(config, "DL3Z", "<CALL:4>DL3Z<EOR>", false);
+        check(waitFor(&client, &WavelogClient::qsoUploaded), "single pending attempt reported");
+        QEventLoop wait; QTimer::singleShot(200, &wait, &QEventLoop::quit); wait.exec();
+        check(attempts == 1 && !retryFlag, "pending re-send does not start its own retries");
+        QObject::disconnect(c);
+    }
+
+    // Second ADIF file with the QSOs whose upload failed.
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("pending.adi");
+        const QString a = "<CALL:4>DL1X <QSO_DATE:8>20261115 <TIME_ON:6>010203 <BAND:3>80m <MODE:3>FT8 <COMMENT:12>not <EOR> me <EOR>";
+        const QString aAgain = "<CALL:4>DL1X <QSO_DATE:8>20261115 <TIME_ON:4>0102 <BAND:3>80m <MODE:3>FT8 <EOR>";
+        const QString b = "<CALL:5>G4XEE <QSO_DATE:8>20261115 <TIME_ON:6>020000 <BAND:3>80m <MODE:3>FT8 <EOR>";
+        check(WavelogPendingLog::add(path, a) && WavelogPendingLog::add(path, b), "failed QSOs added");
+        check(!WavelogPendingLog::add(path, aAgain), "same QSO not added twice");
+        const QStringList list = WavelogPendingLog::records(path);
+        check(list.size() == 2 && WavelogPendingLog::fieldValue(list.at(0), "COMMENT") == "not <EOR> me", "records read back, <EOR> in a comment kept");
+        check(QFile::permissions(path) == (QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+                                           QFileDevice::ReadUser | QFileDevice::WriteUser), "pending file owner-only");
+        check(QFile(path).open(QIODevice::ReadOnly) && QFile::exists(path), "pending file exists");
+        QFile f(path); f.open(QIODevice::ReadOnly);
+        check(f.readAll().contains("<EOH>"), "pending file is a normal ADIF log");
+        check(WavelogPendingLog::remove(path, aAgain) && WavelogPendingLog::records(path).size() == 1, "uploaded QSO removed");
+        check(WavelogPendingLog::remove(path, b) && !QFile::exists(path), "file removed when empty");
+        check(!WavelogPendingLog::remove(path, b), "removing from a missing file is harmless");
+    }
+
+    std::cout << "PASS endpoint/payloads/replies/stations/upload+retry/rejection/radio/pending file\n";
     return 0;
 }
