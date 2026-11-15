@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- QSY plan: a plan switch no longer clears the setting "Tune the rig to the mode's frequency
+  when the mode changes": it was switched off for the moment of the switch and the mode change
+  saved it so (RTTY -> FT8 then kept the frequency). A runtime flag is used instead.
 - JS8 and Q65 decoded nothing after a mode switch with RX running (QSY plan or operator): their
   audio input was only switched on at RX start. It now follows every mode change (also WSPR).
 - JS8 in the runtime log: one line per decoded slot ("JS8 Normal 17:36:00 UTC: 2 frame(s)")

@@ -13925,10 +13925,12 @@ void MainWindow::applyScheduledQsy(const ScheduledQsyEntry &entry)
         // one), but without its own QSY to the mode's last band: the plan's
         // frequency follows below, so the rig moves once, not twice.
         appendLog(uiText("scheduler_log_mode_switch", "QSY plan: mode %1 -> %2.").arg(ui->cmbMode->currentText(), targetMode));
-        const bool qsyOnModeChange = m_settings.frequencyQsyOnModeChange;
-        m_settings.frequencyQsyOnModeChange = false;
+        // A runtime flag, never the setting: the mode change persists the
+        // settings, and a temporarily cleared setting was saved as "off"
+        // (QSY on mode change stayed off after the 2026-11-15 plan run).
+        m_suppressModeChangeQsy = true;
         ui->cmbMode->setCurrentText(targetMode);
-        m_settings.frequencyQsyOnModeChange = qsyOnModeChange;
+        m_suppressModeChangeQsy = false;
     }
 
     if (Ft8Mode::isFamilyMode(targetMode) && m_cmbFt8Band != nullptr && !entry.band.isEmpty()) {
@@ -14770,7 +14772,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
                 m_cmbJs8Band->setCurrentIndex(idx);
             }
         }
-        if (m_settings.frequencyQsyOnModeChange) js8QsyToSelectedBand();
+        if (m_settings.frequencyQsyOnModeChange && !m_suppressModeChangeQsy) js8QsyToSelectedBand();
         js8UpdateBandUi();
         setDecoderReady(QStringLiteral("JS8 ") + Js8Mode::submodeName(currentJs8Submode()));
     } else if (Ft8Mode::isFamilyMode(modeName)) {
@@ -14778,7 +14780,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
             ui->stkModeSettings->setCurrentWidget(m_pageFt8Settings);
         }
         applyFt8Settings();
-        if (m_settings.frequencyQsyOnModeChange) qsyRigToSelectedFtBand();
+        if (m_settings.frequencyQsyOnModeChange && !m_suppressModeChangeQsy) qsyRigToSelectedFtBand();
         const Ft8Mode::Profile profile = Ft8Mode::profileForMode(modeName);
         if (profile.interoperableCoreAvailable) {
             setDecoderReady(profile.shortLabel);

@@ -1682,6 +1682,7 @@ private:
     // lower sideband; everything else on USB.  Asks the rig only on a change.
     bool wantsLowerSideband() const;
     void syncRigSideband();
+    bool m_suppressModeChangeQsy = false;   // QSY plan switches mode and sets the frequency itself
     int m_rigSidebandRequested = -1;     // -1 unknown, 0 USB, 1 LSB
     qint64 m_rigSidebandRequestMs = 0;
 

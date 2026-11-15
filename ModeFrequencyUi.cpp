@@ -306,7 +306,7 @@ void MainWindow::qsyForModeChange(const QString &modeName)
 {
     refreshFrequencyPickers();   // the FT page lists FT8 or FT4 entries
     // FT and JS8 tune in their own branches of handleModeChanged().
-    if (!m_settings.frequencyQsyOnModeChange || !m_settings.hamlibCatEnabled) return;
+    if (!m_settings.frequencyQsyOnModeChange || m_suppressModeChangeQsy || !m_settings.hamlibCatEnabled) return;
     if (Ft8Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName)) return;
     const QString listMode = M3StandardFrequencies::listModeForName(modeName);
     if (listMode.isEmpty()) return;
