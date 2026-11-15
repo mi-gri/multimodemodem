@@ -139,14 +139,21 @@ void SessionDiagnostics::record(const QString &category,QJsonObject fields) {
 void SessionDiagnostics::run() {
     const QString filePath=path();GzipLogWriter file(filePath);
     auto write=[&](const QByteArray &bytes){return file.write(bytes);};
-    bool opened=QDir().mkpath(QFileInfo(filePath).absolutePath())&&file.open();
+    const QString folder=QFileInfo(filePath).absolutePath();
+    bool opened=QDir().mkpath(folder);
+    // The default folder is m³'s own: owner only (0700). A folder the user
+    // chose is left as it is; the log file itself is always 0600.
+    if(opened && QDir(folder).absolutePath()==QDir(defaultFolder()).absolutePath())
+        QFile::setPermissions(folder,QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner);
+    opened=opened&&file.open();
     if(opened)opened=write(line({{"event","session.start"},{"seq","1"},{"schema",1},{"compression","gzip"},
         {"utc",QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},{"steady_ns",QString::number(AudioBlock::steadyNowNs())},
         {"pid",double(QCoreApplication::applicationPid())},{"application",QCoreApplication::applicationName()},
         {"version",QStringLiteral(M3_VERSION_STRING)},{"source_revision",QStringLiteral(M3_SOURCE_REVISION)},
         {"build",QString::fromLatin1(M3Build::number())},{"commit",QStringLiteral(M3_BUILD_COMMIT)},
         {"os",QSysInfo::prettyProductName()},{"architecture",QSysInfo::currentCpuArchitecture()},{"qt",QString::fromLatin1(qVersion())},
-        {"logical_processors",QThread::idealThreadCount()},{"queue_limit_bytes",double(m_limit)}}))&&file.flush();
+        {"logical_processors",QThread::idealThreadCount()},{"queue_limit_bytes",double(m_limit)},
+        {"owner_only",file.permissionsRestricted()}}))&&file.flush();
     {std::lock_guard<std::mutex> l(m_mutex);if(!opened)m_error="Cannot create diagnostic log: "+filePath+" ("+file.errorString()+")";else m_sequence=1;m_ready=true;}
     m_cv.notify_all();if(!opened)return;
     quint64 written=1,reportedLoss=0,flushedRequest=0;

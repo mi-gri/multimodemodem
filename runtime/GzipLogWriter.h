@@ -15,6 +15,11 @@ public:
     GzipLogWriter &operator=(const GzipLogWriter &) = delete;
     bool open() {
         if(!m_file.open(QIODevice::WriteOnly|QIODevice::NewOnly)) return false;
+        // Owner only (0600): the log holds callsigns, CAT traffic and settings.
+        // Set while the file is still empty, before the first byte is written.
+        // Best effort: file systems without Unix permissions (FAT/exFAT, some
+        // network shares) cannot do this, and logging must still work there.
+        m_restricted=m_file.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner);
         const int rc=deflateInit2(&m_stream,Z_BEST_SPEED,Z_DEFLATED,15+16,8,Z_DEFAULT_STRATEGY);
         if(rc!=Z_OK){m_error=QStringLiteral("Cannot initialize gzip compression (%1)").arg(rc);return false;}
         m_initialized=true;m_pending.reserve(BufferSize);return true;
@@ -58,6 +63,10 @@ private:
     }
     static constexpr int BufferSize=64*1024;
     QFile m_file;
+    bool m_restricted=false;
+public:
+    bool permissionsRestricted() const { return m_restricted; }
+private:
     z_stream m_stream{};
     std::array<Bytef,BufferSize> m_output;
     QByteArray m_pending;
