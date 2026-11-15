@@ -38,6 +38,7 @@
 #include "modems/cw/tx/CwSerialTransmitter.h"
 #include "modems/mfsk/tx/MfskTransmitter.h"
 #include "modems/hell/tx/HellschreiberTransmitter.h"
+#include "core/tx/TuneModulator.h"
 #include "modems/ft8/tx/Ft8Transmitter.h"
 #include "modems/radiotelescope/RadioTelescopeMode.h"
 #include "rotator/RotatorPeakSearch.h"
@@ -13136,14 +13137,21 @@ void MainWindow::setupRigReadoutPanel()
         label->setFont(font);
     }
 
-    // One row: frequency | MHz | PWR over SWR over ALC.
+    // One row: frequency | MHz | Tune | PWR over SWR over ALC.
+    m_btnTune = new QPushButton(uiText("tune", "Tune"), readout);
+    m_btnTune->setObjectName(QStringLiteral("rigReadoutTune"));
+    m_btnTune->setCheckable(true);
+    m_btnTune->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    m_btnTune->setToolTip(uiText("tune_button_tip", "Transmits a steady carrier on the TX audio frequency of the current mode for tuning (ATU, power, ALC), at the Tune level. Click again to stop; it stops by itself after 60 s. PWR, SWR and ALC are shown next to it."));
+    connect(m_btnTune, &QPushButton::clicked, this, [this](bool) { toggleTune(); });
     layout->addWidget(m_lcdRigReadoutFrequency, 0, 0, 3, 1);
     layout->addWidget(unit, 0, 1, 3, 1, Qt::AlignLeft | Qt::AlignBottom);
-    layout->addWidget(m_lblRigReadoutPower, 0, 2, Qt::AlignLeft | Qt::AlignVCenter);
-    layout->addWidget(m_lblRigReadoutSwr, 1, 2, Qt::AlignLeft | Qt::AlignVCenter);
-    layout->addWidget(m_lblRigReadoutAlc, 2, 2, Qt::AlignLeft | Qt::AlignVCenter);
+    layout->addWidget(m_btnTune, 0, 2, 3, 1, Qt::AlignVCenter);
+    layout->addWidget(m_lblRigReadoutPower, 0, 3, Qt::AlignLeft | Qt::AlignVCenter);
+    layout->addWidget(m_lblRigReadoutSwr, 1, 3, Qt::AlignLeft | Qt::AlignVCenter);
+    layout->addWidget(m_lblRigReadoutAlc, 2, 3, Qt::AlignLeft | Qt::AlignVCenter);
     layout->setColumnStretch(0, 1);
-    layout->setColumnMinimumWidth(2, m_lblRigReadoutPower->fontMetrics().horizontalAdvance(uiText("rig_readout_power", "PWR %1 W").arg(100)) + 4);
+    layout->setColumnMinimumWidth(3, m_lblRigReadoutPower->fontMetrics().horizontalAdvance(uiText("rig_readout_power", "PWR %1 W").arg(100)) + 4);
     readout->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power, SWR and ALC reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
     m_lcdRigReadoutFrequency->setToolTip(uiText("rig_readout_tune_tooltip", "Dial frequency read by CAT. Mouse wheel over a digit tunes that digit; double-click enters a frequency (MHz, kHz or Hz). Not possible while transmitting."));
     m_lcdRigReadoutFrequency->installEventFilter(this);
@@ -22390,6 +22398,79 @@ void MainWindow::setTxLevelTune(bool tune)
     restoreTxLevelForContext();
 }
 
+double MainWindow::tuneToneHz() const
+{
+    // The mode's own TX audio frequency, so ATU/ALC see the same passband.
+    const QString mode = ui->cmbMode->currentText();
+    double hz = 1500.0;
+    if (mode == RttyDecoder::modeName() && m_spinRttyMarkHz && m_spinRttyShiftHz)
+        hz = m_spinRttyMarkHz->value() + m_spinRttyShiftHz->value() / 2.0;
+    else if (mode == CwDecoder::modeName() && m_spinCwTxToneHz) hz = m_spinCwTxToneHz->value();
+    else if (mode == Bpsk31Decoder::modeName() && m_spinBpsk31ToneHz) hz = m_spinBpsk31ToneHz->value();
+    else if (mode == MfskDecoder::modeName() && m_spinMfskCenterHz) hz = m_spinMfskCenterHz->value();
+    else if (mode == HellschreiberDecoder::modeName() && m_spinHellToneHz) hz = m_spinHellToneHz->value();
+    else if (Msk144Mode::isMode(mode) && m_spinMsk144TxFreq) hz = m_spinMsk144TxFreq->value();
+    else if (Q65Mode::isFamilyMode(mode) && m_spinQ65TxFreq) hz = m_spinQ65TxFreq->value();
+    else if (Js8Mode::isMode(mode) && m_spinJs8TxFreq) hz = m_spinJs8TxFreq->value();
+    else if (WsprMode::isMode(mode) && m_spinWsprTxHz) hz = m_spinWsprTxHz->value();
+    return qBound(300.0, hz, 2700.0);   // inside a 3 kHz TX filter
+}
+
+bool MainWindow::tuneActive() const
+{
+    if (Ft8Mode::isFamilyMode(ui->cmbMode->currentText()))
+        return m_pendingFt8TxPlan.tune || (m_ftSession.lastTxPlan.tune && (m_txRunning || m_ftTxWorkerRunning));
+    return m_tuneTxRunning && (m_txRunning || m_txPreparationPending);
+}
+
+void MainWindow::toggleTune()
+{
+    const QString mode = ui->cmbMode->currentText();
+    if (Ft8Mode::isFamilyMode(mode)) {   // FT keeps its own tune (split handling)
+        tuneFt8Shell();
+        updateTuneButton();
+        return;
+    }
+    if (m_tuneTxRunning && (m_txRunning || m_txPreparationPending)) {
+        appendLog(uiText("tune_stop_log", "Tune stopped."));
+        stopImageTx();
+        return;
+    }
+    if (m_txRunning || m_txPreparationPending) {
+        appendLog(uiText("tune_blocked_log", "Tune blocked: another transmission is running."));
+        updateTuneButton();
+        return;
+    }
+    if (mode == CwDecoder::modeName() && m_settings.cwTxMethod == QStringLiteral("serial_key")) {
+        appendLog(uiText("tune_cw_serial_log", "Tune is not available with CW keying over the serial port; use the rig's own tune or switch the CW TX method to audio."));
+        updateTuneButton();
+        return;
+    }
+    if (m_wsprTxTimer.isActive() && m_chkWsprTx && m_chkWsprTx->isChecked())
+        wsprStopBeacon(QStringLiteral("tune"));
+    appendLog(uiText("tune_start_log", "Tune: carrier %1 Hz (max. 60 s; Tune again stops it).").arg(qRound(tuneToneHz())));
+    m_tuneTxRequested = true;
+    m_tuneTxRunning = true;
+    setTxLevelTune(true);
+    startImageTx();
+    if (!m_txRunning && !m_txPreparationPending) {   // refused before keying
+        m_tuneTxRequested = false;
+        m_tuneTxRunning = false;
+        setTxLevelTune(false);
+    }
+    updateTuneButton();
+}
+
+void MainWindow::updateTuneButton()
+{
+    if (m_btnTune == nullptr) return;
+    const bool active = tuneActive();
+    const QSignalBlocker block(m_btnTune);
+    m_btnTune->setChecked(active);
+    m_btnTune->setEnabled(active || (!m_txRunning && !m_txPreparationPending && !m_offlineAnalysisActive));
+    M3Ui::setSemanticRole(m_btnTune, active ? QStringLiteral("negative") : QString());
+}
+
 void MainWindow::tuneFt8Shell()
 {
     applyFt8Settings();
@@ -26746,6 +26827,7 @@ void MainWindow::updateTxPreview()
 
 void MainWindow::updateTxControlState()
 {
+    updateTuneButton();
     if (m_btnLoadTxImage == nullptr ||
         m_btnStartImageTx == nullptr ||
         m_btnStopImageTx == nullptr ||
@@ -27181,7 +27263,9 @@ void MainWindow::startImageTx()
     const bool q65Mode = Q65Mode::isFamilyMode(activeModeName);
     const bool js8Mode = Js8Mode::isMode(activeModeName);
     const bool wsprMode = WsprMode::isMode(activeModeName);
-    const bool textMode = rttyMode || bpskMode || mfskMode || cwMode || hellMode || ft8Mode || msk144Mode || q65Mode || js8Mode || wsprMode;
+    // Tune (any mode): a carrier, handled like text TX (pause RX, resume).
+    const bool tuneTx = std::exchange(m_tuneTxRequested, false);
+    const bool textMode = tuneTx || rttyMode || bpskMode || mfskMode || cwMode || hellMode || ft8Mode || msk144Mode || q65Mode || js8Mode || wsprMode;
 
     const bool liveRxRunning = m_rxStartPending || m_rxRunning ||
                                (m_audioEngine != nullptr && m_audioEngine->isRunning());
@@ -27198,89 +27282,91 @@ void MainWindow::startImageTx()
         resetRttyTxScopeState();
     }
 
-    if (!textMode && m_txSourceImage.isNull()) {
-        QMessageBox::information(this,
-                                 M3I18n::text(QStringLiteral("Image TX")),
-                                 M3I18n::text(QStringLiteral("Load an image before starting TX.")));
-        return;
-    }
-
-    if (rttyMode && (m_rttyTxOverrideText.isNull() ? (m_txtRttyTx == nullptr || m_txtRttyTx->toPlainText().trimmed().isEmpty()) : m_rttyTxOverrideText.trimmed().isEmpty())) {
-        QMessageBox::information(this,
-                                 QStringLiteral("RTTY TX"),
-                                 M3I18n::text(QStringLiteral("Enter or load text before starting RTTY TX.")));
-        return;
-    }
-
-    if (bpskMode && (m_txtBpsk31Tx == nullptr || m_txtBpsk31Tx->toPlainText().trimmed().isEmpty())) {
-        QMessageBox::information(this,
-                                 QStringLiteral("PSK TX"),
-                                 M3I18n::text(QStringLiteral("Enter or load text before starting PSK TX.")));
-        return;
-    }
-
-    if (mfskMode && (m_txtMfskTx == nullptr || m_txtMfskTx->toPlainText().trimmed().isEmpty())) {
-        QMessageBox::information(this,
-                                 QStringLiteral("MFSK TX"),
-                                 M3I18n::text(QStringLiteral("Enter or load text before starting MFSK TX.")));
-        return;
-    }
-
-    if (cwMode && (m_txtCwTx == nullptr || m_txtCwTx->toPlainText().trimmed().isEmpty())) {
-        QMessageBox::information(this,
-                                 QStringLiteral("CW TX"),
-                                 M3I18n::text(QStringLiteral("Enter or load text before starting CW TX.")));
-        return;
-    }
-
-    if (cwMode && m_settings.cwTxMethod == "serial_key") {
-        startCwSerialTransmission(m_txtCwTx->toPlainText());
-        return;
-    }
-
-    if (hellMode && (m_txtHellTx == nullptr || m_txtHellTx->toPlainText().trimmed().isEmpty())) {
-        QMessageBox::information(this,
-                                 QStringLiteral("Hellschreiber TX"),
-                                 M3I18n::text(QStringLiteral("Enter or load text before starting Hellschreiber TX.")));
-        return;
-    }
-
-    if (ft8Mode && !m_pendingFt8TxPlan.tune && m_pendingFt8TxPlan.message.trimmed().isEmpty()) {
-        const Ft8Mode::Profile profile = Ft8Mode::profileForMode(activeModeName);
-        QMessageBox::information(this,
-                                 profile.shortLabel + QStringLiteral(" TX"),
-                                 uiText("ft8_select_message_before_tx", "Select or generate an FT8 message before starting TX."));
-        return;
-    }
-
-    if (msk144Mode) {
-        refreshMsk144StandardMessages();
-        if (m_tableMsk144TxMessages == nullptr || m_tableMsk144TxMessages->rowCount() == 0) {
-            QMessageBox::information(this, QStringLiteral("MSK144 TX"),
-                                     M3I18n::text(QStringLiteral("Generate or select an MSK144 message before starting TX.")));
+    if (!tuneTx) {   // mode content checks do not apply to a tune carrier
+        if (!textMode && m_txSourceImage.isNull()) {
+            QMessageBox::information(this,
+                                     M3I18n::text(QStringLiteral("Image TX")),
+                                     M3I18n::text(QStringLiteral("Load an image before starting TX.")));
             return;
         }
-    }
-    if (q65Mode) {
-        refreshQ65StandardMessages();
-        if (m_tableQ65TxMessages == nullptr || m_tableQ65TxMessages->rowCount() == 0) {
-            QMessageBox::information(this, QStringLiteral("Q65 TX"),
-                                     M3I18n::text(QStringLiteral("Generate or select a Q65 message before starting TX.")));
+
+        if (rttyMode && (m_rttyTxOverrideText.isNull() ? (m_txtRttyTx == nullptr || m_txtRttyTx->toPlainText().trimmed().isEmpty()) : m_rttyTxOverrideText.trimmed().isEmpty())) {
+            QMessageBox::information(this,
+                                     QStringLiteral("RTTY TX"),
+                                     M3I18n::text(QStringLiteral("Enter or load text before starting RTTY TX.")));
             return;
         }
-    }
 
-    if (js8Mode && m_js8PendingFrames.isEmpty()) {
-        QMessageBox::information(this, QStringLiteral("JS8 TX"),
-                                 M3I18n::text(QStringLiteral("Type a message and press Send.")));
-        return;
-    }
+        if (bpskMode && (m_txtBpsk31Tx == nullptr || m_txtBpsk31Tx->toPlainText().trimmed().isEmpty())) {
+            QMessageBox::information(this,
+                                     QStringLiteral("PSK TX"),
+                                     M3I18n::text(QStringLiteral("Enter or load text before starting PSK TX.")));
+            return;
+        }
 
-    // WSPR transmits only as a planned beacon period (wsprArmPeriod).
-    if (wsprMode && !m_nativeWeakSignalTxBoundaryStart) return;
-    if ((msk144Mode || q65Mode || js8Mode) && !m_nativeWeakSignalTxBoundaryStart) {
-        scheduleNativeWeakSignalPeriodTx();
-        return;
+        if (mfskMode && (m_txtMfskTx == nullptr || m_txtMfskTx->toPlainText().trimmed().isEmpty())) {
+            QMessageBox::information(this,
+                                     QStringLiteral("MFSK TX"),
+                                     M3I18n::text(QStringLiteral("Enter or load text before starting MFSK TX.")));
+            return;
+        }
+
+        if (cwMode && (m_txtCwTx == nullptr || m_txtCwTx->toPlainText().trimmed().isEmpty())) {
+            QMessageBox::information(this,
+                                     QStringLiteral("CW TX"),
+                                     M3I18n::text(QStringLiteral("Enter or load text before starting CW TX.")));
+            return;
+        }
+
+        if (cwMode && m_settings.cwTxMethod == "serial_key") {
+            startCwSerialTransmission(m_txtCwTx->toPlainText());
+            return;
+        }
+
+        if (hellMode && (m_txtHellTx == nullptr || m_txtHellTx->toPlainText().trimmed().isEmpty())) {
+            QMessageBox::information(this,
+                                     QStringLiteral("Hellschreiber TX"),
+                                     M3I18n::text(QStringLiteral("Enter or load text before starting Hellschreiber TX.")));
+            return;
+        }
+
+        if (ft8Mode && !m_pendingFt8TxPlan.tune && m_pendingFt8TxPlan.message.trimmed().isEmpty()) {
+            const Ft8Mode::Profile profile = Ft8Mode::profileForMode(activeModeName);
+            QMessageBox::information(this,
+                                     profile.shortLabel + QStringLiteral(" TX"),
+                                     uiText("ft8_select_message_before_tx", "Select or generate an FT8 message before starting TX."));
+            return;
+        }
+
+        if (msk144Mode) {
+            refreshMsk144StandardMessages();
+            if (m_tableMsk144TxMessages == nullptr || m_tableMsk144TxMessages->rowCount() == 0) {
+                QMessageBox::information(this, QStringLiteral("MSK144 TX"),
+                                         M3I18n::text(QStringLiteral("Generate or select an MSK144 message before starting TX.")));
+                return;
+            }
+        }
+        if (q65Mode) {
+            refreshQ65StandardMessages();
+            if (m_tableQ65TxMessages == nullptr || m_tableQ65TxMessages->rowCount() == 0) {
+                QMessageBox::information(this, QStringLiteral("Q65 TX"),
+                                         M3I18n::text(QStringLiteral("Generate or select a Q65 message before starting TX.")));
+                return;
+            }
+        }
+
+        if (js8Mode && m_js8PendingFrames.isEmpty()) {
+            QMessageBox::information(this, QStringLiteral("JS8 TX"),
+                                     M3I18n::text(QStringLiteral("Type a message and press Send.")));
+            return;
+        }
+
+        // WSPR transmits only as a planned beacon period (wsprArmPeriod).
+        if (wsprMode && !m_nativeWeakSignalTxBoundaryStart) return;
+        if ((msk144Mode || q65Mode || js8Mode) && !m_nativeWeakSignalTxBoundaryStart) {
+            scheduleNativeWeakSignalPeriodTx();
+            return;
+        }
     }
 
     m_currentTxIsTextMode = textMode;
@@ -27295,10 +27381,10 @@ void MainWindow::startImageTx()
 
     QPlainTextEdit *textEditor = rttyMode ? m_txtRttyTx : bpskMode ? m_txtBpsk31Tx :
         mfskMode ? m_txtMfskTx : cwMode ? m_txtCwTx : hellMode ? m_txtHellTx : nullptr;
-    const QString textSnapshot = rttyMode && !m_rttyTxOverrideText.isNull() ? m_rttyTxOverrideText :
+    const QString textSnapshot = tuneTx ? QString() : rttyMode && !m_rttyTxOverrideText.isNull() ? m_rttyTxOverrideText :
         textEditor ? textEditor->toPlainText() : QString();
     const auto captureStopGeneration = m_txRequestGeneration;
-    const bool nativeBoundaryStart = (msk144Mode || q65Mode || js8Mode || wsprMode) && m_nativeWeakSignalTxBoundaryStart;
+    const bool nativeBoundaryStart = !tuneTx && (msk144Mode || q65Mode || js8Mode || wsprMode) && m_nativeWeakSignalTxBoundaryStart;
     const qint64 nativeBoundaryUtcMs = m_nativeWeakSignalTxBoundaryUtcMs;
     const auto nativeWaveform = std::make_shared<std::unique_ptr<TxModulator>>();
     if (nativeBoundaryStart) *nativeWaveform = std::move(m_nativeWeakSignalPreparedModulator);
@@ -27348,6 +27434,9 @@ void MainWindow::startImageTx()
             appendLog(M3I18n::text(
                 QStringLiteral("Unable to create a transmitter for the active mode.")));
         }
+    } else if (tuneTx) {
+        const int rate = (m_settings.audioSampleRate == 44100 || m_settings.audioSampleRate == 96000) ? m_settings.audioSampleRate : 48000;
+        modulator = std::make_unique<TuneModulator>(tuneToneHz(), rate, 60.0);
     } else {
         modulator = buildCurrentTxModulator(textSnapshot);
     }
@@ -27921,6 +28010,8 @@ void MainWindow::handleTxStarted()
 void MainWindow::handleTxStopped()
 {
     setTxLevelTune(false);
+    m_tuneTxRunning = false;
+    QTimer::singleShot(0, this, [this] { updateTuneButton(); });
     m_hellTxRaster = QImage();   // stopped: the paper keeps only what was sent
     m_hellTxColumnsPainted = 0;
     m_pendingTextTxText.clear();
@@ -28056,6 +28147,8 @@ void MainWindow::handleTxFinished()
 void MainWindow::handleTxError(const QString &message)
 {
     setTxLevelTune(false);
+    m_tuneTxRunning = false;
+    QTimer::singleShot(0, this, [this] { updateTuneButton(); });
     m_hellTxRaster = QImage();
     m_hellTxColumnsPainted = 0;
     const FtTxPlan failedFtPlan = m_pendingFt8TxPlan;

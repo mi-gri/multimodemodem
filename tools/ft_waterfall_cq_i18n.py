@@ -1117,3 +1117,23 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Holder dekodet tekst tilbake til den ligner morsetrafikk. Støy, fadende bærebølger og birdies gir rekker av E, T, I, A, N og M; den teksten vises ikke. Et enkelt kort første ord på en ny tone vises når mer tekst følger. Av viser rå dekoderutgang.',
   'Zadržuje dekódovaný text, dokud nevypadá jako provoz Morse. Šum, kolísající nosné a pískání dávají řady E, T, I, A, N a M; takový text se nezobrazí. Jediné krátké první slovo na novém tónu se objeví, jakmile následuje další text. Vypnuto zobrazí surový výstup dekodéru.'),
 }.items()})
+# Mode-independent Tune button (rig readout).
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'tune_button_tip':(
+  'Transmits a steady carrier on the TX audio frequency of the current mode for tuning (ATU, power, ALC), at the Tune level. Click again to stop; it stops by itself after 60 s. PWR, SWR and ALC are shown next to it.',
+  "Trasmette una portante continua sulla frequenza audio TX del modo attuale per l'accordo (ATU, potenza, ALC), al livello Tune. Clicca di nuovo per fermarla; si ferma da sola dopo 60 s. PWR, SWR e ALC sono mostrati accanto.",
+  "Émet une porteuse continue sur la fréquence audio TX du mode actuel pour l'accord (ATU, puissance, ALC), au niveau Tune. Cliquez à nouveau pour l'arrêter ; elle s'arrête seule après 60 s. PWR, SWR et ALC sont affichés à côté.",
+  'Sendet einen Dauerträger auf der TX-Audiofrequenz des aktuellen Modus zum Abstimmen (ATU, Leistung, ALC), mit dem Tune-Pegel. Erneuter Klick beendet ihn; nach 60 s endet er von selbst. PWR, SWR und ALC stehen daneben.',
+  'Sender en kontinuerlig bærebølge på TX-lydfrekvensen for gjeldende modus for avstemming (ATU, effekt, ALC), med Tune-nivået. Klikk igjen for å stoppe; den stopper selv etter 60 s. PWR, SWR og ALC vises ved siden av.',
+  'Vysílá trvalou nosnou na TX zvukovém kmitočtu aktuálního druhu provozu pro ladění (ATU, výkon, ALC) s úrovní Tune. Dalším kliknutím ji zastavíte; po 60 s skončí sama. PWR, SWR a ALC jsou zobrazeny vedle.'),
+ 'tune_start_log':('Tune: carrier %1 Hz (max. 60 s; Tune again stops it).','Tune: portante %1 Hz (max. 60 s; Tune di nuovo la ferma).',"Tune : porteuse %1 Hz (max. 60 s ; Tune à nouveau l'arrête).",'Tune: Träger %1 Hz (max. 60 s; erneut Tune beendet ihn).','Tune: bærebølge %1 Hz (maks. 60 s; Tune igjen stopper den).','Tune: nosná %1 Hz (max. 60 s; opětovné Tune ji zastaví).'),
+ 'tune_stop_log':('Tune stopped.','Tune fermato.','Tune arrêté.','Tune beendet.','Tune stoppet.','Tune zastaveno.'),
+ 'tune_blocked_log':('Tune blocked: another transmission is running.','Tune bloccato: è in corso un\'altra trasmissione.',"Tune bloqué : une autre émission est en cours.",'Tune gesperrt: Eine andere Sendung läuft.','Tune blokkert: en annen sending pågår.','Tune zablokováno: probíhá jiné vysílání.'),
+ 'tune_cw_serial_log':(
+  "Tune is not available with CW keying over the serial port; use the rig's own tune or switch the CW TX method to audio.",
+  "Tune non è disponibile con la manipolazione CW via porta seriale; usa il tune della radio o imposta il metodo TX CW su audio.",
+  "Tune n'est pas disponible avec la manipulation CW par le port série ; utilisez l'accord de la radio ou passez la méthode TX CW sur audio.",
+  'Tune ist mit CW-Tastung über die serielle Schnittstelle nicht verfügbar; das Tune des Funkgeräts nutzen oder die CW-TX-Methode auf Audio stellen.',
+  'Tune er ikke tilgjengelig med CW-nøkling via seriellporten; bruk riggens egen tune eller sett CW TX-metoden til lyd.',
+  'Tune není dostupné s klíčováním CW přes sériový port; použijte ladění rigu nebo přepněte metodu CW TX na audio.'),
+}.items()})

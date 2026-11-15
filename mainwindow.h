@@ -1020,6 +1020,12 @@ private slots:
      * @brief Starts a finite FT8 tune tone at the TX marker.
      */
     void tuneFt8Shell();
+    // Mode-independent Tune (rig readout): FT uses tuneFt8Shell, the other
+    // modes a TuneModulator carrier through the normal TX path.
+    void toggleTune();
+    void updateTuneButton();
+    bool tuneActive() const;
+    double tuneToneHz() const;
 
     /**
      * @brief Key of the current band and mode in the TX level memory; empty while the band is unknown.
@@ -2435,6 +2441,9 @@ private:
     QPushButton *m_btnFt8Stop = nullptr;
     QPushButton *m_btnFt8ClearDx = nullptr;   // abort the QSO, reset messages, next queued caller
     QPushButton *m_btnFt8Tune = nullptr;
+    QPushButton *m_btnTune = nullptr;          // rig readout, all modes
+    bool m_tuneTxRequested = false;            // next startImageTx() sends a carrier
+    bool m_tuneTxRunning = false;
     QCheckBox *m_chkFt8AutoSeq = nullptr;
     QCheckBox *m_chkFt8CqRepeat = nullptr;
     QLabel *m_lblFt8CqTimeout = nullptr;
