@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Period clock (side panel) now in every slot mode: JS8 (6/10/15/30 s by submode), Q65
+  (selected period, TX first/second), MSK144 (15/30 s, TX first/second) and WSPR (120 s), with
+  the UTC clock. JS8 and WSPR have no first/second choice: one bar, red while transmitting.
 - MSK144: the waterfall no longer shows the local TX monitor (as already for FT and CW).
   The noise-free local signal lit up even its -40 dB sidelobes, so the MSK looked far wider
   than on air; the generated signal itself is unchanged and measures as MSK (99 % bandwidth

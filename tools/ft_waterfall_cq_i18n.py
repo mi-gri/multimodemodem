@@ -1020,3 +1020,7 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Posune všechny řádky obrázku WEFAX vodorovně (cyklicky), i hotový obrázek. Zobrazení, uložení PNG i automatické uložení jej používají; 0 obnoví přijatou fázi.'),
  'wefax_line_start_log':('MeteoFax: line start set to %1 px.','MeteoFax: inizio riga impostato a %1 px.',"MeteoFax : début de ligne réglé à %1 px.",'MeteoFax: Zeilenbeginn auf %1 px gesetzt.','MeteoFax: linjestart satt til %1 px.','MeteoFax: začátek řádku nastaven na %1 px.'),
 }.items()})
+# Period clock for all slot modes (JS8, Q65, MSK144, WSPR).
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'slot_period_clock':('%1 periods','Periodi %1','Périodes %1','%1-Perioden','%1-perioder','Periody %1'),
+}.items()})

@@ -2404,6 +2404,8 @@ private:
     QPushButton *m_btnFt8TxPeriod = nullptr;   // toggles TX I / TX II (the radios stay as hidden state)
     QWidget *m_grpFt8UtcClock = nullptr;
     Ft8SlotClockWidget *m_ft8SlotClock = nullptr;
+    QTimer m_slotClockTimer;            // period clock for JS8, Q65, MSK144, WSPR
+    void updateSlotModeClock();
     QLCDNumber *m_lcdFt8UtcClock = nullptr;
     QLabel *m_lblFt8WindowStatus = nullptr;
     QPushButton *m_btnFt8GenerateStd = nullptr;

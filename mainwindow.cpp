@@ -1284,8 +1284,12 @@ public:
                       bool txWindow,
                       double slotLengthSeconds = 15.0,
                       double cycleLengthSeconds = 30.0,
-                      const QString &modeLabel = QStringLiteral("FT8"))
+                      const QString &modeLabel = QStringLiteral("FT8"),
+                      bool periodChoice = true)
     {
+        // periodChoice false (JS8, WSPR): no first/second TX period, so one
+        // bar for the running period, coloured TX while transmitting.
+        m_periodChoice = periodChoice;
         m_slotLengthSeconds = qMax(0.25, slotLengthSeconds);
         m_cycleLengthSeconds = qMax(m_slotLengthSeconds * 2.0, cycleLengthSeconds);
         double normalized = std::fmod(cycleSeconds, m_cycleLengthSeconds);
@@ -1306,9 +1310,24 @@ protected:
         painter.setRenderHint(QPainter::Antialiasing, true);
         const double progress = qBound(0.0,
             std::fmod(m_cycleSeconds, m_slotLengthSeconds) / m_slotLengthSeconds, 1.0);
+        QFont labelFont = font(); labelFont.setBold(true); painter.setFont(labelFont);
+        if (!m_periodChoice) {
+            const QRectF bar(2, 2 + (height() - 4.0) / 4.0, width() - 4, (height() - 4.0) / 2.0);
+            const QColor colour = m_txWindow ? QColor(194, 66, 66) : QColor(32, 150, 85);
+            painter.setPen(QPen(colour, 2));
+            painter.setBrush(palette().color(QPalette::Base));
+            painter.drawRoundedRect(bar, 3, 3);
+            if (progress > 0.0)
+                painter.fillRect(QRectF(bar.left()+1, bar.top()+1, (bar.width()-2)*progress, bar.height()-2), colour);
+            painter.setPen(palette().color(QPalette::Text));
+            painter.drawText(bar.adjusted(6,0,-4,0), Qt::AlignVCenter | Qt::AlignLeft,
+                QStringLiteral("%1  %2 / %3 s").arg(m_txWindow ? QStringLiteral("TX") : QStringLiteral("RX"))
+                    .arg(m_slotLengthSeconds * progress, 0, 'f', m_slotLengthSeconds >= 60.0 ? 0 : 1)
+                    .arg(m_slotLengthSeconds, 0, 'f', 0));
+            return;
+        }
         const int active = m_firstPeriodNow ? 0 : 1;
         const qreal rowHeight = (height() - 8.0) / 2.0;
-        QFont labelFont = font(); labelFont.setBold(true); painter.setFont(labelFont);
         for (int row = 0; row < 2; ++row) {
             const QRectF bar(2, 2 + row * (rowHeight + 4), width() - 4, rowHeight);
             const bool txPeriod = row == (m_txWindow ? active : 1-active);
@@ -1334,6 +1353,7 @@ private:
     double m_cycleLengthSeconds = 30.0;
     bool m_firstPeriodNow = true;
     bool m_txWindow = false;
+    bool m_periodChoice = true;
     QString m_modeLabel = QStringLiteral("FT8");
 };
 
@@ -1627,6 +1647,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(&m_qsoUtcTimer, &QTimer::timeout,
             this, &MainWindow::updateQsoUtcFields);
     m_qsoUtcTimer.start();
+
+    m_slotClockTimer.setInterval(100);
+    connect(&m_slotClockTimer, &QTimer::timeout, this, &MainWindow::updateSlotModeClock);
 
     m_bandSchedulerTimer.setInterval(1000);
     connect(&m_bandSchedulerTimer, &QTimer::timeout,
@@ -17351,13 +17374,63 @@ void MainWindow::updateFtUtcClockVisibility(const QString &modeName)
         ? modeName
         : ((ui != nullptr && ui->cmbMode != nullptr) ? ui->cmbMode->currentText() : QString());
     const bool showFtClock = Ft8Mode::isFamilyMode(activeModeName);
+    const bool slotMode = showFtClock || Js8Mode::isMode(activeModeName) || Q65Mode::isFamilyMode(activeModeName) ||
+                          Msk144Mode::isMode(activeModeName) || WsprMode::isMode(activeModeName);
 
     if (m_grpFt8UtcClock != nullptr) {
-        m_grpFt8UtcClock->setVisible(showFtClock);
+        m_grpFt8UtcClock->setVisible(slotMode);
+        if (auto *box = qobject_cast<QGroupBox *>(m_grpFt8UtcClock)) box->setTitle(showFtClock ? uiText("ft_period_clock", "FT periods")
+                                               : uiText("slot_period_clock", "%1 periods").arg(
+                                                     Q65Mode::isFamilyMode(activeModeName) ? QStringLiteral("Q65") : activeModeName));
+        if (!showFtClock) m_grpFt8UtcClock->setToolTip(QString());
+    }
+    // FT is driven by its slot scheduler; the other slot modes by this timer.
+    if (slotMode && !showFtClock) {
+        if (!m_slotClockTimer.isActive()) m_slotClockTimer.start();
+        updateSlotModeClock();
+    } else {
+        m_slotClockTimer.stop();
     }
     updateRigReadout();
 }
 
+
+void MainWindow::updateSlotModeClock()
+{
+    if (m_ft8SlotClock == nullptr || ui == nullptr || ui->cmbMode == nullptr) return;
+    const QString mode = ui->cmbMode->currentText();
+    int periodS = 0;
+    bool periodChoice = true;
+    bool txFirst = true;
+    QString label;
+    if (Js8Mode::isMode(mode)) {
+        periodS = Js8Mode::parameters(currentJs8Submode()).periodSeconds; periodChoice = false; label = QStringLiteral("JS8");
+    } else if (WsprMode::isMode(mode)) {
+        periodS = 120; periodChoice = false; label = QStringLiteral("WSPR");
+    } else if (Q65Mode::isFamilyMode(mode)) {
+        periodS = m_cmbQ65Period != nullptr ? m_cmbQ65Period->currentData().toInt() : 60;
+        txFirst = m_chkQ65TxFirst == nullptr || m_chkQ65TxFirst->isChecked(); label = QStringLiteral("Q65");
+    } else if (Msk144Mode::isMode(mode)) {
+        periodS = m_cmbMsk144Period != nullptr ? m_cmbMsk144Period->currentData().toInt() : 15;
+        txFirst = m_chkMsk144TxFirst == nullptr || m_chkMsk144TxFirst->isChecked(); label = QStringLiteral("MSK144");
+    } else {
+        m_slotClockTimer.stop();
+        return;
+    }
+    periodS = qMax(1, periodS);
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const QTime t = now.time();
+    const qint64 msOfDay = qint64(t.msecsSinceStartOfDay());
+    const qint64 cycleMs = 2LL * periodS * 1000;
+    const qint64 cyclePosMs = msOfDay % cycleMs;
+    const bool firstPeriodNow = cyclePosMs < periodS * 1000LL;
+    // Periods with a first/second choice: TX window as selected; JS8/WSPR:
+    // TX while actually transmitting.
+    const bool txWindow = periodChoice ? (firstPeriodNow == txFirst) : (m_txRunning || m_lastRigPttOn);
+    m_ft8SlotClock->setSlotState(double(cyclePosMs) / 1000.0, firstPeriodNow, txWindow,
+                                 double(periodS), double(cycleMs) / 1000.0, label, periodChoice);
+    if (m_lcdFt8UtcClock != nullptr) m_lcdFt8UtcClock->display(t.toString(QStringLiteral("HH:mm:ss")));
+}
 
 void MainWindow::updateFt8SlotStatus()
 {
