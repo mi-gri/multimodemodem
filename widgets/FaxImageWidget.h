@@ -81,11 +81,20 @@ public slots:
      */
     void clearTransmitProgress();
 
+    // WEFAX line start: shows every row rotated left by this many pixels
+    // (display only, no image copy). 0 = as received.
+    void setLineStartOffset(int pixels);
+    int lineStartOffset() const { return m_lineStartOffset; }
+    // The same rotation applied to an image (for saving).
+    static QImage rotateLines(const QImage &image, int pixels);
+
 signals:
     /**
      * @brief Emits when zoom mode or zoom value changes.
      */
     void zoomChanged(int percent, bool fitMode);
+    // Shift + left click on the image: image column under the mouse.
+    void lineStartPicked(int imageX);
 
 protected:
     /**
@@ -107,6 +116,7 @@ protected:
      * @brief Updates the pan offset while dragging.
      */
     void mouseMoveEvent(QMouseEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
     /**
      * @brief Ends panning.
@@ -123,6 +133,12 @@ private:
      * @brief Clamps pan offset so the image cannot disappear completely.
      */
     void clampPanOffset();
+    // Dragging pans only when zoomed in and the image is larger than the
+    // view; the open-hand cursor shows exactly when that is possible.
+    bool canPan() const;
+    void updatePanCursor();
+    bool m_panCursorShown = false;
+    int m_lineStartOffset = 0;
 
 private:
     QImage m_image;

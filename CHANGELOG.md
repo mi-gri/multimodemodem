@@ -4,6 +4,12 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- WEFAX: new "Line start" (Operating tab) for a missed phasing. It rotates every row
+  horizontally, also of a completed image, without copying it for display; PNG save and
+  auto-save store the corrected image. Shift+click in the image makes that column the left
+  edge (e.g. the edge of the phasing bar); 0 restores the received phase.
+- WEFAX/SSTV image: the zoom hint no longer claims dragging in "fit" mode; the hand cursor
+  appears exactly when the zoomed image can be dragged.
 - Feld Hell: the paper wraps at the window width (columns = visible width / zoom) instead
   of 1120 columns, so no horizontal scrolling; on a resize the tape is re-wrapped without
   losing pixels. TX text is printed column by column as the audio is actually played

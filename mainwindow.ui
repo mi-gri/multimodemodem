@@ -1020,7 +1020,7 @@
                 <item row="20" column="0" colspan="2">
                  <widget class="QLabel" name="lblFaxZoomStatus">
                   <property name="text">
-                   <string>Zoom: fit. Mouse wheel zooms, drag pans.</string>
+                   <string>Zoom: fit. Mouse wheel over the image zooms in; then drag to pan.</string>
                   </property>
                   <property name="wordWrap">
                    <bool>true</bool>

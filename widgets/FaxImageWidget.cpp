@@ -3,6 +3,9 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPaintEvent>
+#include <QResizeEvent>
+
+#include <cstring>
 #include <QWheelEvent>
 
 // -----------------------------------------------------------------------------
@@ -46,6 +49,7 @@ void FaxImageWidget::clear()
 {
     m_image = QImage();
     m_panOffset = QPoint();
+    updatePanCursor();
     m_txProgressVisible = false;
     m_txProgress = 0.0;
     update();
@@ -59,6 +63,7 @@ void FaxImageWidget::setFitToWindow()
 
     m_fitToWindow = true;
     m_panOffset = QPoint();
+    updatePanCursor();
     emit zoomChanged(m_zoomPercent, true);
     update();
 }
@@ -130,7 +135,18 @@ void FaxImageWidget::paintEvent(QPaintEvent *event)
         painter.fillRect(targetRect, QColor(18, 18, 18));
 
         painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-        painter.drawImage(targetRect, m_image);
+        const int w = m_image.width();
+        const int offset = w > 0 ? ((m_lineStartOffset % w) + w) % w : 0;
+        if (offset == 0) {
+            painter.drawImage(targetRect, m_image);
+        } else {
+            // Rotated rows in two pieces: [offset, w) first, then [0, offset).
+            const double sx = double(targetRect.width()) / w;
+            const QRectF first(targetRect.left(), targetRect.top(), (w - offset) * sx, targetRect.height());
+            const QRectF second(first.right(), targetRect.top(), offset * sx, targetRect.height());
+            painter.drawImage(first, m_image, QRectF(offset, 0, w - offset, m_image.height()));
+            painter.drawImage(second, m_image, QRectF(0, 0, offset, m_image.height()));
+        }
 
         if (m_txProgressVisible) {
             const int transmittedHeight = static_cast<int>(targetRect.height() * m_txProgress);
@@ -172,9 +188,51 @@ void FaxImageWidget::wheelEvent(QWheelEvent *event)
     event->accept();
 }
 
+void FaxImageWidget::setLineStartOffset(int pixels)
+{
+    if (pixels == m_lineStartOffset) return;
+    m_lineStartOffset = pixels;
+    update();
+}
+
+QImage FaxImageWidget::rotateLines(const QImage &image, int pixels)
+{
+    const int w = image.width();
+    const int offset = w > 0 ? ((pixels % w) + w) % w : 0;
+    if (image.isNull() || offset == 0) return image;
+    QImage out(image.size(), image.format());
+    out.setColorTable(image.colorTable());
+    if (image.depth() >= 8) {
+        const int bpp = image.depth() / 8;
+        for (int y = 0; y < image.height(); ++y) {
+            const uchar *src = image.constScanLine(y);
+            uchar *dst = out.scanLine(y);
+            std::memcpy(dst, src + size_t(offset) * bpp, size_t(w - offset) * bpp);
+            std::memcpy(dst + size_t(w - offset) * bpp, src, size_t(offset) * bpp);
+        }
+    } else {
+        QPainter p(&out);
+        p.drawImage(0, 0, image, offset, 0, w - offset, image.height());
+        p.drawImage(w - offset, 0, image, 0, 0, offset, image.height());
+    }
+    return out;
+}
+
 void FaxImageWidget::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton && !m_fitToWindow && !m_image.isNull()) {
+    if (event->button() == Qt::LeftButton && (event->modifiers() & Qt::ShiftModifier) && !m_image.isNull()) {
+        const QRect target = imageTargetRect();
+        if (target.contains(event->pos()) && target.width() > 0) {
+            // Column in the displayed (already rotated) image -> received image.
+            const int w = m_image.width();
+            const int shown = qBound(0, int(double(event->pos().x() - target.left()) * w / target.width()), w - 1);
+            const int offset = ((m_lineStartOffset % w) + w) % w;
+            emit lineStartPicked((shown + offset) % w);
+        }
+        event->accept();
+        return;
+    }
+    if (event->button() == Qt::LeftButton && canPan()) {
         m_panning = true;
         m_lastMousePos = event->pos();
         setCursor(Qt::ClosedHandCursor);
@@ -204,7 +262,9 @@ void FaxImageWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton && m_panning) {
         m_panning = false;
+        m_panCursorShown = false;
         unsetCursor();
+        updatePanCursor();
         event->accept();
         return;
     }
@@ -241,10 +301,37 @@ QRect FaxImageWidget::imageTargetRect() const
     return QRect(topLeft, targetSize);
 }
 
+void FaxImageWidget::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    clampPanOffset();
+}
+
+bool FaxImageWidget::canPan() const
+{
+    if (m_fitToWindow || m_image.isNull()) {
+        return false;
+    }
+    return (m_image.width() * m_zoomPercent) / 100 > width() ||
+           (m_image.height() * m_zoomPercent) / 100 > height();
+}
+
+void FaxImageWidget::updatePanCursor()
+{
+    const bool pan = canPan();
+    if (m_panning || pan == m_panCursorShown) {
+        return;
+    }
+    m_panCursorShown = pan;
+    if (pan) setCursor(Qt::OpenHandCursor);
+    else unsetCursor();
+}
+
 void FaxImageWidget::clampPanOffset()
 {
     if (m_fitToWindow || m_image.isNull()) {
         m_panOffset = QPoint();
+        updatePanCursor();
         return;
     }
 
@@ -258,4 +345,5 @@ void FaxImageWidget::clampPanOffset()
 
     m_panOffset.setX(qBound(-maxX, m_panOffset.x(), maxX));
     m_panOffset.setY(qBound(-maxY, m_panOffset.y(), maxY));
+    updatePanCursor();
 }

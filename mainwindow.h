@@ -1965,6 +1965,7 @@ private:
     QLineEdit *m_editSstvTxReport = nullptr;
     QPushButton *m_btnSstvEditor = nullptr;
     QPushButton *m_btnFaxForceRx = nullptr;
+    QSpinBox *m_spinFaxLineStart = nullptr;   // WEFAX line start (px), display + save
     QPushButton *m_btnSstvForceRx = nullptr;
     QCheckBox *m_chkSstvAutoVis=nullptr;
     SstvImageArchive *m_sstvImageArchive=nullptr;

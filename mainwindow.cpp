@@ -2675,6 +2675,38 @@ void MainWindow::setupCustomWidgets()
         for (QWidget *w : {static_cast<QWidget *>(ui->btnFaxAnalyzeWav), static_cast<QWidget *>(nullptr)})
             if (w != nullptr) opLayout->addWidget(w);
         opLayout->addLayout(zoomRow);
+        // Line start: a missed phasing leaves the margin inside the picture;
+        // rotating every row moves it back to the edge (also a finished image).
+        auto *lineStartRow = new QHBoxLayout();
+        auto *lblLineStart = new QLabel(uiText("wefax_line_start", "Line start"), faxOpGroup);
+        m_spinFaxLineStart = new QSpinBox(faxOpGroup);
+        m_spinFaxLineStart->setRange(0, 9999);
+        m_spinFaxLineStart->setSuffix(QStringLiteral(" px"));
+        m_spinFaxLineStart->setSpecialValueText(uiText("wefax_line_start_received", "as received"));
+        auto *btnLineStartReset = new QPushButton(QStringLiteral("0"), faxOpGroup);
+        btnLineStartReset->setMaximumWidth(40);
+        lineStartRow->addWidget(lblLineStart);
+        lineStartRow->addWidget(m_spinFaxLineStart, 1);
+        lineStartRow->addWidget(btnLineStartReset);
+        opLayout->addLayout(lineStartRow);
+        auto *lblLineStartHint = new QLabel(uiText("wefax_line_start_hint", "Shift+click in the image: that column becomes the left edge (e.g. the edge of the phasing bar)."), faxOpGroup);
+        lblLineStartHint->setWordWrap(true);
+        opLayout->addWidget(lblLineStartHint);
+        const QString lineStartHelp = uiText("wefax_line_start_help", "Moves all rows of the WEFAX image horizontally (wrapping around), also a completed image. Display, PNG save and auto-save use it; 0 restores the received phase.");
+        m_spinFaxLineStart->setToolTip(lineStartHelp);
+        lblLineStart->setToolTip(lineStartHelp);
+        connect(btnLineStartReset, &QPushButton::clicked, m_spinFaxLineStart, [this] { m_spinFaxLineStart->setValue(0); });
+        connect(m_spinFaxLineStart, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int px) {
+            if (m_faxImageWidget != nullptr && ui->cmbMode->currentText() == WeatherFaxDecoder::modeName())
+                m_faxImageWidget->setLineStartOffset(px);
+        });
+        if (m_faxImageWidget != nullptr) {
+            connect(m_faxImageWidget, &FaxImageWidget::lineStartPicked, this, [this](int x) {
+                if (ui->cmbMode->currentText() != WeatherFaxDecoder::modeName()) return;
+                m_spinFaxLineStart->setValue(x);
+                appendLog(uiText("wefax_line_start_log", "MeteoFax: line start set to %1 px.").arg(x));
+            });
+        }
         for (QWidget *w : {static_cast<QWidget *>(ui->lblFaxZoomStatus), static_cast<QWidget *>(ui->btnFaxResetImage),
                            static_cast<QWidget *>(ui->btnFaxSaveImage), static_cast<QWidget *>(m_btnFaxForceRx)})
             if (w != nullptr) opLayout->addWidget(w);
@@ -14552,6 +14584,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
         setDecoderReady(QStringLiteral("WEFAX"));
 
         if (m_faxImageWidget != nullptr) {
+            m_faxImageWidget->setLineStartOffset(m_spinFaxLineStart != nullptr ? m_spinFaxLineStart->value() : 0);
             m_faxImageWidget->setImage(m_rxDecoderWorker->image(m_weatherFaxDecoder));
         }
     } else if (modeName == SstvDecoder::modeName()) {
@@ -14560,6 +14593,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
         setDecoderReady(QStringLiteral("SSTV"));
 
         if (m_faxImageWidget != nullptr) {
+            m_faxImageWidget->setLineStartOffset(0);   // SSTV has its own horizontal position
             m_faxImageWidget->setImage(m_rxDecoderWorker->image(m_sstvDecoder));
         }
     } else if (modeName == RttyDecoder::modeName()) {
@@ -23628,7 +23662,8 @@ void MainWindow::saveWeatherFaxImage()
         return;
     }
 
-    const QImage image = m_rxDecoderWorker->image(m_weatherFaxDecoder);
+    const QImage image = FaxImageWidget::rotateLines(m_rxDecoderWorker->image(m_weatherFaxDecoder),
+                                                     m_spinFaxLineStart != nullptr ? m_spinFaxLineStart->value() : 0);
 
     if (image.isNull()) {
         appendLog("Save PNG failed: no MeteoFax image available.");
@@ -26053,7 +26088,7 @@ void MainWindow::handleWeatherFaxImageCompleted(const QImage &image, const QStri
 
     const QString fileName = makeWeatherFaxAutoSaveFileName();
 
-    if (!saveWeatherFaxImageToFile(image, fileName)) {
+    if (!saveWeatherFaxImageToFile(FaxImageWidget::rotateLines(image, m_spinFaxLineStart != nullptr ? m_spinFaxLineStart->value() : 0), fileName)) {
         QMessageBox::warning(this,
                              M3I18n::text(QStringLiteral("Auto-save PNG failed")),
                              M3I18n::text(QStringLiteral("Unable to auto-save the completed MeteoFax image.")));
@@ -26133,12 +26168,12 @@ void MainWindow::handleFaxImageZoomChanged(int percent, bool fitMode)
 {
     if (fitMode) {
         ui->lblFaxZoomStatus->setText(
-            uiText("fax_zoom_fit_hint", "Zoom: fit. Mouse wheel zooms, drag pans."));
+            uiText("fax_zoom_fit_hint_v2", "Zoom: fit. Mouse wheel over the image zooms in; then drag to pan."));
         return;
     }
 
     ui->lblFaxZoomStatus->setText(
-        uiText("fax_zoom_percent_hint", "Zoom: %1%. Mouse wheel zooms, drag pans.").arg(percent));
+        uiText("fax_zoom_percent_hint_v2", "Zoom: %1%. Mouse wheel zooms; drag pans when the image is larger than the view (hand cursor).").arg(percent));
 }
 
 

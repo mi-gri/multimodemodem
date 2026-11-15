@@ -982,3 +982,41 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'scheduler_append':('Append','Aggiungi','Ajouter','Anhängen','Legg til','Připojit'),
  'scheduler_export_failed':('Could not write %1: %2','Impossibile scrivere %1: %2',"Impossible d'écrire %1 : %2",'%1 konnte nicht geschrieben werden: %2','Kunne ikke skrive %1: %2','Nelze zapsat %1: %2'),
 }.items()})
+# WEFAX/SSTV image: drag pans only when zoomed in beyond the view.
+_FAX_FIT=('Zoom: fit. Mouse wheel over the image zooms in; then drag to pan.',
+  "Zoom: adatta. La rotella sull'immagine ingrandisce; poi trascina per spostare.",
+  "Zoom : ajusté. La molette sur l'image agrandit ; ensuite, faites glisser pour déplacer.",
+  'Zoom: eingepasst. Mausrad über dem Bild vergrößert; danach zum Verschieben ziehen.',
+  'Zoom: tilpasset. Musehjulet over bildet forstørrer; dra deretter for å flytte.',
+  'Zoom: přizpůsobit. Kolečko myši nad obrázkem zvětší; potom tažením posunete.')
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'fax_zoom_fit_hint_v2':_FAX_FIT,
+ 'fax_zoom_percent_hint_v2':(
+  'Zoom: %1%. Mouse wheel zooms; drag pans when the image is larger than the view (hand cursor).',
+  "Zoom: %1%. La rotella zooma; trascina per spostare quando l'immagine è più grande della vista (cursore a mano).",
+  "Zoom : %1%. La molette zoome ; faites glisser pour déplacer quand l'image dépasse la vue (curseur main).",
+  'Zoom: %1 %. Mausrad zoomt; Ziehen verschiebt, wenn das Bild größer als die Ansicht ist (Hand-Mauszeiger).',
+  'Zoom: %1%. Musehjulet zoomer; dra for å flytte når bildet er større enn visningen (håndpeker).',
+  'Zoom: %1%. Kolečko myši zvětšuje; tažením posunete, je-li obrázek větší než zobrazení (kurzor ruky).'),
+}.items()})
+SOURCES.update({_FAX_FIT[0]:dict(zip(LANGS,_FAX_FIT))})
+# WEFAX line start (manual phasing).
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'wefax_line_start':('Line start','Inizio riga','Début de ligne','Zeilenbeginn','Linjestart','Začátek řádku'),
+ 'wefax_line_start_received':('as received','come ricevuto','tel que reçu','wie empfangen','som mottatt','jak přijato'),
+ 'wefax_line_start_hint':(
+  'Shift+click in the image: that column becomes the left edge (e.g. the edge of the phasing bar).',
+  "Maiusc+clic nell'immagine: quella colonna diventa il bordo sinistro (ad es. il bordo della barra di fase).",
+  "Maj+clic dans l'image : cette colonne devient le bord gauche (p. ex. le bord de la barre de phasage).",
+  'Shift+Klick ins Bild: Diese Spalte wird zum linken Rand (z. B. die Kante des Phasing-Balkens).',
+  'Shift+klikk i bildet: den kolonnen blir venstre kant (f.eks. kanten av fasestolpen).',
+  'Shift+klik do obrázku: tento sloupec se stane levým okrajem (např. hrana fázovacího pruhu).'),
+ 'wefax_line_start_help':(
+  'Moves all rows of the WEFAX image horizontally (wrapping around), also a completed image. Display, PNG save and auto-save use it; 0 restores the received phase.',
+  "Sposta orizzontalmente tutte le righe dell'immagine WEFAX (in modo circolare), anche un'immagine completata. Visualizzazione, salvataggio PNG e salvataggio automatico lo usano; 0 ripristina la fase ricevuta.",
+  "Décale horizontalement toutes les lignes de l'image WEFAX (de façon circulaire), même une image terminée. L'affichage, l'enregistrement PNG et l'enregistrement automatique l'utilisent ; 0 rétablit la phase reçue.",
+  'Verschiebt alle Zeilen des WEFAX-Bildes waagerecht (ringförmig), auch ein fertiges Bild. Anzeige, PNG-Speichern und Auto-Save nutzen es; 0 stellt die empfangene Phase wieder her.',
+  'Flytter alle linjene i WEFAX-bildet vannrett (rundt), også et ferdig bilde. Visning, PNG-lagring og autolagring bruker det; 0 gjenoppretter mottatt fase.',
+  'Posune všechny řádky obrázku WEFAX vodorovně (cyklicky), i hotový obrázek. Zobrazení, uložení PNG i automatické uložení jej používají; 0 obnoví přijatou fázi.'),
+ 'wefax_line_start_log':('MeteoFax: line start set to %1 px.','MeteoFax: inizio riga impostato a %1 px.',"MeteoFax : début de ligne réglé à %1 px.",'MeteoFax: Zeilenbeginn auf %1 px gesetzt.','MeteoFax: linjestart satt til %1 px.','MeteoFax: začátek řádku nastaven na %1 px.'),
+}.items()})
