@@ -1596,7 +1596,130 @@ QVector<LogbookEntry> QsoMapWidget::filteredMapRecords() const
     return m_filteredCache;
 }
 
+const QsoMapWidget::RecordIndex &QsoMapWidget::recordIndex() const
+{
+    const void *cty = &CtyCountryFile::instance();
+    if (m_recordIndex && m_recordIndex->generation == m_recordsGeneration && m_recordIndex->cty == cty)
+        return *m_recordIndex;
+    auto index = std::make_shared<RecordIndex>();
+    index->generation = m_recordsGeneration;
+    index->cty = cty;
+    const int n = m_records.size();
+    index->grid4.resize(n); index->mode.resize(n); index->band.resize(n); index->dxccKey.resize(n);
+    index->utcMs.resize(n); index->utcDay.resize(n); index->ctyReference.resize(n);
+    for (int i = 0; i < n; ++i) {
+        const LogbookEntry &e = m_records.at(i);
+        index->grid4[i] = maidenheadGrid4(e.grid);
+        index->mode[i] = normalizedMode(e.mode);
+        index->band[i] = e.band.trimmed().toLower();
+        if (e.utc.isValid()) {
+            const QDateTime utc = e.utc.toUTC();
+            index->utcMs[i] = utc.toMSecsSinceEpoch();
+            index->utcDay[i] = utc.date().toJulianDay();
+        }
+        const CtyCountryFile::LookupResult ctyResult = CtyCountryFile::instance().lookupCallsign(e.callsign);
+        QString key = e.adifFields.value(QStringLiteral("DXCC")).trimmed();
+        if (key.isEmpty() && ctyResult.valid) key = ctyResult.entity.dxcc;
+        if (key.isEmpty()) key = e.country.trimmed().toUpper();
+        if (key.isEmpty()) key = e.callsign.section(QChar('/'), -1).left(3).toUpper();
+        index->dxccKey[i] = key;
+        index->ctyReference[i] = ctyResult.valid && !ctyResult.entity.referenceGrid.isEmpty();
+    }
+    m_recordIndex = index;
+    return *m_recordIndex;
+}
+
+bool QsoMapWidget::modeMatchesNormalized(const QString &entry, const QString &filter)
+{
+    if (filter.isEmpty()) {
+        return entry == QStringLiteral("RTTY") || entry == QStringLiteral("PSK") ||
+               entry == QStringLiteral("MFSK") || entry == QStringLiteral("CW") ||
+               entry.startsWith(QStringLiteral("HELL")) || entry == QStringLiteral("SSTV") ||
+               entry == QStringLiteral("FT8") || entry == QStringLiteral("FT4");
+    }
+    if (filter == QStringLiteral("HELL")) return entry.startsWith(QStringLiteral("HELL"));
+    return entry == filter;
+}
+
 QVector<LogbookEntry> QsoMapWidget::filteredMapRecordsUncached() const
+{
+    // Heard stations are a short, frequently changing list: scan directly.
+    if (m_displayBehavior == DisplayBehavior::HeardToday) return filteredMapRecordsScan();
+
+    const RecordIndex &idx = recordIndex();
+    const int n = m_records.size();
+    const bool dxcc = m_displayBehavior == DisplayBehavior::WorkedDxcc;
+    const QString band = m_mapBandFilter.trimmed().toLower();
+    const QString mode = m_mapUseModeFilter ? normalizedMode(m_modeFilter) : QString();
+    qint64 fromDay = 0, untilDay = 0;
+    const qint64 today = QDateTime::currentDateTimeUtc().date().toJulianDay();
+    const bool allDates = m_mapDateScope == QStringLiteral("all");
+    if (m_mapDateScope == QStringLiteral("custom")) { fromDay = m_mapFromDate.toJulianDay(); untilDay = m_mapUntilDate.toJulianDay(); }
+    else if (m_mapDateScope == QStringLiteral("last30")) { fromDay = today - 29; untilDay = today; }
+    else if (m_mapDateScope == QStringLiteral("last7")) { fromDay = today - 6; untilDay = today; }
+    else { fromDay = today; untilDay = today; }
+
+    QVector<int> chosen;
+    QHash<QString, int> latestByKey;
+    for (int i = 0; i < n; ++i) {
+        const qint64 day = idx.utcDay.at(i);
+        if (day == 0) continue;                                   // no valid UTC
+        if (!allDates && (day < fromDay || day > untilDay)) continue;
+        if (m_mapUseModeFilter && !modeMatchesNormalized(idx.mode.at(i), mode)) continue;
+        if (!band.isEmpty() && idx.band.at(i) != band) continue;
+        const bool hasGrid = !idx.grid4.at(i).isEmpty();
+        if (dxcc) {
+            const QString &key = idx.dxccKey.at(i);
+            if (key.isEmpty() || (!hasGrid && !idx.ctyReference.at(i))) continue;
+            auto it = latestByKey.find(key);
+            if (it == latestByKey.end()) latestByKey.insert(key, i);
+            else if (idx.utcMs.at(i) > idx.utcMs.at(it.value())) it.value() = i;
+            continue;
+        }
+        if (!hasGrid) continue;
+        if (m_mapLatestPerGrid) {
+            auto it = latestByKey.find(idx.grid4.at(i));
+            if (it == latestByKey.end()) latestByKey.insert(idx.grid4.at(i), i);
+            else if (idx.utcMs.at(i) > idx.utcMs.at(it.value())) it.value() = i;
+        } else {
+            chosen.append(i);
+        }
+    }
+    if (dxcc || m_mapLatestPerGrid) {
+        chosen.reserve(latestByKey.size());
+        for (auto it = latestByKey.cbegin(); it != latestByKey.cend(); ++it) chosen.append(it.value());
+    }
+    std::sort(chosen.begin(), chosen.end(), [&idx](int a, int b) {
+        return idx.utcMs.at(a) != idx.utcMs.at(b) ? idx.utcMs.at(a) > idx.utcMs.at(b) : a < b;
+    });
+    if (m_mapMaxMarkers > 0 && chosen.size() > m_mapMaxMarkers) chosen.resize(m_mapMaxMarkers);
+
+    QVector<LogbookEntry> filtered;
+    filtered.reserve(chosen.size());
+    for (int i : chosen) {
+        LogbookEntry entry = m_records.at(i);
+        if (dxcc) {
+            // Enrich only the few selected entries (one per country).
+            const CtyCountryFile::LookupResult cty = CtyCountryFile::instance().lookupCallsign(entry.callsign);
+            if (entry.country.trimmed().isEmpty() && cty.valid) entry.country = cty.entity.name;
+            if (cty.valid) {
+                const QString refined = CtyCountryFile::instance().refinedGridForCallsign(entry.callsign, entry.grid, 6);
+                if (!refined.isEmpty() && (entry.grid.trimmed().isEmpty() || entry.grid.trimmed().size() < 6)) entry.grid = refined;
+                entry.adifFields.insert(QStringLiteral("DXCC"), cty.entity.dxcc);
+                entry.adifFields.insert(QStringLiteral("CTY_NAME"), cty.entity.name);
+                entry.adifFields.insert(QStringLiteral("CTY_PREFIX"), cty.entity.primaryPrefix);
+                entry.adifFields.insert(QStringLiteral("CTY_CONT"), cty.entity.continent);
+                entry.adifFields.insert(QStringLiteral("CTY_GRID"), cty.entity.referenceGrid);
+                entry.adifFields.insert(QStringLiteral("CTY_LAT"), QString::number(cty.entity.latitude, 'f', 4));
+                entry.adifFields.insert(QStringLiteral("CTY_LON"), QString::number(cty.entity.longitude, 'f', 4));
+            }
+        }
+        filtered.append(std::move(entry));
+    }
+    return filtered;
+}
+
+QVector<LogbookEntry> QsoMapWidget::filteredMapRecordsScan() const
 {
     QVector<LogbookEntry> filtered;
     filtered.reserve(qMin(sourceRecordsForBehavior().size(), qMax(32, m_mapMaxMarkers)));
@@ -2166,14 +2289,18 @@ QMap<QString, int> QsoMapWidget::workedMaidenheadGridCounts() const
     const QString key = QStringLiteral("%1|%2|%3").arg(m_recordsGeneration).arg(band, mode);
     if (key == m_workedGridCacheKey) return m_workedGridCache;
     QMap<QString, int> counts;
-    for (const LogbookEntry &entry : m_records) {
-        if (!mode.isEmpty() && !modeMatches(entry.mode, mode)) continue;
-        if (!band.isEmpty() && entry.band.trimmed().compare(band, Qt::CaseInsensitive) != 0) continue;
-        const QString grid4 = maidenheadGrid4(entry.grid);
-        if (!grid4.isEmpty()) {
-            counts[grid4] += 1;
-        }
+    const RecordIndex &idx = recordIndex();
+    const QString modeNorm = mode.isEmpty() ? QString() : normalizedMode(mode);
+    const QString bandLower = band.toLower();
+    QHash<QString, int> hashCounts;
+    for (int i = 0; i < idx.grid4.size(); ++i) {
+        const QString &grid4 = idx.grid4.at(i);
+        if (grid4.isEmpty()) continue;
+        if (!modeNorm.isEmpty() && !modeMatchesNormalized(idx.mode.at(i), modeNorm)) continue;
+        if (!bandLower.isEmpty() && idx.band.at(i) != bandLower) continue;
+        ++hashCounts[grid4];
     }
+    for (auto it = hashCounts.cbegin(); it != hashCounts.cend(); ++it) counts.insert(it.key(), it.value());
     m_workedGridCache = counts;
     m_workedGridCacheKey = key;
     return counts;
@@ -2241,8 +2368,9 @@ bool QsoMapWidget::maidenheadToLonLat(const QString &grid, QPointF *lonLat)
 
 QString QsoMapWidget::maidenheadGrid4(const QString &grid)
 {
+    static const QRegularExpression invalid(QStringLiteral("[^A-R0-9A-X]"));
     QString g = grid.trimmed().toUpper();
-    g.remove(QRegularExpression(QStringLiteral("[^A-R0-9A-X]")));
+    g.remove(invalid);
     if (g.size() < 4) {
         return QString();
     }

@@ -165,8 +165,22 @@ private:
     mutable QVector<LogbookEntry> m_filteredCache;
     mutable QString m_workedGridCacheKey;
     mutable QMap<QString, int> m_workedGridCache;
+    // Per logbook generation: the per-QSO values every map filter needs,
+    // computed once (grid square, normalised mode, band, UTC, DXCC key), so a
+    // filter change no longer re-parses every entry or copies whole entries.
+    struct RecordIndex {
+        quint64 generation = 0;
+        const void *cty = nullptr;           // country data the DXCC keys came from
+        QVector<QString> grid4, mode, band, dxccKey;
+        QVector<qint64> utcMs, utcDay;       // utcDay: Julian day, 0 = no valid time
+        QVector<bool> ctyReference;          // cty.csv knows a reference grid
+    };
+    mutable std::shared_ptr<RecordIndex> m_recordIndex;
+    const RecordIndex &recordIndex() const;
+    static bool modeMatchesNormalized(const QString &entry, const QString &filter);
     const MapLocatorIndex &cachedLocatorIndex() const;
     QVector<LogbookEntry> filteredMapRecordsUncached() const;
+    QVector<LogbookEntry> filteredMapRecordsScan() const;
     mutable QString m_geoCacheKey;
     mutable QVector<MapPoint> m_geoCache;
     const QVector<MapPoint> &cachedGeoPoints() const;
