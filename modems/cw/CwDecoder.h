@@ -96,6 +96,8 @@ public:
     void setBandwidthHz(double bandwidthHz);
     void setAutoBandwidth(bool enabled);
     void setAfcEnabled(bool enabled);
+    // Hold back noise-like text (CwTextGate); off shows the raw decoder output.
+    void setTextGateEnabled(bool enabled);
     void setAfcRangeHz(double rangeHz);
     void setDecodeEngine(const QString& engine);
     QString decodeEngine() const { return m_decodeEngine; }
@@ -178,6 +180,7 @@ private:
     QString m_textA;
     // Hold back noise-like text (birdies, fading carriers, noise) per receiver.
     CwTextGate m_gateA, m_gateB;
+    bool m_textGateEnabled = true;
     QString m_textB;
     QString m_selectedCommittedA;
     QString m_selectedCommittedB;

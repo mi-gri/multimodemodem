@@ -212,6 +212,7 @@ public:
     bool cwSkimmerEnabled = false;
     bool cwSkimmerCqOnly = false;
     bool cwAfcEnabled = true;
+    bool cwNoiseTextGate = true;   // hold back noise-like decoded text
     int cwAfcRangeHz = 20;
     bool cwAutoWpmA = true;
     bool cwAutoWpmB = true;

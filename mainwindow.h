@@ -2110,6 +2110,7 @@ private:
     QCheckBox *m_chkCwSkimmer = nullptr;
     QComboBox *m_cmbCwSkimmerDisplay = nullptr;
     QCheckBox *m_chkCwAfc = nullptr;
+    QCheckBox *m_chkCwNoiseGate = nullptr;
     QSpinBox *m_spinCwAfcRangeHz = nullptr;
     QLabel *m_lblCwReceptionTitle = nullptr;
     QLabel *m_lblCwRxATitle = nullptr;

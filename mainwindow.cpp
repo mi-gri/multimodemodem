@@ -7215,6 +7215,15 @@ void MainWindow::setupCwPage()
     grid->addWidget(m_chkCwAfc, 7, 0, 1, 2);
     m_spinCwAfcRangeHz->setToolTip(uiText("cw_afc_range", "AFC range"));
     grid->addWidget(m_spinCwAfcRangeHz, 7, 2, 1, 2);
+    m_chkCwNoiseGate = new QCheckBox(uiText("cw_noise_gate", "Suppress noise text"), settingsGroup);
+    m_chkCwNoiseGate->setChecked(m_settings.cwNoiseTextGate);
+    m_chkCwNoiseGate->setToolTip(uiText("cw_noise_gate_tip", "Holds decoded text back until it reads like Morse traffic. Noise, fading carriers and birdies come out as runs of E, T, I, A, N and M; that text is not shown. A single short first word on a new tone appears once more text follows. Off shows the raw decoder output."));
+    grid->addWidget(m_chkCwNoiseGate, 8, 0, 1, 4);
+    connect(m_chkCwNoiseGate, &QCheckBox::toggled, this, [this](bool on) {
+        m_settings.cwNoiseTextGate = on;
+        if (m_cwDecoder) invokeRxDecoder(m_cwDecoder, &CwDecoder::setTextGateEnabled, on);
+        savePersistentSettings();
+    });
     opGrid->addWidget(m_lblCwDualRx, 5, 0, 1, 4);
     opGrid->addWidget(m_btnCwDisableSecondary, 6, 0, 1, 4);
     m_chkCwSkimmer = new QCheckBox(QStringLiteral("Skimmer"), settingsGroup);
@@ -16590,6 +16599,7 @@ void MainWindow::applyCwSettings()
     invokeRxDecoder(m_cwDecoder, &CwDecoder::setBandwidthHz, static_cast<double>(bandwidthHz));
     invokeRxDecoder(m_cwDecoder, &CwDecoder::setAutoBandwidth, autoBandwidth);
     invokeRxDecoder(m_cwDecoder, &CwDecoder::setAfcEnabled, afc);
+    invokeRxDecoder(m_cwDecoder, &CwDecoder::setTextGateEnabled, m_settings.cwNoiseTextGate);
     invokeRxDecoder(m_cwDecoder, &CwDecoder::setAfcRangeHz, static_cast<double>(afcRangeHz));
     m_settings.cwToneHz = toneHz;
     m_settings.cwTxToneHz = txToneHz;

@@ -516,6 +516,7 @@ void AppSettings::load()
     cwSkimmerEnabled = settings.value("CW/skimmerEnabled", false).toBool();
     cwSkimmerCqOnly = settings.value("CW/skimmerCqOnly", false).toBool();
     cwAfcEnabled = settings.value("CW/afcEnabled", cwAfcEnabled).toBool();
+    cwNoiseTextGate = settings.value("CW/noiseTextGate", cwNoiseTextGate).toBool();
     cwAfcRangeHz = settings.value("CW/afcRangeHz", cwAfcRangeHz).toInt();
     cwAutoWpmA = settings.value("CW/autoWpmA", legacyCwAutoWpm).toBool();
     cwAutoWpmB = settings.value("CW/autoWpmB", legacyCwAutoWpm).toBool();
@@ -1029,6 +1030,7 @@ bool AppSettings::save() const
     settings.setValue("CW/skimmerEnabled", cwSkimmerEnabled);
     settings.setValue("CW/skimmerCqOnly", cwSkimmerCqOnly);
     settings.setValue("CW/afcEnabled", cwAfcEnabled);
+    settings.setValue("CW/noiseTextGate", cwNoiseTextGate);
     settings.setValue("CW/afcRangeHz", cwAfcRangeHz);
     settings.setValue("CW/noiseReductionEnabled", cwNoiseReductionEnabled);
     settings.setValue("CW/agcEnabled", cwAgcEnabled);

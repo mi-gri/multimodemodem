@@ -54,7 +54,7 @@ void CwDecoder::acceptDecodedText(int rank, const std::string& text)
     const QString decoded = sanitizeSkimmerText(text);
     // Shown only once the recent letters read like Morse traffic, not like
     // decoded noise; RX A and RX B are judged separately.
-    const QString committed = rank <= 0 ? m_gateA.feed(decoded) : m_gateB.feed(decoded);
+    const QString committed = !m_textGateEnabled ? decoded : rank <= 0 ? m_gateA.feed(decoded) : m_gateB.feed(decoded);
 
     if (!committed.isEmpty()) {
         if (rank == 0) {
@@ -452,6 +452,14 @@ void CwDecoder::setDecodeEngine(const QString& engine)
     m_pendingDiagnosticsA.clear(); m_pendingDiagnosticsB.clear();
     emit diagnosticResetRequested(0); emit diagnosticResetRequested(1);
     emitSkimmerStatus(true);
+}
+
+void CwDecoder::setTextGateEnabled(bool enabled)
+{
+    if (m_textGateEnabled == enabled) return;
+    m_textGateEnabled = enabled;
+    m_gateA.reset();
+    m_gateB.reset();
 }
 
 void CwDecoder::setToneHz(double toneHz)

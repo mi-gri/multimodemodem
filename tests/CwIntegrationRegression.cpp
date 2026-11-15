@@ -12,7 +12,7 @@ void require(bool condition, const std::string& name) {
 
 void receive(const std::string& text, double offset = 0.0, bool adjacent = false,
              bool manual = false, int rate = kSampleRate,
-             double speed = 20.0, double hint = 20.0) {
+             double speed = 20.0, double hint = 20.0, bool gated = false) {
   SignalOptions signal;
   signal.frequencyHz = 700.0;
   signal.wpm = speed;
@@ -36,6 +36,8 @@ void receive(const std::string& text, double offset = 0.0, bool adjacent = false
     audio = std::move(converted);
   }
   CwDecoder decoder;
+  // Decoder accuracy on single words: raw output; the gated case is below.
+  decoder.setTextGateEnabled(gated);
   decoder.setToneHz(700.0 - offset);
   decoder.setAfcEnabled(true);
   decoder.setAutoWpm(!manual);
@@ -112,6 +114,8 @@ int main(int argc, char** argv) {
     for (int rate : {44100, 96000}) receive("CQ CQ DE IZ6NNH 599", 0.0, false, false, rate);
     receive("CQ DE TEST 599", 0.0, false, false, kSampleRate, 50.0, 20.0);
     receive("CQ DE TEST 599", 0.0, false, false, kSampleRate, 35.0, 5.0);
+    // With the noise-text gate (as in m³): real traffic is shown in full.
+    receive("CQ CQ DE IZ6NNH IZ6NNH K", 0.0, false, false, kSampleRate, 20.0, 20.0, true);
     filterAndManualClock();
   } catch (const std::exception& error) {
     std::cerr << "CW integration failed: " << error.what() << '\n';

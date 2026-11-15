@@ -10,6 +10,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   Measured: a recorded 80 m band with two carriers 198 -> 11 false characters, synthetic
   -10/-13 dB from 150-330 % to 80-100 % character error (no invented text), clean signals
   unchanged, real recorded QSOs keep calls and exchange. Regression test m3_cw_text_gate_regression.
+  Switch "Suppress noise text" in the CW settings (on by default) shows the raw output when off;
+  a single short first word on a new tone appears once more text follows.
 - QSY plan: a plan switch no longer clears the setting "Tune the rig to the mode's frequency
   when the mode changes": it was switched off for the moment of the switch and the mode change
   saved it so (RTTY -> FT8 then kept the frequency). A runtime flag is used instead.
