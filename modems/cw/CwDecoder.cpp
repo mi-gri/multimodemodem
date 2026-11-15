@@ -51,7 +51,10 @@ QVector<FrequencyMarker> CwDecoder::frequencyMarkers(double toneHz)
 
 void CwDecoder::acceptDecodedText(int rank, const std::string& text)
 {
-    const QString committed = sanitizeSkimmerText(text);
+    const QString decoded = sanitizeSkimmerText(text);
+    // Shown only once the recent letters read like Morse traffic, not like
+    // decoded noise; RX A and RX B are judged separately.
+    const QString committed = rank <= 0 ? m_gateA.feed(decoded) : m_gateB.feed(decoded);
 
     if (!committed.isEmpty()) {
         if (rank == 0) {
@@ -219,6 +222,8 @@ void CwDecoder::reset()
     m_text.clear();
     m_textA.clear();
     m_textB.clear();
+    m_gateA.reset();
+    m_gateB.reset();
     m_selectedCommittedA.clear();
     m_selectedCommittedB.clear();
     m_pendingDiagnosticsA.clear();
@@ -265,6 +270,7 @@ void CwDecoder::clearReceiver(int rank)
             m_toneTrackerA->reset();
         }
         m_textA.clear();
+        m_gateA.reset();
         m_selectedCommittedA.clear();
         m_pendingDiagnosticsA.clear();
         m_haveDiagnosticA = false;
@@ -275,6 +281,7 @@ void CwDecoder::clearReceiver(int rank)
             m_toneTrackerB->reset();
         }
         m_textB.clear();
+        m_gateB.reset();
         m_selectedCommittedB.clear();
         m_pendingDiagnosticsB.clear();
         m_haveDiagnosticB = false;
@@ -459,6 +466,7 @@ void CwDecoder::setToneHz(double toneHz)
         m_toneTrackerA->setToneHz(m_toneHz);
     }
     updateTrackerInterferers();
+    m_gateA.reset();   // another signal: judge it afresh
     m_selectedCommittedA.clear();
     m_haveDiagnosticA = false;
     m_pendingDiagnosticsA.clear();
@@ -480,6 +488,7 @@ void CwDecoder::setSecondaryToneHz(double toneHz)
         m_toneTrackerB->setToneHz(m_secondaryToneHz);
     }
     updateTrackerInterferers();
+    m_gateB.reset();
     m_selectedCommittedB.clear();
     m_haveDiagnosticB = false;
     m_pendingDiagnosticsB.clear();
@@ -503,6 +512,7 @@ void CwDecoder::setSecondaryEnabled(bool enabled)
         m_toneTrackerB->reset();
     }
     updateTrackerInterferers();
+    m_gateB.reset();
     m_selectedCommittedB.clear();
     m_haveDiagnosticB = false;
     m_pendingDiagnosticsB.clear();

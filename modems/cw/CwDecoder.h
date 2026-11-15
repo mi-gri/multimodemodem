@@ -1,6 +1,7 @@
 #ifndef CWDECODER_H
 #define CWDECODER_H
 
+#include "CwTextGate.h"
 #include "../../audio/AudioBlock.h"
 #include "CwBandSkimmerWorker.h"
 #include "../../dsp/FrequencyMarker.h"
@@ -175,6 +176,8 @@ private:
     double m_trackedWpm = 20.0;
     QString m_text;
     QString m_textA;
+    // Hold back noise-like text (birdies, fading carriers, noise) per receiver.
+    CwTextGate m_gateA, m_gateB;
     QString m_textB;
     QString m_selectedCommittedA;
     QString m_selectedCommittedB;

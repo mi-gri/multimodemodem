@@ -4,6 +4,12 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- CW: text plausibility gate for RX A/B. Decoded noise, fading carriers and birdies come out as
+  runs of E/T/I/A/N/M; real traffic has far fewer (15-37 % against 60-89 %). Text is held back
+  until the last 16 letters read like traffic, then released; it closes again on noise.
+  Measured: a recorded 80 m band with two carriers 198 -> 11 false characters, synthetic
+  -10/-13 dB from 150-330 % to 80-100 % character error (no invented text), clean signals
+  unchanged, real recorded QSOs keep calls and exchange. Regression test m3_cw_text_gate_regression.
 - QSY plan: a plan switch no longer clears the setting "Tune the rig to the mode's frequency
   when the mode changes": it was switched off for the moment of the switch and the mode change
   saved it so (RTTY -> FT8 then kept the frequency). A runtime flag is used instead.
