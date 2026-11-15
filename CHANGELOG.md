@@ -4,6 +4,13 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- QSY plan (band scheduler): works in every mode (WSPR added) and switches between
+  modes: each entry sets mode, band and rig frequency at its UTC time, without the extra
+  QSY of the mode change. One switch "Run QSY plan" replaces the per-mode switch (an
+  enabled mode migrates to on). Entries can run daily or only on one UTC date (one-time
+  plans such as a test run); import/export of plans as JSON and "Remove all". The plan
+  never starts TX and still waits for TX (also its preparation) and an FT QSO to end.
+  The mode tab shows the next entry.
 - Wavelog/Cloudlog: a QSO whose upload fails is kept in a second ADIF file
   (~/.local/share/MultiModeModem/wavelog_pending.adi, owner-only) from its first failed
   attempt on, also when Settings lack URL/API key. It is sent again 1 min after start and

@@ -374,6 +374,7 @@ void AppSettings::load()
     schedulerQsyEnabledModes.removeAll(QString());
     schedulerQsyEnabledModes.removeDuplicates();
     schedulerQsyPlanJson = settings.value("Scheduler/qsyPlanJson", schedulerQsyPlanJson).toString().trimmed();
+    schedulerEnabled = settings.value("Scheduler/enabled", !schedulerQsyEnabledModes.isEmpty()).toBool();
 
     weatherFaxLpm = settings.value("WeatherFax/lpm", weatherFaxLpm).toInt();
     // Marker frequencies are intentionally session-only in v50.
@@ -939,6 +940,7 @@ bool AppSettings::save() const
 
     settings.setValue("Scheduler/enabledModes", schedulerQsyEnabledModes);
     settings.setValue("Scheduler/qsyPlanJson", schedulerQsyPlanJson);
+    settings.setValue("Scheduler/enabled", schedulerEnabled);
 
     settings.setValue("WeatherFax/lpm", weatherFaxLpm);
     settings.remove("WeatherFax/blackHz");

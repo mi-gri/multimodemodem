@@ -122,6 +122,9 @@ public:
     // WSJT-X-like transmit audio source hint for CAT PTT: rear_data or front_mic.
     QString hamlibTransmitAudioSource = "rear_data";
 
+    // Master switch of the QSY plan. schedulerQsyEnabledModes is the older
+    // per-mode switch, read once to migrate (any enabled mode -> enabled).
+    bool schedulerEnabled = false;
     QStringList schedulerQsyEnabledModes;
     QString schedulerQsyPlanJson;
 

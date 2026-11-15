@@ -1402,6 +1402,11 @@ if(BUILD_TESTING)
     target_include_directories(m3_cty_update_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(m3_cty_update_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core)
     add_test(NAME m3_cty_update_regression COMMAND m3_cty_update_regression)
+    add_executable(m3_band_scheduler_regression tests/BandSchedulerRegression.cpp dialogs/BandSchedulerDialog.cpp)
+    target_include_directories(m3_band_scheduler_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_band_scheduler_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets)
+    add_test(NAME m3_band_scheduler_regression COMMAND m3_band_scheduler_regression)
+    set_tests_properties(m3_band_scheduler_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
     add_executable(m3_waterfall_cq_regression
         tests/WaterfallCqRegression.cpp dsp/WaterfallLeveler.cpp dsp/DspEngine.cpp widgets/CqSpots.h
         modems/ft8/FtDecodeFilter.h modems/ft8/FtDecodeColours.h)

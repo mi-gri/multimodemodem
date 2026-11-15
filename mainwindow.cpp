@@ -13477,21 +13477,39 @@ void MainWindow::updateBandSchedulerTabForMode(const QString &modeName)
     if (group.isEmpty()) {
         return;
     }
-    const QString display = group == QStringLiteral("WEFAX")
-                            ? uiText("scheduler_wefax_group", "MeteoFax / HF WEFAX RX")
-                            : group;
-
     const bool enabledForMode = isBandSchedulerEnabledForMode(group);
     QString statusText;
-    if (group.isEmpty()) {
-        statusText = uiText("scheduler_status_no_mode", "Scheduler: no valid mode selected.");
-    } else if (m_hasPendingScheduledQsy) {
+    if (m_hasPendingScheduledQsy) {
         statusText = uiText("scheduler_status_pending", "Scheduler: pending QSY to %1.")
                          .arg(scheduledQsyDescription(m_pendingScheduledQsy));
     } else if (enabledForMode) {
-        statusText = uiText("scheduler_status_enabled", "Scheduler: enabled for %1.").arg(display);
+        // Next entry still to come (today, then tomorrow) so a test run can be followed.
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        const QTime minute(now.time().hour(), now.time().minute());
+        const ScheduledQsyEntry *next = nullptr;
+        QDate nextDate;
+        const QList<ScheduledQsyEntry> entries = schedulerEntries();
+        for (int day = 0; day < 2 && next == nullptr; ++day) {
+            const QDate date = now.date().addDays(day);
+            for (const ScheduledQsyEntry &entry : entries) {
+                if (!entry.enabled || !entry.runsOn(date) || (day == 0 && entry.timeUtc <= minute) ||
+                    !shouldRunScheduledQsyForMode(entry.mode)) {
+                    continue;
+                }
+                if (next == nullptr || entry.timeUtc < next->timeUtc) {
+                    next = &entry;
+                    nextDate = date;
+                }
+            }
+        }
+        statusText = next != nullptr
+            ? uiText("scheduler_status_next", "QSY plan on. Next: %1 UTC %2.")
+                  .arg(nextDate == now.date() ? next->timeUtc.toString(QStringLiteral("HH:mm"))
+                                              : nextDate.toString(Qt::ISODate) + QLatin1Char(' ') + next->timeUtc.toString(QStringLiteral("HH:mm")),
+                       scheduledQsyDescription(*next))
+            : uiText("scheduler_status_no_next", "QSY plan on. No further entry.");
     } else {
-        statusText = uiText("scheduler_status_disabled", "Scheduler: disabled for %1.").arg(display);
+        statusText = uiText("scheduler_status_off", "QSY plan off.");
     }
 
     if (m_lblBandSchedulerMode != nullptr) {
@@ -13499,8 +13517,8 @@ void MainWindow::updateBandSchedulerTabForMode(const QString &modeName)
     }
     if (m_chkBandSchedulerEnabled != nullptr) {
         const QSignalBlocker blocker(m_chkBandSchedulerEnabled);
-        m_chkBandSchedulerEnabled->setText(uiText("scheduler_enable_for_mode", "Enable for current mode"));
-        m_chkBandSchedulerEnabled->setToolTip(uiText("scheduler_enable_tooltip", "When enabled, MM applies the daily UTC QSY plan for this mode. It changes only rig frequency/band and never starts TX."));
+        m_chkBandSchedulerEnabled->setText(uiText("scheduler_enable_plan", "Run QSY plan"));
+        m_chkBandSchedulerEnabled->setToolTip(uiText("scheduler_enable_plan_tooltip", "When enabled, m³ follows the UTC QSY plan in all modes: each entry switches mode, band and rig frequency. It never starts TX and waits for TX/QSO end."));
         m_chkBandSchedulerEnabled->setChecked(enabledForMode);
         m_chkBandSchedulerEnabled->setEnabled(!group.isEmpty());
     }
@@ -13672,16 +13690,8 @@ void MainWindow::setDspAgcEnabledForModeKey(const QString &modeKey, bool enabled
 
 QString MainWindow::schedulerModeGroup(const QString &modeName) const
 {
-    const QString mode = modeName.trimmed();
-    if (mode.compare(QStringLiteral("WEFAX"), Qt::CaseInsensitive) == 0 ||
-        mode.compare(QStringLiteral("MeteoFax / HF WEFAX"), Qt::CaseInsensitive) == 0 ||
-        mode.compare(QStringLiteral("MeteoFax / HF WEFAX RX"), Qt::CaseInsensitive) == 0) {
-        return QStringLiteral("WEFAX");
-    }
-    if (mode.compare(QStringLiteral("RTTY"), Qt::CaseInsensitive) == 0) {
-        return QStringLiteral("RTTY");
-    }
-    return QString();
+    // Every mode with a frequency-list entry (FT8 … WEFAX, WSPR) can be planned.
+    return M3StandardFrequencies::listModeForName(modeName);
 }
 
 QString MainWindow::activeSchedulerModeGroup() const
@@ -13694,38 +13704,23 @@ QString MainWindow::activeSchedulerModeGroup() const
 
 bool MainWindow::isBandSchedulerEnabledForMode(const QString &modeName) const
 {
-    const QString group = schedulerModeGroup(modeName);
-    for (const QString &enabled : m_settings.schedulerQsyEnabledModes) {
-        if (schedulerModeGroup(enabled).compare(group, Qt::CaseInsensitive) == 0) {
-            return true;
-        }
-    }
-    return false;
+    // One plan for all modes: an entry switches the mode itself.
+    return !schedulerModeGroup(modeName).isEmpty() && m_settings.schedulerEnabled;
 }
 
-void MainWindow::setBandSchedulerEnabledForMode(const QString &modeName, bool enabled)
+void MainWindow::setBandSchedulerEnabledForMode(const QString &, bool enabled)
 {
-    const QString group = schedulerModeGroup(modeName);
-    QStringList normalized;
-    for (const QString &m : m_settings.schedulerQsyEnabledModes) {
-        const QString g = schedulerModeGroup(m);
-        if (!g.isEmpty() && g.compare(group, Qt::CaseInsensitive) != 0 && !normalized.contains(g)) {
-            normalized.append(g);
-        }
-    }
-    if (enabled && !group.isEmpty() && !normalized.contains(group)) {
-        normalized.append(group);
-    }
-    m_settings.schedulerQsyEnabledModes = normalized;
+    m_settings.schedulerEnabled = enabled;
+    m_settings.schedulerQsyEnabledModes.clear();   // replaced by the master switch
     savePersistentSettings();
 
-    if (m_chkBandSchedulerEnabled != nullptr && activeSchedulerModeGroup().compare(group, Qt::CaseInsensitive) == 0) {
+    if (m_chkBandSchedulerEnabled != nullptr) {
         const QSignalBlocker block(m_chkBandSchedulerEnabled);
         m_chkBandSchedulerEnabled->setChecked(enabled);
     }
-
     updateBandSchedulerTabForMode(ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QString());
-    appendLog(QStringLiteral("Scheduler %1 for %2.").arg(enabled ? QStringLiteral("enabled") : QStringLiteral("disabled"), group));
+    appendLog(enabled ? uiText("scheduler_log_enabled", "QSY plan enabled.")
+                      : uiText("scheduler_log_disabled", "QSY plan disabled."));
 }
 
 QList<ScheduledQsyEntry> MainWindow::schedulerEntries() const
@@ -13735,13 +13730,11 @@ QList<ScheduledQsyEntry> MainWindow::schedulerEntries() const
 
 bool MainWindow::shouldRunScheduledQsyForMode(const QString &modeName) const
 {
-    const QString entryGroup = schedulerModeGroup(modeName);
-    const QString currentGroup = activeSchedulerModeGroup();
-    if (entryGroup.isEmpty() || currentGroup.isEmpty() ||
-        entryGroup.compare(currentGroup, Qt::CaseInsensitive) != 0) {
+    if (!m_settings.schedulerEnabled || schedulerModeGroup(modeName).isEmpty()) {
         return false;
     }
-    return isBandSchedulerEnabledForMode(entryGroup);
+    // The entry's mode must exist in this build (e.g. not a removed mode name).
+    return ui != nullptr && ui->cmbMode != nullptr && ui->cmbMode->findText(modeName.trimmed()) >= 0;
 }
 
 QString MainWindow::scheduledQsyDescription(const ScheduledQsyEntry &entry) const
@@ -13754,7 +13747,8 @@ QString MainWindow::scheduledQsyDescription(const ScheduledQsyEntry &entry) cons
 bool MainWindow::canApplyScheduledQsyNow() const
 {
     if (m_cwKeyReleaseFailed || m_cwSerialActive) return false;
-    if (m_txRunning || m_ftTxWorkerRunning || m_lastRigPttOn || m_ft8PendingTxArmed || m_pendingFt8PttKeyed) {
+    if (m_txRunning || m_txPreparationPending || m_ftTxWorkerRunning || m_lastRigPttOn ||
+        m_ft8PendingTxArmed || m_pendingFt8PttKeyed) {
         return false;
     }
     if (m_ftSession.qsoActive) {
@@ -13791,7 +13785,14 @@ void MainWindow::applyScheduledQsy(const ScheduledQsyEntry &entry)
     const QString targetMode = entry.mode.trimmed();
     if (ui != nullptr && ui->cmbMode != nullptr && !targetMode.isEmpty() &&
         ui->cmbMode->findText(targetMode) >= 0 && ui->cmbMode->currentText() != targetMode) {
+        // The normal mode switch (stops the old mode, restarts RX in the new
+        // one), but without its own QSY to the mode's last band: the plan's
+        // frequency follows below, so the rig moves once, not twice.
+        appendLog(uiText("scheduler_log_mode_switch", "QSY plan: mode %1 -> %2.").arg(ui->cmbMode->currentText(), targetMode));
+        const bool qsyOnModeChange = m_settings.frequencyQsyOnModeChange;
+        m_settings.frequencyQsyOnModeChange = false;
         ui->cmbMode->setCurrentText(targetMode);
+        m_settings.frequencyQsyOnModeChange = qsyOnModeChange;
     }
 
     if (Ft8Mode::isFamilyMode(targetMode) && m_cmbFt8Band != nullptr && !entry.band.isEmpty()) {
@@ -13838,7 +13839,7 @@ void MainWindow::handleBandSchedulerTick()
     const QTime minute(now.time().hour(), now.time().minute());
     const QList<ScheduledQsyEntry> entries = schedulerEntries();
     for (const ScheduledQsyEntry &entry : entries) {
-        if (!entry.enabled || !entry.timeUtc.isValid() || entry.timeUtc != minute) {
+        if (!entry.enabled || !entry.timeUtc.isValid() || entry.timeUtc != minute || !entry.runsOn(today)) {
             continue;
         }
         if (!shouldRunScheduledQsyForMode(entry.mode)) {
