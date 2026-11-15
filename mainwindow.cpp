@@ -4701,6 +4701,7 @@ void MainWindow::setupTextTerminalPages()
                                                &m_rttyMacroButtons,
                                                &m_rttyQsoForm);
     if (QVBoxLayout *rttyLayout = qobject_cast<QVBoxLayout *>(m_rttyDisplayPage->layout())) {
+        setupRttyBrowser();
         m_btnRttyMacroEdit = new QPushButton(uiText("edit_macros", "✎ Edit macros…"), m_rttyDisplayPage);
         m_btnRttyMacroEdit->setFlat(true);
         m_btnRttyMacroEdit->setCursor(Qt::PointingHandCursor);
@@ -6570,7 +6571,7 @@ void MainWindow::setupRttyPage()
     m_spinRttyMaxDecoders = new QSpinBox(settingsGroup);
     m_spinRttyMaxDecoders->setRange(2, 16);
     m_spinRttyMaxDecoders->setObjectName(QStringLiteral("rttySkimmerChannels"));
-    m_chkRttyMultiDecode->setToolTip(uiText("rtty_skimmer_help", "Decode independent Mark/Space pairs across 100–3500 Hz using the selected baud, shift and polarity. The radio filter limits the received band. Text and CQ labels do not change the selected QSO or start TX."));
+    m_chkRttyMultiDecode->setToolTip(uiText("rtty_skimmer_help2", "Decode independent Mark/Space pairs across 100–4900 Hz using the selected baud, shift and polarity. The radio filter limits the received band. Text and CQ labels do not change the selected QSO or start TX."));
     grid->addWidget(m_chkRttyMultiDecode, 8, 0);
     grid->addWidget(m_cmbRttySkimmerDisplay, 8, 1, 1, 2);
     grid->addWidget(new QLabel(uiText("skimmer_channels", "Channels"), settingsGroup), 9, 0);
@@ -7151,7 +7152,7 @@ void MainWindow::setupCwPage()
     m_lblCwTrackedWpmB->setStyleSheet(QStringLiteral("font-weight:600;"));
     M3Ui::setSemanticRole(m_lblCwTrackedWpmA, QStringLiteral("rxPrimary"));
     M3Ui::setSemanticRole(m_lblCwTrackedWpmB, QStringLiteral("rxSecondary"));
-    m_lblCwDualRx = new QLabel(uiText("cw_dual_rx_status", "RX A: left click · RX B: right click · TX: left+right click on waterfall"), settingsGroup);
+    m_lblCwDualRx = new QLabel(uiText("cw_dual_rx_status2", "RX A: left click · RX B: right click · TX: Ctrl+click (or left+right) on the waterfall"), settingsGroup);
     m_lblCwDualRx->setWordWrap(true);
     m_lblCwDualRx->setStyleSheet(QStringLiteral("font-weight: 500;"));
 
@@ -10140,8 +10141,8 @@ void MainWindow::setupHelpTooltips()
     setHelpText(ui->cmbPttPort, "Compatibility PTT serial selector. Prefer Settings > Audio / PTT settings or CAT / Rig for normal configuration.");
     setHelpText(ui->btnRefreshDevices, "Refresh visible audio and serial device lists after plugging/unplugging USB sound cards or radio interfaces.");
     if (m_waterfallWidget != nullptr) {
-        const QString waterfallHelp = uiText("tooltip.waterfall_widget",
-                                            "Live audio waterfall. Click on a signal to tune the active mode marker. In FT4/FT8 green is RX and red is TX; in CW left click sets RX A, right click sets RX B, and left+right together sets the red TX tone.");
+        const QString waterfallHelp = uiText("tooltip.waterfall_widget2",
+                                            "Live audio waterfall. Click on a signal to tune the active mode marker. In FT4/FT8 green is RX and red is TX; in CW left click sets RX A, right click sets RX B, and Ctrl+click (or left+right together) sets the red TX tone.");
         // Do not use a normal hover tooltip on the GL waterfall: on several
         // Linux/Wayland/X11 themes it becomes a large black rectangle over the
         // spectrum.  Keep the help text available through the status bar and
@@ -10710,6 +10711,7 @@ void MainWindow::setupProcessingConnections()
                 this, [this](const QVector<SkimmerSpot> &spots) {
                     if (m_txRunning || ui->cmbMode->currentText() != RttyDecoder::modeName()) return;
                     m_rttySkimmerSpots = spots;
+                    updateRttyBrowser(spots);
                     updateRttyWaterfallOverlays();
                     spotFromSkimmer(spots, QStringLiteral("RTTY"));
                 });

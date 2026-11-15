@@ -4,6 +4,13 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- RTTY signal browser (like fldigi's) under the RTTY receive text, in a resizable split:
+  one row per signal the skimmer decodes in parallel (Hz, CQ call, country, text with the
+  newest characters visible), sorted by frequency; CQ calls marked new DXCC / new on band /
+  worked from the logbook; the country filter applies; vanished signals grey out and go after
+  60 s. Double-click tunes the main decoder to that signal. Skimmer range up to 4900 Hz.
+- CW: Ctrl+click on the waterfall sets the TX tone (as left+right together did; the help
+  texts name both).
 - WSPR beacon: unticking "Transmit as beacon" works like WSJT-X "Enable Tx": a transmission
   already on air ends normally and nothing new starts; the TX button still stops at once.
 - Waterfall click and tone settings: RTTY, CW (RX A/B, skimmer) and Feld Hell reach up to 4900 Hz (the waterfall

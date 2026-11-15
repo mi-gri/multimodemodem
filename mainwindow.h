@@ -2670,6 +2670,21 @@ private:
     };
     QVector<Ft8WaterfallCallout> m_ft8WaterfallCallouts;
     QVector<SkimmerSpot> m_rttySkimmerSpots;
+    // RTTY signal browser (RttyBrowserUi.cpp): one row per skimmer channel.
+    struct RttyBrowserRow {
+        quint64 id = 0;
+        double frequencyHz = 0.0, markHz = 0.0, spaceHz = 0.0;
+        QString text, cqCall;
+        qint64 lastSeenMs = 0;
+    };
+    QHash<quint64, RttyBrowserRow> m_rttyBrowserRows;
+    QTableWidget *m_tableRttyBrowser = nullptr;
+    QLabel *m_lblRttyBrowser = nullptr;
+    QTimer m_rttyBrowserTimer;
+    void setupRttyBrowser();
+    void updateRttyBrowser(const QVector<SkimmerSpot> &spots);
+    void renderRttyBrowser();
+    void tuneRttyToSignal(double markHz, double spaceHz);
     QString m_rttyWaterfallLiveText;
 
     QImage m_txSourceImage;

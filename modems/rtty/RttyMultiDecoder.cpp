@@ -6,7 +6,7 @@
 
 namespace {
 constexpr double kTwoPi = 6.2831853071795864769;
-constexpr int kMinFreqHz = 100, kMaxFreqHz = 3500;
+constexpr int kMinFreqHz = 100, kMaxFreqHz = 4900;   // up to the waterfall top
 constexpr int kScanStepHz = 5, kTrackBucketHz = 35;
 constexpr int kTrackHoldMs = 4000, kScanIntervalMs = 350;
 constexpr int kScanWindowSamples = 8192;

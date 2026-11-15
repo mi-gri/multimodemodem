@@ -1065,3 +1065,44 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 }.items()})
 # CW skimmer range up to 4900 Hz.
 KEYS.update({'cw_skimmer_help2':dict(zip(LANGS,('Decode up to 16 independent CW signals in the received audio passband (100–4900 Hz). A narrow radio filter limits what can be received. CQ calls require two matching callsigns after CQ. Zoom the waterfall to separate crowded columns.','Decodifica fino a 16 segnali CW indipendenti nella banda audio ricevuta (100–4900 Hz). Un filtro stretto della radio limita i segnali ricevibili. I nominativi CQ richiedono due ripetizioni concordanti dopo CQ. Ingrandisci il waterfall per separare colonne affollate.','Décodage de 16 signaux CW indépendants au maximum dans la bande audio reçue (100–4900 Hz). Un filtre radio étroit limite la réception. Deux indicatifs identiques après CQ sont nécessaires. Agrandissez la cascade pour séparer les colonnes proches.','Bis zu 16 unabhängige CW-Signale im empfangenen Audioband (100–4900 Hz). Ein schmales Funkgerätefilter begrenzt den Empfang. CQ-Rufzeichen erfordern zwei gleiche Wiederholungen nach CQ. Bei dicht belegten Spalten den Wasserfall vergrößern.','Dekoder opptil 16 uavhengige CW-signaler i mottatt lydbånd (100–4900 Hz). Et smalt radiofilter begrenser mottaket. CQ-kallesignaler krever to like gjentakelser etter CQ. Zoom inn for å skille tette kolonner.','Dekóduje až 16 nezávislých CW signálů v přijímaném zvukovém pásmu (100–4900 Hz). Úzký filtr rádia omezuje příjem. Značka CQ vyžaduje dvě shodná opakování po CQ. Přibližte vodopád pro oddělení blízkých sloupců.')))})
+# CW TX tone: Ctrl+click on the waterfall.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'cw_dual_rx_status2':(
+  'RX A: left click · RX B: right click · TX: Ctrl+click (or left+right) on the waterfall',
+  'RX A: clic sinistro · RX B: clic destro · TX: Ctrl+clic (o sinistro+destro) sul waterfall',
+  'RX A : clic gauche · RX B : clic droit · TX : Ctrl+clic (ou gauche+droit) sur la cascade',
+  'RX A: Linksklick · RX B: Rechtsklick · TX: Strg+Klick (oder links+rechts) im Wasserfall',
+  'RX A: venstreklikk · RX B: høyreklikk · TX: Ctrl+klikk (eller venstre+høyre) i fossen',
+  'RX A: levý klik · RX B: pravý klik · TX: Ctrl+klik (nebo levý+pravý) ve vodopádu'),
+ 'tooltip.waterfall_widget2':(
+  'Live audio waterfall. Click on a signal to tune the active mode marker. In FT4/FT8 green is RX and red is TX; in CW left click sets RX A, right click sets RX B, and Ctrl+click (or left+right together) sets the red TX tone.',
+  'Waterfall audio dal vivo. Clicca su un segnale per sintonizzare il marcatore del modo attivo. In FT4/FT8 il verde è RX e il rosso TX; in CW il clic sinistro imposta RX A, il destro RX B e Ctrl+clic (o sinistro+destro insieme) il tono TX rosso.',
+  "Cascade audio en direct. Cliquez sur un signal pour régler le marqueur du mode actif. En FT4/FT8 le vert est RX et le rouge TX ; en CW le clic gauche règle RX A, le clic droit RX B et Ctrl+clic (ou gauche+droit ensemble) la tonalité TX rouge.",
+  'Live-Audio-Wasserfall. Klick auf ein Signal stimmt die Markierung des aktiven Modus ab. In FT4/FT8 ist grün RX und rot TX; in CW setzt Linksklick RX A, Rechtsklick RX B und Strg+Klick (oder links+rechts zusammen) den roten TX-Ton.',
+  'Direkte lydfoss. Klikk på et signal for å stille markøren for aktiv modus. I FT4/FT8 er grønt RX og rødt TX; i CW setter venstreklikk RX A, høyreklikk RX B og Ctrl+klikk (eller venstre+høyre sammen) den røde TX-tonen.',
+  'Živý zvukový vodopád. Kliknutím na signál naladíte značku aktivního druhu provozu. Ve FT4/FT8 je zelená RX a červená TX; v CW levý klik nastaví RX A, pravý RX B a Ctrl+klik (nebo levý+pravý současně) červený tón TX.'),
+}.items()})
+# RTTY signal browser.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'rtty_browser_hz':('Hz','Hz','Hz','Hz','Hz','Hz'),
+ 'rtty_browser_call':('CQ','CQ','CQ','CQ','CQ','CQ'),
+ 'rtty_browser_country':('Country','Paese','Pays','Land','Land','Země'),
+ 'rtty_browser_text':('Text','Testo','Texte','Text','Tekst','Text'),
+ 'rtty_browser_tooltip':('All RTTY signals the skimmer decodes in parallel, one row each. Double-click a row to tune the main decoder to it.',
+  'Tutti i segnali RTTY decodificati in parallelo dallo skimmer, una riga ciascuno. Doppio clic su una riga per sintonizzare il decodificatore principale.',
+  "Tous les signaux RTTY décodés en parallèle par le skimmer, une ligne chacun. Double-cliquez sur une ligne pour y régler le décodeur principal.",
+  'Alle RTTY-Signale, die der Skimmer parallel dekodiert, je eine Zeile. Doppelklick auf eine Zeile stellt den Haupt-Decoder darauf ein.',
+  'Alle RTTY-signaler skimmeren dekoder parallelt, én linje hver. Dobbeltklikk en linje for å stille hoveddekoderen på den.',
+  'Všechny signály RTTY dekódované skimmerem souběžně, každý na jednom řádku. Dvojklik na řádek naladí hlavní dekodér.'),
+ 'rtty_browser_tuned':('RTTY: main decoder tuned to the signal at %1 Hz.','RTTY: decodificatore principale sintonizzato sul segnale a %1 Hz.',"RTTY : décodeur principal réglé sur le signal à %1 Hz.",'RTTY: Haupt-Decoder auf das Signal bei %1 Hz eingestellt.','RTTY: hoveddekoderen stilt på signalet ved %1 Hz.','RTTY: hlavní dekodér naladěn na signál na %1 Hz.'),
+ 'rtty_browser_title':('RTTY signals (%1) — double-click tunes the main decoder','Segnali RTTY (%1) — doppio clic sintonizza il decodificatore principale',"Signaux RTTY (%1) — double-clic règle le décodeur principal",'RTTY-Signale (%1) — Doppelklick stellt den Haupt-Decoder ein','RTTY-signaler (%1) — dobbeltklikk stiller hoveddekoderen','Signály RTTY (%1) — dvojklik naladí hlavní dekodér'),
+ 'rtty_browser_off':('RTTY signals: switch on "Skimmer" in the RTTY settings to decode all signals in parallel.',
+  'Segnali RTTY: attiva "Skimmer" nelle impostazioni RTTY per decodificare tutti i segnali in parallelo.',
+  "Signaux RTTY : activez « Skimmer » dans les réglages RTTY pour décoder tous les signaux en parallèle.",
+  'RTTY-Signale: „Skimmer“ in den RTTY-Einstellungen einschalten, um alle Signale parallel zu dekodieren.',
+  'RTTY-signaler: slå på «Skimmer» i RTTY-innstillingene for å dekode alle signaler parallelt.',
+  'Signály RTTY: zapněte „Skimmer“ v nastavení RTTY pro souběžné dekódování všech signálů.'),
+ 'rtty_browser_worked':('Already in the logbook.','Già nel log.','Déjà dans le log.','Schon im Logbuch.','Allerede i loggen.','Už je v logu.'),
+ 'rtty_browser_tones':('Mark %1 Hz · Space %2 Hz','Mark %1 Hz · Space %2 Hz','Mark %1 Hz · Space %2 Hz','Mark %1 Hz · Space %2 Hz','Mark %1 Hz · Space %2 Hz','Mark %1 Hz · Space %2 Hz'),
+}.items()})
+KEYS.update({'rtty_skimmer_help2':dict(zip(LANGS,('Decode independent Mark/Space pairs across 100–4900 Hz using the selected baud, shift and polarity. The radio filter limits the received band. Text and CQ labels do not change the selected QSO or start TX.','Decodifica coppie Mark/Space indipendenti fra 100 e 3500 Hz con baud, shift e polarità selezionati. Il filtro della radio limita la banda ricevuta. Testo ed etichette CQ non cambiano il QSO selezionato e non avviano il TX.','Décode des paires Mark/Space indépendantes entre 100 et 3500 Hz avec le débit, le décalage et la polarité choisis. Le filtre radio limite la bande reçue. Le texte et les indicatifs CQ ne changent pas le QSO sélectionné et ne lancent pas le TX.','Dekodiert unabhängige Mark/Space-Paare von 100 bis 3500 Hz mit gewählter Baudrate, Shift und Polarität. Das Funkgerätefilter begrenzt den Empfangsbereich. Text und CQ-Rufzeichen ändern weder das ausgewählte QSO noch starten sie TX.','Dekoder uavhengige Mark/Space-par fra 100 til 3500 Hz med valgt baudrate, skift og polaritet. Radiofilteret begrenser mottatt bånd. Tekst og CQ-kallesignaler endrer ikke valgt QSO og starter ikke TX.','Dekóduje nezávislé dvojice Mark/Space od 100 do 3500 Hz se zvolenou rychlostí, zdvihem a polaritou. Filtr rádia omezuje přijímané pásmo. Text a značky CQ nemění vybrané QSO ani nespouštějí TX.')))})

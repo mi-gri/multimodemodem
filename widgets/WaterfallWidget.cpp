@@ -671,6 +671,15 @@ void WaterfallWidget::mousePressEvent(QMouseEvent *event)
     const double frequencyHz = frequencyAtMouseEvent(event);
 
     if (m_chordClickEnabled) {
+        // Ctrl+click is the easy way to the chord action (CW: set TX tone).
+        if (button == Qt::LeftButton && (event->modifiers() & Qt::ControlModifier)) {
+            m_chordClickTimer.stop();
+            m_pendingSingleClick = false;
+            m_pendingClickButton = Qt::NoButton;
+            emit frequencyChordClicked(frequencyHz);
+            event->accept();
+            return;
+        }
         const Qt::MouseButtons buttons = event->buttons();
         const bool chord = buttons.testFlag(Qt::LeftButton) && buttons.testFlag(Qt::RightButton);
         if (chord) {

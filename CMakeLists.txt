@@ -506,6 +506,7 @@ add_executable(MultiModeModem
     FtCqWorkListUi.cpp
     Js8Ui.cpp
     WsprUi.cpp
+    RttyBrowserUi.cpp
     ModeFrequencyUi.cpp
     mainwindow.cpp
     FtAutomationLog.cpp
