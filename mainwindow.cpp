@@ -454,7 +454,7 @@ constexpr int kFtPresentationOnlyRole = Qt::UserRole + 429;
 constexpr int kFtDecodeRole = Qt::UserRole + 430;
 constexpr int kFtWorkedRole = Qt::UserRole + 431;      // station already in the log
 constexpr int kFtLastQsoUtcRole = Qt::UserRole + 432;  // its latest QSO (UTC)
-constexpr int kFtSlotSeparatorRole = Qt::UserRole + 433;  // "──── HHMMSS ────" row
+constexpr int kFtSlotSeparatorRole = Qt::UserRole + 433;  // "──── 2m ────" row (band)
 constexpr int kFtLogPendingSinceRole = Qt::UserRole + 434; // logbook status asked at (ms since epoch), 0 = known
 constexpr int kFtLogbookRecentHours = 24;            // logbook lookup "recent" window (diagnostics only)
 constexpr int kFtCountryPrefixRole = Qt::UserRole + 435;   // DXCC primary prefix of the station (cty.dat)
@@ -20888,10 +20888,15 @@ void MainWindow::appendFt8LocalTxRow(const QString &message, int frequencyHz, co
 
     const QString utc = QDateTime::currentDateTimeUtc().time().toString("HHmmss");
     if (!m_lastFt8RxTableUtc.isEmpty() && m_lastFt8RxTableUtc != utc) {
+        // The time is already in every row; the separator names the band the
+        // rig is on (CAT), else the selected FT band.
+        QString band = m_lastRigFrequencyHz > 0.0 ? bandFromFrequencyHz(m_lastRigFrequencyHz) : QString();
+        if (band.isEmpty()) band = m_settings.ft8Band;
+        const QString separatorText = band.isEmpty() ? QStringLiteral("────────") : QStringLiteral("──── %1 ────").arg(band);
         const int sepRow = m_tableFt8Rx->rowCount();
         m_tableFt8Rx->insertRow(sepRow);
         for (int col = 0; col < m_tableFt8Rx->columnCount(); ++col) {
-            QTableWidgetItem *sep = new QTableWidgetItem(col == 0 ? QStringLiteral("──── %1 ────").arg(utc) : QString());
+            QTableWidgetItem *sep = new QTableWidgetItem(col == 0 ? separatorText : QString());
             sep->setFlags(sep->flags() & ~Qt::ItemIsEditable & ~Qt::ItemIsSelectable);
             sep->setData(kFtSlotSeparatorRole, true);
             sep->setBackground(QBrush(m_tableFt8Rx->palette().color(QPalette::AlternateBase)));

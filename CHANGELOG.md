@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- FT decode list: the separator before an own TX row shows the current band (CAT, else
+  the selected FT band) instead of repeating the time that every row already has.
 - WEFAX: new "Line start" (Operating tab) for a missed phasing. It rotates every row
   horizontally, also of a completed image, without copying it for display; PNG save and
   auto-save store the corrected image. Shift+click in the image makes that column the left
