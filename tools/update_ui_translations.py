@@ -730,7 +730,7 @@ DE_TERMS = [
     (r"\bin der letzten Periode\b", "im letzten Slot"),
     (r"\bpro Periode\b", "pro Slot"),
     (r"\bdie gerade, Slot 2 die ungerade 7,5-s-Periode\b", "der gerade, Slot 2 der ungerade 7,5-s-Slot"),
-    (r"\bFT-Perioden\b", "FT-Slots"),
+    (r"(\S)-Perioden\b", r"\1-Slots"),
     (r"\bLetzte (MSK144|Q65)-Periode\b", r"Letzter \1-Slot"),
     (r"\bPeriode %", "Slot %"),
     (r"\bnächsten ausgewählten UTC-TX-Zeitschlitz\b", "nächsten ausgewählten UTC-TX-Slot"),

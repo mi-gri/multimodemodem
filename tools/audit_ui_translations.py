@@ -93,6 +93,12 @@ def main() -> int:
         if retired:
             errors.append(f"{lang}: retired MIND/DDSP vocabulary remains; first: {retired[:8]}")
 
+        # German operators say "Slot" for a TX/RX time slot, never "Periode".
+        if lang == "de":
+            periode = [k for k, value in data.items() if re.search(r"Periode", value)]
+            if periode:
+                errors.append(f"de: 'Periode' instead of 'Slot'; first: {periode[:8]}")
+
         placeholder_errors: list[str] = []
         for key, english in canonical.items():
             value = data.get(key, "")

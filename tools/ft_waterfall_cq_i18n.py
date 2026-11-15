@@ -1022,5 +1022,7 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 }.items()})
 # Period clock for all slot modes (JS8, Q65, MSK144, WSPR).
 KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
- 'slot_period_clock':('%1 periods','Periodi %1','Périodes %1','%1-Perioden','%1-perioder','Periody %1'),
+ 'slot_period_clock':('%1 slots','Slot %1','Slots %1','%1-Slots','%1-slotter','Sloty %1'),
+ # Q65/MSK144 slot length label; German operators say "Slot", not "Periode".
+ 'period':('Slot','Slot','Slot','Slot','Slot','Slot'),
 }.items()})

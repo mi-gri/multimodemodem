@@ -8801,7 +8801,7 @@ void MainWindow::setupMsk144Page()
     m_lblMsk144PeriodStatus->setWordWrap(true);
 
     int row = 0;
-    grid->addWidget(new QLabel(uiText("period", "Period"), rxGroup), row, 0);
+    grid->addWidget(new QLabel(uiText("period", "Slot"), rxGroup), row, 0);
     grid->addWidget(m_cmbMsk144Period, row, 1);
     ++row;
     grid->addWidget(new QLabel(uiText("rx_frequency", "RX freq"), rxGroup), row, 0);
@@ -9126,7 +9126,7 @@ void MainWindow::setupQ65Page()
     int row = 0;
     grid->addWidget(compactLabel(uiText("submode", "Sub")), row, 0);
     grid->addWidget(m_cmbQ65Submode, row, 1);
-    grid->addWidget(compactLabel(uiText("period", "Period")), row, 2);
+    grid->addWidget(compactLabel(uiText("period", "Slot")), row, 2);
     grid->addWidget(m_cmbQ65Period, row, 3);
     ++row;
     grid->addWidget(compactLabel(uiText("decode_depth", "Decode")), row, 0);
@@ -17380,7 +17380,7 @@ void MainWindow::updateFtUtcClockVisibility(const QString &modeName)
     if (m_grpFt8UtcClock != nullptr) {
         m_grpFt8UtcClock->setVisible(slotMode);
         if (auto *box = qobject_cast<QGroupBox *>(m_grpFt8UtcClock)) box->setTitle(showFtClock ? uiText("ft_period_clock", "FT periods")
-                                               : uiText("slot_period_clock", "%1 periods").arg(
+                                               : uiText("slot_period_clock", "%1 slots").arg(
                                                      Q65Mode::isFamilyMode(activeModeName) ? QStringLiteral("Q65") : activeModeName));
         if (!showFtClock) m_grpFt8UtcClock->setToolTip(QString());
     }
