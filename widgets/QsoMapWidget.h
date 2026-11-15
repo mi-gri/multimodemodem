@@ -163,6 +163,8 @@ private:
     mutable int m_locatorIndexBehavior = -1;
     mutable QString m_filteredCacheKey;
     mutable QVector<LogbookEntry> m_filteredCache;
+    mutable QString m_workedGridCacheKey;
+    mutable QMap<QString, int> m_workedGridCache;
     const MapLocatorIndex &cachedLocatorIndex() const;
     QVector<LogbookEntry> filteredMapRecordsUncached() const;
     mutable QString m_geoCacheKey;

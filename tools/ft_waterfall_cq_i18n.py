@@ -924,3 +924,13 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
   'Laster ned cty.csv over HTTPS høyst én gang i uken og bruker den bare hvis den er komplett og nyere. Hjelp -> Oppdater landfil sjekker straks.',
   'Stahuje cty.csv přes HTTPS nejvýše jednou týdně a použije jej jen, je-li úplný a novější. Nápověda -> Aktualizovat soubor zemí zkontroluje hned.'),
 }.items()})
+# Map: worked squares tooltip.
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Green squares: worked in the logbook on the selected band and mode (all dates); red: not worked yet.':(
+  'Green squares: worked in the logbook on the selected band and mode (all dates); red: not worked yet.',
+  'Quadrati verdi: lavorati nel log sulla banda e nel modo selezionati (tutte le date); rossi: non ancora lavorati.',
+  "Carrés verts : contactés dans le log sur la bande et le mode choisis (toutes dates) ; rouges : pas encore contactés.",
+  'Grüne Felder: im Log auf dem gewählten Band und in der gewählten Betriebsart gearbeitet (alle Daten); rot: noch nicht gearbeitet.',
+  'Grønne ruter: kjørt i loggen på valgt bånd og modus (alle datoer); røde: ikke kjørt ennå.',
+  'Zelené čtverce: pracováno v logu na zvoleném pásmu a druhu provozu (všechna data); červené: dosud nepracováno.'),
+}.items()})

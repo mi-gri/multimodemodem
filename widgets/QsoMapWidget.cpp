@@ -149,6 +149,28 @@ double mercatorY01ToLat(double y)
     return tileYToLat(y, 0);
 }
 
+// The bundled planet_map is equirectangular; markers and the locator grid
+// use Web Mercator while OSM tiles load or when only some arrived. Draw the
+// image in horizontal strips re-projected to Mercator so land, grid squares
+// and HOME line up (a plain stretch put JO30 over North Africa).
+void drawEquirectangularAsMercator(QPainter *painter, const QPixmap &image, const QRectF &projected, const QRect &visible)
+{
+    if (image.isNull() || projected.height() <= 0.0) return;
+    const int strips = qBound(64, static_cast<int>(projected.height() / 4.0), 4096);
+    const double imageHeight = image.height();
+    for (int i = 0; i < strips; ++i) {
+        const double y0 = projected.top() + projected.height() * i / strips;
+        const double y1 = projected.top() + projected.height() * (i + 1) / strips;
+        if (y1 < visible.top() || y0 > visible.bottom()) continue;
+        const double lat0 = tileYToLat(static_cast<double>(i) / strips, 0);
+        const double lat1 = tileYToLat(static_cast<double>(i + 1) / strips, 0);
+        const double sy0 = (90.0 - lat0) / 180.0 * imageHeight;
+        const double sy1 = (90.0 - lat1) / 180.0 * imageHeight;
+        painter->drawPixmap(QRectF(projected.left(), y0, projected.width(), y1 - y0 + 0.5), image,
+                            QRectF(0.0, sy0, image.width(), qMax(0.5, sy1 - sy0)));
+    }
+}
+
 bool ctyCentroidForCoarseEntry(const LogbookEntry &entry, QPointF *lonLat, QString *mapGrid)
 {
     if (lonLat == nullptr) {
@@ -785,6 +807,7 @@ QWidget* QsoMapWidget::createControls(QWidget* parent)
     auto* currentMode=new QCheckBox(L("Current mode only"),panel);currentMode->setObjectName("mapCurrentMode");currentMode->setChecked(m_mapUseModeFilter);
     auto* paths=new QCheckBox(L("Paths"),panel);paths->setChecked(m_showPaths);
     auto* grid=new QCheckBox(L("Grid and worked squares"),panel);grid->setChecked(m_showMaidenheadGrid);
+    grid->setToolTip(L("Green squares: worked in the logbook on the selected band and mode (all dates); red: not worked yet."));
     auto* row=new QHBoxLayout;row->addWidget(currentMode);row->addWidget(paths);row->addWidget(grid);row->addStretch();
     auto* options=new QToolButton(panel);options->setText(L("Map options"));options->setPopupMode(QToolButton::InstantPopup);
     auto* menu=new QMenu(options);
@@ -1274,8 +1297,7 @@ void QsoMapWidget::drawOsmTiles(QPainter *painter, const QRect &mapRect) const
         // during print/PDF rendering, but draw every tile that is already in the
         // cache; use the bundled map only behind missing tiles.
         if (!m_worldMap.isNull()) {
-            const QRectF projected = projectedMapRect(mapRect);
-            painter->drawPixmap(projected, m_worldMap, QRectF(m_worldMap.rect()));
+            drawEquirectangularAsMercator(painter, m_worldMap, projectedMapRect(mapRect), mapRect);
         } else {
             drawLand(painter, mapRect);
             drawGrid(painter, mapRect);
@@ -1314,8 +1336,7 @@ void QsoMapWidget::drawOsmTiles(QPainter *painter, const QRect &mapRect) const
         if (m_osmTileRequestBlocked) {
             painter->drawPixmap(offlineMapRect(mapRect), m_worldMap, QRectF(m_worldMap.rect()));
         } else {
-            const QRectF projected = projectedMapRect(mapRect);
-            painter->drawPixmap(projected, m_worldMap, QRectF(m_worldMap.rect()));
+            drawEquirectangularAsMercator(painter, m_worldMap, projectedMapRect(mapRect), mapRect);
         }
     } else {
         drawLand(painter, mapRect);
@@ -1356,8 +1377,7 @@ void QsoMapWidget::drawOsmTiles(QPainter *painter, const QRect &mapRect) const
         if (m_osmTileRequestBlocked) {
             painter->drawPixmap(offlineMapRect(mapRect), m_worldMap, QRectF(m_worldMap.rect()));
         } else {
-            const QRectF projected = projectedMapRect(mapRect);
-            painter->drawPixmap(projected, m_worldMap, QRectF(m_worldMap.rect()));
+            drawEquirectangularAsMercator(painter, m_worldMap, projectedMapRect(mapRect), mapRect);
         }
     }
 
@@ -2137,14 +2157,25 @@ void QsoMapWidget::fallBackToStaticMap(const QString &reason)
 
 QMap<QString, int> QsoMapWidget::workedMaidenheadGridCounts() const
 {
+    // Worked squares come from every logged QSO on the selected band/mode,
+    // not from the displayed markers: those are reduced to one per DXCC or
+    // locator, capped, and limited to the date scope ("today" left almost
+    // no square marked).
+    const QString band = m_mapBandFilter.trimmed();
+    const QString mode = m_mapUseModeFilter ? m_modeFilter : QString();
+    const QString key = QStringLiteral("%1|%2|%3").arg(m_recordsGeneration).arg(band, mode);
+    if (key == m_workedGridCacheKey) return m_workedGridCache;
     QMap<QString, int> counts;
-    const QVector<LogbookEntry> entries = filteredMapRecords();
-    for (const LogbookEntry &entry : entries) {
+    for (const LogbookEntry &entry : m_records) {
+        if (!mode.isEmpty() && !modeMatches(entry.mode, mode)) continue;
+        if (!band.isEmpty() && entry.band.trimmed().compare(band, Qt::CaseInsensitive) != 0) continue;
         const QString grid4 = maidenheadGrid4(entry.grid);
         if (!grid4.isEmpty()) {
             counts[grid4] += 1;
         }
     }
+    m_workedGridCache = counts;
+    m_workedGridCacheKey = key;
     return counts;
 }
 
