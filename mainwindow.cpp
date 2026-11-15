@@ -10355,9 +10355,13 @@ void MainWindow::setupProcessingConnections()
                 // CW keying also makes broadband transients visible in this
                 // local monitor. Freeze the RX display for both modes; CW text
                 // progress is driven separately by audio playback timestamps.
+                // MSK144 likewise: the noise-free local signal makes even its
+                // -40 dB sidelobes bright, so the 2.4 kHz MSK looked far wider
+                // than it is on air.
                 if (ui != nullptr && ui->cmbMode != nullptr &&
                     (Ft8Mode::isFamilyMode(ui->cmbMode->currentText()) ||
-                     ui->cmbMode->currentText() == CwDecoder::modeName())) {
+                     ui->cmbMode->currentText() == CwDecoder::modeName() ||
+                     Msk144Mode::isMode(ui->cmbMode->currentText()))) {
                     return;
                 }
 

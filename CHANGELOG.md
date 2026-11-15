@@ -4,6 +4,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- MSK144: the waterfall no longer shows the local TX monitor (as already for FT and CW).
+  The noise-free local signal lit up even its -40 dB sidelobes, so the MSK looked far wider
+  than on air; the generated signal itself is unchanged and measures as MSK (99 % bandwidth
+  293-2754 Hz at 1500 Hz centre, as in WSJT-X).
 - FT decode list: the separator before an own TX row shows the current band (CAT, else
   the selected FT band) instead of repeating the time that every row already has.
 - WEFAX: new "Line start" (Operating tab) for a missed phasing. It rotates every row
