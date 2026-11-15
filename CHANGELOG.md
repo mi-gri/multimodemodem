@@ -4,6 +4,14 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Country data: operating suffixes (/R rover, /P, /M, /QRP, /digit) are never taken as a
+  prefix. "/R" was read as Russia: a US rover (W1ABC/R) counted as Russia and the AP noise
+  decode "DO3BOX 0W2QAL/R FC14" passed the call check; such decodes are now dropped.
+- FT country filter: entries may be any prefix of a DXCC entity (R9, U9, RA9 -> UA9), not
+  only the primary one; the filter menu shows what each entry hides and marks entries that
+  match no entity, and the runtime log reports them at start.
+- FT slot separator spans the whole row; the slot clock in JS8/WSPR no longer flickers
+  between RX and TX (the FT scheduler drew the same clock).
 - Slot clock (side panel, "<Mode>-Slots") now in every slot mode: JS8 (6/10/15/30 s by submode), Q65
   (selected period, TX first/second), MSK144 (15/30 s, TX first/second) and WSPR (120 s), with
   the UTC clock. JS8 and WSPR have no first/second choice: one bar, red while transmitting.

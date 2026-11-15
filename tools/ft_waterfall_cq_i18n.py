@@ -1026,3 +1026,14 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  # Q65/MSK144 slot length label; German operators say "Slot", not "Periode".
  'period':('Slot','Slot','Slot','Slot','Slot','Slot'),
 }.items()})
+# Country filter: entries that match no DXCC entity.
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft_filter_country_unknown':('Not a DXCC prefix, ignored: %1','Non è un prefisso DXCC, ignorato: %1',"Pas un préfixe DXCC, ignoré : %1",'Kein DXCC-Präfix, wird ignoriert: %1','Ikke et DXCC-prefiks, ignoreres: %1','Není prefix DXCC, ignorováno: %1'),
+ 'ft_filter_country_unknown_log':(
+  'FT country filter: %1 is not a DXCC prefix and hides nothing (e.g. UA9 for Asiatic Russia).',
+  'Filtro paesi FT: %1 non è un prefisso DXCC e non nasconde nulla (ad es. UA9 per la Russia asiatica).',
+  "Filtre pays FT : %1 n'est pas un préfixe DXCC et ne masque rien (p. ex. UA9 pour la Russie d'Asie).",
+  'FT-Länderfilter: %1 ist kein DXCC-Präfix und blendet nichts aus (z. B. UA9 für das asiatische Russland).',
+  'FT-landfilter: %1 er ikke et DXCC-prefiks og skjuler ingenting (f.eks. UA9 for asiatisk Russland).',
+  'Filtr zemí FT: %1 není prefix DXCC a nic neskrývá (např. UA9 pro asijské Rusko).'),
+}.items()})

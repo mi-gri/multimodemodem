@@ -2386,6 +2386,14 @@ private:
     QAction *m_actFt8FilterWorked = nullptr;       // hide worked stations
     QSpinBox *m_spinFt8FilterWorkedDays = nullptr; // ... within N days, 0 = all
     QAction *m_actFt8FilterCountries = nullptr;    // hide DXCC countries (JTDX)
+    QLabel *m_lblFt8FilterCountriesResolved = nullptr;
+    // Country filter entries resolved to DXCC primary prefixes (R9 -> UA9);
+    // cached per list text and country-data instance.
+    QStringList hiddenCountryPrimaryPrefixes() const;
+    QString describeCountryFilter(const QString &list, QStringList *unknown = nullptr) const;
+    mutable QString m_hiddenCountryCacheKey;
+    mutable const void *m_hiddenCountryCacheCty = nullptr;
+    mutable QStringList m_hiddenCountryCache;
     QLineEdit *m_editFt8FilterCountries = nullptr; // ... cty.dat prefixes, comma separated
     QMenu *m_menuFt8FilterContinents = nullptr;    // hide continents (JTDX)
     QList<QAction *> m_actFt8FilterContinents;     // one per cty.dat continent code

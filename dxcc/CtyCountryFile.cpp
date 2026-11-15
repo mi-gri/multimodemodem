@@ -302,6 +302,18 @@ bool CtyCountryFile::loadFromFile(const QString &path)
 }
 
 
+QString CtyCountryFile::primaryPrefixForFilterToken(const QString &token) const
+{
+    const QString t = token.trimmed().toUpper();
+    if (t.isEmpty()) return QString();
+    for (const Entity &e : m_entities)
+        if (e.primaryPrefix.compare(t, Qt::CaseInsensitive) == 0) return e.primaryPrefix;
+    const auto it = m_prefixHash.constFind(t);
+    if (it != m_prefixHash.constEnd() && it.value() >= 0 && it.value() < m_entities.size())
+        return m_entities.at(it.value()).primaryPrefix;
+    return QString();
+}
+
 CtyCountryFile::LookupResult CtyCountryFile::lookupEntityNameOrPrefix(const QString &query) const
 {
     LookupResult result;
@@ -423,13 +435,21 @@ CtyCountryFile::LookupResult CtyCountryFile::lookupCallsign(const QString &calls
     if (parts.size() > 1) {
         const QString suffix = parts.last();
         static const QRegularExpression digitsOnly(QStringLiteral("^[0-9]+$"));
-        if (suffix != "P" && suffix != "M" && suffix != "MM" && suffix != "AM" && suffix != "QRP" &&
+        // "/R" is the FT8/FT4 rover flag, not the prefix of Russia: W1ABC/R
+        // stays in the USA and a noise decode like 0W2QAL/R stays invalid.
+        if (suffix != "P" && suffix != "M" && suffix != "MM" && suffix != "AM" && suffix != "QRP" && suffix != "R" &&
             !digitsOnly.match(suffix).hasMatch() && m_prefixHash.contains(suffix)) {
             candidates << suffix;
         }
     }
     candidates << call;
+    static const QRegularExpression digitsOnlyPart(QStringLiteral("^[0-9]+$"));
     for (const QString &part : parts) {
+        // Operating suffixes (/P, /M, /R rover, /QRP, /7) never name a country.
+        if (parts.size() > 1 && (part == "P" || part == "M" || part == "MM" || part == "AM" || part == "QRP" ||
+                                 part == "R" || digitsOnlyPart.match(part).hasMatch())) {
+            continue;
+        }
         if (!candidates.contains(part)) {
             candidates << part;
         }

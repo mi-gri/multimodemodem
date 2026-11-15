@@ -72,6 +72,9 @@ public:
 
     LookupResult lookupCallsign(const QString &callsign) const;
     LookupResult lookupEntityNameOrPrefix(const QString &query) const;
+    /// Country-filter token -> DXCC primary prefix: a primary prefix itself
+    /// or any prefix listed for an entity (R9, RA9 -> UA9). Empty if unknown.
+    QString primaryPrefixForFilterToken(const QString &token) const;
 
     /**
      * Returns the best map/grid reference MultiModeModem can derive from the

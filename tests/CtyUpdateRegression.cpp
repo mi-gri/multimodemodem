@@ -48,6 +48,16 @@ int main(int argc, char **argv)
     check(before.lookupCallsign(QStringLiteral("DL1ABC")).valid, "previous data set still valid for running lookups");
     const auto dl = CtyCountryFile::instance().lookupCallsign(QStringLiteral("DL1ABC"));
     check(dl.valid && dl.entity.primaryPrefix == QStringLiteral("DL"), "lookups work on the new data");
+    {   // Operating suffixes are not prefixes: /R is the FT rover flag, not Russia.
+        const CtyCountryFile &c = CtyCountryFile::instance();
+        const auto rover = c.lookupCallsign(QStringLiteral("W1ABC/R"));
+        check(rover.valid && rover.entity.primaryPrefix == QStringLiteral("K"), "W1ABC/R stays USA");
+        check(!c.lookupCallsign(QStringLiteral("0W2QAL/R")).valid, "noise call 0W2QAL/R is no valid call");
+        check(c.lookupCallsign(QStringLiteral("DL1ABC/P")).entity.primaryPrefix == QStringLiteral("DL"), "DL1ABC/P stays DL");
+        check(c.primaryPrefixForFilterToken(QStringLiteral("R9")) == QStringLiteral("UA9") &&
+              c.primaryPrefixForFilterToken(QStringLiteral("UA")) == QStringLiteral("UA") &&
+              c.primaryPrefixForFilterToken(QStringLiteral("Q9")).isEmpty(), "country filter tokens resolve to primary prefixes");
+    }
     std::cout << r.message.toStdString() << '\n';
     return ok ? 0 : 1;
 }

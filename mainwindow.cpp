@@ -1648,6 +1648,15 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::updateQsoUtcFields);
     m_qsoUtcTimer.start();
 
+    // An entry of the country filter that matches no DXCC entity hides
+    // nothing; say so once at start (the filter menu shows it as well).
+    QTimer::singleShot(3000, this, [this] {
+        QStringList unknown;
+        describeCountryFilter(m_settings.ftDecodeFilterCountryList, &unknown);
+        if (m_settings.ftDecodeFilterCountries && !unknown.isEmpty())
+            appendLog(uiText("ft_filter_country_unknown_log", "FT country filter: %1 is not a DXCC prefix and hides nothing (e.g. UA9 for Asiatic Russia).")
+                          .arg(unknown.join(QStringLiteral(", "))));
+    });
     m_slotClockTimer.setInterval(100);
     connect(&m_slotClockTimer, &QTimer::timeout, this, &MainWindow::updateSlotModeClock);
 
@@ -9390,8 +9399,26 @@ void MainWindow::setupFt8Page()
         m_editFt8FilterCountries->setToolTip(uiText("ft_filter_country_list_tooltip", "Comma separated DXCC prefixes as in cty.dat, e.g. UA,UA9,JA or DL,F,I. The prefix of a station is shown in the tooltip of the Country column."));
         countriesLayout->addWidget(m_editFt8FilterCountries, 1);
         QWidgetAction *countriesAction = new QWidgetAction(filterMenu);
+        // What each entry hides (and which entries match no DXCC entity).
+        QWidget *resolvedRow = new QWidget(filterMenu);
+        QHBoxLayout *resolvedLayout = new QHBoxLayout(resolvedRow);
+        resolvedLayout->setContentsMargins(24, 0, 8, 4);
+        m_lblFt8FilterCountriesResolved = new QLabel(resolvedRow);
+        m_lblFt8FilterCountriesResolved->setWordWrap(true);
+        m_lblFt8FilterCountriesResolved->setMaximumWidth(360);
+        resolvedLayout->addWidget(m_lblFt8FilterCountriesResolved, 1);
+        QWidgetAction *resolvedAction = new QWidgetAction(filterMenu);
+        resolvedAction->setDefaultWidget(resolvedRow);
+        const auto showResolved = [this](const QString &text) {
+            QStringList unknown;
+            m_lblFt8FilterCountriesResolved->setText(describeCountryFilter(text, &unknown));
+            M3Ui::setSemanticRole(m_lblFt8FilterCountriesResolved, unknown.isEmpty() ? QStringLiteral("muted") : QStringLiteral("negative"));
+        };
+        showResolved(m_editFt8FilterCountries->text());
+        connect(m_editFt8FilterCountries, &QLineEdit::textChanged, this, showResolved);
         countriesAction->setDefaultWidget(countriesRow);
         filterMenu->addAction(countriesAction);
+        filterMenu->addAction(resolvedAction);
         connect(m_editFt8FilterCountries, &QLineEdit::textEdited, this, [this](const QString &text) {
             const int pos = m_editFt8FilterCountries->cursorPosition();
             m_editFt8FilterCountries->setText(text.toUpper());
@@ -17464,7 +17491,10 @@ void MainWindow::updateFt8SlotStatus()
     const QString window = txWindow ? uiText("ft8_tx_window", "TX window")
                                     : uiText("ft8_rx_window", "RX window");
 
-    if (m_ft8SlotClock != nullptr) {
+    // Only FT owns the shared slot clock; JS8/Q65/MSK144/WSPR draw it in
+    // updateSlotModeClock() (two writers made it flicker between RX and TX).
+    const bool ftClock = Ft8Mode::isFamilyMode(modeName);
+    if (m_ft8SlotClock != nullptr && ftClock) {
         m_ft8SlotClock->setSlotState(cycleSeconds,
                                       firstPeriodNow,
                                       txWindow,
@@ -17472,7 +17502,7 @@ void MainWindow::updateFt8SlotStatus()
                                       static_cast<double>(cycleMs) / 1000.0,
                                       profile.shortLabel);
     }
-    if (m_lcdFt8UtcClock != nullptr) {
+    if (m_lcdFt8UtcClock != nullptr && ftClock) {
         m_lcdFt8UtcClock->display(t.toString("HH:mm:ss"));
     }
     if (m_lblFt8WindowStatus != nullptr) {
@@ -17521,7 +17551,8 @@ void MainWindow::handleFtSlotUpdated(const QString &modeLabel,
     const QString window = txWindow ? uiText("ft8_tx_window", "TX window")
                                     : uiText("ft8_rx_window", "RX window");
 
-    if (m_ft8SlotClock != nullptr) {
+    const bool ftClock = ui != nullptr && ui->cmbMode != nullptr && Ft8Mode::isFamilyMode(ui->cmbMode->currentText());
+    if (m_ft8SlotClock != nullptr && ftClock) {
         m_ft8SlotClock->setSlotState(cycleSeconds,
                                       firstPeriodNow,
                                       txWindow,
@@ -17529,7 +17560,7 @@ void MainWindow::handleFtSlotUpdated(const QString &modeLabel,
                                       static_cast<double>(cycleMs) / 1000.0,
                                       modeLabel);
     }
-    if (m_lcdFt8UtcClock != nullptr) {
+    if (m_lcdFt8UtcClock != nullptr && ftClock) {
         m_lcdFt8UtcClock->display(QDateTime::fromMSecsSinceEpoch(nowUtcMs, Qt::UTC).time().toString("HH:mm:ss"));
     }
     if (m_lblFt8WindowStatus != nullptr) {
@@ -20694,7 +20725,7 @@ bool MainWindow::ft8DecodeRowPassesFilter(int row) const
     }
     if (countries && !messageItem->data(kFtWatchedRole).toBool() &&
         FtDecodeFilter::hiddenByCountry(messageItem->data(kFtCountryPrefixRole).toString(),
-                                        FtDecodeFilter::countryPrefixList(m_settings.ftDecodeFilterCountryList))) {
+                                        hiddenCountryPrimaryPrefixes())) {
         return false;   // JTDX "Hide messages from countries"; watched stations stay
     }
     if (continents && !messageItem->data(kFtWatchedRole).toBool() &&
@@ -20983,6 +21014,9 @@ void MainWindow::appendFt8LocalTxRow(const QString &message, int frequencyHz, co
             sep->setFont(f);
             m_tableFt8Rx->setItem(sepRow, col, sep);
         }
+        // One cell across the whole row: the band text is not cut by the
+        // narrow UTC column.
+        m_tableFt8Rx->setSpan(sepRow, 0, 1, m_tableFt8Rx->columnCount());
     }
     m_lastFt8RxTableUtc = utc;
 
@@ -21188,6 +21222,43 @@ bool MainWindow::isFtCallBlacklisted(const QString &call) const
     return false;
 }
 
+QStringList MainWindow::hiddenCountryPrimaryPrefixes() const
+{
+    const CtyCountryFile &cty = CtyCountryFile::instance();
+    if (m_hiddenCountryCacheKey != m_settings.ftDecodeFilterCountryList || m_hiddenCountryCacheCty != &cty) {
+        m_hiddenCountryCacheKey = m_settings.ftDecodeFilterCountryList;
+        m_hiddenCountryCacheCty = &cty;
+        m_hiddenCountryCache.clear();
+        for (const QString &token : FtDecodeFilter::countryPrefixList(m_settings.ftDecodeFilterCountryList)) {
+            const QString primary = cty.primaryPrefixForFilterToken(token);
+            const QString use = primary.isEmpty() ? token : primary;
+            if (!m_hiddenCountryCache.contains(use)) m_hiddenCountryCache << use;
+        }
+    }
+    return m_hiddenCountryCache;
+}
+
+QString MainWindow::describeCountryFilter(const QString &list, QStringList *unknown) const
+{
+    const CtyCountryFile &cty = CtyCountryFile::instance();
+    QStringList known, missing;
+    for (const QString &token : FtDecodeFilter::countryPrefixList(list)) {
+        const QString primary = cty.primaryPrefixForFilterToken(token);
+        if (primary.isEmpty()) { missing << token; continue; }
+        const CtyCountryFile::LookupResult entity = cty.lookupEntityNameOrPrefix(primary);
+        const QString name = entity.valid ? entity.entity.name : primary;
+        known << (primary == token ? QStringLiteral("%1 %2").arg(token, name)
+                                   : QStringLiteral("%1 = %2 %3").arg(token, primary, name));
+    }
+    if (unknown) *unknown = missing;
+    QString text = known.join(QStringLiteral(" · "));
+    if (!missing.isEmpty()) {
+        if (!text.isEmpty()) text += QLatin1Char('\n');
+        text += uiText("ft_filter_country_unknown", "Not a DXCC prefix, ignored: %1").arg(missing.join(QStringLiteral(", ")));
+    }
+    return text;
+}
+
 QString MainWindow::ftAutoQsoFilterReason(const QString &call) const
 {
     if (call.trimmed().isEmpty()) return QString();
@@ -21197,8 +21268,7 @@ QString MainWindow::ftAutoQsoFilterReason(const QString &call) const
     if ((!countries && hiddenContinents.isEmpty()) || isFtCallWatched(call)) return QString();
     const CtyCountryFile::LookupResult cty = CtyCountryFile::instance().lookupCallsign(call);
     if (!cty.valid) return QString();
-    if (countries && FtDecodeFilter::hiddenByCountry(cty.entity.primaryPrefix,
-                                                     FtDecodeFilter::countryPrefixList(m_settings.ftDecodeFilterCountryList)))
+    if (countries && FtDecodeFilter::hiddenByCountry(cty.entity.primaryPrefix, hiddenCountryPrimaryPrefixes()))
         return QStringLiteral("country filter %1 (%2)").arg(cty.entity.primaryPrefix, cty.entity.name);
     if (FtDecodeFilter::hiddenByContinent(cty.entity.continent, hiddenContinents))
         return QStringLiteral("continent filter %1").arg(cty.entity.continent);
