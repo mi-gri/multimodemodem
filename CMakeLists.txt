@@ -1407,6 +1407,13 @@ if(BUILD_TESTING)
     target_include_directories(m3_band_scheduler_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(m3_band_scheduler_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets)
     add_test(NAME m3_band_scheduler_regression COMMAND m3_band_scheduler_regression)
+    add_executable(m3_wefax_completion_regression tests/WeatherFaxCompletionRegression.cpp
+        modems/weatherfax/WeatherFaxDecoder.cpp dsp/FrequencyTracker.cpp)
+    target_include_directories(m3_wefax_completion_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_compile_definitions(m3_wefax_completion_regression PRIVATE QT_FORCE_ASSERTS)
+    target_link_libraries(m3_wefax_completion_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Gui)
+    add_test(NAME m3_wefax_completion_regression COMMAND m3_wefax_completion_regression)
+    set_tests_properties(m3_wefax_completion_regression PROPERTIES TIMEOUT 120)
     set_tests_properties(m3_band_scheduler_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
     add_executable(m3_waterfall_cq_regression
         tests/WaterfallCqRegression.cpp dsp/WaterfallLeveler.cpp dsp/DspEngine.cpp widgets/CqSpots.h

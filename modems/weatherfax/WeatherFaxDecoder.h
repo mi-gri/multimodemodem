@@ -607,6 +607,11 @@ private:
     QVector<float> m_buffer;
     QVector<double> m_frequencyBuffer;
     QImage m_image;
+    // completedImageSnapshot() is asked for on every audio block (RX worker
+    // snapshot); the deep copy is made once per new line, not per block.
+    mutable QImage m_snapshotCache;
+    mutable int m_snapshotCacheLines = -1;
+    mutable qint64 m_snapshotCacheKey = 0;
 
     DecoderState m_state = DecoderState::Searching;
 

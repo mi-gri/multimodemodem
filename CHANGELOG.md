@@ -4,6 +4,12 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- WEFAX crash fixed (bad_alloc after 3000 free-running lines): completing an image inside the
+  line loop (line limit, APT stop, end of signal) cleared the sample buffers, then one sample
+  was removed from the empty buffer, corrupting the heap. Regression test
+  m3_wefax_completion_regression (with Qt container asserts).
+- WEFAX: the receive snapshot is copied once per new line instead of on every audio block
+  (up to ~450 MB/s of copying near the end of a 3000-line image).
 - RTTY signal browser (like fldigi's) under the RTTY receive text, in a resizable split:
   one row per signal the skimmer decodes in parallel (Hz, CQ call, country, text with the
   newest characters visible), sorted by frequency; CQ calls marked new DXCC / new on band /

@@ -1796,6 +1796,14 @@ void WeatherFaxDecoder::consumeOneLineFromBuffer()
     int consumeSamples = static_cast<int>(qFloor(exactConsume));
     m_lineSampleRemainder = exactConsume - static_cast<double>(consumeSamples);
 
+    // completeImage() (line limit, APT stop, end of signal) clears the
+    // buffers while a line is being handled.  qBound(1, n, 0) then asked to
+    // remove one sample from an empty vector; release Qt does not check that
+    // and the heap was corrupted (bad_alloc crash after 3000 free-run lines).
+    if (m_buffer.isEmpty()) {
+        m_frequencyBuffer.clear();
+        return;
+    }
     consumeSamples = qBound(1, consumeSamples, m_buffer.size());
 
     m_buffer.remove(0, consumeSamples);
@@ -2140,12 +2148,18 @@ QImage WeatherFaxDecoder::completedImageSnapshot() const
     }
 
     const int usedLines = qBound(1, m_y, m_image.height());
-
-    if (usedLines >= m_image.height()) {
-        return m_image.copy();
+    // Same image object and line count: nothing new to copy.  (cacheKey()
+    // changes when m_image is replaced, e.g. grown or a new frame started;
+    // pixels of already written lines never change afterwards.)
+    if (!m_snapshotCache.isNull() && m_snapshotCacheLines == usedLines && m_snapshotCacheKey == m_image.cacheKey()) {
+        return m_snapshotCache;
     }
 
-    return m_image.copy(QRect(0, 0, m_image.width(), usedLines));
+    m_snapshotCache = (usedLines >= m_image.height()) ? m_image.copy()
+                                                       : m_image.copy(QRect(0, 0, m_image.width(), usedLines));
+    m_snapshotCacheLines = usedLines;
+    m_snapshotCacheKey = m_image.cacheKey();
+    return m_snapshotCache;
 }
 
 // -----------------------------------------------------------------------------
