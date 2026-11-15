@@ -1408,6 +1408,7 @@ private:
     /**
      * @brief Updates a QSO form with current mode/default values.
      */
+    void updateQsoFormBands();
     void populateQsoFormDefaults(QsoFormWidgets *form, const QString &modeName);
 
     /**

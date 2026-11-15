@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- QSO forms of the text modes: the band field follows the rig's band (CAT) instead of showing a
+  fixed "20m" hint; a band typed by the operator is kept, and a QSO logged with an empty field
+  takes the CAT band (it was logged without band before).
 - Tune button in every mode, between the rig frequency and PWR/SWR/ALC: FT8/FT4 use their
   tune; the other modes send a steady carrier on their TX audio frequency (RTTY between mark
   and space, CW TX tone, PSK/MFSK/Hell tone, MSK144/Q65/JS8/WSPR TX frequency, 1500 Hz for

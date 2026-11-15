@@ -3805,6 +3805,24 @@ void MainWindow::publishWavelogRadio()
     m_wavelog->sendRadio(config, m_settings.wavelogRadioName, hz, mode, watts);
 }
 
+void MainWindow::updateQsoFormBands()
+{
+    // The band field follows the rig (CAT) unless the operator typed a band:
+    // only an empty field or one m³ filled itself is updated.
+    const QString band = m_lastRigFrequencyHz > 0.0 ? bandFromFrequencyHz(m_lastRigFrequencyHz) : QString();
+    const QList<QsoFormWidgets *> forms = {m_rttyQsoForm, m_bpsk31QsoForm, m_mfskQsoForm, m_cwQsoForm, m_hellQsoForm, m_msk144QsoForm, m_q65QsoForm, m_js8QsoForm};
+    for (QsoFormWidgets *form : forms) {
+        if (form == nullptr || form->band == nullptr) continue;
+        QLineEdit *edit = form->band;
+        const QString current = edit->text().trimmed();
+        const QString autoBand = edit->property("m3AutoBand").toString();
+        edit->setPlaceholderText(band.isEmpty() ? QStringLiteral("20m") : band);
+        if (band.isEmpty() || (!current.isEmpty() && current != autoBand)) continue;
+        if (current != band) edit->setText(band);
+        edit->setProperty("m3AutoBand", band);
+    }
+}
+
 void MainWindow::updateQsoUtcFields()
 {
     const QString utc = QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd HH:mm:ss 'UTC'");
@@ -3840,6 +3858,8 @@ bool MainWindow::addQsoToLogFromForm(QsoFormWidgets *form)
     entry.rstSent = form->rstSent != nullptr ? form->rstSent->text().trimmed().toUpper() : QStringLiteral("599");
     entry.rstReceived = form->rstReceived != nullptr ? form->rstReceived->text().trimmed().toUpper() : QStringLiteral("599");
     entry.band = form->band != nullptr ? form->band->text().trimmed().toLower() : QString();
+    if (entry.band.isEmpty() && m_lastRigFrequencyHz > 0.0)   // never log without a band
+        entry.band = bandFromFrequencyHz(m_lastRigFrequencyHz).toLower();
     entry.mode = form->mode != nullptr ? form->mode->text().trimmed().toUpper() : currentAdifMode();
     entry.grid = form->grid != nullptr ? form->grid->text().trimmed().toUpper() : QString();
     entry.utc = QDateTime::currentDateTimeUtc();
@@ -13311,6 +13331,7 @@ void MainWindow::handleRigFrequencyChanged(double frequencyHz)
 
     if (bandFromFrequencyHz(previousFrequencyHz) != bandFromFrequencyHz(frequencyHz)) {
         restoreTxLevelForContext();
+        updateQsoFormBands();
     }
     syncRigSideband();
 
