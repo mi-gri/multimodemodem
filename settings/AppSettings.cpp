@@ -481,17 +481,17 @@ void AppSettings::load()
     }
     if (cwDecodeEngine != "neural_search") cwDecodeEngine = "native";
     cwToneHz = settings.value("CW/toneHz", cwToneHz).toInt();
-    if (cwToneHz < 250 || cwToneHz > 3000) {
+    if (cwToneHz < 250 || cwToneHz > 4900) {   // RX tone: up to the waterfall top
         cwToneHz = 1000;
     }
     // Before the dedicated CW TX marker existed, TX used RX A directly.
     // Preserve that exact initial behaviour once when loading an older settings file.
     cwTxToneHz = settings.value("CW/txToneHz", cwToneHz).toInt();
-    if (cwTxToneHz < 250 || cwTxToneHz > 3000) {
-        cwTxToneHz = cwToneHz;
+    if (cwTxToneHz < 250 || cwTxToneHz > 3000) {   // TX tone: inside the rig's TX filter
+        cwTxToneHz = qBound(250, cwToneHz, 3000);
     }
     cwSecondaryToneHz = settings.value("CW/secondaryToneHz", cwSecondaryToneHz).toInt();
-    if (cwSecondaryToneHz < 250 || cwSecondaryToneHz > 3000) {
+    if (cwSecondaryToneHz < 250 || cwSecondaryToneHz > 4900) {
         cwSecondaryToneHz = 1400;
     }
     cwSecondaryEnabled = settings.value("CW/secondaryEnabled", cwSecondaryEnabled).toBool();

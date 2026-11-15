@@ -14,7 +14,7 @@
 namespace {
 
 constexpr double kMinUiToneHz = 100.0;
-constexpr double kMaxUiToneHz = 3500.0;
+constexpr double kMaxUiToneHz = 4900.0;   // up to the waterfall top (5000 Hz)
 
 } // namespace
 
@@ -85,7 +85,7 @@ void CwDecoder::resetSkimmer()
     // therefore cannot inject unrelated characters into the RX terminals.
     m3::cwskimmer::CwSkimmerConfig cfg;
     cfg.minimumFrequencyHz = 100.0;
-    cfg.maximumFrequencyHz = 3500.0;
+    cfg.maximumFrequencyHz = 4900.0;
     cfg.associationRadiusHz = 18.0;
     cfg.releaseTimeSec = 3.0;
     cfg.thresholdMultiplier = 8.0f;
@@ -721,7 +721,7 @@ void CwDecoder::refreshPriorityAndOverlays()
         const auto lanes = m_skimmer->priorityChannels(12);
         for (const auto &lane : lanes) {
             if (lane.confidence < 0.20f || lane.audioFrequencyHz < 100.0 ||
-                lane.audioFrequencyHz > 3500.0) {
+                lane.audioFrequencyHz > kMaxUiToneHz) {
                 continue;
             }
             labels.append(QStringLiteral("CW %1 Hz").arg(qRound(lane.audioFrequencyHz)));

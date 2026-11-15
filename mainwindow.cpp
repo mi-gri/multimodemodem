@@ -7119,7 +7119,7 @@ void MainWindow::setupCwPage()
     m_cmbCwDecodeEngine->setToolTip(uiText("cw_engine_help", "Select Native R12 or Neural R13 for RX A/B. Place each marker on its signal. Native filter, AFC and WPM controls apply to Native R12. The band skimmer always uses Native R12. Neural R13 uses causal envelope normalization and CTC search without a dictionary."));
 
     m_spinCwToneHz = new QSpinBox(settingsGroup);
-    m_spinCwToneHz->setRange(250, 3000);
+    m_spinCwToneHz->setRange(250, 4900);   // RX: full-rate decoder; TX tone stays below 3000 Hz
     m_spinCwToneHz->setSingleStep(10);
     m_spinCwToneHz->setSuffix(" Hz");
 
@@ -7222,7 +7222,7 @@ void MainWindow::setupCwPage()
     m_cmbCwSkimmerDisplay->setObjectName(QStringLiteral("cwSkimmerDisplay"));
     m_cmbCwSkimmerDisplay->addItem(uiText("cw_skimmer_text", "Text"), false);
     m_cmbCwSkimmerDisplay->addItem(uiText("cw_skimmer_cq", "CQ calls only"), true);
-    const QString skimmerHelp = uiText("cw_skimmer_help", "Decode up to 16 independent CW signals in the received audio passband (100–3500 Hz). A narrow radio filter limits what can be received. CQ calls require two matching callsigns after CQ. Zoom the waterfall to separate crowded columns.");
+    const QString skimmerHelp = uiText("cw_skimmer_help2", "Decode up to 16 independent CW signals in the received audio passband (100–4900 Hz). A narrow radio filter limits what can be received. CQ calls require two matching callsigns after CQ. Zoom the waterfall to separate crowded columns.");
     m_chkCwSkimmer->setToolTip(skimmerHelp);
     m_cmbCwSkimmerDisplay->setToolTip(skimmerHelp);
     grid->addWidget(m_chkCwSkimmer, 10, 0, 1, 2);
@@ -7330,10 +7330,10 @@ void MainWindow::loadCwSettingsToUi()
     const QSignalBlocker blockAfc(m_chkCwAfc);
     const QSignalBlocker blockAfcRange(m_spinCwAfcRangeHz);
 
-    m_spinCwToneHz->setValue(qBound(250, m_settings.cwToneHz, 3000));
+    m_spinCwToneHz->setValue(qBound(250, m_settings.cwToneHz, 4900));
     m_spinCwTxToneHz->setValue(qBound(250, m_settings.cwTxToneHz, 3000));
     m_cwSecondaryEnabled = m_settings.cwSecondaryEnabled;
-    m_cwSecondaryToneHz = qBound(250, m_settings.cwSecondaryToneHz, 3000);
+    m_cwSecondaryToneHz = qBound(250, m_settings.cwSecondaryToneHz, 4900);
     updateCwDualRxStatusLabel();
     m_spinCwWpmA->setValue(qBound(5, m_settings.cwWpmA, 50));
     m_spinCwWpmB->setValue(qBound(5, m_settings.cwWpmB, 50));
@@ -12928,7 +12928,7 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
     }
 
     m_cwSecondaryEnabled = m_settings.cwSecondaryEnabled;
-    m_cwSecondaryToneHz = qBound(250, m_settings.cwSecondaryToneHz, 3000);
+    m_cwSecondaryToneHz = qBound(250, m_settings.cwSecondaryToneHz, 4900);
     invokeRxDecoder(m_cwDecoder, &CwDecoder::setDecodeEngine, m_settings.cwDecodeEngine);
     invokeRxDecoder(m_cwDecoder, &CwDecoder::setBandSkimmerEnabled, m_settings.cwSkimmerEnabled);
     invokeRxDecoder(m_cwDecoder, &CwDecoder::setToneHz, static_cast<double>(m_settings.cwToneHz));
