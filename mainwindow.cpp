@@ -24247,7 +24247,8 @@ void MainWindow::setupCatRotatorSideTab()
     if (ui->sideTabWidget->tabBar() != nullptr) {
         const int idx = ui->sideTabWidget->indexOf(m_tabCatRotator);
         if (idx >= 0) {
-            ui->sideTabWidget->tabBar()->setTabVisible(idx, true);
+            // Only with rotator control on (Settings → Rotator).
+            ui->sideTabWidget->tabBar()->setTabVisible(idx, m_settings.rotatorEnabled);
         }
     }
 }
@@ -25189,6 +25190,7 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
     rebuildQuickBandButtons();
     applyPreferredBandOrder();
     updateRigReadout();
+    if (ui != nullptr && ui->cmbMode != nullptr) updateSideTabsForMode(ui->cmbMode->currentText());   // Rotator tab
     if (m_settings.ftWaterfallCqSeconds != oldSettings.ftWaterfallCqSeconds) {
         // A changed time applies to the calls already shown, as in JTDX.
         const int seconds = qBound(0, m_settings.ftWaterfallCqSeconds, 600);

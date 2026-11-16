@@ -4,6 +4,7 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- The Rotator tab on the right is shown only with rotator control on (Settings → Rotator).
 - QSY plan: after a restart inside a WSPR entry marked "Send WSPR beacon", the beacon may run
   again (the permission was only set when the plan switched into the entry). A refused beacon
   switch now says why (plan entry not marked, rig on another band, band receive only, no frequency).

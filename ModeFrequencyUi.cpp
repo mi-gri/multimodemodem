@@ -111,6 +111,8 @@ void MainWindow::updateSideTabsForMode(const QString &modeName)
     // Weather fax and the radio telescope (no list mode) have no QSO partner.
     // WSPR beacons: spots, no QSO partner either.
     showTab(m_tabQrz, !listMode.isEmpty() && listMode != QStringLiteral("WEFAX") && listMode != QStringLiteral("WSPR"));
+    // The Rotator tab only with rotator control on (Settings → Rotator).
+    showTab(m_tabCatRotator, m_settings.rotatorEnabled);
     applyPreferredBandOrder();
     updateQuickBandButtons();   // which bands have a frequency for this mode
 }
