@@ -8847,8 +8847,7 @@ void MainWindow::setupMsk144Page()
     m_btnMsk144Rx = new QPushButton(uiText("rx", "RX"), rxGroup);
     m_btnMsk144Tx = new QPushButton(uiText("tx", "TX"), rxGroup);
     m_btnMsk144Stop = new QPushButton(uiText("button.stop", "STOP"), rxGroup);
-    m_btnMsk144Tune = new QPushButton(uiText("tune", "Tune"), rxGroup);
-    for (QPushButton *btn : {m_btnMsk144GenerateStd, m_btnMsk144Rx, m_btnMsk144Tx, m_btnMsk144Stop, m_btnMsk144Tune}) {
+    for (QPushButton *btn : {m_btnMsk144GenerateStd, m_btnMsk144Rx, m_btnMsk144Tx, m_btnMsk144Stop}) {
         if (btn != nullptr) btn->hide();
     }
     m_lblMsk144Status = new QLabel(uiText("msk144_status_idle", "MSK144: idle"), rxGroup);
@@ -8966,10 +8965,6 @@ void MainWindow::setupMsk144Page()
     connect(m_btnMsk144Rx, &QPushButton::clicked, this, &MainWindow::startMsk144RxShell);
     connect(m_btnMsk144Tx, &QPushButton::clicked, this, &MainWindow::startMsk144TxShell);
     connect(m_btnMsk144Stop, &QPushButton::clicked, this, &MainWindow::stopMsk144Shell);
-    if (m_btnMsk144Tune != nullptr) {
-        m_btnMsk144Tune->setVisible(false); // no non-standard diagnostic tune waveform in MSK144
-        m_btnMsk144Tune->setEnabled(false);
-    }
 
     if (ui != nullptr && ui->menubar != nullptr && m_cmbMsk144DecodeDepth != nullptr) {
         QMenu *decodeMenu = new QMenu(uiText("menu_decode", "Decode"), this);
@@ -9673,7 +9668,6 @@ void MainWindow::setupFt8Page()
     m_btnFt8ClearDx = new QPushButton(uiText("ft_clear_dx", "Clear DX"), controlGroup);
     m_btnFt8ClearDx->setObjectName(QStringLiteral("ftClearDx"));
     m_btnFt8ClearDx->setToolTip(uiText("ft_clear_dx_tooltip", "Ends the current QSO (a running transmission for it stops), clears the DX call and grid, resets Tx1–Tx6 and then answers the next station waiting in the caller queue. Automation stays on; the cleared station is not answered automatically for 15 minutes."));
-    m_btnFt8Tune = new QPushButton(uiText("tune", "Tune"), controlGroup);
     m_chkFt8AutoSeq = new QCheckBox(uiText("ft8_auto_sequence", "Auto sequence"), controlGroup);
     // Auto-sequence is the normal FT4/FT8 operating model.  Keep the widget as
     // an internal compatibility setting, but do not expose it as an operator
@@ -9730,7 +9724,7 @@ void MainWindow::setupFt8Page()
     controlGrid->addWidget(m_btnFt8Tx, 0, 2);
     controlGrid->addWidget(m_btnFt8ClearDx, 0, 3);
     controlGrid->addWidget(m_btnFt8Stop, 0, 4);
-    controlGrid->addWidget(m_btnFt8Tune, 0, 5);
+    // Tune: the button beside the frequency display (all modes).
     m_chkFt8AutoSeq->setChecked(true);
     m_chkFt8AutoSeq->hide();
     controlGrid->addWidget(m_chkFt8CqRepeat, 1, 0);
@@ -12320,10 +12314,6 @@ void MainWindow::setupUiConnections()
     if (m_btnFt8ClearDx != nullptr) {
         connect(m_btnFt8ClearDx, &QPushButton::clicked, this, &MainWindow::clearFt8Dx);
     }
-    if (m_btnFt8Tune != nullptr) {
-        connect(m_btnFt8Tune, &QPushButton::clicked,
-                this, &MainWindow::tuneFt8Shell);
-    }
     if (m_chkFt8AutoSeq != nullptr) {
         connect(m_chkFt8AutoSeq, &QCheckBox::toggled,
                 this, [this](bool) { applyFt8Settings(); });
@@ -14401,10 +14391,7 @@ void MainWindow::updateFt8ControlStates()
         if (m_btnFt8Rx != nullptr) m_btnFt8Rx->setEnabled(!m_txRunning && !m_offlineAnalysisActive && !ft8Pending);
         if (m_btnFt8Tx != nullptr) m_btnFt8Tx->setEnabled(!m_txRunning && !m_offlineAnalysisActive && !ft8Pending);
         if (m_btnFt8Stop != nullptr) m_btnFt8Stop->setEnabled((m_rxRunning || m_txRunning || ft8Pending || ft8TuneActive || m_ftSession.cqRepeatActive || m_ftSession.qsoActive) && !m_offlineAnalysisActive);
-        if (m_btnFt8Tune != nullptr) {
-            m_btnFt8Tune->setText(ft8TuneActive ? uiText("button.stopTune", "Stop Tune") : uiText("tune", "Tune"));
-            m_btnFt8Tune->setEnabled(!m_offlineAnalysisActive && (!ft8Pending || ft8TuneActive));
-        }
+        updateTuneButton();   // the Tune button beside the frequency display
         if (m_chkFt8AutoSeq != nullptr) m_chkFt8AutoSeq->setEnabled(!m_offlineAnalysisActive);
         if (m_chkFt8CqRepeat != nullptr) m_chkFt8CqRepeat->setEnabled(!m_offlineAnalysisActive);
         if (m_chkFt8AutoLog != nullptr) m_chkFt8AutoLog->setEnabled(!m_offlineAnalysisActive);

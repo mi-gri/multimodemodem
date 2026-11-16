@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Tune only beside the frequency display (all modes); the extra Tune button in the FT controls
+  and the hidden one of MSK144 are gone.
 - Bands (Settings → Bands): per band "TX allowed" or receive only, and preferred bands.
   - Receive-only band: a manual transmission asks first (the answer holds until the band
     changes); automatic transmissions (JS8 heartbeat/CQ/replies, FT Auto QSO, WSPR beacon)

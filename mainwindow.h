@@ -2179,7 +2179,6 @@ private:
     QPushButton *m_btnMsk144Rx = nullptr;
     QPushButton *m_btnMsk144Tx = nullptr;
     QPushButton *m_btnMsk144Stop = nullptr;
-    QPushButton *m_btnMsk144Tune = nullptr;
     QComboBox *m_cmbMsk144Period = nullptr;
     QComboBox *m_cmbMsk144DecodeDepth = nullptr;
     QSpinBox *m_spinMsk144RxFreq = nullptr;
@@ -2461,7 +2460,6 @@ private:
     QPushButton *m_btnFt8Tx = nullptr;
     QPushButton *m_btnFt8Stop = nullptr;
     QPushButton *m_btnFt8ClearDx = nullptr;   // abort the QSO, reset messages, next queued caller
-    QPushButton *m_btnFt8Tune = nullptr;
     QCheckBox *m_chkWaterfallShowTx = nullptr;   // footer: own TX in the waterfall, per mode
     QPushButton *m_btnTune = nullptr;          // rig readout, all modes
     bool m_tuneTxRequested = false;            // next startImageTx() sends a carrier
