@@ -838,6 +838,14 @@ void AppSettings::load()
         if (!band.isEmpty() && !antenna.isEmpty()) textAntennaByBand.insert(band, antenna);
     }
     textPower = settings.value("Text/power", textPower).toString();
+    bandsConfigured = settings.value("Bands/configured", false).toBool();
+    txBands = settings.value("Bands/tx").toStringList();
+    preferredBands = settings.value("Bands/preferred").toStringList();
+    for (QStringList *list : {&txBands, &preferredBands}) {
+        for (QString &b : *list) b = b.trimmed().toLower();
+        list->removeAll(QString());
+        list->removeDuplicates();
+    }
     textMacroLabels = settings.value("Text/macroLabels", textMacroLabels).toStringList();
     textMacroTexts = settings.value("Text/macroTexts", textMacroTexts).toStringList();
     normalizeTextMacros(textMacroLabels, textMacroTexts);
@@ -1205,6 +1213,9 @@ bool AppSettings::save() const
         settings.setValue("Text/antennaByBand", byBand);
     }
     settings.setValue("Text/power", textPower);
+    settings.setValue("Bands/configured", bandsConfigured);
+    settings.setValue("Bands/tx", txBands);
+    settings.setValue("Bands/preferred", preferredBands);
     settings.setValue("Text/macroLabels", textMacroLabels);
     settings.setValue("Text/macroTexts", textMacroTexts);
     settings.setValue("JS8/macroLabels", js8MacroLabels);

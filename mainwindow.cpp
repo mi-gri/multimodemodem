@@ -1701,6 +1701,12 @@ MainWindow::MainWindow(QWidget *parent)
                                 m_tabQrz, uiText("tab_qrz", "QRZ"));
     setupWavelog();
     setupRigReadoutPanel();
+    QTimer::singleShot(0, this, [this]() {
+        if (!m_settings.bandsConfigured)
+            appendLog(uiText("bands_not_configured_log", "Bands not set up (Settings → Bands): every amateur band counts as TX allowed."));
+        if (!m_settings.hamlibCatEnabled)
+            appendLog(uiText("manual_frequency_needed_log", "CAT is off: enter the dial frequency above the tabs before transmitting."));
+    });
     ui->modeTabLayout->addWidget(m_grpRigReadout, 0);
     if (m_grpFt8UtcClock != nullptr) {
         m_pageFt8Settings->layout()->removeWidget(m_grpFt8UtcClock);
@@ -13150,6 +13156,7 @@ void MainWindow::setupRigReadoutPanel()
     layout->addWidget(m_lblRigReadoutPower, 0, 3, Qt::AlignLeft | Qt::AlignVCenter);
     layout->addWidget(m_lblRigReadoutSwr, 1, 3, Qt::AlignLeft | Qt::AlignVCenter);
     layout->addWidget(m_lblRigReadoutAlc, 2, 3, Qt::AlignLeft | Qt::AlignVCenter);
+    setupManualFrequencyAndQuickBands(layout, readout);
     layout->setColumnStretch(0, 1);
     layout->setColumnMinimumWidth(3, m_lblRigReadoutPower->fontMetrics().horizontalAdvance(uiText("rig_readout_power", "PWR %1 W").arg(100)) + 4);
     readout->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power, SWR and ALC reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
@@ -13160,7 +13167,7 @@ void MainWindow::setupRigReadoutPanel()
     m_rigTuneTimer->setSingleShot(true);
     m_rigTuneTimer->setInterval(150);
     connect(m_rigTuneTimer, &QTimer::timeout, this, [this]() {
-        if (m_rigTuneTargetHz > 0.0 && tuneRigTo(m_rigTuneTargetHz, QStringLiteral("frequency display"))) {
+        if (m_rigTuneTargetHz > 0.0 && qsyOrSetManual(m_rigTuneTargetHz, QStringLiteral("frequency display"))) {
             m_rigTuneHoldUntilMs = QDateTime::currentMSecsSinceEpoch() + 1500;
         } else {
             m_rigTuneTargetHz = 0.0;
@@ -13168,6 +13175,7 @@ void MainWindow::setupRigReadoutPanel()
         updateRigReadout();
     });
     m_grpRigReadout = group;
+    rebuildQuickBandButtons();
 }
 
 bool MainWindow::tuneRigTo(double frequencyHz, const QString &reason)
@@ -13225,7 +13233,9 @@ void MainWindow::promptRigFrequency()
         appendLog(QStringLiteral("Invalid frequency: %1").arg(input));
         return;
     }
-    if (tuneRigTo(hz, QStringLiteral("entered"))) {
+    if (!m_settings.hamlibCatEnabled) {
+        setManualDialFrequency(hz, QStringLiteral("entered"));
+    } else if (tuneRigTo(hz, QStringLiteral("entered"))) {
         m_rigTuneTargetHz = hz;
         m_rigTuneHoldUntilMs = QDateTime::currentMSecsSinceEpoch() + 1500;
         updateRigReadout();
@@ -13241,8 +13251,12 @@ void MainWindow::updateRigReadout()
         auto *hostLayout = qobject_cast<QBoxLayout *>(host->layout());
         if (hostLayout != nullptr) hostLayout->insertWidget(0, m_rigReadoutWidget);
     }
-    m_rigReadoutWidget->setVisible(m_settings.hamlibCatEnabled);
-    m_grpRigReadout->setVisible(m_settings.hamlibCatEnabled && host == m_grpRigReadout);
+    // Without CAT the readout shows the entered frequency (and its field).
+    m_rigReadoutWidget->setVisible(true);
+    m_grpRigReadout->setVisible(host == m_grpRigReadout);
+    for (QLabel *meter : {m_lblRigReadoutPower, m_lblRigReadoutSwr, m_lblRigReadoutAlc})
+        if (meter != nullptr) meter->setVisible(m_settings.hamlibCatEnabled);
+    updateQuickBandButtons();
 
     if (m_lcdRigReadoutFrequency != nullptr) {
         // While a QSY from the readout is on its way, show its target.
@@ -13250,7 +13264,8 @@ void MainWindow::updateRigReadout()
                             ((m_rigTuneTimer != nullptr && m_rigTuneTimer->isActive()) ||
                              QDateTime::currentMSecsSinceEpoch() < m_rigTuneHoldUntilMs);
         if (!tuning) m_rigTuneTargetHz = 0.0;
-        const qint64 hz = qRound64(tuning ? m_rigTuneTargetHz : m_lastRigFrequencyHz);
+        const double shownHz = m_settings.hamlibCatEnabled ? m_lastRigFrequencyHz : m_manualDialHz;
+        const qint64 hz = qRound64(tuning ? m_rigTuneTargetHz : shownHz);
         QString text = QStringLiteral("--.---.---");
         int digits = 8;
         if (hz > 0) {
@@ -13293,6 +13308,12 @@ void MainWindow::updateRigReadout()
 void MainWindow::handleRigFrequencyChanged(double frequencyHz)
 {
     const double previousFrequencyHz = m_lastRigFrequencyHz;
+    if (frequencyHz <= 0.0) return;   // no reading: keep the last one
+    {
+        const QString fromBand = M3StandardFrequencies::bandOf(previousFrequencyHz);
+        const QString toBand = M3StandardFrequencies::bandOf(frequencyHz);
+        if (previousFrequencyHz > 0.0 && fromBand != toBand) abortTxForBandChange(fromBand, toBand);
+    }
     m_lastRigFrequencyHz = frequencyHz;
     if (!m_lastRigPttOn && !m_ftSplitPreparedForTx) m_lastRxDialHz = frequencyHz;
     if (m_ft8RxDecoder) m_ft8RxDecoder->setRadioFrequencyHz(frequencyHz);
@@ -13362,6 +13383,8 @@ void MainWindow::handleRigFrequencyChanged(double frequencyHz)
     updateFtBandFrequencyUi();
     updateRigControlStatusUi();
     updateRttyContestBandFromCat();
+    updateQuickBandButtons();
+    schedulerWsprTxTryArm();
 }
 
 void MainWindow::handleRigStatusChanged(const QString &status)
@@ -13456,33 +13479,8 @@ void MainWindow::showTxBlockedWarning(const QString &modeLabel,
 
 QString MainWindow::bandFromFrequencyHz(double frequencyHz) const
 {
-    if (frequencyHz <= 0.0) {
-        return QString();
-    }
-    const double mhz = frequencyHz / 1000000.0;
-    struct BandRange { double low; double high; const char *name; };
-    static const BandRange ranges[] = {
-        {1.8, 2.0, "160m"},
-        {3.5, 4.0, "80m"},
-        {5.0, 5.5, "60m"},
-        {7.0, 7.3, "40m"},
-        {10.1, 10.15, "30m"},
-        {14.0, 14.35, "20m"},
-        {18.068, 18.168, "17m"},
-        {21.0, 21.45, "15m"},
-        {24.89, 24.99, "12m"},
-        {28.0, 29.7, "10m"},
-        {50.0, 54.0, "6m"},
-        {144.0, 148.0, "2m"},
-        {430.0, 440.0, "70cm"},
-        {1240.0, 1300.0, "23cm"}
-    };
-    for (const BandRange &range : ranges) {
-        if (mhz >= range.low && mhz <= range.high) {
-            return QString::fromLatin1(range.name);
-        }
-    }
-    return QString();
+    // One band table for display, logging and the TX permission.
+    return frequencyHz > 0.0 ? M3StandardFrequencies::bandOf(frequencyHz) : QString();
 }
 
 double MainWindow::ftStandardFrequencyHz(const QString &modeName, const QString &band) const
@@ -13862,12 +13860,24 @@ bool MainWindow::isBandSchedulerEnabledForMode(const QString &modeName) const
     return !schedulerModeGroup(modeName).isEmpty() && m_settings.schedulerEnabled;
 }
 
-bool MainWindow::autoTxPermitted() const
+bool MainWindow::autoTxPermitted(bool wsprBeacon) const
 {
     // Automatic transmissions (JS8 heartbeat/CQ/replies, FT Auto QSO, WSPR
     // beacon) need Auto mode, and never run while the QSY plan is on: the plan
     // switches modes unattended and must not key the rig. Manual TX stays.
-    return m_ft8AutoModeEnabled && !m_settings.schedulerEnabled;
+    // Only exception: the WSPR beacon of a plan entry the user marked for TX,
+    // on that entry's band.  And never on a band without TX permission or
+    // without a known frequency (Settings > Bands).
+    if (!m_ft8AutoModeEnabled) return false;
+    if (m_settings.schedulerEnabled &&
+        (!wsprBeacon || m_schedulerWsprTxBand.isEmpty() || currentTxBand() != m_schedulerWsprTxBand)) {
+        return false;
+    }
+    if (!txBandPermitted(true)) {
+        logAutoTxBandRefusal(currentTxBand() + QLatin1Char('|') + QString::number(txReferenceDialHz() > 0.0));
+        return false;
+    }
+    return true;
 }
 
 void MainWindow::setBandSchedulerEnabledForMode(const QString &, bool enabled)
@@ -13887,6 +13897,7 @@ void MainWindow::setBandSchedulerEnabledForMode(const QString &, bool enabled)
         appendLog(uiText("scheduler_log_auto_tx_paused", "QSY plan on: automatic transmissions (JS8 heartbeat/CQ/replies, FT Auto QSO, WSPR beacon) are paused; manual TX stays possible."));
     if (enabled && m_chkWsprTx != nullptr && m_chkWsprTx->isChecked())
         wsprStopBeacon(QStringLiteral("QSY plan on"));
+    if (!enabled) schedulerWsprTxEnd(QStringLiteral("QSY plan off"));
 }
 
 QList<ScheduledQsyEntry> MainWindow::schedulerEntries() const
@@ -13949,6 +13960,8 @@ void MainWindow::requestScheduledQsy(const ScheduledQsyEntry &entry, const QStri
 void MainWindow::applyScheduledQsy(const ScheduledQsyEntry &entry)
 {
     const QString targetMode = entry.mode.trimmed();
+    // The beacon permission belongs to one entry: it ends with the next one.
+    schedulerWsprTxEnd(QStringLiteral("QSY plan: next entry"));
     if (ui != nullptr && ui->cmbMode != nullptr && !targetMode.isEmpty() &&
         ui->cmbMode->findText(targetMode) >= 0 && ui->cmbMode->currentText() != targetMode) {
         // The normal mode switch (stops the old mode, restarts RX in the new
@@ -13984,6 +13997,12 @@ void MainWindow::applyScheduledQsy(const ScheduledQsyEntry &entry)
 
     invokeRigSetFrequency(entry.frequencyHz);
     appendLog(QStringLiteral("Scheduled QSY applied: %1.").arg(scheduledQsyDescription(entry)));
+    if (entry.wsprTx && WsprMode::isMode(targetMode)) {
+        m_schedulerWsprTxBand = M3StandardFrequencies::bandOf(entry.frequencyHz);
+        m_schedulerWsprTxEntryTime = entry.timeUtc.toString(QStringLiteral("HH:mm"));
+        m_schedulerWsprTxRefusalLogged = false;
+        schedulerWsprTxTryArm();   // or after the CAT readback of the new band
+    }
 }
 
 void MainWindow::handleBandSchedulerTick()
@@ -18445,6 +18464,11 @@ void MainWindow::scheduleFt8SequencerMessage(const QString &message,
 {
     if (m_ft8OperatorStopLatched || m_shutdownInProgress || m_runtimeShutdownComplete ||
         !Ft8Mode::isFamilyMode(ui->cmbMode->currentText())) return;
+    if (!confirmTxBand(ui->cmbMode->currentText())) {
+        m_ft8OperatorStopLatched = true;
+        stopFt8Sequencer(txBandRefusalReason());
+        return;
+    }
     if (allowManualLatePartial) m_ft8TxStartFailureCount = 0;
     const QString txMessage = message.trimmed().toUpper();
     const QString txTag = tag.trimmed().isEmpty() ? QStringLiteral("TX") : tag.trimmed().toUpper();
@@ -22044,6 +22068,7 @@ void MainWindow::updateFt8WaterfallOverlays()
 
 void MainWindow::startFt8TxShell()
 {
+    if (!confirmTxBand(ui->cmbMode->currentText())) return;
     m_ft8OperatorStopLatched = false;
     applyFt8Settings();
     const QString modeName = (ui != nullptr && ui->cmbMode != nullptr) ? ui->cmbMode->currentText() : QStringLiteral("FT8");
@@ -22516,6 +22541,7 @@ void MainWindow::tuneFt8Shell()
         appendLog("FT digital Tune blocked: another TX is active.");
         return;
     }
+    if (!confirmTxBand(QStringLiteral("Tune"))) return;
 
     if (m_ftSlotScheduler != nullptr) {
         ++m_txRequestGeneration; m_catCommand->cancel();
@@ -24917,6 +24943,10 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
             if (dialogPtr) dialogPtr->setExternalCatTestStatus(uiText("station_identity_required", "Station identity required"), false);
             return;
         }
+        if (enabled && !confirmTxBand(QStringLiteral("PTT TEST"))) {
+            if (dialogPtr) dialogPtr->setExternalCatTestStatus(txBandRefusalReason(), false);
+            return;
+        }
         if (m_rigController == nullptr) {
             if (dialogPtr) dialogPtr->setExternalCatTestStatus(QStringLiteral("PTT TEST FAILED — no CAT controller"), false);
             return;
@@ -25141,6 +25171,16 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
     if (m_qrzLookupPanel) m_qrzLookupPanel->setAccountCredentials(m_settings.qrzUsername, m_settings.qrzPassword);
     m_settings.schedulerQsyPlanJson = BandSchedulerDialog::serializeEntries(dialog.schedulerEntries());
     savePersistentSettings();
+    if (oldSettings.hamlibCatEnabled != m_settings.hamlibCatEnabled) {
+        // Switching CAT off/on: the entered frequency is not trusted across it.
+        m_manualDialHz = 0.0;
+        m_txBandOverride.clear();
+    }
+    if (oldSettings.txBands != m_settings.txBands || oldSettings.bandsConfigured != m_settings.bandsConfigured)
+        m_txBandOverride.clear();
+    rebuildQuickBandButtons();
+    applyPreferredBandOrder();
+    updateRigReadout();
     if (m_settings.ftWaterfallCqSeconds != oldSettings.ftWaterfallCqSeconds) {
         // A changed time applies to the calls already shown, as in JTDX.
         const int seconds = qBound(0, m_settings.ftWaterfallCqSeconds, 600);
@@ -26854,6 +26894,7 @@ void MainWindow::updateTxPreview()
 
 void MainWindow::updateTxControlState()
 {
+    updateQuickBandButtons();   // no QSY buttons while transmitting
     updateTuneButton();
     if (m_btnLoadTxImage == nullptr ||
         m_btnStartImageTx == nullptr ||
@@ -27043,6 +27084,14 @@ void MainWindow::keyPttForTx(std::function<void(bool)> completion)
     if (m_cwKeyReleaseFailed) { completion(false); return; }
     if(m_catCommand->faulted() || m_ftSplitRestoreFailed){completion(false);return;}
     if (!ensureStationIdentityForTx(QStringLiteral("TX/PTT"))) {
+        completion(false); return;
+    }
+    // Last line of defence for every keyed path: a known frequency on a band
+    // with TX permission (or one the operator confirmed).  Never asks here -
+    // this runs on slot timing; the entry points ask beforehand.
+    if (!txBandPermitted(false)) {
+        appendLog(QStringLiteral("TX/PTT refused: ") + txBandRefusalReason());
+        SessionDiagnostics::instance().record("tx.band.ptt_refused", {{"band", currentTxBand()}, {"frequency_hz", txReferenceDialHz()}});
         completion(false); return;
     }
 
@@ -27277,6 +27326,9 @@ void MainWindow::startImageTx()
 
     const QString activeModeName = ui->cmbMode->currentText();
     if (!ensureStationIdentityForTx(activeModeName.trimmed().isEmpty() ? QStringLiteral("TX") : activeModeName)) {
+        return;
+    }
+    if (!confirmTxBand(activeModeName)) {
         return;
     }
 
@@ -28323,6 +28375,8 @@ void MainWindow::testPtt()
                              uiText("open_audio_ptt_settings", "Open Audio/PTT settings"));
         return;
     }
+
+    if (!confirmTxBand(QStringLiteral("PTT TEST"))) return;
 
     if(m_txPreparationPending || m_catCommand->busy())return;
     m_txPreparationPending=true;

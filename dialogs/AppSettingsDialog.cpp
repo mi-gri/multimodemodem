@@ -661,6 +661,7 @@ AppSettingsDialog::AppSettingsDialog(const AppSettings &settings,
     addSettingsTab(InitialPage::FtDecoder, QStringLiteral("FT8 / FT4"), shouldBuildNow(InitialPage::FtDecoder));
     addSettingsTab(InitialPage::Rotator, L(QStringLiteral("Rotator")), shouldBuildNow(InitialPage::Rotator));
     addSettingsTab(InitialPage::Frequencies, L(QStringLiteral("Frequencies")), shouldBuildNow(InitialPage::Frequencies));
+    addSettingsTab(InitialPage::Bands, L(QStringLiteral("Bands")), shouldBuildNow(InitialPage::Bands));
     addSettingsTab(InitialPage::Scheduler, L(QStringLiteral("Scheduler")), shouldBuildNow(InitialPage::Scheduler));
     addSettingsTab(InitialPage::SoundCardCalibration, L(QStringLiteral("Soundcard calibration")), shouldBuildNow(InitialPage::SoundCardCalibration));
     addSettingsTab(InitialPage::Diagnostics, L(QStringLiteral("Diagnostics")), shouldBuildNow(InitialPage::Diagnostics));
@@ -828,10 +829,13 @@ QWidget *AppSettingsDialog::buildSettingsPage(InitialPage page)
                                                   m_initialSettings.frequencyQsyOnModeChange, [this](const QString &source) { return L(source); }, this);
         return m_frequencyPage;
     }
+    case InitialPage::Bands:
+        return makeBandsPage();
     case InitialPage::Scheduler:
         m_schedulerPage = new BandSchedulerDialog(m_initialSchedulerEntries,
                                                   m_schedulerTranslator,
                                                   this);
+        m_schedulerPage->setPreferredBands(m_initialSettings.preferredBands);
         hideEmbeddedIntroLabels(m_schedulerPage);
         return embedDialogPage(m_schedulerPage);
     case InitialPage::SoundCardCalibration:
@@ -840,6 +844,50 @@ QWidget *AppSettingsDialog::buildSettingsPage(InitialPage page)
         return embedDialogPage(m_calibrationPage);
     }
     return makeDeferredSettingsPage(L(QStringLiteral("Settings")));
+}
+
+QWidget *AppSettingsDialog::makeBandsPage()
+{
+    auto *page = new QWidget(this);
+    auto *layout = new QVBoxLayout(page);
+    auto *intro = new QLabel(L(QStringLiteral("Bands you work on. TX allowed: m³ may transmit there. Not ticked: receive only - a manual transmission asks first, automatic transmissions (beacon, heartbeat, Auto QSO, QSY plan) never start there. Preferred bands get quick-select buttons at the frequency display and come first in the band lists.")), page);
+    intro->setWordWrap(true);
+    layout->addWidget(intro);
+    if (!m_initialSettings.bandsConfigured) {
+        auto *notice = new QLabel(L(QStringLiteral("Not set up yet: until now every amateur band counts as TX allowed. When you save, only the bands ticked here may transmit.")), page);
+        notice->setWordWrap(true);
+        M3Ui::setSemanticRole(notice, QStringLiteral("warning"));
+        layout->addWidget(notice);
+    }
+    m_bandsTable = new QTableWidget(page);
+    m_bandsTable->setObjectName(QStringLiteral("bandsTable"));
+    m_bandsTable->setColumnCount(3);
+    m_bandsTable->setHorizontalHeaderLabels({L(QStringLiteral("Band")), L(QStringLiteral("Preferred")), L(QStringLiteral("TX allowed"))});
+    m_bandsTable->verticalHeader()->setVisible(false);
+    m_bandsTable->setSelectionMode(QAbstractItemView::NoSelection);
+    m_bandsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    const QStringList bands = M3StandardFrequencies::allBands();
+    m_bandsTable->setRowCount(bands.size());
+    for (int r = 0; r < bands.size(); ++r) {
+        const QString band = bands.at(r);
+        auto *name = new QTableWidgetItem(band);
+        name->setData(Qt::UserRole, band);
+        name->setFlags(Qt::ItemIsEnabled);
+        auto *preferred = new QTableWidgetItem();
+        preferred->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
+        preferred->setCheckState(m_initialSettings.preferredBands.contains(band) ? Qt::Checked : Qt::Unchecked);
+        auto *tx = new QTableWidgetItem();
+        tx->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
+        const bool txOn = m_initialSettings.bandsConfigured ? m_initialSettings.txBands.contains(band) : false;
+        tx->setCheckState(txOn ? Qt::Checked : Qt::Unchecked);
+        m_bandsTable->setItem(r, 0, name);
+        m_bandsTable->setItem(r, 1, preferred);
+        m_bandsTable->setItem(r, 2, tx);
+    }
+    m_bandsTable->resizeColumnsToContents();
+    m_bandsTable->horizontalHeader()->setStretchLastSection(true);
+    layout->addWidget(m_bandsTable, 1);
+    return page;
 }
 
 int AppSettingsDialog::addSettingsTab(InitialPage page, const QString &title, bool buildNow)
@@ -2516,9 +2564,10 @@ void AppSettingsDialog::setInitialPage(InitialPage page)
     case InitialPage::FtDecoder: index = 4; break;
     case InitialPage::Rotator: index = 5; break;
     case InitialPage::Frequencies: index = 6; break;
-    case InitialPage::Scheduler: index = 7; break;
-    case InitialPage::SoundCardCalibration: index = 8; break;
-    case InitialPage::Diagnostics: index = 9; break;
+    case InitialPage::Bands: index = 7; break;
+    case InitialPage::Scheduler: index = 8; break;
+    case InitialPage::SoundCardCalibration: index = 9; break;
+    case InitialPage::Diagnostics: index = 10; break;
     }
     if (index >= 0 && index < m_tabs->count()) {
         ensureSettingsTabBuilt(index);
@@ -2710,6 +2759,17 @@ void AppSettingsDialog::collectSettings()
     if (m_spinFtDriftMax) merged.ftDriftMaxHzPerSec = m_spinFtDriftMax->value();
     if (m_chkFtGpuSync) merged.ftGpuSyncEnabled = m_chkFtGpuSync->isChecked();
     if (m_chkFtGpuDecode) merged.ftGpuDecodeEnabled = m_chkFtGpuDecode->isChecked();
+
+    if (m_bandsTable != nullptr) {
+        merged.bandsConfigured = true;
+        merged.preferredBands.clear();
+        merged.txBands.clear();
+        for (int r = 0; r < m_bandsTable->rowCount(); ++r) {
+            const QString band = m_bandsTable->item(r, 0)->data(Qt::UserRole).toString();
+            if (m_bandsTable->item(r, 1)->checkState() == Qt::Checked) merged.preferredBands << band;
+            if (m_bandsTable->item(r, 2)->checkState() == Qt::Checked) merged.txBands << band;
+        }
+    }
 
     if (m_frequencyPage != nullptr) {
         const QVector<M3StandardFrequencies::Entry> entries = m_frequencyPage->entries();

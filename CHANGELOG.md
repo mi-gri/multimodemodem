@@ -4,6 +4,21 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Bands (Settings → Bands): per band "TX allowed" or receive only, and preferred bands.
+  - Receive-only band: a manual transmission asks first (the answer holds until the band
+    changes); automatic transmissions (JS8 heartbeat/CQ/replies, FT Auto QSO, WSPR beacon)
+    never start there. Until the page is saved once, every amateur band counts as TX allowed.
+  - No TX without a known frequency: with CAT the rig must report its dial frequency; without
+    CAT the dial frequency is entered above the tabs (Enter confirms; not kept across a restart).
+    Bands, QSO form and log follow it.
+  - A band change during a transmission or a running sequence (FT CQ/QSO, JS8 queue, WSPR,
+    MSK144/Q65 periods, Tune) stops it; nothing continues on the new band, allowed or not.
+  - Quick band buttons for the preferred bands below the frequency display: QSY to the current
+    mode's frequency; receive-only bands in italics with "RX", bands without a frequency for the
+    mode struck through and disabled, the current band framed. Band lists show preferred bands first.
+- QSY plan: a WSPR entry can be marked "Send WSPR beacon" - the only automatic TX a running plan
+  starts, on that entry's band once CAT confirms it, with Auto mode and TX allowed on the band.
+  Imported plans with such entries ask before keeping them.
 - Safety: while the QSY plan is on, no automatic transmission starts (JS8 heartbeat, CQ and
   replies, FT Auto QSO, WSPR beacon); manual TX stays possible. A plan switch to JS8 had sent an
   overdue heartbeat at once (test run 2026-11-16 08:40 UTC). Entering JS8 now restarts the

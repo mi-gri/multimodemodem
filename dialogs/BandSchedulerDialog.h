@@ -38,6 +38,9 @@ struct ScheduledQsyEntry
     QString band;
     double frequencyHz = 0.0;
     bool useFtStandard = false;
+    // WSPR only: the user explicitly allows this entry to send WSPR beacons
+    // (the only automatic TX a running plan may start). Default: receive.
+    bool wsprTx = false;
 
     QString triggerKey(const QDate &utcDate) const;
     bool runsOn(const QDate &utcDate) const { return !dateUtc.isValid() || dateUtc == utcDate; }
@@ -62,6 +65,10 @@ public:
     static double standardFtFrequencyHz(const QString &modeName, const QString &band);
     static QStringList defaultModes();
     static QStringList defaultBands();
+    /// Puts the preferred bands (Settings > Bands) on top of the band list.
+    void setPreferredBands(const QStringList &preferred);
+    /// Entries of @p entries that send (wsprTx), for confirmations.
+    static QList<ScheduledQsyEntry> transmittingEntries(const QList<ScheduledQsyEntry> &entries);
 
 private:
     QString L(const QString &key, const QString &fallback) const;
@@ -86,6 +93,7 @@ private:
     QComboBox *m_modeCombo = nullptr;
     QComboBox *m_bandCombo = nullptr;
     QCheckBox *m_chkFtStandard = nullptr;
+    QCheckBox *m_chkWsprTx = nullptr;
     QDoubleSpinBox *m_freqMHz = nullptr;
     QLabel *m_hint = nullptr;
     QPushButton *m_addButton = nullptr;

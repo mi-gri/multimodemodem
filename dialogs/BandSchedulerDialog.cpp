@@ -1,5 +1,7 @@
 #include "BandSchedulerDialog.h"
 
+#include <QColor>
+#include <QFont>
 #include <QAbstractItemView>
 #include <QCheckBox>
 #include <QComboBox>
@@ -109,12 +111,12 @@ void BandSchedulerDialog::buildUi()
     outer->setSpacing(8);
 
     QLabel *description = new QLabel(L(QStringLiteral("scheduler_plan_description"),
-        QStringLiteral("UTC QSY plan. At its time each entry switches the m³ mode, the band and the rig frequency, every day or only on the chosen date. The plan never starts TX. It waits until TX ends and, in FT4/FT8, until the current QSO is complete.")), this);
+        QStringLiteral("UTC QSY plan. At its time each entry switches the m³ mode, the band and the rig frequency, every day or only on the chosen date. The plan never starts TX, except WSPR entries with \"Send WSPR beacon\" ticked. It waits until TX ends and, in FT4/FT8, until the current QSO is complete.")), this);
     description->setWordWrap(true);
     outer->addWidget(description);
 
     m_table = new QTableWidget(this);
-    m_table->setColumnCount(7);
+    m_table->setColumnCount(8);
     const QStringList headers = {
         L(QStringLiteral("enabled"), QStringLiteral("Enabled")),
         L(QStringLiteral("scheduler_date"), QStringLiteral("Date")),
@@ -122,6 +124,7 @@ void BandSchedulerDialog::buildUi()
         L(QStringLiteral("mode"), QStringLiteral("Mode")),
         L(QStringLiteral("band"), QStringLiteral("Band")),
         L(QStringLiteral("frequency"), QStringLiteral("Frequency")),
+        L(QStringLiteral("scheduler_tx_column"), QStringLiteral("TX")),
         L(QStringLiteral("source"), QStringLiteral("Source"))
     };
     for (int i = 0; i < headers.size(); ++i) {
@@ -159,6 +162,9 @@ void BandSchedulerDialog::buildUi()
     m_bandCombo->addItems(defaultBands());
 
     m_chkFtStandard = new QCheckBox(L(QStringLiteral("scheduler_use_frequency_list"), QStringLiteral("Use the frequency list entry for the band")), editorGroup);
+    m_chkWsprTx = new QCheckBox(L(QStringLiteral("scheduler_wspr_tx"), QStringLiteral("Send WSPR beacon (automatic TX)")), editorGroup);
+    m_chkWsprTx->setToolTip(L(QStringLiteral("scheduler_wspr_tx_tip"),
+        QStringLiteral("Only for WSPR entries. While this entry is active the WSPR beacon transmits unattended, with the TX share of the WSPR page. Needs Auto mode, CAT and a band with TX allowed in Settings > Bands. Off: the entry only receives.")));
     m_freqMHz = new QDoubleSpinBox(editorGroup);
     m_freqMHz->setDecimals(6);
     m_freqMHz->setMinimum(0.100000);
@@ -193,11 +199,12 @@ void BandSchedulerDialog::buildUi()
     m_exportButton = new QPushButton(L(QStringLiteral("scheduler_export"), QStringLiteral("Export...")), editorGroup);
     buttonRow->addWidget(m_importButton);
     buttonRow->addWidget(m_exportButton);
-    grid->addLayout(buttonRow, 6, 0, 1, 3);
+    grid->addWidget(m_chkWsprTx, 6, 0, 1, 3);
+    grid->addLayout(buttonRow, 7, 0, 1, 3);
 
     m_hint = new QLabel(editorGroup);
     m_hint->setWordWrap(true);
-    grid->addWidget(m_hint, 7, 0, 1, 3);
+    grid->addWidget(m_hint, 8, 0, 1, 3);
 
     outer->addWidget(editorGroup);
 
@@ -263,12 +270,20 @@ void BandSchedulerDialog::refreshTable()
             normalizedMode(e.mode),
             e.band,
             frequencyText(e.frequencyHz),
+            e.wsprTx ? L(QStringLiteral("scheduler_tx_beacon"), QStringLiteral("TX beacon")) : QString(),
             e.useFtStandard ? L(QStringLiteral("scheduler_standard_ft"), QStringLiteral("standard FT"))
                             : L(QStringLiteral("manual"), QStringLiteral("manual"))
         };
         for (int c = 0; c < cells.size(); ++c) {
             auto *item = new QTableWidgetItem(cells.at(c));
             item->setData(SourceTextRole, cells.at(c));
+            if (c == 6 && e.wsprTx) {
+                QFont f = item->font();
+                f.setBold(true);
+                item->setFont(f);
+                item->setForeground(QColor(QStringLiteral("#d03030")));
+                item->setToolTip(L(QStringLiteral("scheduler_tx_beacon_tip"), QStringLiteral("This entry transmits WSPR beacons.")));
+            }
             m_table->setItem(r, c, item);
         }
     }
@@ -290,6 +305,7 @@ ScheduledQsyEntry BandSchedulerDialog::editorEntry() const
     e.mode = normalizedMode(m_modeCombo->currentText());
     e.band = m_bandCombo->currentText().trimmed();
     e.useFtStandard = m_chkFtStandard->isChecked();
+    e.wsprTx = m_chkWsprTx->isEnabled() && m_chkWsprTx->isChecked();
     e.frequencyHz = m_freqMHz->value() * 1000000.0;
     if (e.useFtStandard) {
         const double standard = standardFtFrequencyHz(e.mode, e.band);
@@ -310,6 +326,7 @@ void BandSchedulerDialog::setEditorEntry(const ScheduledQsyEntry &entry)
     const int bandIndex = m_bandCombo->findText(entry.band, Qt::MatchFixedString);
     m_bandCombo->setCurrentIndex(bandIndex >= 0 ? bandIndex : m_bandCombo->findText(QStringLiteral("20m")));
     m_chkFtStandard->setChecked(entry.useFtStandard);
+    m_chkWsprTx->setChecked(entry.wsprTx);
     if (entry.frequencyHz > 0.0) {
         m_freqMHz->setValue(entry.frequencyHz / 1000000.0);
     }
@@ -320,6 +337,10 @@ void BandSchedulerDialog::updateEditorStandardFrequency()
 {
     const QString mode = normalizedMode(m_modeCombo->currentText());
     const bool isFt = !M3StandardFrequencies::listModeForName(mode).isEmpty();
+    const bool wspr = mode.compare(QLatin1String("WSPR"), Qt::CaseInsensitive) == 0;
+    m_chkWsprTx->setEnabled(wspr);
+    m_chkWsprTx->setVisible(wspr);
+    if (!wspr) m_chkWsprTx->setChecked(false);
     m_chkFtStandard->setEnabled(isFt);
     if (!isFt) {
         m_chkFtStandard->setChecked(false);
@@ -385,6 +406,7 @@ QString BandSchedulerDialog::serializeEntries(const QList<ScheduledQsyEntry> &en
         o.insert(QStringLiteral("band"), e.band.trimmed());
         o.insert(QStringLiteral("frequency_hz"), e.frequencyHz);
         o.insert(QStringLiteral("ft_standard"), e.useFtStandard);
+        if (e.wsprTx) o.insert(QStringLiteral("wspr_tx"), true);
         array.append(o);
     }
     return QString::fromUtf8(QJsonDocument(array).toJson(QJsonDocument::Compact));
@@ -411,6 +433,9 @@ QList<ScheduledQsyEntry> BandSchedulerDialog::deserializeEntries(const QString &
         e.band = o.value(QStringLiteral("band")).toString(QStringLiteral("20m"));
         e.frequencyHz = o.value(QStringLiteral("frequency_hz")).toDouble(0.0);
         e.useFtStandard = o.value(QStringLiteral("ft_standard")).toBool(false);
+        // Only an explicit JSON true on a WSPR entry transmits.
+        e.wsprTx = o.value(QStringLiteral("wspr_tx")).toBool(false) &&
+                   e.mode.compare(QLatin1String("WSPR"), Qt::CaseInsensitive) == 0;
         if (e.useFtStandard) {
             const double standard = standardFtFrequencyHz(e.mode, e.band);
             if (standard > 0.0) e.frequencyHz = standard;
@@ -439,6 +464,29 @@ void BandSchedulerDialog::importPlan()
         return;
     }
 
+    // Transmitting entries in a file are confirmed one by one, as a list: a
+    // plan from elsewhere must not key the rig without the user seeing it.
+    const QList<ScheduledQsyEntry> sending = transmittingEntries(imported);
+    if (!sending.isEmpty()) {
+        QStringList lines;
+        for (const ScheduledQsyEntry &e : sending)
+            lines << QStringLiteral("%1 %2 UTC  %3  %4").arg(e.dateUtc.isValid() ? e.dateUtc.toString(Qt::ISODate) : L(QStringLiteral("scheduler_daily"), QStringLiteral("daily")),
+                                                           e.timeUtc.toString(QStringLiteral("HH:mm")), e.band, frequencyText(e.frequencyHz));
+        QMessageBox box(QMessageBox::Warning, windowTitle(),
+            L(QStringLiteral("scheduler_import_tx_confirm"),
+              QStringLiteral("%1 entries of this plan send WSPR beacons (automatic TX). Keep them as TX entries?")).arg(sending.size()),
+            QMessageBox::NoButton, this);
+        box.setDetailedText(lines.join(QLatin1Char('\n')));
+        box.setInformativeText(lines.mid(0, 12).join(QLatin1Char('\n')));
+        QPushButton *keep = box.addButton(L(QStringLiteral("scheduler_import_tx_keep"), QStringLiteral("Keep TX")), QMessageBox::AcceptRole);
+        QPushButton *rx = box.addButton(L(QStringLiteral("scheduler_import_tx_rx"), QStringLiteral("Import as receive only")), QMessageBox::RejectRole);
+        box.setDefaultButton(rx);
+        box.exec();
+        if (box.clickedButton() != keep) {
+            for (ScheduledQsyEntry &e : imported) e.wsprTx = false;
+        }
+    }
+
     bool replace = true;
     if (!m_entries.isEmpty()) {
         QMessageBox box(QMessageBox::Question, windowTitle(),
@@ -460,6 +508,29 @@ void BandSchedulerDialog::importPlan()
         m_table->selectRow(0);
         loadRowToEditor(0);
     }
+}
+
+void BandSchedulerDialog::setPreferredBands(const QStringList &preferred)
+{
+    if (m_bandCombo == nullptr || preferred.isEmpty()) return;
+    const QString current = m_bandCombo->currentText();
+    QStringList bands;
+    for (int i = 0; i < m_bandCombo->count(); ++i) bands << m_bandCombo->itemText(i);
+    QStringList first, rest;
+    for (const QString &b : bands) (preferred.contains(b.toLower()) ? first : rest) << b;
+    const QSignalBlocker block(m_bandCombo);
+    m_bandCombo->clear();
+    m_bandCombo->addItems(first + rest);
+    if (!first.isEmpty() && !rest.isEmpty()) m_bandCombo->insertSeparator(first.size());
+    m_bandCombo->setCurrentIndex(qMax(0, m_bandCombo->findText(current)));
+}
+
+QList<ScheduledQsyEntry> BandSchedulerDialog::transmittingEntries(const QList<ScheduledQsyEntry> &entries)
+{
+    QList<ScheduledQsyEntry> out;
+    for (const ScheduledQsyEntry &e : entries)
+        if (e.wsprTx) out << e;
+    return out;
 }
 
 void BandSchedulerDialog::exportPlan()

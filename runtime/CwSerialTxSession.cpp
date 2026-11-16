@@ -50,6 +50,7 @@ void MainWindow::startCwSerialTransmission(const QString& text)
         error=uiText("cw_key_shared_config", "Sharing the CAT port for CW KEY requires CAT handshaking None and both DTR and RTS forced OFF in Audio/PTT/CAT settings. Alternatively choose the radio's separate KEY port.");
     if (m_settings.rotatorEnabled && M3Serial::sameEndpoint(port,m_settings.rotatorPath))
         error=uiText("cw_key_rotator_conflict", "The CW KEY port is assigned to the rotator. Choose a different serial port.");
+    if (error.isEmpty() && !txBandPermitted(false)) error = txBandRefusalReason();   // keys without keyPttForTx
     if (!error.isEmpty()) { appendLog(error);QMessageBox::warning(this,QStringLiteral("CW KEY"),error);return; }
     if (!m_cwSerialTx || m_cwSerialTx->isRunning()) return;
     const bool hadRx=m_rxStartPending || m_rxRunning || (m_audioEngine && m_audioEngine->isRunning());

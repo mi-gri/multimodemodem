@@ -1703,7 +1703,26 @@ private:
      */
     void setReceiverRunning(bool running);
     void updateWeakSignalLiveInputs();
-    bool autoTxPermitted() const;
+    bool autoTxPermitted(bool wsprBeacon = false) const;
+
+    // Band TX policy, manual frequency, quick bands (BandTxUi.cpp)
+    double txReferenceDialHz() const;
+    QString currentTxBand() const;
+    bool txBandPermitted(bool automatic) const;
+    QString txBandRefusalReason() const;
+    bool confirmTxBand(const QString &what);
+    void logAutoTxBandRefusal(const QString &key) const;
+    void abortTxForBandChange(const QString &from, const QString &to);
+    void setManualDialFrequency(double hz, const QString &source);
+    bool qsyOrSetManual(double hz, const QString &reason);
+    double quickBandDialHz(const QString &modeName, const QString &band) const;
+    void quickBandSelected(const QString &band);
+    void setupManualFrequencyAndQuickBands(class QGridLayout *layout, QWidget *readout);
+    void rebuildQuickBandButtons();
+    void updateQuickBandButtons();
+    void applyPreferredBandOrder();
+    void schedulerWsprTxTryArm();
+    void schedulerWsprTxEnd(const QString &reason);
 
     /**
      * @brief Updates the compact Ready/RX/TX main-state button.
@@ -2635,6 +2654,17 @@ private:
     QVector<Ft8AudioActivity> m_ft8RecentAudioActivity;
     FtStandardMessageSet m_ftStandardMessages;
     double m_lastRigFrequencyHz = 0.0;
+    double m_manualDialHz = 0.0;            // without CAT: entered, 0 = not confirmed (no TX)
+    QString m_txBandOverride;               // receive-only band the operator confirmed TX on
+    mutable QString m_autoTxBlockLoggedKey;
+    QString m_schedulerWsprTxBand;          // QSY plan entry allowed to send WSPR beacons
+    QString m_schedulerWsprTxEntryTime;
+    bool m_schedulerWsprTxRefusalLogged = false;
+    QWidget *m_manualFrequencyWidget = nullptr;
+    QLineEdit *m_editManualFrequency = nullptr;
+    QLabel *m_lblManualFrequencyState = nullptr;
+    QWidget *m_quickBandRow = nullptr;
+    QMap<QString, QToolButton *> m_quickBandButtons;
     double m_rigTuneTargetHz = 0.0;       // frequency shown while a readout QSY is on its way
     qint64 m_rigTuneHoldUntilMs = 0;
     int m_rigWheelRemainder = 0;          // partial wheel steps (touchpads)

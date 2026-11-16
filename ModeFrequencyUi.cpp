@@ -111,6 +111,8 @@ void MainWindow::updateSideTabsForMode(const QString &modeName)
     // Weather fax and the radio telescope (no list mode) have no QSO partner.
     // WSPR beacons: spots, no QSO partner either.
     showTab(m_tabQrz, !listMode.isEmpty() && listMode != QStringLiteral("WEFAX") && listMode != QStringLiteral("WSPR"));
+    applyPreferredBandOrder();
+    updateQuickBandButtons();   // which bands have a frequency for this mode
 }
 
 QWidget *MainWindow::createModeBandGroup(QWidget *parent, const QString &listMode)
@@ -251,6 +253,7 @@ void MainWindow::refreshModeBandLists()
         const int idx = combo->findData(current);
         combo->setCurrentIndex(idx >= 0 ? idx : 0);
     }
+    applyPreferredBandOrder();
     refreshFrequencyPickers();
     updateModeBandUis();
 }

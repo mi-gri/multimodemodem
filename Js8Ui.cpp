@@ -1097,6 +1097,7 @@ void MainWindow::js8RefreshBandList()
         const int idx = m_cmbJs8Band->findText(current);
         m_cmbJs8Band->setCurrentIndex(idx >= 0 ? idx : qMax(0, m_cmbJs8Band->findText(QStringLiteral("20m"))));
     }
+    applyPreferredBandOrder();
     js8UpdateBandUi();
 }
 

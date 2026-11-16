@@ -65,7 +65,8 @@ public:
         SoundCardCalibration,
         Diagnostics,
         Display,
-        Frequencies
+        Frequencies,
+        Bands
     };
 
     explicit AppSettingsDialog(const AppSettings &settings,
@@ -173,6 +174,8 @@ private:
     LogbookSettingsDialog *m_logbookPage = nullptr;
     BandSchedulerDialog *m_schedulerPage = nullptr;
     class FrequencyListEditor *m_frequencyPage = nullptr;
+    class QTableWidget *m_bandsTable = nullptr;   // Band | preferred | TX allowed
+    QWidget *makeBandsPage();
     SoundCardCalibrationDialog *m_calibrationPage = nullptr;
     QWidget *m_rotatorPage = nullptr;
     QHash<int, InitialPage> m_deferredSettingsTabs;

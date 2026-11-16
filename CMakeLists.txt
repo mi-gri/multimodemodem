@@ -505,6 +505,7 @@ add_executable(MultiModeModem
     main.cpp
     FtCqWorkListUi.cpp
     Js8Ui.cpp
+    BandTxUi.cpp
     WsprUi.cpp
     RttyBrowserUi.cpp
     ModeFrequencyUi.cpp
@@ -1411,6 +1412,11 @@ if(BUILD_TESTING)
     target_include_directories(m3_cw_text_gate_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(m3_cw_text_gate_regression PRIVATE Qt${QT_VERSION_MAJOR}::Core)
     add_test(NAME m3_cw_text_gate_regression COMMAND m3_cw_text_gate_regression)
+    add_executable(m3_band_policy_regression tests/BandPolicyRegression.cpp dialogs/BandSchedulerDialog.cpp)
+    target_include_directories(m3_band_policy_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_band_policy_regression PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+    add_test(NAME m3_band_policy_regression COMMAND m3_band_policy_regression)
+    set_tests_properties(m3_band_policy_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     add_executable(m3_wefax_completion_regression tests/WeatherFaxCompletionRegression.cpp
         modems/weatherfax/WeatherFaxDecoder.cpp dsp/FrequencyTracker.cpp)
     target_include_directories(m3_wefax_completion_regression PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")

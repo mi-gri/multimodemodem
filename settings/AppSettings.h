@@ -132,6 +132,14 @@ public:
     QStringList schedulerQsyEnabledModes;
     QString schedulerQsyPlanJson;
 
+    // Bands (Settings > Bands). Until the page was saved once
+    // (bandsConfigured), every amateur band counts as TX-allowed so existing
+    // stations keep working; afterwards only txBands may transmit without a
+    // confirmation, and automatic TX never runs elsewhere.
+    bool bandsConfigured = false;
+    QStringList txBands;         // "80m", "2m" ... (M3StandardFrequencies::allBands names)
+    QStringList preferredBands;  // quick-select row and top of band lists
+
     int weatherFaxLpm = 120;
     int weatherFaxBlackHz = 1500;
     int weatherFaxWhiteHz = 2300;
