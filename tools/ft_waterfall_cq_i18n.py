@@ -1317,3 +1317,26 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
   'Ikke satt opp ennå: hittil regnes alle amatørbånd som TX tillatt. Når du lagrer, kan bare båndene som er avkrysset her sende.',
   'Zatím nenastaveno: dosud platí každé radioamatérské pásmo jako s povoleným TX. Po uložení smí vysílat jen zde zaškrtnutá pásma.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'scheduler_wspr_tx_restored_log':(
+  'QSY plan (%1): the active entry %2 UTC allows the WSPR beacon on %3.',
+  'Piano QSY (%1): la voce attiva delle %2 UTC consente il beacon WSPR su %3.',
+  'Plan de QSY (%1) : l’entrée active de %2 UTC autorise la balise WSPR sur %3.',
+  'QSY-Plan (%1): Der laufende Eintrag %2 UTC erlaubt die WSPR-Bake auf %3.',
+  'QSY-plan (%1): den aktive oppføringen %2 UTC tillater WSPR-baken på %3.',
+  'Plán QSY (%1): aktivní položka %2 UTC povoluje maják WSPR na %3.'),
+ 'wspr_tx_plan_only':(
+  'QSY plan on: the beacon only transmits in plan entries marked \\"Send WSPR beacon\\".',
+  'Piano QSY attivo: il beacon trasmette solo nelle voci con «Invia beacon WSPR».',
+  'Plan de QSY actif : la balise n’émet que dans les entrées marquées « Envoyer la balise WSPR ».',
+  'QSY-Plan an: Die Bake sendet nur in Planeinträgen mit „WSPR-Bake senden“.',
+  'QSY-plan på: baken sender bare i oppføringer merket «Send WSPR-bake».',
+  'Plán QSY zapnut: maják vysílá jen v položkách označených „Vysílat maják WSPR“.'),
+ 'wspr_tx_plan_band':(
+  'QSY plan: the beacon of this entry is for %1; the rig is not there.',
+  'Piano QSY: il beacon di questa voce è per %1; il rig non è lì.',
+  'Plan de QSY : la balise de cette entrée est pour %1 ; le rig n’y est pas.',
+  'QSY-Plan: Die Bake dieses Eintrags gilt für %1; das Funkgerät steht nicht dort.',
+  'QSY-plan: baken i denne oppføringen gjelder %1; riggen står ikke der.',
+  'Plán QSY: maják této položky platí pro %1; rig tam není naladěn.'),
+}.items()})

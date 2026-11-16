@@ -13888,6 +13888,7 @@ void MainWindow::setBandSchedulerEnabledForMode(const QString &, bool enabled)
     if (enabled && m_chkWsprTx != nullptr && m_chkWsprTx->isChecked())
         wsprStopBeacon(QStringLiteral("QSY plan on"));
     if (!enabled) schedulerWsprTxEnd(QStringLiteral("QSY plan off"));
+    else schedulerRestoreActiveWsprTx(QStringLiteral("plan on"));
 }
 
 QList<ScheduledQsyEntry> MainWindow::schedulerEntries() const
@@ -13999,6 +14000,12 @@ void MainWindow::handleBandSchedulerTick()
 {
     const QDateTime now = QDateTime::currentDateTimeUtc();
     const QDate today = now.date();
+    // After a restart the plan entry that is running now still allows its
+    // WSPR beacon (only the switch into the entry set that before).
+    if (!m_schedulerStartupChecked) {
+        m_schedulerStartupChecked = true;
+        schedulerRestoreActiveWsprTx(QStringLiteral("start"));
+    }
 
     if (m_hasPendingScheduledQsy) {
         if (canApplyScheduledQsyNow()) {

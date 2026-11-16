@@ -168,6 +168,10 @@ void MainWindow::setupWsprPage()
             const QSignalBlocker block(m_chkWsprTx);
             m_chkWsprTx->setChecked(false);
             updateWsprTxAvailability();
+            // Say why instead of silently unticking.
+            const QString why = !error.isEmpty() ? error : wsprBeaconRefusalReason();
+            if (m_lblWsprTxStatus != nullptr) m_lblWsprTxStatus->setText(why);
+            appendLog(QStringLiteral("WSPR beacon not switched on: ") + why);
             return;
         }
         appendLog(QStringLiteral("WSPR beacon on: %1 %, %2 Hz, %3")

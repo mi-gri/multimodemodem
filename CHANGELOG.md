@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- QSY plan: after a restart inside a WSPR entry marked "Send WSPR beacon", the beacon may run
+  again (the permission was only set when the plan switched into the entry). A refused beacon
+  switch now says why (plan entry not marked, rig on another band, band receive only, no frequency).
 - Audio timeline after lost capture samples: a short audio stall (seen when Settings opened)
   shifted all FT8 timing by ~1.7 s and the clock servo needed ~15 minutes to catch up (no FT8
   decodes meanwhile). Lost frames are now detected within a few seconds and the timeline starts a

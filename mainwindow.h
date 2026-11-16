@@ -1723,6 +1723,8 @@ private:
     void applyPreferredBandOrder();
     void schedulerWsprTxTryArm();
     void schedulerWsprTxEnd(const QString &reason);
+    void schedulerRestoreActiveWsprTx(const QString &why);
+    QString wsprBeaconRefusalReason() const;
 
     /**
      * @brief Updates the compact Ready/RX/TX main-state button.
@@ -2658,6 +2660,7 @@ private:
     QString m_schedulerWsprTxBand;          // QSY plan entry allowed to send WSPR beacons
     QString m_schedulerWsprTxEntryTime;
     bool m_schedulerWsprTxRefusalLogged = false;
+    bool m_schedulerStartupChecked = false;
     QWidget *m_manualFrequencyWidget = nullptr;
     QLineEdit *m_editManualFrequency = nullptr;
     QLabel *m_lblManualFrequencyState = nullptr;

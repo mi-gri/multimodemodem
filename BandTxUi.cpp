@@ -392,6 +392,40 @@ void MainWindow::schedulerWsprTxTryArm()
     m_chkWsprTx->setChecked(true);
 }
 
+// The entry of today's plan that is active now (latest start <= now).  When it
+// is a WSPR entry marked for TX, its beacon permission is restored, e.g. after
+// a restart in the middle of the entry.
+void MainWindow::schedulerRestoreActiveWsprTx(const QString &why)
+{
+    if (!m_settings.schedulerEnabled || !m_schedulerWsprTxBand.isEmpty()) return;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const QTime minute(now.time().hour(), now.time().minute());
+    const ScheduledQsyEntry *active = nullptr;
+    const QList<ScheduledQsyEntry> entries = schedulerEntries();
+    for (const ScheduledQsyEntry &e : entries) {
+        if (!e.enabled || !e.timeUtc.isValid() || !e.runsOn(now.date()) || e.timeUtc > minute) continue;
+        if (active == nullptr || e.timeUtc >= active->timeUtc) active = &e;
+    }
+    if (active == nullptr || !active->wsprTx || !WsprMode::isMode(active->mode)) return;
+    m_schedulerWsprTxBand = M3StandardFrequencies::bandOf(active->frequencyHz);
+    m_schedulerWsprTxEntryTime = active->timeUtc.toString(QStringLiteral("HH:mm"));
+    m_schedulerWsprTxRefusalLogged = false;
+    appendLog(uiText("scheduler_wspr_tx_restored_log", "QSY plan (%1): the active entry %2 UTC allows the WSPR beacon on %3.")
+                  .arg(why, m_schedulerWsprTxEntryTime, m_schedulerWsprTxBand));
+    schedulerWsprTxTryArm();
+}
+
+QString MainWindow::wsprBeaconRefusalReason() const
+{
+    if (!m_ft8AutoModeEnabled)
+        return uiText("wspr_tx_needs_auto", "Beacon TX is automatic operation: enable Auto mode in Settings first.");
+    if (m_settings.schedulerEnabled && m_schedulerWsprTxBand.isEmpty())
+        return uiText("wspr_tx_plan_only", "QSY plan on: the beacon only transmits in plan entries marked \"Send WSPR beacon\".");
+    if (m_settings.schedulerEnabled && currentTxBand() != m_schedulerWsprTxBand)
+        return uiText("wspr_tx_plan_band", "QSY plan: the beacon of this entry is for %1; the rig is not there.").arg(m_schedulerWsprTxBand);
+    return txBandRefusalReason();
+}
+
 void MainWindow::schedulerWsprTxEnd(const QString &reason)
 {
     if (m_schedulerWsprTxBand.isEmpty()) return;
