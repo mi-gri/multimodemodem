@@ -1340,3 +1340,8 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'QSY-plan: baken i denne oppføringen gjelder %1; riggen står ikke der.',
   'Plán QSY: maják této položky platí pro %1; rig tam není naladěn.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft_cq_retry_started_log':('%1 CQ retry started: %2 CQ transmission(s).','%1 CQ retry avviato: %2 trasmissione/i CQ.','%1 répétition CQ lancée : %2 émission(s) CQ.','%1 CQ-Retry gestartet: %2 CQ-Sendung(en).','%1 CQ-gjentak startet: %2 CQ-sending(er).','%1 opakování CQ spuštěno: %2 vysílání CQ.'),
+ 'ft_auto_qso_paused_log':('Auto QSO stays paused for now: %1','Auto QSO resta in pausa per ora: %1','Auto QSO reste en pause pour l’instant : %1','Auto QSO bleibt vorerst pausiert: %1','Auto QSO står på pause inntil videre: %1','Auto QSO zatím zůstává pozastaveno: %1'),
+ 'ft_auto_qso_paused_plan':('the QSY plan is on (no automatic TX while it runs).','il piano QSY è attivo (nessuna TX automatica mentre è in corso).','le plan de QSY est actif (pas de TX automatique pendant son exécution).','der QSY-Plan läuft (solange keine automatischen Sendungen).','QSY-planen er på (ingen automatisk TX mens den kjører).','plán QSY běží (během něj žádné automatické TX).'),
+}.items()})

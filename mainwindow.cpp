@@ -11087,7 +11087,10 @@ QString MainWindow::localizedRuntimeText(const QString &prefix, const QString &m
     // 1) Exact message match. This covers static appendLog()/QMessageBox text
     //    without forcing every call site to be rewritten immediately.
     QString translated = uiTextFromSource(prefix, source);
-    if (translated != source) {
+    // A filled-in line ("...: 1 CQ transmission(s).") can normalize to the key
+    // of its own template ("...: %1 ..."); that match would show "%1".
+    static const QRegularExpression placeholder(QStringLiteral("%[1-9]"));
+    if (translated != source && (source.contains(QLatin1Char('%')) || !translated.contains(placeholder))) {
         return translated;
     }
 
@@ -18885,6 +18888,11 @@ void MainWindow::handleFt8FullAutoQsoToggled(bool enabled)
             startFt8RxShell();
         }
         appendLog("FT Auto QSO enabled: decoded CQs are buffered briefly and ranked by new country, new grid square, new band, new mode, distance, then SNR before answering. STOP disables it.");
+        if (!autoTxPermitted())   // armed, but the plan / band blocks it for now
+            appendLog(uiText("ft_auto_qso_paused_log", "Auto QSO stays paused for now: %1")
+                          .arg(m_settings.schedulerEnabled
+                                   ? uiText("ft_auto_qso_paused_plan", "the QSY plan is on (no automatic TX while it runs).")
+                                   : txBandRefusalReason()));
     } else {
         m_ft8FullAutoCqCandidates.clear();
         m_ft8FullAutoCqSelectionTimer.stop();
@@ -19430,7 +19438,9 @@ void MainWindow::startFt8CqRepeat()
         startFt8RxShell();
     }
 
-    appendLog(QString("FT8 CQ retry started: %1 CQ transmission(s).").arg(qBound(1, repeatCount, 99)));
+    appendLog(uiText("ft_cq_retry_started_log", "%1 CQ retry started: %2 CQ transmission(s).")
+                  .arg(Ft8Mode::profileForMode(ui->cmbMode->currentText()).shortLabel)
+                  .arg(qBound(1, repeatCount, 99)));
     scheduleFt8SequencerMessage(cq, QStringLiteral("CQ"));
 }
 

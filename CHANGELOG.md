@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Runtime log: a line whose number happened to be "1" could pick up its own translation template
+  and show "%1" ("CQ-Retry gestartet: %1"); the CQ retry line names FT4/FT8 correctly. Switching on
+  Auto QSO while the QSY plan runs (or on a receive-only band) says that it stays paused.
 - The Rotator tab on the right is shown only with rotator control on (Settings → Rotator).
 - QSY plan: after a restart inside a WSPR entry marked "Send WSPR beacon", the beacon may run
   again (the permission was only set when the plan switched into the entry). A refused beacon
