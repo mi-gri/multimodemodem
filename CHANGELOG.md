@@ -4,6 +4,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- JS8: {RST} in macros is the SNR report of the station in To ("SNR +05"; from the RST-sent field
+  of the QSO form when it holds one) - "SNR 599" went out as "SNR +05" plus a stray "99". Without a
+  known report the macro sends nothing and says why. Any station set in To (heard list, inbox
+  reply, typed) now fills the QSO form, so the QRZ tab follows.
 - JS8: frames naming a station that cannot be an amateur callsign are dropped (and logged) -
   false decodes from noise such as "7ZWEZV/2RH: @HB HEARTBEAT QF89" at -28 dB.
   Lone text frames with no message start on their offset are dropped when they lie far out of time

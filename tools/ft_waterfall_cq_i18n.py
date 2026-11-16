@@ -1345,3 +1345,12 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'ft_auto_qso_paused_log':('Auto QSO stays paused for now: %1','Auto QSO resta in pausa per ora: %1','Auto QSO reste en pause pour l’instant : %1','Auto QSO bleibt vorerst pausiert: %1','Auto QSO står på pause inntil videre: %1','Auto QSO zatím zůstává pozastaveno: %1'),
  'ft_auto_qso_paused_plan':('the QSY plan is on (no automatic TX while it runs).','il piano QSY è attivo (nessuna TX automatica mentre è in corso).','le plan de QSY est actif (pas de TX automatique pendant son exécution).','der QSY-Plan läuft (solange keine automatischen Sendungen).','QSY-planen er på (ingen automatisk TX mens den kjører).','plán QSY běží (během něj žádné automatické TX).'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'js8_no_report':(
+  'No SNR report for the station in To yet: select a heard station or enter the report in the QSO form.',
+  'Ancora nessun rapporto SNR per la stazione in To: selezionare una stazione ascoltata o inserire il rapporto nel modulo QSO.',
+  'Pas encore de rapport SNR pour la station dans To : choisissez une station entendue ou saisissez le rapport dans le formulaire QSO.',
+  'Noch kein SNR-Rapport für die Station in „To“: eine gehörte Station wählen oder den Rapport im QSO-Formular eintragen.',
+  'Ingen SNR-rapport for stasjonen i To ennå: velg en hørt stasjon eller skriv rapporten i QSO-skjemaet.',
+  'Pro stanici v To zatím není rapport SNR: vyberte slyšenou stanici nebo zadejte rapport do formuláře QSO.'),
+}.items()})

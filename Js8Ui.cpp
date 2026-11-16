@@ -13,6 +13,7 @@
 #include "utils/StandardFrequencies.h"
 #include "widgets/WaterfallWidget.h"
 
+#include <QRegularExpression>
 #include <QApplication>
 #include <QCheckBox>
 #include <QDialog>
@@ -211,6 +212,22 @@ void MainWindow::setupJs8DisplayPage()
     connect(m_btnJs8Send, &QPushButton::clicked, this, &MainWindow::js8SendFromEditor);
     connect(m_editJs8Tx, &QLineEdit::returnPressed, this, &MainWindow::js8SendFromEditor);
     connect(m_btnJs8ClearTo, &QPushButton::clicked, this, [this]() { m_editJs8To->clear(); js8OperatorActivity(); });
+    // Whatever sets the station in To (heard list, inbox reply, typing): the
+    // QSO form - and with it the QRZ tab - follows; @groups are no station.
+    connect(m_editJs8To, &QLineEdit::textChanged, this, [this](const QString &text) {
+        const QString call = text.trimmed().toUpper();
+        if (m_js8QsoForm == nullptr || m_js8QsoForm->callsign == nullptr) return;
+        if (call.isEmpty() || call.startsWith(QLatin1Char('@')) || !Js8Message::isPlausibleAmateurCall(call)) return;
+        if (m_js8QsoForm->callsign->text().trimmed().compare(call, Qt::CaseInsensitive) != 0) {
+            m_js8QsoForm->callsign->setText(call);
+            const auto heard = m_js8Heard.constFind(call);
+            if (heard != m_js8Heard.constEnd()) {
+                if (m_js8QsoForm->grid != nullptr && !heard->grid.isEmpty()) m_js8QsoForm->grid->setText(heard->grid);
+                if (m_js8QsoForm->rstSent != nullptr) m_js8QsoForm->rstSent->setText(QString::asprintf("%+03d", heard->snrDb));
+            }
+        }
+        refreshQrzStationPanel();
+    });
     connect(m_editJs8Tx, &QLineEdit::textEdited, this, [this]() { js8OperatorActivity(); });
     connect(m_btnJs8Cq, &QPushButton::clicked, this, [this]() {
         m_editJs8To->clear();
@@ -1266,6 +1283,18 @@ QString MainWindow::js8ExpandMacro(const QString &source) const
     QString text = source;
     const QString to = m_editJs8To != nullptr ? m_editJs8To->text().trimmed().toUpper() : QString();
     text.replace(QStringLiteral("{CALL}"), to, Qt::CaseInsensitive);
+    // JS8 reports are SNR values ("SNR +05"), not RST: "SNR 599" went out as
+    // "SNR +05" plus a stray "99".  The report is the last SNR heard from the
+    // station in To, or the RST-sent field of the QSO form when it holds one.
+    if (text.contains(QStringLiteral("{RST}"), Qt::CaseInsensitive)) {
+        QString report;
+        static const QRegularExpression snrShape(QStringLiteral("^[+-]\\d{1,2}$"));
+        const QString formRst = m_js8QsoForm != nullptr && m_js8QsoForm->rstSent != nullptr ? m_js8QsoForm->rstSent->text().trimmed() : QString();
+        if (snrShape.match(formRst).hasMatch()) report = QString::asprintf("%+03d", formRst.toInt());
+        else if (const auto heard = m_js8Heard.constFind(to); heard != m_js8Heard.constEnd()) report = QString::asprintf("%+03d", heard->snrDb);
+        if (report.isEmpty()) return QString();   // unknown: send nothing rather than a wrong report
+        text.replace(QStringLiteral("{RST}"), report, Qt::CaseInsensitive);
+    }
     text.replace(QStringLiteral("{MYGRID}"), stationLocator().trimmed().left(4).toUpper(), Qt::CaseInsensitive);
     text = expandTextTemplate(text);
     text.replace(QLatin1Char('\n'), QLatin1Char(' '));
@@ -1290,7 +1319,11 @@ void MainWindow::js8RunMacro(int index, bool editOnly)
     const QString source = m_settings.js8MacroTexts.value(index).trimmed();
     if (source.isEmpty()) return;
     const QString text = js8ExpandMacro(source);
-    if (text.isEmpty()) return;
+    if (text.isEmpty()) {
+        if (source.contains(QStringLiteral("{RST}"), Qt::CaseInsensitive) && m_lblJs8TxStatus != nullptr)
+            m_lblJs8TxStatus->setText(uiText("js8_no_report", "No SNR report for the station in To yet: select a heard station or enter the report in the QSO form."));
+        return;
+    }
     if (editOnly) {
         if (m_editJs8Tx != nullptr) {
             m_editJs8Tx->setText(text);
