@@ -196,6 +196,7 @@ void MainWindow::setupJs8DisplayPage()
     js8RefreshMacroButtons();
 
     m_lblJs8TxStatus = new QLabel(m_js8DisplayPage);
+    m_lblJs8TxStatus->setTextFormat(Qt::AutoText);
     m_lblJs8TxStatus->setWordWrap(true);
 
     layout->addWidget(vertical, 1);
@@ -948,6 +949,66 @@ void MainWindow::clearJs8Activity()
     js8RefreshCalls();
 }
 
+// Frame k of n is on air from start + k*period.  The status line shows the slot
+// and the message with the sent part grey, the frame on air highlighted and
+// the rest unchanged.
+void MainWindow::js8BeginTxProgress(qint64 startUtcMs)
+{
+    const Js8Mode::Submode submode = currentJs8Submode();
+    m_js8TxFrameTexts.clear();
+    for (const Js8Message::Frame &f : std::as_const(m_js8PendingFrames))
+        m_js8TxFrameTexts << Js8Message::unpack(f.frame, f.bits, submode).text;
+    m_js8TxPeriodMs = Js8Mode::parameters(submode).periodSeconds * 1000;
+    m_js8TxStartUtcMs = startUtcMs;
+    if (!m_js8TxProgressTimer.isActive()) {
+        m_js8TxProgressTimer.setInterval(250);
+        connect(&m_js8TxProgressTimer, &QTimer::timeout, this, &MainWindow::updateJs8TxProgress, Qt::UniqueConnection);
+        m_js8TxProgressTimer.start();
+    }
+    updateJs8TxProgress();
+}
+
+void MainWindow::updateJs8TxProgress()
+{
+    const int n = m_js8TxFrameTexts.size();
+    if (n == 0 || m_js8TxPeriodMs <= 0 || m_lblJs8TxStatus == nullptr) {
+        m_js8TxProgressTimer.stop();
+        return;
+    }
+    const qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - m_js8TxStartUtcMs;
+    const qint64 total = qint64(n) * m_js8TxPeriodMs;
+    const bool onAir = m_txRunning || m_txPreparationPending;
+    const int current = int(qBound<qint64>(qint64{0}, elapsed / m_js8TxPeriodMs, qint64(n - 1)));
+    const auto mmss = [](qint64 ms) {
+        const qint64 s = qMax<qint64>(qint64{0}, ms / 1000);
+        return QStringLiteral("%1:%2").arg(s / 60).arg(s % 60, 2, 10, QLatin1Char('0'));
+    };
+    QString html;
+    bool finished = false;
+    if (!onAir && elapsed >= 0) {
+        // Ended (or stopped): everything up to the last frame begun counts as sent.
+        finished = true;
+        const bool complete = elapsed >= total - 1000;
+        html = (complete ? uiText("js8_tx_done", "JS8 TX done: %1 slot(s)").arg(n)
+                         : uiText("js8_tx_stopped_at", "JS8 TX stopped in slot %1 of %2").arg(current + 1).arg(n)).toHtmlEscaped();
+    } else {
+        html = uiText("js8_tx_progress", "JS8 TX: slot %1 of %2 · %3 / %4")
+                   .arg(current + 1).arg(n).arg(mmss(elapsed), mmss(total)).toHtmlEscaped();
+    }
+    html += QStringLiteral(" &nbsp;—&nbsp; ");   // one line: the status field is single-line
+    for (int i = 0; i < n; ++i) {
+        const QString part = m_js8TxFrameTexts.at(i).toHtmlEscaped();
+        const bool sent = finished ? i <= current : i < current;
+        if (sent) html += QStringLiteral("<span style=\"color:#2e9b57;text-decoration:line-through\">%1</span>").arg(part);
+        else if (i == current && !finished)
+            html += QStringLiteral("<span style=\"background:#c03030;color:#ffffff;font-weight:bold\">%1</span>").arg(part);
+        else html += QStringLiteral("<span style=\"font-weight:600\">%1</span>").arg(part);
+    }
+    m_lblJs8TxStatus->setTextFormat(Qt::RichText);
+    m_lblJs8TxStatus->setText(html);
+    if (finished) m_js8TxProgressTimer.stop();
+}
+
 void MainWindow::js8SendFromEditor()
 {
     if (m_editJs8Tx == nullptr) return;
@@ -987,6 +1048,8 @@ bool MainWindow::js8Transmit(const QString &text, const QString &to, bool automa
     }
     m_js8PendingFrames = frames;
     m_js8PendingText = Js8Message::preview(frames, submode).trimmed();
+    m_js8TxProgressTimer.stop();
+    m_lblJs8TxStatus->setTextFormat(Qt::AutoText);
     m_js8PendingTxHz = txHz;
     m_js8LastTxText = Js8Message::normalizeText(text);
     const int hz = txHz > 0 ? txHz : (m_spinJs8TxFreq != nullptr ? m_spinJs8TxFreq->value() : 1500);

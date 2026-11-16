@@ -2357,6 +2357,13 @@ private:
     QVector<Js8Activity> m_js8Activity;
     QMap<QString, Js8Heard> m_js8Heard;
     QVector<Js8Message::Frame> m_js8PendingFrames;
+    // JS8 TX progress: one frame per period from the first boundary.
+    QStringList m_js8TxFrameTexts;
+    qint64 m_js8TxStartUtcMs = 0;
+    int m_js8TxPeriodMs = 0;
+    QTimer m_js8TxProgressTimer;
+    void js8BeginTxProgress(qint64 startUtcMs);
+    void updateJs8TxProgress();
     QString m_js8PendingText;
     int m_js8PendingTxHz = 0;             // 0 = TX offset of the spin box
     struct ModeBandWidgets

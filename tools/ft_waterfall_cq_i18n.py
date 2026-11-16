@@ -1354,3 +1354,8 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Ingen SNR-rapport for stasjonen i To ennå: velg en hørt stasjon eller skriv rapporten i QSO-skjemaet.',
   'Pro stanici v To zatím není rapport SNR: vyberte slyšenou stanici nebo zadejte rapport do formuláře QSO.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'js8_tx_progress':('JS8 TX: slot %1 of %2 · %3 / %4','JS8 TX: slot %1 di %2 · %3 / %4','JS8 TX : slot %1 sur %2 · %3 / %4','JS8 TX: Slot %1 von %2 · %3 / %4','JS8 TX: slot %1 av %2 · %3 / %4','JS8 TX: slot %1 z %2 · %3 / %4'),
+ 'js8_tx_done':('JS8 TX done: %1 slot(s)','JS8 TX terminata: %1 slot','JS8 TX terminée : %1 slot(s)','JS8 TX fertig: %1 Slot(s)','JS8 TX ferdig: %1 slot','JS8 TX dokončeno: %1 slot(ů)'),
+ 'js8_tx_stopped_at':('JS8 TX stopped in slot %1 of %2','JS8 TX fermata nello slot %1 di %2','JS8 TX arrêtée au slot %1 sur %2','JS8 TX abgebrochen in Slot %1 von %2','JS8 TX stoppet i slot %1 av %2','JS8 TX zastaveno ve slotu %1 z %2'),
+}.items()})

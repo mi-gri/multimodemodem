@@ -15964,13 +15964,16 @@ void MainWindow::handleNativeWeakSignalPeriodTxDue()
     m_nativeWeakSignalTxPending = false;
     m_nativeWeakSignalTxMode.clear();
     m_nativeWeakSignalTxBoundaryStart = true;
+    const qint64 js8TxStartUtcMs = m_nativeWeakSignalTxBoundaryUtcMs > 0 ? m_nativeWeakSignalTxBoundaryUtcMs : nowMs;
     updateTxControlState();
     startImageTx();
+    if (Js8Mode::isMode(activeMode) && (m_txRunning || m_txPreparationPending) && !m_js8PendingFrames.isEmpty())
+        js8BeginTxProgress(js8TxStartUtcMs);
     m_nativeWeakSignalTxBoundaryStart = false;
     if (Js8Mode::isMode(activeMode) && !m_nativeWeakSignalTxPending) {
         // The frames are on air now; a new Send builds the next message.
         m_js8PendingFrames.clear();
-        if (m_lblJs8TxStatus != nullptr)
+        if (m_lblJs8TxStatus != nullptr && !m_js8TxProgressTimer.isActive())
             m_lblJs8TxStatus->setText(M3I18n::text(QStringLiteral("JS8 TX: %1")).arg(m_js8PendingText));
     }
     // Preserve a newly deferred period; only discard an unconsumed old plan.

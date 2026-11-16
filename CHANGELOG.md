@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- JS8 TX progress: the status line shows "slot 2 of 3 · 0:22 / 0:45" and the message with the part
+  already sent (green, struck through), the frame on air (highlighted) and the rest; at the end it
+  says whether the message went out completely or was stopped in which slot.
 - JS8: {RST} in macros is the SNR report of the station in To ("SNR +05"; from the RST-sent field
   of the QSO form when it holds one) - "SNR 599" went out as "SNR +05" plus a stray "99". Without a
   known report the macro sends nothing and says why. Any station set in To (heard list, inbox
