@@ -508,7 +508,7 @@ void AudioEngine::readInputData()
     if(m_captureTracker.observe(completeFrames,nowMonotonicNs,nowUtcNs,effectiveRate,
                                std::abs(clockCorrectionPpm())<1e-9)) {
         ++m_captureGeneration;m_captureSequence=0;
-        reportDiagnostic(QStringLiteral("Audio capture clock: new epoch after UTC/calibration change"));
+        reportDiagnostic(QStringLiteral("Audio capture clock: new epoch (UTC step, calibration change or lost capture samples)"));
     }
     if(nowMonotonicNs-m_lastClockDiagnosticNs>=30000000000LL) {
         m_lastClockDiagnosticNs=nowMonotonicNs;

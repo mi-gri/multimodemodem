@@ -34,6 +34,32 @@ int main(){
  check(clock.observe(2000*819,34125000000LL,utc+34125000000LL+1000000000LL,48000),"UTC step not detected");
  check(!clock.locked(),"UTC step contaminated frequency model");
  clock.reset();check(!clock.initialized(),"capture restart did not reset tracker");
+ // Lost capture frames (stall when Settings opened, 2026-11-16): the
+ // timeline must re-anchor within seconds, not slew for a quarter hour.
+ {CaptureClockTracker lost;int64_t frames=0,emitted=0;bool epoch=false;double epochAt=0,worstAfter=0;
+  const double lostSeconds=1.7;
+  for(int call=1;call<48000*240/819;++call){
+   const double t=call*819/48000.;
+   frames=int64_t(call)*819-(t>=120.?int64_t(lostSeconds*48000):0);
+   const int64_t mono=std::llround((t+.003)*1e9);
+   if(lost.observe(frames,mono,utc+mono,48000) && t>=120.){epoch=true;if(!epochAt)epochAt=t;}
+   while(frames-emitted>=1024){auto span=lost.take(1024);emitted+=1024;
+    // After the epoch, block timestamps must again match real capture time.
+    if(epoch && t>epochAt+5.){const double real=(emitted+lostSeconds*48000)/48000.;
+     worstAfter=std::max(worstAfter,std::abs((span.mono+span.duration)/1e9-real));}}
+  }
+  std::cout<<"lost frames: epoch after "<<(epochAt-120.)<<" s, worst error after "<<worstAfter*1000<<" ms"<<std::endl;
+  check(epoch && epochAt-120.<10.,"lost capture frames not re-anchored");
+  check(worstAfter<.06,"timeline still off after re-anchor");}
+ // Ordinary GUI stall without loss (late callback, then burst): no new epoch.
+ {CaptureClockTracker stall;bool epoch=false;int64_t lastMono=0;
+  for(int call=1;call<48000*240/819;++call){
+   const double t=call*819/48000.;double delay=.003;
+   if(t>=120. && t<121.5)delay=121.5-t;   // 1.5 s stall, all frames delivered after
+   const int64_t mono=std::max<int64_t>(lastMono,std::llround((t+delay)*1e9));lastMono=mono;
+   if(stall.observe(int64_t(call)*819,mono,utc+mono,48000))epoch=true;
+  }
+  check(!epoch,"GUI stall without lost frames started a new epoch");}
  // Explicit manual calibration keeps its chosen mapping and never learns it away.
  clock.reset();int64_t manualEnd=0;
  for(int i=1;i<=2000;++i){clock.observe(i*1024,int64_t(i)*21350000,utc+int64_t(i)*21350000,48000,false);auto span=clock.take(1024);manualEnd=span.mono+span.duration;}

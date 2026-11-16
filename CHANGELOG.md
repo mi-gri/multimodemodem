@@ -4,6 +4,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Audio timeline after lost capture samples: a short audio stall (seen when Settings opened)
+  shifted all FT8 timing by ~1.7 s and the clock servo needed ~15 minutes to catch up (no FT8
+  decodes meanwhile). Lost frames are now detected within a few seconds and the timeline starts a
+  new epoch; ordinary GUI stalls without loss do not trigger it.
 - FT4/FT8 receive follows mode changes with RX running (QSY plan, operator), like JS8/Q65/WSPR:
   after the WSPR beacon had restarted RX, later plan switches to FT8/FT4 left the FT decoder deaf
   (no FT decodes on 10m/2m/70cm in the 2026-11-16 plan run); before that, FT kept decoding in the

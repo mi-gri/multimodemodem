@@ -23,11 +23,27 @@ public:
         if(nominal<=0 || frames<m_emitted)return false;
         bool discontinuity=m_initialized && (nominal!=m_nominal || automatic!=m_auto ||
             std::abs((utc-mono)-m_utcOffset)>250000000LL);
+        // Lost (or duplicated) capture frames: the sample count stays off
+        // the learned clock by a fixed amount.  The 2000-ppm servo would need
+        // ~15 minutes for 1.7 s (2026-11-16: no FT8 decodes after a stall when
+        // Settings opened), so start a new epoch instead.  Judged once per
+        // second on the lower envelope, for kLostBins seconds in a row, so a
+        // late callback followed by a burst never triggers it.
+        if(m_initialized && !discontinuity && m_auto && m_locked) {
+            const double y0=double(mono-m_anchorMono)/1e9;
+            const int64_t b0=int64_t(std::floor(y0));
+            if(b0>m_bin && !m_points.empty()) {
+                const Point &p=m_points.back();
+                const double off=p.y-(m_intercept+m_slope*p.x);
+                m_lostBins=std::abs(off)>kLostSeconds ? m_lostBins+1 : 0;
+                if(m_lostBins>=kLostBins)discontinuity=true;
+            }
+        }
         if(!m_initialized || discontinuity) {
             m_nominal=nominal;m_auto=automatic;m_initialized=true;m_locked=false;
             m_slope=1;m_intercept=0;m_periodScale=1;m_residual=0;m_points.clear();m_bin=-1;
             m_baseFrame=m_emitted;m_anchorMono=mono-std::llround(1e9*(frames-m_emitted)/double(nominal));
-            m_nextMono=m_anchorMono;m_utcOffset=utc-mono;
+            m_nextMono=m_anchorMono;m_utcOffset=utc-mono;m_lostBins=0;
         }
         const double x=double(frames-m_baseFrame)/m_nominal;
         const double y=double(mono-m_anchorMono)/1e9;
@@ -76,6 +92,9 @@ private:
         std::vector<double> offsets;for(auto p:m_points)offsets.push_back(p.y-slope*p.x);
         m_slope=slope;m_intercept=median(offsets);m_locked=true;
     }
+    static constexpr double kLostSeconds=.3;
+    static constexpr int kLostBins=5;
+    int m_lostBins=0;
     bool m_initialized=false,m_locked=false,m_auto=true;
     double m_nominal=48000,m_slope=1,m_intercept=0,m_periodScale=1,m_residual=0;
     int64_t m_emitted=0,m_baseFrame=0,m_anchorMono=0,m_utcOffset=0,m_bin=-1;
