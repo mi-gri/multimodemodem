@@ -396,11 +396,11 @@ void MainWindow::setupJs8Page()
     autoGrid->addWidget(m_chkJs8Relay, arow++, 0, 1, 4);
 
     m_cmbJs8HbInterval = new QComboBox(autoGroup);
-    fillIntervalCombo(m_cmbJs8HbInterval, {0, 10, 15, 30, 60}, uiText("js8_off", "Off"));
+    fillIntervalCombo(m_cmbJs8HbInterval, {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60}, uiText("js8_off", "Off"));
     m_cmbJs8HbInterval->setCurrentIndex(qMax(0, m_cmbJs8HbInterval->findData(settings.value(QStringLiteral("JS8/heartbeatMinutes"), 0).toInt())));
     m_cmbJs8HbInterval->setToolTip(uiText("js8_hb_interval_tooltip", "Repeats a heartbeat on a free offset between 500 and 1000 Hz. Paused while a station is selected."));
     m_cmbJs8CqInterval = new QComboBox(autoGroup);
-    fillIntervalCombo(m_cmbJs8CqInterval, {0, 5, 10, 15, 30}, uiText("js8_off", "Off"));
+    fillIntervalCombo(m_cmbJs8CqInterval, {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60}, uiText("js8_off", "Off"));
     m_cmbJs8CqInterval->setCurrentIndex(qMax(0, m_cmbJs8CqInterval->findData(settings.value(QStringLiteral("JS8/cqMinutes"), 0).toInt())));
     m_cmbJs8CqInterval->setToolTip(uiText("js8_cq_interval_tooltip", "Repeats CQ on the TX offset. Paused while a station is selected."));
     autoGrid->addWidget(new QLabel(uiText("js8_hb_every", "Heartbeat every"), autoGroup), arow, 0);

@@ -4,6 +4,7 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- JS8: heartbeat and CQ repeat intervals 5–60 min in 5-min steps; German labels "Heartbeat-Takt" and "CQ-Takt".
 - Runtime log: a line whose number happened to be "1" could pick up its own translation template
   and show "%1" ("CQ-Retry gestartet: %1"); the CQ retry line names FT4/FT8 correctly. Switching on
   Auto QSO while the QSY plan runs (or on a receive-only band) says that it stays paused.
