@@ -771,7 +771,7 @@ void MainWindow::js8ProcessCommand(const Js8Command &command)
     ctx.myGrid = stationLocator().trimmed().toUpper();
     ctx.info = m_editJs8Info != nullptr ? Js8Message::normalizeText(m_editJs8Info->text()) : QString();
     ctx.status = m_editJs8StatusText != nullptr ? Js8Message::normalizeText(m_editJs8StatusText->text()) : QString();
-    ctx.autoReply = m_ft8AutoModeEnabled && m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked() && !m_js8WatchdogTripped;
+    ctx.autoReply = autoTxPermitted() && m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked() && !m_js8WatchdogTripped;
     ctx.heartbeatAck = m_chkJs8HbAck != nullptr && m_chkJs8HbAck->isChecked();
     ctx.relay = m_chkJs8Relay != nullptr && m_chkJs8Relay->isChecked();
     ctx.heardRecentFirst = js8RecentCalls();
@@ -799,7 +799,7 @@ void MainWindow::js8ProcessCommand(const Js8Command &command)
     if (action.storedId > 0) js8UpdateInboxButton();
     if (action.reply.isEmpty()) return;
 
-    const bool automatic = m_ft8AutoModeEnabled && m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked();
+    const bool automatic = autoTxPermitted() && m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked();
     if (automatic && !m_js8WatchdogTripped) {
         const bool broadcast = action.allCall || action.lowPriority;
         const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
@@ -1026,8 +1026,9 @@ void MainWindow::js8Tick()
     if (ui == nullptr || ui->cmbMode == nullptr || !Js8Mode::isMode(ui->cmbMode->currentText())) return;
 
     const qint64 now = nowUtc.toMSecsSinceEpoch();
-    // Without Auto mode (Settings) no automatic JS8 transmission at all.
-    const bool autoMode = m_ft8AutoModeEnabled;
+    // Without Auto mode (Settings), and while the QSY plan runs, no automatic
+    // JS8 transmission at all (a plan switch to JS8 sent an overdue heartbeat).
+    const bool autoMode = autoTxPermitted();
     const int hbMinutes = autoMode && m_cmbJs8HbInterval != nullptr ? m_cmbJs8HbInterval->currentData().toInt() : 0;
     const int cqMinutes = autoMode && m_cmbJs8CqInterval != nullptr ? m_cmbJs8CqInterval->currentData().toInt() : 0;
     const bool autoReply = autoMode && m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked();

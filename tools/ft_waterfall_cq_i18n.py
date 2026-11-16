@@ -1158,3 +1158,12 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Viser eget TX-signal i fossen under sending, som et sterkt mottatt signal (bare de øverste 18 dB, ikke overstyrt). Lagres per modus; av som standard i FT8/FT4.',
   'Při vysílání zobrazí vlastní TX signál ve vodopádu jako silný přijímaný signál (jen horních 18 dB, bez přebuzení). Ukládá se pro každý druh provozu; ve FT8/FT4 výchozí vypnuto.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'scheduler_log_auto_tx_paused':(
+  'QSY plan on: automatic transmissions (JS8 heartbeat/CQ/replies, FT Auto QSO, WSPR beacon) are paused; manual TX stays possible.',
+  'Piano QSY attivo: le trasmissioni automatiche (heartbeat/CQ/risposte JS8, Auto QSO FT, beacon WSPR) sono sospese; la TX manuale resta possibile.',
+  "Plan de QSY actif : les émissions automatiques (heartbeat/CQ/réponses JS8, Auto QSO FT, balise WSPR) sont suspendues ; la TX manuelle reste possible.",
+  'QSY-Plan an: Automatische Sendungen (JS8-Heartbeat/CQ/Antworten, FT Auto QSO, WSPR-Bake) sind pausiert; manuelles TX bleibt möglich.',
+  'QSY-plan på: automatiske sendinger (JS8 heartbeat/CQ/svar, FT Auto QSO, WSPR-bake) er satt på pause; manuell TX er fortsatt mulig.',
+  'Plán QSY zapnut: automatická vysílání (heartbeat/CQ/odpovědi JS8, FT Auto QSO, maják WSPR) jsou pozastavena; ruční TX zůstává možné.'),
+}.items()})

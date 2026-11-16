@@ -13862,6 +13862,14 @@ bool MainWindow::isBandSchedulerEnabledForMode(const QString &modeName) const
     return !schedulerModeGroup(modeName).isEmpty() && m_settings.schedulerEnabled;
 }
 
+bool MainWindow::autoTxPermitted() const
+{
+    // Automatic transmissions (JS8 heartbeat/CQ/replies, FT Auto QSO, WSPR
+    // beacon) need Auto mode, and never run while the QSY plan is on: the plan
+    // switches modes unattended and must not key the rig. Manual TX stays.
+    return m_ft8AutoModeEnabled && !m_settings.schedulerEnabled;
+}
+
 void MainWindow::setBandSchedulerEnabledForMode(const QString &, bool enabled)
 {
     m_settings.schedulerEnabled = enabled;
@@ -13875,6 +13883,10 @@ void MainWindow::setBandSchedulerEnabledForMode(const QString &, bool enabled)
     updateBandSchedulerTabForMode(ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QString());
     appendLog(enabled ? uiText("scheduler_log_enabled", "QSY plan enabled.")
                       : uiText("scheduler_log_disabled", "QSY plan disabled."));
+    if (enabled && m_ft8AutoModeEnabled)
+        appendLog(uiText("scheduler_log_auto_tx_paused", "QSY plan on: automatic transmissions (JS8 heartbeat/CQ/replies, FT Auto QSO, WSPR beacon) are paused; manual TX stays possible."));
+    if (enabled && m_chkWsprTx != nullptr && m_chkWsprTx->isChecked())
+        wsprStopBeacon(QStringLiteral("QSY plan on"));
 }
 
 QList<ScheduledQsyEntry> MainWindow::schedulerEntries() const
@@ -14782,6 +14794,15 @@ void MainWindow::handleModeChanged(const QString &modeName)
         applyQ65Settings();
         setDecoderReady(Q65Mode::modeName(currentQ65Submode()));
     } else if (Js8Mode::isMode(modeName)) {
+        // Heartbeat/CQ repeats restart their interval on entering JS8; an
+        // interval that ran out in another mode is not caught up at once.
+        {
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            const int hb = m_cmbJs8HbInterval != nullptr ? m_cmbJs8HbInterval->currentData().toInt() : 0;
+            const int cq = m_cmbJs8CqInterval != nullptr ? m_cmbJs8CqInterval->currentData().toInt() : 0;
+            m_js8NextHeartbeatMs = hb > 0 ? now + qint64(hb) * 60000 : 0;
+            m_js8NextCqMs = cq > 0 ? now + qint64(cq) * 60000 : 0;
+        }
         if (m_pageJs8Settings != nullptr) {
             ui->stkModeSettings->setCurrentWidget(m_pageJs8Settings);
         }
@@ -18898,7 +18919,7 @@ void MainWindow::selectFt8OppositePeriodFromDecode(const Ft8RxDecoder::Decode &d
 bool MainWindow::canCollectFt8FullAutoCqs() const
 {
     return !m_ft8OperatorStopLatched && !m_shutdownInProgress && !m_runtimeShutdownComplete &&
-        !m_offlineAnalysisActive && m_ft8AutoModeEnabled && m_chkFt8FullAutoQso &&
+        !m_offlineAnalysisActive && autoTxPermitted() && m_chkFt8FullAutoQso &&
         m_chkFt8FullAutoQso->isChecked() && ui && ui->cmbMode &&
         Ft8Mode::isFamilyMode(ui->cmbMode->currentText());
 }
@@ -20151,7 +20172,7 @@ void MainWindow::completeFt8Qso(const QString &reason)
     m_deferredFt8TxPlan.tag.clear();
     m_deferredFt8TxPlan = FtTxPlan();
     m_ftSession.deferredState = Ft8SequencerState::Idle;
-    const bool autoQsoArmed = m_ft8AutoModeEnabled && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked();
+    const bool autoQsoArmed = autoTxPermitted() && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked();
     if (autoQsoArmed) {
         appendLog(currentAdifMode() + " QSO complete: Auto QSO remains armed and will answer the next decoded CQ subject to blacklist and decode filters.");
     } else {
@@ -21234,7 +21255,7 @@ void MainWindow::finishFt8ResponseWait(quint64 retryGeneration, qint64 replySlot
         m_ftSession.retryGeneration != retryGeneration || replySlotUtcMs <= 0 ||
         m_ftSession.retryReplySlotUtcMs != replySlotUtcMs) return;
     const QString dx = m_ftSession.dxCall.trimmed().toUpper();
-    const bool fullAutoEnabled = m_ft8AutoModeEnabled &&
+    const bool fullAutoEnabled = autoTxPermitted() &&
                                  m_chkFt8FullAutoQso != nullptr &&
                                  m_chkFt8FullAutoQso->isChecked();
     if (fullAutoEnabled && !dx.isEmpty()) {

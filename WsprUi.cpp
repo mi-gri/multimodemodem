@@ -164,7 +164,7 @@ void MainWindow::setupWsprPage()
             return;
         }
         QString error;
-        if (!m_ft8AutoModeEnabled || wsprTxMessages(&error).isEmpty()) {
+        if (!autoTxPermitted() || wsprTxMessages(&error).isEmpty()) {
             const QSignalBlocker block(m_chkWsprTx);
             m_chkWsprTx->setChecked(false);
             updateWsprTxAvailability();
@@ -376,7 +376,7 @@ void MainWindow::wsprPlanNextPeriod()
     m_wsprTxTimer.stop();
     if (m_chkWsprTx == nullptr || !m_chkWsprTx->isChecked()) return;
     if (ui == nullptr || ui->cmbMode == nullptr || !WsprMode::isMode(ui->cmbMode->currentText()) ||
-        !m_ft8AutoModeEnabled) {
+        !autoTxPermitted()) {
         wsprStopBeacon(QStringLiteral("mode or Auto mode changed"));
         return;
     }

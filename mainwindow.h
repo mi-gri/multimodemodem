@@ -1703,6 +1703,7 @@ private:
      */
     void setReceiverRunning(bool running);
     void updateWeakSignalLiveInputs();
+    bool autoTxPermitted() const;
 
     /**
      * @brief Updates the compact Ready/RX/TX main-state button.

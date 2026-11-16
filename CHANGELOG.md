@@ -4,6 +4,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Safety: while the QSY plan is on, no automatic transmission starts (JS8 heartbeat, CQ and
+  replies, FT Auto QSO, WSPR beacon); manual TX stays possible. A plan switch to JS8 had sent an
+  overdue heartbeat at once (test run 2026-11-16 08:40 UTC). Entering JS8 now restarts the
+  heartbeat/CQ intervals instead of catching up.
 - Own TX signal in the waterfall, clean and per mode (checkbox "TX" next to the waterfall speed;
   on by default, off in FT8/FT4). Shown like a strong received signal: only the top 18 dB, peak
   at ~70 % of the scale, referenced to the held peak of the transmission so keying pauses stay
