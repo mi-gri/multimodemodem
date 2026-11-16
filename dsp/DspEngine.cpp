@@ -63,10 +63,14 @@ void DspEngine::setTxMonitor(bool on)
 {
     if (on == m_txMonitor) return;
     m_txMonitor = on;
-    // RX and TX rows have unrelated levels: neither may average into the
-    // other or into the RX baseline history.
-    m_waterfallLeveler.reset();
+    // RX and TX rows have unrelated levels: TX rows never reach the RX
+    // leveler (see below), so its learned state survives the transmission
+    // and RX continues seamlessly afterwards; only the row average restarts
+    // and the FFT buffer is not shared between the two sample streams.
+    m_fifo.clear();
     resetRowAverage();
+    m_txMonitorRefDb = -1.0e9;   // each transmission finds its own level
+    if (!on) m_rxResumingAfterTx = true;
 }
 
 void DspEngine::processTxMonitorBlock(const AudioBlock &block)
@@ -87,11 +91,15 @@ void DspEngine::processAudioBlockInternal(const AudioBlock &block)
         return;
     }
 
-    if (m_continuity.accept(block)) {
+    // RX and TX blocks have their own sample clocks. Switching between them
+    // only empties the FFT buffer (setTxMonitor); the RX leveler is reset on a
+    // real RX gap, not on the expected one after our own transmission.
+    if ((m_txMonitor ? m_txContinuity : m_continuity).accept(block)) {
         m_fifo.clear();
-        m_waterfallLeveler.reset();
+        if (!m_txMonitor && !m_rxResumingAfterTx) m_waterfallLeveler.reset();
         resetRowAverage();
     }
+    if (!m_txMonitor) m_rxResumingAfterTx = false;
     updateFftSize(block.sampleRate);
     if (m_fifo.isEmpty()) {
         m_fifoStartUtcNs = block.firstSampleUtcNs;   // 0: the producer has no capture time
@@ -400,7 +408,7 @@ void DspEngine::analyzeWindow(const QVector<float> &window, int sampleRate)
         }
         const double levelColumnHz = (m_maxHz - m_minHz) / static_cast<double>(m_columns - 1);
         const int receiverWidth = m_receiverFilterAge.isValid() && m_receiverFilterAge.elapsed() < 45000 ? m_receiverWidthHz : 0;
-        const WaterfallLevelResult levels =
+        const WaterfallLevelResult levels = m_txMonitor ? WaterfallLevelResult{} :
             m_waterfallLeveler.update(levelInput, lineSeconds, zoomed ? levelColumnHz : columnHz,
                 receiverWidth, m_narrowBandDisplay || (receiverWidth >= 50 && receiverWidth <= 1000));
         const bool haveBaseline = levels.baselineDb.size() ==
@@ -420,7 +428,25 @@ void DspEngine::analyzeWindow(const QVector<float> &window, int sampleRate)
         if (m_txMonitor) {
             double peakDb = -240.0;
             for (double v : dbLine) peakDb = qMax(peakDb, v);
-            txBaselineDb = peakDb - 22.0;
+            // Own TX shown like a strong received signal: only the top
+            // kTxMonitorRangeDb of its spectrum, the peak at ~70 % of the
+            // colour scale. Keying sidebands and window leakage further down
+            // (-20..-55 dB) stay black instead of painting wide stripes.
+            // The reference is the held peak of this transmission (slow
+            // decay), not the row's own peak: a row in a keying pause has
+            // only numerical residue and must stay black, not light up the
+            // whole width (the "wide orange stripes" in Feld Hell / CW).
+            constexpr double kTxMonitorRangeDb = 18.0;
+            constexpr double kTxMonitorDecayDbPerRow = 0.05;
+            // A row counts as signal only if its peak stands well above its
+            // own median (a tone, not silence or residue); until the first
+            // such row there is no reference and the row stays black.
+            std::vector<double> sorted(dbLine.begin(), dbLine.end());
+            std::nth_element(sorted.begin(), sorted.begin() + sorted.size() / 2, sorted.end());
+            const bool tonal = peakDb - sorted[sorted.size() / 2] > 20.0;
+            if (tonal) m_txMonitorRefDb = qMax(peakDb, m_txMonitorRefDb - kTxMonitorDecayDbPerRow);
+            else m_txMonitorRefDb -= kTxMonitorDecayDbPerRow;
+            txBaselineDb = m_txMonitorRefDb > -1.0e8 ? m_txMonitorRefDb - kTxMonitorRangeDb : 1.0e9;
         }
         for (int x = 0; x < m_columns; ++x) {
             const double baselineDb = m_txMonitor ? txBaselineDb : baselineAt(x);

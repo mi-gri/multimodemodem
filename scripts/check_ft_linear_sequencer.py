@@ -63,12 +63,8 @@ ft_branch = main[ft_branch_start:main.index("if (!m_rxRunning", ft_branch_start)
 require("QMetaObject::invokeMethod" not in ft_branch and "m_ft8RxDecoder->processAudioBlock" not in ft_branch,
         "MainWindow no longer duplicates FT audio transport")
 
-require("m_ftTxWorker, &FtTxWorker::audioBlockReady" not in main,
-        "generated FT TX audio is not injected into the RX waterfall")
-monitor_start = main.index("connect(m_txAudioEngine, &TxAudioEngine::audioBlockReady")
-monitor = main[monitor_start:main.index("/*", monitor_start)]
-require("Ft8Mode::isFamilyMode(ui->cmbMode->currentText())" in monitor and "return;" in monitor,
-        "generic TX monitor also freezes for FT family modes")
+require("m_settings.waterfallShowTxFor" in main and "processTxMonitorBlock" in main,
+        "own TX reaches the waterfall only through the optional clean monitor")
 
 require("maybeAdjustLocked" not in resources_h + resources_cpp and
         "m_liveWorkerTarget" not in resources_h + resources_cpp,

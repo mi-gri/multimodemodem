@@ -4,6 +4,12 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Own TX signal in the waterfall, clean and per mode (checkbox "TX" next to the waterfall speed;
+  on by default, off in FT8/FT4). Shown like a strong received signal: only the top 18 dB, peak
+  at ~70 % of the scale, referenced to the held peak of the transmission so keying pauses stay
+  black (the wide orange stripes in Feld Hell/CW were whole key-up rows lit by residue). TX rows
+  no longer touch the RX leveler, so RX continues without relearning after TX. Measured: Hell
+  ~30 Hz, carrier ~26 Hz, RTTY ~73 Hz lit width, peak 180/254, RX level before/after equal.
 - QSO forms of the text modes: the band field follows the rig's band (CAT) instead of showing a
   fixed "20m" hint; a band typed by the operator is kept, and a QSO logged with an empty field
   takes the CAT band (it was logged without band before).

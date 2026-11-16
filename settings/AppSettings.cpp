@@ -666,6 +666,7 @@ void AppSettings::load()
         else if (key == QLatin1String("FT4")) fallback = ftWaterfallRowMs / 2;
         else if (key == QLatin1String("WSPR")) fallback = settings.value("WSPR/waterfallRowMs", 500).toInt();
         waterfallRowMs.insert(key, qBound(0, settings.value(QStringLiteral("Waterfall/rowMs_") + key, fallback).toInt(), 2000));
+        waterfallShowTx.insert(key, settings.value(QStringLiteral("Waterfall/showTx_") + key, waterfallShowTxFor(key)).toBool());
     }
     ftWaterfallRowMs = qBound(50, waterfallRowMs.value(QStringLiteral("FT8"), ftWaterfallRowMs), 1000);
     ftDecodeFilterCqEnd = settings.value("FT8/decodeFilterCqEnd", ftDecodeFilterCqEnd).toBool();
@@ -1102,8 +1103,10 @@ bool AppSettings::save() const
     settings.setValue("FT8/highlightNewCall", ftHighlightNewCall);
     settings.setValue("FT8/waterfallCqSeconds", ftWaterfallCqSeconds);
     settings.setValue("FT8/waterfallRowMs", qBound(50, waterfallRowMsFor(QStringLiteral("FT8")), 1000));
-    for (const QString &key : waterfallModeKeys())
+    for (const QString &key : waterfallModeKeys()) {
         settings.setValue(QStringLiteral("Waterfall/rowMs_") + key, waterfallRowMsFor(key));
+        settings.setValue(QStringLiteral("Waterfall/showTx_") + key, waterfallShowTxFor(key));
+    }
     settings.setValue("FT8/decodeFilterCqEnd", ftDecodeFilterCqEnd);
     settings.setValue("FT8/decodeFilterWorked", ftDecodeFilterWorked);
     settings.setValue("FT8/decodeFilterWorkedDays", ftDecodeFilterWorkedDays);
@@ -1226,6 +1229,12 @@ QStringList AppSettings::waterfallModeKeys()
             QStringLiteral("MSK144"), QStringLiteral("WSPR"), QStringLiteral("RTTY"), QStringLiteral("PSK"),
             QStringLiteral("MFSK"), QStringLiteral("CW"), QStringLiteral("HELL"), QStringLiteral("SSTV"),
             QStringLiteral("WEFAX"), QStringLiteral("RT")};
+}
+
+bool AppSettings::waterfallShowTxFor(const QString &modeKey) const
+{
+    const bool fallback = modeKey != QLatin1String("FT8") && modeKey != QLatin1String("FT4");
+    return waterfallShowTx.value(modeKey, fallback);
 }
 
 int AppSettings::waterfallRowMsFor(const QString &modeKey) const

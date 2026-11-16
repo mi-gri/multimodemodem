@@ -1796,6 +1796,18 @@ void MainWindow::organizeSidePanel()
         m_lblWaterfallSpeed->setToolTip(m_spinWaterfallSpeed->toolTip());
         rowLayout->addWidget(m_lblWaterfallSpeed);
         rowLayout->addWidget(m_spinWaterfallSpeed, 1);
+        m_chkWaterfallShowTx = new QCheckBox(uiText("waterfall_show_tx", "TX"), row);
+        m_chkWaterfallShowTx->setObjectName(QStringLiteral("chkWaterfallShowTx"));
+        m_chkWaterfallShowTx->setToolTip(uiText("waterfall_show_tx_tip", "Show your own TX signal in the waterfall while transmitting, like a strong received signal (top 18 dB only, not overdriven). Stored per mode; off by default in FT8/FT4."));
+        rowLayout->addWidget(m_chkWaterfallShowTx);
+        connect(m_chkWaterfallShowTx, &QCheckBox::toggled, this, [this](bool on) {
+            if (ui == nullptr || ui->cmbMode == nullptr) return;
+            const QString key = waterfallModeKey(ui->cmbMode->currentText());
+            if (key.isEmpty()) return;
+            m_settings.waterfallShowTx.insert(key, on);
+            QSettings settings(AppSettings::settingsFilePath(), QSettings::IniFormat);
+            settings.setValue(QStringLiteral("Waterfall/showTx_") + key, on);
+        });
         footerLayout->addWidget(row);
         connect(m_spinWaterfallSpeed, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int ms) {
             if (ui == nullptr || ui->cmbMode == nullptr) return;
@@ -10423,50 +10435,18 @@ void MainWindow::setupProcessingConnections()
                 }, Qt::QueuedConnection);
     }
 
-    connect(m_txAudioEngine, &TxAudioEngine::audioBlockReady,
-            this, [this](const AudioBlock &block) {
-                if (!m_txRunning) {
-                    return;
-                }
-
-                // FT4/FT8 TX is a generated GFSK waveform, not receiver audio.
-                // Feeding it through the RX waterfall leveler produces large
-                // synthetic symmetric skirts and a white column that look like
-                // RF splatter even though they are only a local display artefact.
-                // CW keying also makes broadband transients visible in this
-                // local monitor. Freeze the RX display for both modes; CW text
-                // progress is driven separately by audio playback timestamps.
-                // MSK144 likewise: the noise-free local signal makes even its
-                // -40 dB sidelobes bright, so the 2.4 kHz MSK looked far wider
-                // than it is on air.
-                if (ui != nullptr && ui->cmbMode != nullptr &&
-                    (Ft8Mode::isFamilyMode(ui->cmbMode->currentText()) ||
-                     ui->cmbMode->currentText() == CwDecoder::modeName() ||
-                     Msk144Mode::isMode(ui->cmbMode->currentText()))) {
-                    return;
-                }
-
-                /*
-                 * Do not feed Hell TX monitor audio back through the live
-                 * Hell RX decoder.  That created a heavy UI feedback path and
-                 * made the local paper speed differ from the actual TX raster.
-                 * Hell TX now paints the exact generated raster directly when
-                 * transmission starts; the copied PCM below is only for the
-                 * waterfall/spectrum path.
-                 */
-
-                if (m_dspEngine == nullptr) {
-                    return;
-                }
-
-                QMetaObject::invokeMethod(
-                    m_dspEngine,
-                    "processTxMonitorBlock",
-                    Qt::QueuedConnection,
-                    Q_ARG(AudioBlock, block)
-                    );
-            },
-            Qt::QueuedConnection);
+    // Own TX in the waterfall (setting, all modes incl. FT): DspEngine shows
+    // only the top 18 dB of the generated audio and keeps TX rows away from
+    // the RX leveler, so there are no wide sideband stripes, no overdrive and
+    // no relearning after TX. Hell paints its TX on the paper as well.
+    const auto showTxMonitor = [this](const AudioBlock &block) {
+        if (m_dspEngine == nullptr || !(m_txRunning || m_ftTxWorkerRunning) || ui == nullptr || ui->cmbMode == nullptr ||
+            !m_settings.waterfallShowTxFor(waterfallModeKey(ui->cmbMode->currentText()))) return;
+        QMetaObject::invokeMethod(m_dspEngine, "processTxMonitorBlock", Qt::QueuedConnection, Q_ARG(AudioBlock, block));
+    };
+    connect(m_txAudioEngine, &TxAudioEngine::audioBlockReady, this, showTxMonitor, Qt::QueuedConnection);
+    if (m_ftTxWorker != nullptr)
+        connect(m_ftTxWorker, &FtTxWorker::audioBlockReady, this, showTxMonitor, Qt::QueuedConnection);
 
     connect(m_txAudioEngine, &TxAudioEngine::rttyToneStateChanged,
             this, [this](bool mark, double progress) {
@@ -14618,6 +14598,11 @@ void MainWindow::updateWaterfallSpeedControl()
     const QSignalBlocker block(m_spinWaterfallSpeed);
     m_spinWaterfallSpeed->setEnabled(!key.isEmpty());
     m_spinWaterfallSpeed->setValue(key.isEmpty() ? 0 : m_settings.waterfallRowMsFor(key));
+    if (m_chkWaterfallShowTx != nullptr) {
+        const QSignalBlocker blockTx(m_chkWaterfallShowTx);
+        m_chkWaterfallShowTx->setEnabled(!key.isEmpty());
+        m_chkWaterfallShowTx->setChecked(!key.isEmpty() && m_settings.waterfallShowTxFor(key));
+    }
 }
 
 double MainWindow::waterfallRowSecondsForMode(const QString &modeName) const

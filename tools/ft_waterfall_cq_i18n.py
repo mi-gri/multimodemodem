@@ -1137,3 +1137,24 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Tune er ikke tilgjengelig med CW-nøkling via seriellporten; bruk riggens egen tune eller sett CW TX-metoden til lyd.',
   'Tune není dostupné s klíčováním CW přes sériový port; použijte ladění rigu nebo přepněte metodu CW TX na audio.'),
 }.items()})
+# Waterfall: own TX signal (clean monitor).
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Show own TX signal in the waterfall':('Show own TX signal in the waterfall','Mostra il proprio segnale TX nel waterfall','Afficher son propre signal TX dans la cascade','Eigenes TX-Signal im Wasserfall zeigen','Vis eget TX-signal i fossen','Zobrazit vlastní TX signál ve vodopádu'),
+ 'While transmitting, the waterfall shows the generated TX audio like a strong received signal (top 18 dB only, not overdriven). Off: the waterfall pauses during TX.':(
+  'While transmitting, the waterfall shows the generated TX audio like a strong received signal (top 18 dB only, not overdriven). Off: the waterfall pauses during TX.',
+  "Durante la trasmissione il waterfall mostra l'audio TX generato come un segnale ricevuto forte (solo i 18 dB superiori, senza saturazione). Disattivato: il waterfall si ferma durante la TX.",
+  "Pendant l'émission, la cascade affiche l'audio TX généré comme un signal reçu fort (seulement les 18 dB supérieurs, sans saturation). Désactivé : la cascade s'arrête pendant la TX.",
+  'Beim Senden zeigt der Wasserfall das erzeugte TX-Audio wie ein kräftiges Empfangssignal (nur die oberen 18 dB, nicht übersteuert). Aus: Der Wasserfall pausiert während TX.',
+  'Under sending viser fossen generert TX-lyd som et sterkt mottatt signal (bare de øverste 18 dB, ikke overstyrt). Av: fossen pauser under TX.',
+  'Při vysílání vodopád zobrazuje generovaný TX zvuk jako silný přijímaný signál (jen horních 18 dB, bez přebuzení). Vypnuto: vodopád se během TX zastaví.'),
+}.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'waterfall_show_tx':('TX','TX','TX','TX','TX','TX'),
+ 'waterfall_show_tx_tip':(
+  'Show your own TX signal in the waterfall while transmitting, like a strong received signal (top 18 dB only, not overdriven). Stored per mode; off by default in FT8/FT4.',
+  'Mostra il proprio segnale TX nel waterfall durante la trasmissione, come un segnale ricevuto forte (solo i 18 dB superiori, senza saturazione). Memorizzato per modo; disattivato di default in FT8/FT4.',
+  "Affiche son propre signal TX dans la cascade pendant l'émission, comme un signal reçu fort (seulement les 18 dB supérieurs, sans saturation). Mémorisé par mode ; désactivé par défaut en FT8/FT4.",
+  'Zeigt beim Senden das eigene TX-Signal im Wasserfall wie ein kräftiges Empfangssignal (nur die oberen 18 dB, nicht übersteuert). Pro Modus gespeichert; in FT8/FT4 standardmäßig aus.',
+  'Viser eget TX-signal i fossen under sending, som et sterkt mottatt signal (bare de øverste 18 dB, ikke overstyrt). Lagres per modus; av som standard i FT8/FT4.',
+  'Při vysílání zobrazí vlastní TX signál ve vodopádu jako silný přijímaný signál (jen horních 18 dB, bez přebuzení). Ukládá se pro každý druh provozu; ve FT8/FT4 výchozí vypnuto.'),
+}.items()})

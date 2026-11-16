@@ -2442,6 +2442,7 @@ private:
     QPushButton *m_btnFt8Stop = nullptr;
     QPushButton *m_btnFt8ClearDx = nullptr;   // abort the QSO, reset messages, next queued caller
     QPushButton *m_btnFt8Tune = nullptr;
+    QCheckBox *m_chkWaterfallShowTx = nullptr;   // footer: own TX in the waterfall, per mode
     QPushButton *m_btnTune = nullptr;          // rig readout, all modes
     bool m_tuneTxRequested = false;            // next startImageTx() sends a carrier
     bool m_tuneTxRunning = false;

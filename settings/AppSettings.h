@@ -77,6 +77,10 @@ public:
     QMap<QString, int> waterfallRowMs;
     static QStringList waterfallModeKeys();
     int waterfallRowMsFor(const QString &modeKey) const;
+    // Own TX signal in the waterfall, per mode (clean, fixed range). Default
+    // on, off for FT8/FT4 where the slot-long TX row is more in the way.
+    QMap<QString, bool> waterfallShowTx;
+    bool waterfallShowTxFor(const QString &modeKey) const;
     // Global UI appearance. Theme names are stable keys, not translated labels:
     // avionica, qt_default, hacker_green, classic_dark, high_contrast.
     QString uiTheme = "avionica";

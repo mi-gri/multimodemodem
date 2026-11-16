@@ -163,7 +163,10 @@ private:
     FftPlan *m_fftPlan = nullptr;
 
 private:
-    AudioContinuity m_continuity;
+    AudioContinuity m_continuity;       // RX blocks
+    AudioContinuity m_txContinuity;     // TX monitor blocks
+    bool m_rxResumingAfterTx = false;   // first RX gap after TX is expected
+    double m_txMonitorRefDb = -1.0e9;   // held TX peak: key-up rows stay black
     QVector<float> m_windowScratch;
     QVector<double> m_magnitudeScratch;
     QVector<float> m_fifo;
