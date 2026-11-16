@@ -672,6 +672,32 @@ void MainWindow::handleJs8Decode(const Js8Decode &decode)
                                                                     {"to", decode.to}, {"snr", decode.snrDb}});
         return;
     }
+    // A lone text frame with no message start heard on its offset, far out of
+    // time (|DT| >= 1.8 s) or at the edge of the passband, is noise too
+    // ("A76EYEZ S IS I", DT 2.1 s at 270 Hz).  Frames that continue a message
+    // already heard on that offset are kept whatever their DT.
+    if (decode.from.trimmed().isEmpty() && decode.to.trimmed().isEmpty()) {
+        const double tol = Js8Mode::parameters(decode.submode).bandwidthHz() / 2.0;
+        const qint64 periodMs = qint64(Js8Mode::parameters(decode.submode).periodSeconds) * 1000;
+        bool continues = false;
+        for (const Js8Activity &act : std::as_const(m_js8Activity)) {
+            if (act.submode == decode.submode && std::fabs(act.offsetHz - decode.frequencyHz) <= tol &&
+                act.utc.isValid() && decode.utc.isValid() &&
+                act.utc.msecsTo(decode.utc) <= 4 * periodMs && !act.from.isEmpty()) {
+                continues = true;
+                break;
+            }
+        }
+        const bool offTime = std::fabs(decode.dtSeconds) >= 1.8;
+        const bool offBand = decode.frequencyHz < 400.0 || decode.frequencyHz > 2900.0;
+        if (!continues && (offTime || offBand)) {
+            appendLog(QStringLiteral("JS8 frame dropped (lone text frame, DT %1 s, %2 Hz): %3")
+                          .arg(decode.dtSeconds, 0, 'f', 1).arg(qRound(decode.frequencyHz)).arg(decode.text.trimmed()));
+            SessionDiagnostics::instance().record("js8.decode.dropped", {{"text", decode.text}, {"dt", decode.dtSeconds},
+                                                                        {"frequency", decode.frequencyHz}, {"snr", decode.snrDb}});
+            return;
+        }
+    }
     SessionDiagnostics::instance().record("rx.message.delivery", {{"mode", "JS8"}, {"message", decode.text},
                                                                   {"snr", decode.snrDb}, {"frequency", decode.frequencyHz}});
     appendLog(QStringLiteral("JS8 decode: %1 dB DT %2 Freq %3 Hz: %4")
