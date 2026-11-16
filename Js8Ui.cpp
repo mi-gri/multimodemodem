@@ -403,9 +403,9 @@ void MainWindow::setupJs8Page()
     fillIntervalCombo(m_cmbJs8CqInterval, {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60}, uiText("js8_off", "Off"));
     m_cmbJs8CqInterval->setCurrentIndex(qMax(0, m_cmbJs8CqInterval->findData(settings.value(QStringLiteral("JS8/cqMinutes"), 0).toInt())));
     m_cmbJs8CqInterval->setToolTip(uiText("js8_cq_interval_tooltip", "Repeats CQ on the TX offset. Paused while a station is selected."));
-    autoGrid->addWidget(new QLabel(uiText("js8_hb_every", "Heartbeat every"), autoGroup), arow, 0);
+    autoGrid->addWidget(new QLabel(uiText("js8_hb_every", "Heartbeat interval"), autoGroup), arow, 0);
     autoGrid->addWidget(m_cmbJs8HbInterval, arow++, 1, 1, 3);
-    autoGrid->addWidget(new QLabel(uiText("js8_cq_every", "CQ every"), autoGroup), arow, 0);
+    autoGrid->addWidget(new QLabel(uiText("js8_cq_every", "CQ interval"), autoGroup), arow, 0);
     autoGrid->addWidget(m_cmbJs8CqInterval, arow++, 1, 1, 3);
 
     m_spinJs8Watchdog = new QSpinBox(autoGroup);
