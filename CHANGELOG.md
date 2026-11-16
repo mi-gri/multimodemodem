@@ -4,6 +4,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- FT4/FT8 receive follows mode changes with RX running (QSY plan, operator), like JS8/Q65/WSPR:
+  after the WSPR beacon had restarted RX, later plan switches to FT8/FT4 left the FT decoder deaf
+  (no FT decodes on 10m/2m/70cm in the 2026-11-16 plan run); before that, FT kept decoding in the
+  background in every other mode.
 - Tune only beside the frequency display (all modes); the extra Tune button in the FT controls
   and the hidden one of MSK144 are gone.
 - Bands (Settings → Bands): per band "TX allowed" or receive only, and preferred bands.

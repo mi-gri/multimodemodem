@@ -14176,6 +14176,20 @@ void MainWindow::updateWeakSignalLiveInputs()
     if (m_q65Decoder) m_q65Decoder->setLiveInputEnabled(running && Q65Mode::isFamilyMode(mode));
     if (m_wsprDecoder) m_wsprDecoder->setLiveInputEnabled(running && WsprMode::isMode(mode));
     if (m_js8Decoder) m_js8Decoder->setLiveInputEnabled(running && Js8Mode::isMode(mode));
+    // FT4/FT8 likewise.  Only startRx()/stopRx() switched it before: after a
+    // plan switch FT8 -> RTTY the FT decoder kept decoding in the background,
+    // and after RX was restarted in WSPR (beacon TX) a later switch to FT8
+    // left it deaf - no FT decodes on 10m/2m/70cm in the 2026-11-16 plan run.
+    // Queued behind the setModeName() of applyFt8Settings().
+    if (m_ft8RxDecoder != nullptr) {
+        const bool ftLive = running && Ft8Mode::isFamilyMode(mode) &&
+                            Ft8Mode::profileForMode(mode).interoperableCoreAvailable;
+        // Always sent (a flag set): a cached read could be stale while an
+        // earlier queued change is still pending on the FT thread.
+        QMetaObject::invokeMethod(m_ft8RxDecoder, "setLiveInputEnabled",
+                                  m_ft8RxDecoder->thread() == QThread::currentThread() ? Qt::DirectConnection : Qt::QueuedConnection,
+                                  Q_ARG(bool, ftLive));
+    }
 }
 
 void MainWindow::setReceiverRunning(bool running)
