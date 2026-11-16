@@ -615,6 +615,10 @@ int main(int argc, char **argv)
         const QString shown = Js8Message::preview(frames, Js8Mode::Submode::Normal);
         check(shown.contains("DL1ABC"), "JS8 macro directed: " + shown.toStdString());
     }
+    for (const char *ok : {"DO3BOX", "9A5E", "4U1A", "2E0LMA", "HF40BLP", "3DA0XX", "A61AB", "DL1ABC/P", "VK2/DL1ABC", "PA/DO3BOX/MM", "OE3WCR"})
+        check(Js8Message::isPlausibleAmateurCall(ok), std::string("plausible callsign ") + ok);
+    for (const char *bad : {"7ZWEZV/2RH", "7ZWEZV", "ABCDEF", "123456", "Q", "DL1ABC1"})
+        check(!Js8Message::isPlausibleAmateurCall(bad), std::string("implausible callsign ") + bad);
     testCommandsAndReplies();
     testStandardFrequencies();
     testMultiDecode();

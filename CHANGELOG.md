@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- JS8: frames naming a station that cannot be an amateur callsign are dropped (and logged) -
+  false decodes from noise such as "7ZWEZV/2RH: @HB HEARTBEAT QF89" at -28 dB.
 - JS8: heartbeat and CQ repeat intervals 5–60 min in 5-min steps; labels "Heartbeat interval" / "CQ interval" in all languages (de: Heartbeat-Takt, CQ-Takt).
 - Runtime log: a line whose number happened to be "1" could pick up its own translation template
   and show "%1" ("CQ-Retry gestartet: %1"); the CQ retry line names FT4/FT8 correctly. Switching on

@@ -58,6 +58,10 @@ public:
     static QString heartbeatText(const QString &myGrid);
     static QString cqText(const QString &myGrid);
     static bool isValidCallsign(const QString &call);
+    /// Amateur callsign shape (DO3BOX, 9A5E, 4U1A, 2E0LMA, HF40BLP, VK2/DL1ABC,
+    /// DL1ABC/P): a prefix, a district digit, a suffix.  JS8's own check also
+    /// takes noise like "7ZWEZV/2RH", which false decodes produce.
+    static bool isPlausibleAmateurCall(const QString &call);
     /// False when the JSC word tables are missing from the build.
     static bool dictionaryAvailable();
     /// Characters accepted in free text (upper case letters, digits, punctuation).

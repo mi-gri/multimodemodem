@@ -657,6 +657,21 @@ void MainWindow::js8AppendRx(const QString &line, const QColor &colour)
 
 void MainWindow::handleJs8Decode(const Js8Decode &decode)
 {
+    // False decodes from noise near the threshold unpack into callsign-like
+    // garbage ("7ZWEZV/2RH: @HB HEARTBEAT QF89" at -28 dB, 2026-11-16).
+    // Frames naming a station that cannot be an amateur callsign are dropped.
+    const auto implausible = [](const QString &call) {
+        const QString c = call.trimmed();
+        return !c.isEmpty() && !c.startsWith(QLatin1Char('@')) && !c.contains(QStringLiteral("....")) &&
+               !Js8Message::isPlausibleAmateurCall(c);
+    };
+    if (implausible(decode.from) || implausible(decode.to)) {
+        appendLog(QStringLiteral("JS8 frame dropped (no valid callsign): %1 dB Freq %2 Hz: %3")
+                      .arg(decode.snrDb).arg(qRound(decode.frequencyHz)).arg(decode.text.trimmed()));
+        SessionDiagnostics::instance().record("js8.decode.dropped", {{"text", decode.text}, {"from", decode.from},
+                                                                    {"to", decode.to}, {"snr", decode.snrDb}});
+        return;
+    }
     SessionDiagnostics::instance().record("rx.message.delivery", {{"mode", "JS8"}, {"message", decode.text},
                                                                   {"snr", decode.snrDb}, {"frequency", decode.frequencyHz}});
     appendLog(QStringLiteral("JS8 decode: %1 dB DT %2 Freq %3 Hz: %4")

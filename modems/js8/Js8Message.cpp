@@ -94,6 +94,18 @@ bool Js8Message::isValidCallsign(const QString &call)
     return js8::Varicode::isValidCallsign(call.trimmed().toUpper(), nullptr);
 }
 
+bool Js8Message::isPlausibleAmateurCall(const QString &call)
+{
+    static const QRegularExpression base(QStringLiteral("^(?:[A-Z]{1,2}|[0-9][A-Z]{1,2}|[A-Z][0-9])[0-9]{1,4}[A-Z]{1,5}$"));
+    const QString c = call.trimmed().toUpper();
+    if (c.isEmpty() || c.size() > 16) return false;
+    // A compound call is plausible when one part is a full callsign
+    // (DL1ABC/P, VK2/DL1ABC, PA/DO3BOX/MM).
+    for (const QString &part : c.split(QLatin1Char('/'), Qt::SkipEmptyParts))
+        if (base.match(part).hasMatch()) return true;
+    return false;
+}
+
 bool Js8Message::dictionaryAvailable()
 {
     return js8::JSC::tablesLoaded();
