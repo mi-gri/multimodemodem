@@ -728,6 +728,11 @@ private slots:
     void js8RememberGroup(const QString &group);
     void js8ForgetGroup(const QString &group);
     void js8RebuildTargetMenu();
+    void js8SendStationCommand(const QString &command);
+    /// True for directed commands that only make sense for one station and
+    /// that JS8 answers automatically (SNR? GRID? INFO? STATUS? HEARING?
+    /// QUERY ... AGN? MSG): they are never sent to an @group or @ALLCALL.
+    static bool js8IsStationOnlyCommand(const QString &text);
     void js8SendFromEditor();
     void js8RefreshActivity();
     void js8RefreshCalls();
@@ -2351,6 +2356,7 @@ private:
     QPushButton *m_btnJs8Cq = nullptr;
     QPushButton *m_btnJs8Hb = nullptr;
     QPushButton *m_btnJs8Snr = nullptr;
+    QToolButton *m_btnJs8Cmd = nullptr;      // directed queries (GRID? INFO? ...)
     QPushButton *m_btnJs8Stop = nullptr;
     QPushButton *m_btnJs8ClearTo = nullptr;
     QComboBox *m_cmbJs8Submode = nullptr;

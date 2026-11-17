@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- JS8: directed queries that JS8 answers automatically (SNR? GRID? INFO? STATUS? HEARING? QUERY ...
+  AGN? MSG) are refused when the target is an @group or @ALLCALL ("select a station first"); a new
+  CMD menu next to SNR? sends the common queries to the station in To.
 - JS8: text never goes out without a target. "To" defaults to @ALLCALL (x resets to it, an empty
   field means it); any callsign or @group (e.g. @EMCOMM) can be typed, anything else is refused with a
   message. @groups you use are remembered (menu next to To; "Forget group" removes one). Only a

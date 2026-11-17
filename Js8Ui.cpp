@@ -175,6 +175,16 @@ void MainWindow::setupJs8DisplayPage()
     m_btnJs8Hb->setToolTip(uiText("js8_hb_tooltip", "Send a heartbeat with your grid."));
     m_btnJs8Snr = new QPushButton(QStringLiteral("SNR?"), m_js8DisplayPage);
     m_btnJs8Snr->setToolTip(uiText("js8_snr_tooltip", "Ask the selected station for a signal report."));
+    m_btnJs8Cmd = new QToolButton(m_js8DisplayPage);
+    m_btnJs8Cmd->setText(QStringLiteral("CMD \u25be"));
+    m_btnJs8Cmd->setPopupMode(QToolButton::InstantPopup);
+    m_btnJs8Cmd->setToolTip(uiText("js8_cmd_menu_tip", "Directed queries to the station in To (not possible to groups or @ALLCALL)."));
+    auto *cmdMenu = new QMenu(m_btnJs8Cmd);
+    for (const char *cmd : {"SNR?", "GRID?", "INFO?", "STATUS?", "HEARING?", "QUERY MSGS", "AGN?", "HW CPY?"}) {
+        const QString c = QString::fromLatin1(cmd);
+        connect(cmdMenu->addAction(c), &QAction::triggered, this, [this, c]() { js8SendStationCommand(c); });
+    }
+    m_btnJs8Cmd->setMenu(cmdMenu);
     m_btnJs8Inbox = new QPushButton(uiText("js8_inbox", "Inbox"), m_js8DisplayPage);
     m_btnJs8Inbox->setToolTip(uiText("js8_inbox_tooltip", "Messages received with MSG and messages kept for other stations (MSG TO:)."));
     txRow->addWidget(toLabel);
@@ -186,6 +196,7 @@ void MainWindow::setupJs8DisplayPage()
     txRow->addWidget(m_btnJs8Cq);
     txRow->addWidget(m_btnJs8Hb);
     txRow->addWidget(m_btnJs8Snr);
+    txRow->addWidget(m_btnJs8Cmd);
     txRow->addWidget(m_btnJs8Inbox);
 
     // Macro bar (Settings -> User / QTH / Macros, JS8).
@@ -216,7 +227,7 @@ void MainWindow::setupJs8DisplayPage()
 
     // Header and button texts are already localised or are protocol words.
     for (QObject *fixed : std::initializer_list<QObject *>{m_tableJs8Band, m_tableJs8Calls, m_btnJs8ClearTo, m_btnJs8Cq,
-                                                           m_btnJs8Hb, m_btnJs8Snr})
+                                                           m_btnJs8Hb, m_btnJs8Snr, m_btnJs8Cmd})
         fixed->setProperty("i18nSkipSelf", true);
 
     connect(m_btnJs8Inbox, &QPushButton::clicked, this, &MainWindow::showJs8Inbox);
@@ -255,14 +266,7 @@ void MainWindow::setupJs8DisplayPage()
     connect(m_btnJs8Hb, &QPushButton::clicked, this, [this]() {
         js8Send(stationCallsign() + QStringLiteral(": ") + Js8Message::heartbeatText(stationLocator()), QString());
     });
-    connect(m_btnJs8Snr, &QPushButton::clicked, this, [this]() {
-        const QString to = m_editJs8To->text().trimmed().toUpper();
-        if (to.isEmpty() || to.startsWith(QLatin1Char('@'))) {
-            m_lblJs8TxStatus->setText(uiText("js8_select_station", "Select a station first (click it in the heard list)."));
-            return;
-        }
-        js8Send(QStringLiteral("SNR?"), to);
-    });
+    connect(m_btnJs8Snr, &QPushButton::clicked, this, [this]() { js8SendStationCommand(QStringLiteral("SNR?")); });
     auto selectCall = [this](const QString &call) {
         if (call.isEmpty()) return;
         js8OperatorActivity();
@@ -1044,6 +1048,23 @@ void MainWindow::js8SendFromEditor()
 // The target of free text: a callsign or an @group; an empty field means the
 // default @ALLCALL, anything else is refused (JS8 text never goes out without
 // a valid target).
+void MainWindow::js8SendStationCommand(const QString &command)
+{
+    const QString to = m_editJs8To != nullptr ? m_editJs8To->text().trimmed().toUpper() : QString();
+    if (to.isEmpty() || to.startsWith(QLatin1Char('@')) || !Js8Message::isPlausibleAmateurCall(to)) {
+        m_lblJs8TxStatus->setText(uiText("js8_select_station", "Select a station first (click it in the heard list)."));
+        return;
+    }
+    js8Send(command, to);
+}
+
+bool MainWindow::js8IsStationOnlyCommand(const QString &text)
+{
+    static const QRegularExpression re(QStringLiteral(
+        "^(?:SNR\\?|HEARING\\?|GRID\\?|STATUS\\?|INFO\\?|AGN\\?|QUERY(?:\\s|$)|MSG(?:\\s|$))"));
+    return re.match(text.trimmed().toUpper()).hasMatch();
+}
+
 QString MainWindow::js8SendTarget(bool report)
 {
     QString to = m_editJs8To != nullptr ? m_editJs8To->text().trimmed().toUpper() : QString();
@@ -1134,6 +1155,21 @@ bool MainWindow::js8Transmit(const QString &text, const QString &to, bool automa
         if (!automatic)
             m_lblJs8TxStatus->setText(uiText("js8_tx_busy", "A transmission is already running or armed; press STOP to cancel it."));
         return false;
+    }
+    if (!automatic) {
+        // Queries answered automatically (INFO? GRID? ...) go to one station,
+        // never to a group or @ALLCALL (the whole band would answer).
+        QString target = to.trimmed().toUpper();
+        QString body = text.trimmed().toUpper();
+        if (body.startsWith(QLatin1Char('@'))) {
+            const int sp = body.indexOf(QLatin1Char(' '));
+            target = body.left(sp < 0 ? body.size() : sp);
+            body = sp < 0 ? QString() : body.mid(sp + 1).trimmed();
+        }
+        if (target.startsWith(QLatin1Char('@')) && js8IsStationOnlyCommand(body)) {
+            m_lblJs8TxStatus->setText(uiText("js8_group_command_refused", "This command can only be sent to one station, not to a group or @ALLCALL: select a station first."));
+            return false;
+        }
     }
     const Js8Mode::Submode submode = currentJs8Submode();
     const auto frames = Js8Message::buildFrames(myCall, stationLocator(), to, text, submode, true);

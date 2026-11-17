@@ -1371,3 +1371,19 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Målet må være et kallesignal eller en @gruppe (f.eks. @ALLCALL, @EMCOMM).',
   'Cílem musí být značka nebo @skupina (např. @ALLCALL, @EMCOMM).'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'js8_cmd_menu_tip':(
+  'Directed queries to the station in To (not possible to groups or @ALLCALL).',
+  'Interrogazioni dirette alla stazione in To (non possibili verso gruppi o @ALLCALL).',
+  'Requêtes dirigées vers la station dans To (impossibles vers des groupes ou @ALLCALL).',
+  'Gerichtete Abfragen an die Station in „To“ (an Gruppen oder @ALLCALL nicht möglich).',
+  'Rettede forespørsler til stasjonen i To (ikke mulig til grupper eller @ALLCALL).',
+  'Adresní dotazy na stanici v To (na skupiny nebo @ALLCALL nelze).'),
+ 'js8_group_command_refused':(
+  'This command can only be sent to one station, not to a group or @ALLCALL: select a station first.',
+  'Questo comando può essere inviato solo a una stazione, non a un gruppo o a @ALLCALL: selezionare prima una stazione.',
+  'Cette commande ne peut être envoyée qu’à une seule station, pas à un groupe ni à @ALLCALL : choisissez d’abord une station.',
+  'Dieser Befehl geht nur an eine einzelne Station, nicht an eine Gruppe oder @ALLCALL: zuerst eine Station wählen.',
+  'Denne kommandoen kan bare sendes til én stasjon, ikke til en gruppe eller @ALLCALL: velg en stasjon først.',
+  'Tento příkaz lze poslat jen jedné stanici, ne skupině ani @ALLCALL: nejprve vyberte stanici.'),
+}.items()})
