@@ -1387,3 +1387,36 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Denne kommandoen kan bare sendes til én stasjon, ikke til en gruppe eller @ALLCALL: velg en stasjon først.',
   'Tento příkaz lze poslat jen jedné stanici, ne skupině ani @ALLCALL: nejprve vyberte stanici.'),
 }.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Not applied yet: the changes only take effect when you close Settings with OK.':(
+  'Not applied yet: the changes only take effect when you close Settings with OK.',
+  'Non ancora applicato: le modifiche hanno effetto solo chiudendo le Impostazioni con OK.',
+  'Pas encore appliqué : les modifications ne prennent effet qu’en fermant les Paramètres avec OK.',
+  'Noch nicht übernommen: Die Änderungen gelten erst, wenn du die Einstellungen mit OK schließt.',
+  'Ikke tatt i bruk ennå: Endringene gjelder først når du lukker Innstillinger med OK.',
+  'Zatím nepoužito: změny se projeví až po zavření Nastavení tlačítkem OK.'),
+ 'The frequency list was changed but not applied. Discard the changes?':(
+  'The frequency list was changed but not applied. Discard the changes?',
+  'L’elenco frequenze è stato modificato ma non applicato. Scartare le modifiche?',
+  'La liste de fréquences a été modifiée mais pas appliquée. Annuler les modifications ?',
+  'Die Frequenzliste wurde geändert, aber nicht übernommen. Änderungen verwerfen?',
+  'Frekvenslisten er endret, men ikke tatt i bruk. Forkaste endringene?',
+  'Seznam kmitočtů byl změněn, ale nepoužit. Zahodit změny?'),
+}.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Operator callsign':('Operator callsign','Nominativo operatore','Indicatif de l’opérateur','Operator-Rufzeichen','Operatørens kallesignal','Značka operátora'),
+ "operator's own callsign (club or special-event call; optional)":(
+  "operator's own callsign (club or special-event call; optional)",
+  'nominativo personale dell’operatore (stazione club o speciale; facoltativo)',
+  'indicatif personnel de l’opérateur (station de club ou spéciale ; facultatif)',
+  'eigenes Rufzeichen des Operators (Club- oder Sonderrufzeichen; optional)',
+  'operatørens eget kallesignal (klubb- eller spesialkallesignal; valgfritt)',
+  'vlastní značka operátora (klubová nebo speciální stanice; volitelné)'),
+ 'For club and special-event callsigns: the callsign of the person operating. It is logged as OPERATOR (ADIF); the station callsign stays STATION_CALLSIGN. Empty: the station callsign is used.':(
+  'For club and special-event callsigns: the callsign of the person operating. It is logged as OPERATOR (ADIF); the station callsign stays STATION_CALLSIGN. Empty: the station callsign is used.',
+  'Per nominativi di club e speciali: il nominativo di chi opera. Viene registrato come OPERATOR (ADIF); il nominativo della stazione resta STATION_CALLSIGN. Vuoto: si usa il nominativo della stazione.',
+  'Pour les indicatifs de club et spéciaux : l’indicatif de la personne qui opère. Il est enregistré comme OPERATOR (ADIF) ; l’indicatif de la station reste STATION_CALLSIGN. Vide : l’indicatif de la station est utilisé.',
+  'Für Club- und Sonderrufzeichen: das Rufzeichen der Person am Gerät. Es wird als OPERATOR (ADIF) geloggt; das Stationsrufzeichen bleibt STATION_CALLSIGN. Leer: Es gilt das Stationsrufzeichen.',
+  'For klubb- og spesialkallesignal: kallesignalet til personen som opererer. Det loggføres som OPERATOR (ADIF); stasjonens kallesignal forblir STATION_CALLSIGN. Tomt: stasjonens kallesignal brukes.',
+  'Pro klubové a speciální značky: značka osoby u zařízení. Loguje se jako OPERATOR (ADIF); značka stanice zůstává STATION_CALLSIGN. Prázdné: použije se značka stanice.'),
+}.items()})

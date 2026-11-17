@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "FrequencyListEditor.h"
 
+#include "../utils/CockpitTheme.h"
 #include <QTimer>
 #include <QAbstractItemView>
 #include <QBrush>
@@ -94,8 +95,14 @@ FrequencyListEditor::FrequencyListEditor(const QVector<M3StandardFrequencies::En
     m_summary = new QLabel(this);
     m_summary->setWordWrap(true);
     layout->addWidget(m_summary);
+    m_notice = new QLabel(L(QStringLiteral("Not applied yet: the changes only take effect when you close Settings with OK.")), this);
+    m_notice->setWordWrap(true);
+    M3Ui::setSemanticRole(m_notice, QStringLiteral("warning"));
+    m_notice->hide();
+    layout->addWidget(m_notice);
 
     load(entries);
+    m_initial = this->entries();
 
     connect(m_filter, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() { applyFilter(); });
     connect(m_table, &QTableWidget::itemChanged, this, [this](QTableWidgetItem *item) {
@@ -352,4 +359,10 @@ void FrequencyListEditor::updateSummary()
     QString text = L(QStringLiteral("%1 entries")).arg(m_table->rowCount());
     if (invalid > 0) text += QStringLiteral(" — ") + L(QStringLiteral("%1 invalid (not saved)")).arg(invalid);
     m_summary->setText(text);
+    if (m_notice != nullptr) m_notice->setVisible(!m_loading && modified());
+}
+
+bool FrequencyListEditor::modified() const
+{
+    return entries() != m_initial;
 }

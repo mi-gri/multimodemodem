@@ -4,6 +4,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Settings → User/QTH: optional Operator callsign for club and special-event stations; logged as
+  OPERATOR (ADIF) with the station call as STATION_CALLSIGN; empty = the station call as before.
+  Macro variable {OPCALL}.
+- Settings → Frequencies: a note shows that changes only take effect with OK, and cancelling asks
+  before dropping a changed list.
 - Settings → Frequencies: a row whose frequency you change moves to its place; the list stays sorted by frequency.
 - JS8: directed queries that JS8 answers automatically (SNR? GRID? INFO? STATUS? HEARING? QUERY ...
   AGN? MSG) are refused when the target is an @group or @ALLCALL ("select a station first"); a new

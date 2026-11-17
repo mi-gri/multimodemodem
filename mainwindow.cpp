@@ -3884,7 +3884,7 @@ bool MainWindow::addQsoToLogFromForm(QsoFormWidgets *form)
     entry.utcEnd = entry.utc;
     entry.adifFields.insert(QStringLiteral("APP_M3_QSO_ID"), QUuid::createUuid().toString(QUuid::WithoutBraces));
     entry.stationCallsign = stationCallsign();
-    entry.operatorCall = stationCallsign();
+    entry.operatorCall = operatorCallsign();
     if (m_lastRigFrequencyHz > 0.0) entry.freq = QString::number(m_lastRigFrequencyHz / 1.0e6, 'f', 6);
 
     if (entry.callsign.isEmpty()) {
@@ -13393,6 +13393,13 @@ QString MainWindow::stationCallsign() const
     return m_settings.textMyCallsign.trimmed().toUpper();
 }
 
+// The operator's own call at a club / special-event station; else the station call.
+QString MainWindow::operatorCallsign() const
+{
+    const QString op = m_settings.textOperatorCall.trimmed().toUpper();
+    return op.isEmpty() ? stationCallsign() : op;
+}
+
 QString MainWindow::stationLocator() const
 {
     return m_settings.textMyLocator.trimmed().toUpper();
@@ -20242,7 +20249,7 @@ void MainWindow::autoLogFt8QsoFor(const FtQsoSession &session, const QString &re
     LogbookEntry entry;
     entry.callsign = AdifLogbook::normalizeCallsign(session.dxCall);
     entry.stationCallsign = stationCallsign();
-    entry.operatorCall = stationCallsign();
+    entry.operatorCall = operatorCallsign();
     entry.adifFields.insert(QStringLiteral("APP_M3_QSO_ID"), QUuid::createUuid().toString(QUuid::WithoutBraces));
     entry.adifFields.insert(QStringLiteral("MY_GRIDSQUARE"), stationLocator());
     entry.rstSent = session.reportSent.isEmpty() ? QStringLiteral("-10") : cleanFt8Report(session.reportSent);
@@ -22694,6 +22701,7 @@ QString MainWindow::expandTextTemplate(const QString &source) const
     };
 
     replaceToken("MYCALL", m_settings.textMyCallsign);
+    replaceToken("OPCALL", operatorCallsign());
     replaceToken("MYNAME", m_settings.textMyName);
     replaceToken("MYQTH", m_settings.textMyQth);
     replaceToken("LOC", m_settings.textMyLocator);

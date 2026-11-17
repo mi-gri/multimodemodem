@@ -35,6 +35,8 @@ public:
     QString region() const;
     bool qsyOnModeChange() const;
     int invalidRows() const;
+    /// The list differs from the one the page was opened with (not yet applied).
+    bool modified() const;
 
 private:
     QString L(const QString &source) const;
@@ -55,6 +57,8 @@ private:
     QCheckBox *m_qsyOnModeChange = nullptr;
     QTableWidget *m_table = nullptr;
     QLabel *m_summary = nullptr;
+    QLabel *m_notice = nullptr;
+    QVector<M3StandardFrequencies::Entry> m_initial;
     bool m_loading = false;
 };
 

@@ -1611,6 +1611,7 @@ private:
     void updateFtBandFrequencyUi();
     void qsyRigToSelectedFtBand();
     QString stationCallsign() const;
+    QString operatorCallsign() const;
     QString stationLocator() const;
     bool stationIdentityReady(QString *reason = nullptr) const;
     bool ensureStationIdentityForTx(const QString &modeLabel);

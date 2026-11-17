@@ -95,6 +95,7 @@ signals:
 
 protected:
     void accept() override;
+    void reject() override;
     void showEvent(QShowEvent *event) override;
 
 private:
@@ -150,6 +151,7 @@ private:
     RigControlSettingsDialog *m_rigPage = nullptr;
     TextMacroSettingsDialog *m_textMacroPage = nullptr;
     QLineEdit *m_editMyCallsign = nullptr;
+    QLineEdit *m_editOperatorCall = nullptr;
     QLineEdit *m_editQrzUsername = nullptr;
     QLineEdit *m_editQrzPassword = nullptr;
     QCheckBox *m_chkFtGpuSync = nullptr;

@@ -810,6 +810,7 @@ void AppSettings::load()
     rotatorTargetToleranceDeg = rotatorProfiles[0].targetToleranceDeg;
 
     textMyCallsign = settings.value("Text/myCallsign", textMyCallsign).toString();
+    textOperatorCall = settings.value("Text/operatorCall").toString().trimmed().toUpper();
     textMyName = settings.value("Text/myName", textMyName).toString();
     textMyQth = settings.value("Text/myQth", textMyQth).toString();
     textMyLocator = settings.value("Text/myLocator", textMyLocator).toString();
@@ -1193,6 +1194,7 @@ bool AppSettings::save() const
     }
 
     settings.setValue("Text/myCallsign", textMyCallsign);
+    settings.setValue("Text/operatorCall", textOperatorCall.trimmed().toUpper());
     settings.setValue("Text/myName", textMyName);
     settings.setValue("Text/myQth", textMyQth);
     settings.setValue("Text/myLocator", textMyLocator);

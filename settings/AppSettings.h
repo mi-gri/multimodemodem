@@ -403,6 +403,7 @@ public:
     int rotatorTargetToleranceDeg = 3;
 
     QString textMyCallsign;
+    QString textOperatorCall;   // club / special-event call: the operator's own call (ADIF OPERATOR); empty = station call
     QString textMyName;
     QString textMyQth;
     QString textMyLocator;

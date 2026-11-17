@@ -1072,6 +1072,8 @@ QWidget *AppSettingsDialog::makeUserQthMacrosPage()
     myStationGrid->setColumnStretch(2, 1);
 
     m_editMyCallsign = makeLineEdit(myStationGroup, QStringLiteral("your callsign"));
+    m_editOperatorCall = makeLineEdit(myStationGroup, QStringLiteral("operator's own callsign (club or special-event call; optional)"));
+    m_editOperatorCall->setToolTip(L(QStringLiteral("For club and special-event callsigns: the callsign of the person operating. It is logged as OPERATOR (ADIF); the station callsign stays STATION_CALLSIGN. Empty: the station callsign is used.")));
     m_editMyName = makeLineEdit(myStationGroup, QStringLiteral("operator name"));
     m_editMyQth = makeLineEdit(myStationGroup, QStringLiteral("town / city"));
     m_editMyLocator = makeLineEdit(myStationGroup, QStringLiteral("Maidenhead locator, e.g. AA00aa"));
@@ -1082,6 +1084,7 @@ QWidget *AppSettingsDialog::makeUserQthMacrosPage()
     m_editMyCallsign->setText(!m_initialSettings.textMyCallsign.trimmed().isEmpty()
                                   ? m_initialSettings.textMyCallsign
                                   : m_initialSettings.ft8MyCallsign);
+    m_editOperatorCall->setText(m_initialSettings.textOperatorCall);
     m_editMyName->setText(m_initialSettings.textMyName);
     m_editMyQth->setText(m_initialSettings.textMyQth);
     m_editMyLocator->setText(!m_initialSettings.textMyLocator.trimmed().isEmpty()
@@ -1104,6 +1107,7 @@ QWidget *AppSettingsDialog::makeUserQthMacrosPage()
     updateAntennaByBandButton();
     connect(m_btnAntennaByBand, &QPushButton::clicked, this, &AppSettingsDialog::editAntennaByBand);
     addVariableRow(myStationGrid, 6, L(QStringLiteral("Power")), QStringLiteral("{PWR}"), m_editPower, myStationGroup);
+    addVariableRow(myStationGrid, 7, L(QStringLiteral("Operator callsign")), QStringLiteral("{OPCALL}"), m_editOperatorCall, myStationGroup);
 
     QGroupBox *coordinatesGroup = new QGroupBox(L(QStringLiteral("Precise station coordinates")), variablesContent);
     coordinatesGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
@@ -2800,6 +2804,7 @@ void AppSettingsDialog::collectSettings()
 
     if (m_editMyCallsign != nullptr) {
         merged.textMyCallsign = m_editMyCallsign->text().trimmed().toUpper();
+        merged.textOperatorCall = m_editOperatorCall != nullptr ? m_editOperatorCall->text().trimmed().toUpper() : QString();
         merged.textMyName = m_editMyName != nullptr ? m_editMyName->text().trimmed() : QString();
         merged.textMyQth = m_editMyQth != nullptr ? m_editMyQth->text().trimmed() : QString();
         merged.textMyLocator = m_editMyLocator != nullptr ? m_editMyLocator->text().trimmed().toUpper() : QString();
@@ -3171,6 +3176,18 @@ void AppSettingsDialog::updateRotatorEndpointWarning()
 bool AppSettingsDialog::rotatorEndpointConflictRequiresConfirmation() const
 {
     return !rotatorEndpointConflictText(m_resultSettings).isEmpty();
+}
+
+void AppSettingsDialog::reject()
+{
+    // The frequency list is easy to edit and forget: ask before dropping changes.
+    if (m_frequencyPage != nullptr && m_frequencyPage->modified()) {
+        if (QMessageBox::question(this, L(QStringLiteral("Frequencies")),
+                                  L(QStringLiteral("The frequency list was changed but not applied. Discard the changes?")),
+                                  QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Discard)
+            return;
+    }
+    QDialog::reject();
 }
 
 void AppSettingsDialog::accept()
