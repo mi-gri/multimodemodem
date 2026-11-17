@@ -16,7 +16,7 @@ try {
     if ($roots.Count -ne 1 -or -not $roots[0].PSIsContainer) { throw 'Invalid package layout.' }
     $source = $roots[0].FullName
     if (-not (Test-Path -LiteralPath "$source\bin\MultiModeModem.exe") -or -not (Test-Path -LiteralPath "$target\bin\MultiModeModem.exe")) { throw 'Executable missing.' }
-    $userFiles = @(Get-ChildItem -LiteralPath $source -Recurse -Force | Where-Object { $_.Name -in @('settings.mad','managed-install.flag') -or $_.Extension -in @('.adi','.adif') })
+    $userFiles = @(Get-ChildItem -LiteralPath $source -Recurse -Force | Where-Object { $_.Name -in @('settings.m3cfg','settings.mad','managed-install.flag') -or $_.Extension -in @('.adi','.adif') })
     if ($userFiles.Count) { throw 'Release contains user data.' }
     Copy-Item -LiteralPath $target -Destination "$work\backup" -Recurse -Force
     $mutating = $true

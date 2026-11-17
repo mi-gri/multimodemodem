@@ -1954,7 +1954,7 @@ void MainWindow::spotWeakSignalMessage(const QString &message, double audioHz, i
     reportPskSpot(call, parsed.grid, audioHz, mode, snrDb, true, true);
 }
 
-// Headless test runs (offscreen/minimal platform) share settings.mad with the
+// Headless test runs (offscreen/minimal platform) share settings.m3cfg with the
 // operator's build; they must neither change nor follow the remembered session.
 static bool sessionMemoryEnabled()
 {

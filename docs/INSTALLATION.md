@@ -23,21 +23,21 @@ Managed installations use per-user directories:
 
 | System | Settings | Default logbook |
 | --- | --- | --- |
-| Windows | `%LOCALAPPDATA%/MultiModeModem/settings.mad` | `%LOCALAPPDATA%/MultiModeModem/logbook.adi` |
-| Linux | `~/.config/MultiModeModem/settings.mad` | `~/.local/share/MultiModeModem/logbook.adi` |
-| macOS | `~/Library/Preferences/MultiModeModem/settings.mad` | `~/Library/Application Support/MultiModeModem/logbook.adi` |
+| Windows | `%LOCALAPPDATA%/MultiModeModem/settings.m3cfg` | `%LOCALAPPDATA%/MultiModeModem/logbook.adi` |
+| Linux | `~/.config/MultiModeModem/settings.m3cfg` | `~/.local/share/MultiModeModem/logbook.adi` |
+| macOS | `~/Library/Preferences/MultiModeModem/settings.m3cfg` | `~/Library/Application Support/MultiModeModem/logbook.adi` |
 
 Linux XDG overrides and explicitly chosen logbook paths are respected. Portable
 copies retain executable-adjacent data. Back up settings, ADIF files and recordings
 before replacing a portable folder; do not delete the old copy until checked.
 Uninstalling MM must not be used to delete personal data.
 
-Several configurations: `MultiModeModem --config NAME` uses `configs/NAME.mad` in
-the settings folder (created as a copy of the default settings), `--config FILE.mad`
+Several configurations: `MultiModeModem --config NAME` uses `configs/NAME.m3cfg` in
+the settings folder (created as a copy of the default settings), `--config FILE.m3cfg`
 a file of its own. Only one instance runs per configuration: a second start on the
 same settings file shows a message and exits, because both would overwrite each
 other's settings and logbook. Instances with different configurations run side by
-side. A lock left by a crashed instance (`settings.mad.instance`) is taken over.
+side. A lock left by a crashed instance (`settings.m3cfg.instance`) is taken over.
 
 Help provides update checking and its startup setting. Published prereleases are
 included; versions and build numbers determine ordering, independently of Latest.
@@ -47,3 +47,8 @@ Stop transmission and automation before updating. An old updater may need one ma
 
 If APT reports an unfinished operation, complete `sudo dpkg --configure -a` before
 retrying. The installer does not repair unrelated packages automatically.
+
+Configuration files end in `.m3cfg` (MadModem used `.mad`). Old `settings.mad`
+and `configs/NAME.mad` files are converted at start: the file is renamed to
+`.m3cfg`; an existing `.m3cfg` is never replaced. Older program versions do not
+find the renamed file.

@@ -14,9 +14,9 @@
  *
  * Two instances on the same settings file would overwrite each other's
  * settings, logbook appends and session state.  The lock file sits next to
- * the settings file (settings.mad.instance, configs/NAME.mad.instance), so instances
+ * the settings file (settings.m3cfg.instance, configs/NAME.m3cfg.instance), so instances
  * with different configurations (--config) run side by side.  Not ".lock":
- * QSettings itself locks the file through settings.mad.lock while it syncs,
+ * QSettings itself locks the file through settings.m3cfg.lock while it syncs,
  * and would wait forever for this lock.  QLockFile
  * stores the PID: a lock left by a crashed instance is taken over.
  */

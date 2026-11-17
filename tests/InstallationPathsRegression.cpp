@@ -49,31 +49,58 @@ int main(int argc, char **argv) {
     check(M3Installation::userFile(install, storage.filePath("blocked/child"), "settings.mad", backups) == saved,
           "failed Mac migration retains access to preserved data");
 
-    // Central settings and named configurations (--config).
+    // Central settings and named configurations (--config): *.m3cfg, old *.mad converted.
     const QString portable = storage.filePath("portable"), config = storage.filePath("config");
     QDir().mkpath(portable);
     check(write(portable + "/settings.mad", "portable settings"), "portable settings fixture");
-    check(M3Installation::settingsFileFor(portable, config, QString()) == config + "/settings.mad" &&
-          read(config + "/settings.mad") == "portable settings" && read(portable + "/settings.mad") == "portable settings",
-          "default settings move to the config folder, portable file kept");
-    check(write(config + "/settings.mad", "central settings") &&
-          M3Installation::settingsFileFor(portable, config, QString()) == config + "/settings.mad" &&
-          read(config + "/settings.mad") == "central settings", "central settings never overwritten by portable file");
-    const QString contest = config + "/configs/contest.mad";
+    check(M3Installation::settingsFileFor(portable, config, QString()) == config + "/settings.m3cfg" &&
+          read(config + "/settings.m3cfg") == "portable settings" && read(portable + "/settings.mad") == "portable settings" &&
+          !QFileInfo::exists(config + "/settings.mad"),
+          "portable settings.mad becomes settings.m3cfg in the config folder, portable file kept");
+    check(write(config + "/settings.m3cfg", "central settings") &&
+          M3Installation::settingsFileFor(portable, config, QString()) == config + "/settings.m3cfg" &&
+          read(config + "/settings.m3cfg") == "central settings", "central settings never overwritten by portable file");
+    // settings.mad in the config folder is renamed
+    const QString oldCfg = storage.filePath("oldcfg");
+    QDir().mkpath(oldCfg);
+    check(write(oldCfg + "/settings.mad", "old default") &&
+          M3Installation::settingsFileFor(storage.filePath("noportable"), oldCfg, QString()) == oldCfg + "/settings.m3cfg" &&
+          read(oldCfg + "/settings.m3cfg") == "old default" && !QFileInfo::exists(oldCfg + "/settings.mad"),
+          "settings.mad in the config folder is renamed to settings.m3cfg");
+    // an existing settings.m3cfg wins; the old file is left untouched
+    check(write(oldCfg + "/settings.mad", "stale old") && M3Installation::settingsFileFor(storage.filePath("noportable"), oldCfg, QString()) == oldCfg + "/settings.m3cfg" &&
+          read(oldCfg + "/settings.m3cfg") == "old default" && read(oldCfg + "/settings.mad") == "stale old",
+          "existing settings.m3cfg is never replaced by an old settings.mad");
+    // named configurations
+    QDir().mkpath(config + "/configs");
+    check(write(config + "/configs/ftx-1.mad", "ftx-1 old"), "old named configuration fixture");
+    check(M3Installation::settingsFileFor(portable, config, "ftx-1") == config + "/configs/ftx-1.m3cfg" &&
+          read(config + "/configs/ftx-1.m3cfg") == "ftx-1 old" && !QFileInfo::exists(config + "/configs/ftx-1.mad"),
+          "configs/NAME.mad is renamed to NAME.m3cfg at start");
+    const QString contest = config + "/configs/contest.m3cfg";
     check(M3Installation::settingsFileFor(portable, config, "contest") == contest &&
           read(contest) == "central settings", "new named configuration starts as copy of default");
 #ifndef Q_OS_WIN
     check(!(QFileInfo(contest).permissions() & (QFileDevice::ReadGroup | QFileDevice::ReadOther | QFileDevice::WriteGroup | QFileDevice::WriteOther)),
           "copied configuration readable by the owner only");
+    check(!(QFileInfo(config + "/configs/ftx-1.m3cfg").permissions() & (QFileDevice::ReadGroup | QFileDevice::ReadOther)),
+          "converted configuration readable by the owner only");
 #endif
     check(write(contest, "contest settings") &&
           M3Installation::settingsFileFor(portable, config, "contest") == contest &&
-          read(contest) == "contest settings" && read(config + "/settings.mad") == "central settings",
+          read(contest) == "contest settings" && read(config + "/settings.m3cfg") == "central settings",
           "named configuration independent of default");
-    const QString explicitFile = storage.filePath("elsewhere/field.mad");
+    const QString explicitFile = storage.filePath("elsewhere/field.m3cfg");
     check(M3Installation::settingsFileFor(portable, config, explicitFile) == explicitFile &&
           read(explicitFile) == "central settings", "configuration given as file path");
+    // a path to an old .mad continues as .m3cfg beside it
+    QDir().mkpath(storage.filePath("elsewhere"));
+    check(write(storage.filePath("elsewhere/day.mad"), "day old") &&
+          M3Installation::settingsFileFor(portable, config, storage.filePath("elsewhere/day.mad")) == storage.filePath("elsewhere/day.m3cfg") &&
+          read(storage.filePath("elsewhere/day.m3cfg")) == "day old" && !QFileInfo::exists(storage.filePath("elsewhere/day.mad")),
+          "path to an old .mad file is converted");
     check(M3Installation::isValidConfigArgument("contest") && M3Installation::isValidConfigArgument("field-2026.day1") &&
+          M3Installation::isValidConfigArgument("/tmp/x.m3cfg") && M3Installation::isValidConfigArgument("x.mad") &&
           !M3Installation::isValidConfigArgument("") && !M3Installation::isValidConfigArgument("..") &&
           !M3Installation::isValidConfigArgument("a b") && M3Installation::configLabel(explicitFile) == "field",
           "configuration names validated");

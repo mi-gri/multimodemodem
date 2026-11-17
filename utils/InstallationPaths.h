@@ -73,11 +73,17 @@ inline QString &activeConfig()
     return config;
 }
 
-// --config takes a name (letters, digits, '.', '_', '-') or a path to a .mad file.
+// Configuration files are *.m3cfg; *.mad (MadModem's name) is still read and
+// converted to *.m3cfg when the program starts.
+inline QString configExtension() { return QStringLiteral(".m3cfg"); }
+inline QString legacyConfigExtension() { return QStringLiteral(".mad"); }
+
+// --config takes a name (letters, digits, '.', '_', '-') or a path to a .m3cfg (or old .mad) file.
 inline bool isConfigFileArgument(const QString &config)
 {
     return config.contains(QLatin1Char('/')) || config.contains(QLatin1Char('\\')) ||
-           config.endsWith(QStringLiteral(".mad"), Qt::CaseInsensitive);
+           config.endsWith(configExtension(), Qt::CaseInsensitive) ||
+           config.endsWith(legacyConfigExtension(), Qt::CaseInsensitive);
 }
 
 inline bool isValidConfigArgument(const QString &config)
@@ -94,22 +100,61 @@ inline QString configLabel(const QString &config)
     return isConfigFileArgument(config) ? QFileInfo(config).completeBaseName() : config;
 }
 
+// An old NAME.mad becomes NAME.m3cfg (a rename; an existing NAME.m3cfg is never
+// replaced and the old file is then left alone).  Returns true if @p newFile exists afterwards.
+inline bool migrateLegacyConfig(const QString &newFile)
+{
+    if (QFileInfo::exists(newFile)) return true;
+    if (!newFile.endsWith(configExtension(), Qt::CaseInsensitive)) return false;
+    const QString legacy = newFile.left(newFile.size() - configExtension().size()) + legacyConfigExtension();
+    if (!QFileInfo::exists(legacy)) return false;
+    if (!QFile::rename(legacy, newFile)) {
+        // Rename impossible (e.g. read-only folder): copy, keep the original.
+        if (!QFile::copy(legacy, newFile)) return false;
+    }
+    restrictToOwner(newFile);
+    return QFileInfo::exists(newFile);
+}
+
+// The default configuration: configDir/settings.m3cfg.  An old settings.mad in
+// the config folder is converted; one next to the program (portable builds,
+// older versions) or in an installer snapshot is copied there once (as before)
+// and converted, the original stays.
+inline QString defaultSettingsFile(const QString &executableDir, const QString &configDir)
+{
+    const QString target = QDir(configDir).filePath(QStringLiteral("settings") + configExtension());
+    if (QFileInfo::exists(target)) return target;
+    if (migrateLegacyConfig(target)) return target;
+    const QString legacy = userFile(executableDir, configDir, QStringLiteral("settings") + legacyConfigExtension());
+    if (QFileInfo(legacy).absoluteFilePath() == QFileInfo(QDir(configDir).filePath(QStringLiteral("settings") + legacyConfigExtension())).absoluteFilePath()
+        && migrateLegacyConfig(target))
+        return target;
+    if (QFileInfo::exists(legacy)) return legacy;   // copying was impossible: keep reading the original
+    return target;
+}
+
 /**
  * @brief Settings file of a configuration.
  *
- * The default configuration lives in @p configDir/settings.mad; settings.mad
- * next to the program (portable builds, older versions) is copied there once
- * and never deleted.  A named configuration is configDir/configs/NAME.mad, a
- * path is used as given.  A configuration that does not exist yet starts as a
- * copy of the default settings.
+ * The default configuration lives in @p configDir/settings.m3cfg.  A named
+ * configuration is configDir/configs/NAME.m3cfg, a path is used as given
+ * (*.m3cfg or the old *.mad).  Old NAME.mad files are converted at start.  A
+ * configuration that does not exist yet starts as a copy of the default settings.
  */
 inline QString settingsFileFor(const QString &executableDir, const QString &configDir, const QString &config)
 {
-    const QString defaultFile = userFile(executableDir, configDir, QStringLiteral("settings.mad"));
+    const QString defaultFile = defaultSettingsFile(executableDir, configDir);
     if (config.isEmpty()) return defaultFile;
-    const QString file = isConfigFileArgument(config)
+    QString file = isConfigFileArgument(config)
         ? QFileInfo(config).absoluteFilePath()
-        : QDir(configDir).filePath(QStringLiteral("configs/") + config + QStringLiteral(".mad"));
+        : QDir(configDir).filePath(QStringLiteral("configs/") + config + configExtension());
+    // A path to an old *.mad is converted too (it continues as *.m3cfg beside it).
+    if (file.endsWith(legacyConfigExtension(), Qt::CaseInsensitive)) {
+        const QString converted = file.left(file.size() - legacyConfigExtension().size()) + configExtension();
+        file = migrateLegacyConfig(converted) || !QFileInfo::exists(file) ? converted : file;
+    } else {
+        migrateLegacyConfig(file);
+    }
     if (!QFileInfo::exists(file)) {
         QDir().mkpath(QFileInfo(file).absolutePath());
         if (QFileInfo::exists(defaultFile) && QFile::copy(defaultFile, file))
@@ -122,7 +167,7 @@ inline void adoptUpstreamUserData()
 {
     // Settings next to the program take precedence over MultiModeModem's folder.
     if (!qEnvironmentVariableIsSet("M3_CONFIG_DIR"))
-        userFile(QCoreApplication::applicationDirPath(), configDirectory(), QStringLiteral("settings.mad"));
+        defaultSettingsFile(QCoreApplication::applicationDirPath(), configDirectory());
     const struct { QStandardPaths::StandardLocation location; const char *file; } items[] = {
         {QStandardPaths::AppConfigLocation, "settings.mad"},
         {QStandardPaths::AppLocalDataLocation, "logbook.adi"},
@@ -131,6 +176,8 @@ inline void adoptUpstreamUserData()
         const QString target = QStandardPaths::writableLocation(item.location);
         if (target.isEmpty()) continue;
         if (item.location == QStandardPaths::AppConfigLocation && qEnvironmentVariableIsSet("M3_CONFIG_DIR")) continue;
+        if (item.location == QStandardPaths::AppConfigLocation &&
+            QFileInfo::exists(QDir(target).filePath(QStringLiteral("settings") + configExtension()))) continue;   // already converted
         QDir upstreamDir(target);
         if (upstreamDir.dirName() == QStringLiteral("MadModem")) continue;
         upstreamDir.cdUp();

@@ -57,7 +57,7 @@ else
 fi
 [[ -x "$source/$executable" && -x "$target/$executable" ]] || exit 7
 # Release archives must never overwrite user state or change portable mode.
-if find "$source" \( -name settings.mad -o -name '*.adi' -o -name '*.adif' -o -name managed-install.flag \) -print | grep -q .; then exit 8; fi
+if find "$source" \( -name settings.m3cfg -o -name settings.mad -o -name '*.adi' -o -name '*.adif' -o -name managed-install.flag \) -print | grep -q .; then exit 8; fi
 # Verify the distributed bundle before merging it with executable-adjacent
 # portable user files, which are intentionally absent from its resource seal.
 if [[ "$platform" == mac ]]; then codesign --verify --deep --strict "$source"; fi

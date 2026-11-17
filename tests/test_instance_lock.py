@@ -37,16 +37,16 @@ def main() -> int:
             return subprocess.Popen([str(binary), *args], env=env, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, text=True)
 
-        default_lock = Path(tmp) / "settings.mad.instance"
-        other_lock = Path(tmp) / "configs" / "second.mad.instance"
+        default_lock = Path(tmp) / "settings.m3cfg.instance"
+        other_lock = Path(tmp) / "configs" / "second.m3cfg.instance"
         running = []
         try:
             first = start()
             running.append(first)
             wait_for(default_lock, first)
             # The instance must get past loading its settings (QSettings uses
-            # its own settings.mad.lock; a clash once made it wait forever).
-            wait_for(Path(tmp) / "settings.mad", first)
+            # its own settings.m3cfg.lock; a clash once made it wait forever).
+            wait_for(Path(tmp) / "settings.m3cfg", first)
 
             second = start()
             try:
@@ -97,7 +97,7 @@ def main() -> int:
             via_link = subprocess.Popen([str(binary)], env=dict(env, M3_CONFIG_DIR=str(link)),
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             running.append(via_link)
-            wait_for(real / "settings.mad.instance", via_link)
+            wait_for(real / "settings.m3cfg.instance", via_link)
             direct = subprocess.Popen([str(binary)], env=dict(env, M3_CONFIG_DIR=str(real)),
                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             try:

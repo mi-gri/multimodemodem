@@ -161,7 +161,7 @@ struct Ft8FullAutoCqCandidate
  *
  * Purpose:
  * - Own the main UI.
- * - Load and save persistent settings from settings.mad.
+ * - Load and save persistent settings from settings.m3cfg.
  * - Open the Audio / PTT settings dialog from the menu action.
  * - Start and stop the RX audio path using the saved audio input device.
  * - Show input level diagnostics.

@@ -23,7 +23,7 @@ mkdir -p "$PACKAGE_DIR"
 cp -a "$INSTALL_DIR/." "$PACKAGE_DIR/"
 # A portable archive must not accidentally inherit installer path semantics or
 # data from a reused local staging directory.
-for user_file in settings.mad logbook.adi; do
+for user_file in settings.m3cfg settings.mad logbook.adi; do
     if [[ -e "$PACKAGE_DIR/bin/$user_file" ]]; then
         echo "ERROR: refusing to distribute user data: $user_file" >&2
         exit 1
@@ -81,7 +81,7 @@ Use the build matching your distribution; the host provides glibc, graphics
 drivers, a desktop session and its audio server. This is not a universal AppImage.
 Do not run MultiModeModem.bin directly: the launcher selects the bundled libraries.
 See runtime-manifest.json and runtime-licenses for bundled component details.
-Keep settings.mad, ADIF logbooks and recordings when replacing a portable copy.
+Keep settings.m3cfg (old: settings.mad), ADIF logbooks and recordings when replacing a portable copy.
 TXT
 
 cp -f "$PACKAGE_DIR/RUN_LINUX.txt" "$PACKAGE_DIR/BUILD_INFO.txt"

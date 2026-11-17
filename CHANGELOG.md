@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Configuration files are now `settings.m3cfg` and `configs/NAME.m3cfg` (was `.mad`, MadModem's name). Old files
+  are converted at start by renaming; an existing `.m3cfg` is never replaced. `--config` also takes an old
+  `.mad` path (continues as `.m3cfg`). Older program versions do not find the renamed file.
 - WSPR: a callsign WSPR cannot send (special-event/club calls such as DL75WAU) is reported on the WSPR page
   and in the log with the reason - before and independent of the Auto-mode hint.
 - JS8 relay/reply parsing accepts special-event calls with two digits (DL75WAU).

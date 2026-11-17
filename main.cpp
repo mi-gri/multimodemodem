@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
                 continue;
             }
             if (!M3Installation::isValidConfigArgument(value)) {
-                std::fprintf(stderr, "--config needs a name (letters, digits, . _ -) or a path to a .mad file\n");
+                std::fprintf(stderr, "--config needs a name (letters, digits, . _ -) or a path to a .m3cfg file\n");
                 return 2;
             }
             M3Installation::activeConfig() = value;
@@ -202,8 +202,8 @@ int main(int argc, char *argv[])
     const QCommandLineOption architectureRegressionOption(QStringLiteral("architecture-regression"), QStringLiteral("Check asynchronous FT generation and logbook persistence."));
     commandLine.addOption(architectureRegressionOption);
     const QCommandLineOption configOption(QStringList{QStringLiteral("c"), QStringLiteral("config")},
-        QStringLiteral("Use another configuration: a name (stored as configs/<name>.mad in the settings folder, "
-                       "created as a copy of the default settings) or a path to a .mad file."),
+        QStringLiteral("Use another configuration: a name (stored as configs/<name>.m3cfg in the settings folder, "
+                       "created as a copy of the default settings) or a path to a .m3cfg file (old .mad files are converted)."),
         QStringLiteral("name|file"));
     commandLine.addOption(configOption);
     const QCommandLineOption runtimeRegressionOption(QStringLiteral("runtime-regression"),QStringLiteral("Check RX worker and asynchronous CAT without radio hardware."));

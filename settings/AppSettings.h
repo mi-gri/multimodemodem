@@ -15,7 +15,7 @@
  * - Keep audio input/output device selections.
  * - Keep PTT serial port selection.
  * - Keep current WeatherFax parameters and synchronization preference.
- * - Save and load values from settings.mad.
+ * - Save and load values from settings.m3cfg.
  */
 class AppSettings
 {
@@ -283,7 +283,7 @@ public:
     QString ft8DecodeEngine = "mshv"; // v2.19: fixed MSHV-derived native pipeline
 
     // FT4/FT8 decode table colours, as in JTDX. Stored as #RRGGBB strings so
-    // settings.mad remains human-editable and no GUI type leaks into AppSettings.
+    // settings.m3cfg remains human-editable and no GUI type leaks into AppSettings.
     // Text colour = kind of message; background = what the station is new for.
     // The values are the light JTDX set; a dark theme darkens them itself.
     QString ftHighlightMyCallForeground = "#FF0000";
