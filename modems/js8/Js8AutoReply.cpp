@@ -8,8 +8,10 @@
 #include <QRegularExpression>
 
 namespace {
+// base: 1-3 prefix characters, a digit, up to 4 letters - also special-event
+// calls with a second digit (DL75WAU), which the older pattern cut off.
 const QString kCallPattern = QStringLiteral(
-    R"((?<prefix>[A-Z0-9]{1,4}\/)?(?<base>([0-9A-Z])?([0-9A-Z])([0-9])([A-Z])?([A-Z])?([A-Z])?)(?<suffix>\/[A-Z0-9]{1,4})?)");
+    R"((?<prefix>[A-Z0-9]{1,4}\/)?(?<base>[0-9A-Z]{1,3}[0-9][A-Z]{0,4})(?<suffix>\/[A-Z0-9]{1,4})?)");
 
 Js8StoredMessage storedFrom(const Js8Command &c, const Js8ReplyContext &ctx, const QString &to,
                             const QString &path, const QString &text, Js8StoredMessage::Type type)

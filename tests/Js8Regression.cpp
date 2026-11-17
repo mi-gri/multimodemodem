@@ -619,6 +619,13 @@ int main(int argc, char **argv)
         check(Js8Message::isPlausibleAmateurCall(ok), std::string("plausible callsign ") + ok);
     for (const char *bad : {"7ZWEZV/2RH", "7ZWEZV", "ABCDEF", "123456", "Q", "DL1ABC1"})
         check(!Js8Message::isPlausibleAmateurCall(bad), std::string("implausible callsign ") + bad);
+    // Special-event call with two digits (DL75WAU): frames, relay path and base call.
+    {
+        const auto frames = Js8Message::buildFrames("DL75WAU", "JO30", "DL1ABC", "HELLO", Js8Mode::Submode::Normal, true);
+        check(Js8Message::preview(frames, Js8Mode::Submode::Normal).contains("DL75WAU: DL1ABC"), "DL75WAU encodes in JS8 frames");
+        check(Js8AutoReply::parseRelayPath("DK2XYZ", "HELLO *DE* DL75WAU").contains("DL75WAU"), "relay path finds DL75WAU");
+        check(Js8Message::baseCallsign("DL75WAU") == "DL75WAU", "base call of DL75WAU unchanged");
+    }
     testCommandsAndReplies();
     testStandardFrequencies();
     testMultiDecode();
