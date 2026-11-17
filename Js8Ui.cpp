@@ -13,7 +13,9 @@
 #include "utils/StandardFrequencies.h"
 #include "widgets/WaterfallWidget.h"
 
+#include <QMenu>
 #include <QRegularExpression>
+#include <QToolButton>
 #include <QApplication>
 #include <QCheckBox>
 #include <QDialog>
@@ -153,10 +155,17 @@ void MainWindow::setupJs8DisplayPage()
     m_editJs8To = new QLineEdit(m_js8DisplayPage);
     m_editJs8To->setPlaceholderText(uiText("js8_to_placeholder", "call or @GROUP"));
     m_editJs8To->setMaximumWidth(130);
-    m_editJs8To->setToolTip(uiText("js8_to_tooltip", "Selected station. Your text is sent directed to it unless the text already starts with a call, @group, CQ or HEARTBEAT."));
+    m_editJs8To->setText(QStringLiteral("@ALLCALL"));
+    m_editJs8To->setToolTip(uiText("js8_to_tooltip", "Target of your text: a callsign or an @group (default @ALLCALL, e.g. @EMCOMM). Nothing is sent without a target. The text is sent directed to it unless it already starts with a call, @group, CQ or HEARTBEAT."));
+    m_btnJs8ToMenu = new QToolButton(m_js8DisplayPage);
+    m_btnJs8ToMenu->setText(QStringLiteral("\u25be"));
+    m_btnJs8ToMenu->setPopupMode(QToolButton::InstantPopup);
+    m_btnJs8ToMenu->setToolTip(uiText("js8_to_menu_tip", "Remembered @groups: choose one as the target."));
+    m_menuJs8To = new QMenu(m_btnJs8ToMenu);
+    m_btnJs8ToMenu->setMenu(m_menuJs8To);
     m_btnJs8ClearTo = new QPushButton(QStringLiteral("\u00d7"), m_js8DisplayPage);
     m_btnJs8ClearTo->setMaximumWidth(26);
-    m_btnJs8ClearTo->setToolTip(uiText("js8_clear_to", "Deselect the station"));
+    m_btnJs8ClearTo->setToolTip(uiText("js8_clear_to", "Back to @ALLCALL (deselect the station)"));
     m_editJs8Tx = new QLineEdit(m_js8DisplayPage);
     m_editJs8Tx->setPlaceholderText(uiText("js8_tx_placeholder", "Message, e.g. HW CPY? or free text"));
     m_btnJs8Send = new QPushButton(uiText("js8_send", "Send"), m_js8DisplayPage);
@@ -170,6 +179,7 @@ void MainWindow::setupJs8DisplayPage()
     m_btnJs8Inbox->setToolTip(uiText("js8_inbox_tooltip", "Messages received with MSG and messages kept for other stations (MSG TO:)."));
     txRow->addWidget(toLabel);
     txRow->addWidget(m_editJs8To);
+    txRow->addWidget(m_btnJs8ToMenu);
     txRow->addWidget(m_btnJs8ClearTo);
     txRow->addWidget(m_editJs8Tx, 1);
     txRow->addWidget(m_btnJs8Send);
@@ -212,7 +222,15 @@ void MainWindow::setupJs8DisplayPage()
     connect(m_btnJs8Inbox, &QPushButton::clicked, this, &MainWindow::showJs8Inbox);
     connect(m_btnJs8Send, &QPushButton::clicked, this, &MainWindow::js8SendFromEditor);
     connect(m_editJs8Tx, &QLineEdit::returnPressed, this, &MainWindow::js8SendFromEditor);
-    connect(m_btnJs8ClearTo, &QPushButton::clicked, this, [this]() { m_editJs8To->clear(); js8OperatorActivity(); });
+    js8LoadGroups();
+    connect(m_btnJs8ClearTo, &QPushButton::clicked, this, [this]() { m_editJs8To->setText(QStringLiteral("@ALLCALL")); js8OperatorActivity(); });
+    // Leaving the field: empty falls back to @ALLCALL; a valid @group is remembered.
+    connect(m_editJs8To, &QLineEdit::editingFinished, this, [this]() {
+        const QString text = m_editJs8To->text().trimmed().toUpper();
+        if (text.isEmpty()) { m_editJs8To->setText(QStringLiteral("@ALLCALL")); return; }
+        if (text != m_editJs8To->text()) m_editJs8To->setText(text);
+        if (js8SendTarget(false).startsWith(QLatin1Char('@'))) js8RememberGroup(text);
+    });
     // Whatever sets the station in To (heard list, inbox reply, typing): the
     // QSO form - and with it the QRZ tab - follows; @groups are no station.
     connect(m_editJs8To, &QLineEdit::textChanged, this, [this](const QString &text) {
@@ -231,7 +249,7 @@ void MainWindow::setupJs8DisplayPage()
     });
     connect(m_editJs8Tx, &QLineEdit::textEdited, this, [this]() { js8OperatorActivity(); });
     connect(m_btnJs8Cq, &QPushButton::clicked, this, [this]() {
-        m_editJs8To->clear();
+        m_editJs8To->setText(QStringLiteral("@ALLCALL"));
         js8Send(Js8Message::cqText(stationLocator()), QString());
     });
     connect(m_btnJs8Hb, &QPushButton::clicked, this, [this]() {
@@ -239,7 +257,7 @@ void MainWindow::setupJs8DisplayPage()
     });
     connect(m_btnJs8Snr, &QPushButton::clicked, this, [this]() {
         const QString to = m_editJs8To->text().trimmed().toUpper();
-        if (to.isEmpty()) {
+        if (to.isEmpty() || to.startsWith(QLatin1Char('@'))) {
             m_lblJs8TxStatus->setText(uiText("js8_select_station", "Select a station first (click it in the heard list)."));
             return;
         }
@@ -1014,8 +1032,85 @@ void MainWindow::js8SendFromEditor()
     if (m_editJs8Tx == nullptr) return;
     const QString text = m_editJs8Tx->text();
     if (text.trimmed().isEmpty()) return;
-    js8Send(text, m_editJs8To != nullptr ? m_editJs8To->text().trimmed().toUpper() : QString());
-    if (!m_js8PendingFrames.isEmpty()) m_editJs8Tx->clear();
+    const QString to = js8SendTarget();
+    if (to.isEmpty()) return;   // invalid target: message shown, nothing sent
+    js8Send(text, to);
+    if (!m_js8PendingFrames.isEmpty()) {
+        m_editJs8Tx->clear();
+        if (to.startsWith(QLatin1Char('@'))) js8RememberGroup(to);
+    }
+}
+
+// The target of free text: a callsign or an @group; an empty field means the
+// default @ALLCALL, anything else is refused (JS8 text never goes out without
+// a valid target).
+QString MainWindow::js8SendTarget(bool report)
+{
+    QString to = m_editJs8To != nullptr ? m_editJs8To->text().trimmed().toUpper() : QString();
+    if (to.isEmpty()) to = QStringLiteral("@ALLCALL");
+    static const QRegularExpression group(QStringLiteral("^@[A-Z0-9]{2,12}$"));
+    const bool valid = to.startsWith(QLatin1Char('@'))
+        ? (group.match(to).hasMatch() && to != QLatin1String("@APRSIS") && to != QLatin1String("@JS8NET"))
+        : Js8Message::isPlausibleAmateurCall(to);
+    if (!valid) {
+        if (report && m_lblJs8TxStatus != nullptr)
+            m_lblJs8TxStatus->setText(uiText("js8_target_invalid", "The target must be a callsign or an @group (e.g. @ALLCALL, @EMCOMM)."));
+        return QString();
+    }
+    return to;
+}
+
+void MainWindow::js8LoadGroups()
+{
+    m_js8Groups = js8Settings().value(QStringLiteral("JS8/groups")).toStringList();
+    for (QString &g : m_js8Groups) g = g.trimmed().toUpper();
+    m_js8Groups.removeAll(QString());
+    m_js8Groups.removeAll(QStringLiteral("@ALLCALL"));
+    m_js8Groups.removeDuplicates();
+    m_js8Groups.prepend(QStringLiteral("@ALLCALL"));
+    js8RebuildTargetMenu();
+}
+
+void MainWindow::js8RememberGroup(const QString &groupIn)
+{
+    const QString group = groupIn.trimmed().toUpper();
+    if (!group.startsWith(QLatin1Char('@')) || m_js8Groups.contains(group)) return;
+    m_js8Groups.append(group);
+    while (m_js8Groups.size() > 31) m_js8Groups.removeAt(1);   // keep @ALLCALL
+    QStringList saved = m_js8Groups;
+    saved.removeFirst();
+    js8Settings().setValue(QStringLiteral("JS8/groups"), saved);
+    js8RebuildTargetMenu();
+}
+
+void MainWindow::js8ForgetGroup(const QString &group)
+{
+    if (group == QLatin1String("@ALLCALL") || !m_js8Groups.removeAll(group)) return;
+    QStringList saved = m_js8Groups;
+    saved.removeFirst();
+    js8Settings().setValue(QStringLiteral("JS8/groups"), saved);
+    js8RebuildTargetMenu();
+}
+
+void MainWindow::js8RebuildTargetMenu()
+{
+    if (m_menuJs8To == nullptr) return;
+    m_menuJs8To->clear();
+    for (const QString &g : std::as_const(m_js8Groups)) {
+        QAction *a = m_menuJs8To->addAction(g);
+        connect(a, &QAction::triggered, this, [this, g]() {
+            m_editJs8To->setText(g);
+            js8OperatorActivity();
+        });
+    }
+    if (m_js8Groups.size() > 1) {
+        m_menuJs8To->addSeparator();
+        QMenu *forget = m_menuJs8To->addMenu(uiText("js8_to_forget", "Forget group"));
+        for (const QString &g : std::as_const(m_js8Groups)) {
+            if (g == QLatin1String("@ALLCALL")) continue;
+            connect(forget->addAction(g), &QAction::triggered, this, [this, g]() { js8ForgetGroup(g); });
+        }
+    }
 }
 
 void MainWindow::js8Send(const QString &text, const QString &to)
@@ -1167,7 +1262,9 @@ void MainWindow::js8Tick()
     if (m_js8WatchdogTripped || !m_rxRunning) return;
 
     // Heartbeat and CQ repeats pause while a station is selected (QSO).
-    const bool inQso = m_editJs8To != nullptr && !m_editJs8To->text().trimmed().isEmpty();
+    // Only a station in To (not the default @ALLCALL or another @group) counts as a QSO.
+    const bool inQso = m_editJs8To != nullptr && !m_editJs8To->text().trimmed().isEmpty() &&
+                       !m_editJs8To->text().trimmed().startsWith(QLatin1Char('@'));
     if (hbMinutes > 0 && m_js8NextHeartbeatMs > 0 && now >= m_js8NextHeartbeatMs) {
         m_js8NextHeartbeatMs = now + qint64(hbMinutes) * 60000;
         if (!inQso)
@@ -1344,7 +1441,8 @@ void MainWindow::showJs8Inbox()
 QString MainWindow::js8ExpandMacro(const QString &source) const
 {
     QString text = source;
-    const QString to = m_editJs8To != nullptr ? m_editJs8To->text().trimmed().toUpper() : QString();
+    QString to = m_editJs8To != nullptr ? m_editJs8To->text().trimmed().toUpper() : QString();
+    if (to.isEmpty()) to = QStringLiteral("@ALLCALL");
     text.replace(QStringLiteral("{CALL}"), to, Qt::CaseInsensitive);
     // JS8 reports are SNR values ("SNR +05"), not RST: "SNR 599" went out as
     // "SNR +05" plus a stray "99".  The report is the last SNR heard from the
@@ -1395,5 +1493,8 @@ void MainWindow::js8RunMacro(int index, bool editOnly)
         js8OperatorActivity();
         return;
     }
-    js8Send(text, m_editJs8To != nullptr ? m_editJs8To->text().trimmed().toUpper() : QString());
+    const QString to = js8SendTarget();
+    if (to.isEmpty()) return;
+    js8Send(text, to);
+    if (to.startsWith(QLatin1Char('@'))) js8RememberGroup(to);
 }

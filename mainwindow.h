@@ -722,6 +722,12 @@ private slots:
     void applyJs8Settings();
     void handleJs8Decode(const Js8Decode &decode);
     void js8Send(const QString &text, const QString &to);
+    // Target ("To"): a callsign or an @group, default @ALLCALL, never empty.
+    QString js8SendTarget(bool report = true);   // empty = invalid (message shown)
+    void js8LoadGroups();
+    void js8RememberGroup(const QString &group);
+    void js8ForgetGroup(const QString &group);
+    void js8RebuildTargetMenu();
     void js8SendFromEditor();
     void js8RefreshActivity();
     void js8RefreshCalls();
@@ -2338,6 +2344,9 @@ private:
     QPlainTextEdit *m_txtJs8Rx = nullptr;
     QLineEdit *m_editJs8Tx = nullptr;
     QLineEdit *m_editJs8To = nullptr;
+    QToolButton *m_btnJs8ToMenu = nullptr;   // remembered @groups
+    QMenu *m_menuJs8To = nullptr;
+    QStringList m_js8Groups;                 // @ALLCALL first, then the user's groups
     QPushButton *m_btnJs8Send = nullptr;
     QPushButton *m_btnJs8Cq = nullptr;
     QPushButton *m_btnJs8Hb = nullptr;

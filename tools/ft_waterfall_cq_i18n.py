@@ -376,13 +376,13 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'js8_to':('To:','A:','À :','An:','Til:','Pro:'),
  'js8_to_placeholder':('call or @GROUP','nominativo o @GRUPPO','indicatif ou @GROUPE','Rufzeichen oder @GRUPPE','kallesignal eller @GRUPPE','značka nebo @SKUPINA'),
  'js8_to_tooltip':(
-  'Selected station. Your text is sent directed to it unless the text already starts with a call, @group, CQ or HEARTBEAT.',
-  'Stazione selezionata. Il testo le viene inviato in modo diretto, a meno che non inizi già con un nominativo, un @gruppo, CQ o HEARTBEAT.',
-  'Station sélectionnée. Votre texte lui est adressé, sauf s’il commence déjà par un indicatif, un @groupe, CQ ou HEARTBEAT.',
-  'Gewählte Station. Dein Text geht gerichtet an sie, außer er beginnt schon mit einem Rufzeichen, einer @Gruppe, CQ oder HEARTBEAT.',
-  'Valgt stasjon. Teksten sendes direkte til den, med mindre den allerede starter med et kallesignal, en @gruppe, CQ eller HEARTBEAT.',
-  'Vybraná stanice. Text se jí pošle adresně, pokud už nezačíná značkou, @skupinou, CQ nebo HEARTBEAT.'),
- 'js8_clear_to':('Deselect the station','Deseleziona la stazione','Désélectionner la station','Station abwählen','Fjern valgt stasjon','Zrušit výběr stanice'),
+  'Target of your text: a callsign or an @group (default @ALLCALL, e.g. @EMCOMM). Nothing is sent without a target. The text is sent directed to it unless it already starts with a call, @group, CQ or HEARTBEAT.',
+  'Destinatario del testo: un nominativo o un @gruppo (predefinito @ALLCALL, ad es. @EMCOMM). Senza destinatario non viene inviato nulla. Il testo viene inviato in modo diretto, a meno che non inizi già con un nominativo, un @gruppo, CQ o HEARTBEAT.',
+  'Destinataire du texte : un indicatif ou un @groupe (par défaut @ALLCALL, p. ex. @EMCOMM). Rien n’est émis sans destinataire. Le texte est adressé, sauf s’il commence déjà par un indicatif, un @groupe, CQ ou HEARTBEAT.',
+  'Ziel deines Textes: ein Rufzeichen oder eine @Gruppe (Standard @ALLCALL, z. B. @EMCOMM). Ohne Ziel wird nichts gesendet. Der Text geht gerichtet an das Ziel, außer er beginnt schon mit einem Rufzeichen, einer @Gruppe, CQ oder HEARTBEAT.',
+  'Mål for teksten: et kallesignal eller en @gruppe (standard @ALLCALL, f.eks. @EMCOMM). Uten mål sendes ingenting. Teksten sendes rettet mot målet, med mindre den allerede starter med et kallesignal, en @gruppe, CQ eller HEARTBEAT.',
+  'Cíl textu: značka nebo @skupina (výchozí @ALLCALL, např. @EMCOMM). Bez cíle se nic nevysílá. Text se pošle adresně na cíl, pokud už nezačíná značkou, @skupinou, CQ nebo HEARTBEAT.'),
+ 'js8_clear_to':('Back to @ALLCALL (deselect the station)','Torna a @ALLCALL (deseleziona la stazione)','Retour à @ALLCALL (désélectionner la station)','Zurück zu @ALLCALL (Station abwählen)','Tilbake til @ALLCALL (fjern valgt stasjon)','Zpět na @ALLCALL (zrušit výběr stanice)'),
  'js8_tx_placeholder':('Message, e.g. HW CPY? or free text','Messaggio, ad es. HW CPY? o testo libero','Message, p. ex. HW CPY? ou texte libre','Nachricht, z. B. HW CPY? oder freier Text','Melding, f.eks. HW CPY? eller fritekst','Zpráva, např. HW CPY? nebo volný text'),
  'js8_send':('Send','Invia','Envoyer','Senden','Send','Odeslat'),
  'js8_send_tooltip':(
@@ -1358,4 +1358,16 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'js8_tx_progress':('JS8 TX: slot %1 of %2 · %3 / %4','JS8 TX: slot %1 di %2 · %3 / %4','JS8 TX : slot %1 sur %2 · %3 / %4','JS8 TX: Slot %1 von %2 · %3 / %4','JS8 TX: slot %1 av %2 · %3 / %4','JS8 TX: slot %1 z %2 · %3 / %4'),
  'js8_tx_done':('JS8 TX done: %1 slot(s)','JS8 TX terminata: %1 slot','JS8 TX terminée : %1 slot(s)','JS8 TX fertig: %1 Slot(s)','JS8 TX ferdig: %1 slot','JS8 TX dokončeno: %1 slot(ů)'),
  'js8_tx_stopped_at':('JS8 TX stopped in slot %1 of %2','JS8 TX fermata nello slot %1 di %2','JS8 TX arrêtée au slot %1 sur %2','JS8 TX abgebrochen in Slot %1 von %2','JS8 TX stoppet i slot %1 av %2','JS8 TX zastaveno ve slotu %1 z %2'),
+}.items()})
+
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'js8_to_menu_tip':('Remembered @groups: choose one as the target.','@gruppi memorizzati: sceglierne uno come destinatario.','@groupes mémorisés : en choisir un comme destinataire.','Gemerkte @Gruppen: eine als Ziel wählen.','Husket @grupper: velg en som mål.','Zapamatované @skupiny: vyberte jednu jako cíl.'),
+ 'js8_to_forget':('Forget group','Dimentica gruppo','Oublier le groupe','Gruppe vergessen','Glem gruppe','Zapomenout skupinu'),
+ 'js8_target_invalid':(
+  'The target must be a callsign or an @group (e.g. @ALLCALL, @EMCOMM).',
+  'Il destinatario deve essere un nominativo o un @gruppo (ad es. @ALLCALL, @EMCOMM).',
+  'Le destinataire doit être un indicatif ou un @groupe (p. ex. @ALLCALL, @EMCOMM).',
+  'Das Ziel muss ein Rufzeichen oder eine @Gruppe sein (z. B. @ALLCALL, @EMCOMM).',
+  'Målet må være et kallesignal eller en @gruppe (f.eks. @ALLCALL, @EMCOMM).',
+  'Cílem musí být značka nebo @skupina (např. @ALLCALL, @EMCOMM).'),
 }.items()})

@@ -4,6 +4,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- JS8: text never goes out without a target. "To" defaults to @ALLCALL (x resets to it, an empty
+  field means it); any callsign or @group (e.g. @EMCOMM) can be typed, anything else is refused with a
+  message. @groups you use are remembered (menu next to To; "Forget group" removes one). Only a
+  station in To - not @ALLCALL or another group - counts as a QSO that pauses heartbeat/CQ repeats.
 - JS8 TX progress: the status line shows "slot 2 of 3 · 0:22 / 0:45" and the message with the part
   already sent (green, struck through), the frame on air (highlighted) and the rest; at the end it
   says whether the message went out completely or was stopped in which slot.
