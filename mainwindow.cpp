@@ -21659,7 +21659,7 @@ void MainWindow::finishFt8ResponseWait(quint64 retryGeneration, qint64 replySlot
         }
         if (resumeCq && !m_ftSession.qsoActive && !m_ft8OperatorStopLatched && autoTxPermitted() &&
             m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked()) {
-            appendLog(QStringLiteral("FT Auto mode: no reply; the CQ series continues."));
+            appendLog(uiText("ft_cq_series_continues_noreply_log", "FT Auto mode: no reply; the CQ series continues."));
             startFt8CqRepeat();
         }
     });

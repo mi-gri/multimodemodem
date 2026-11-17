@@ -1543,3 +1543,9 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Le mode Auto est désactivé : activez-le avec le bouton Auto (en haut à droite).','Auto-Modus ist aus: mit dem Knopf „Auto“ (oben rechts) einschalten.',
   'Auto-modus er av: slå på med Auto-knappen (øverst til høyre).','Režim Auto je vypnutý: zapněte jej tlačítkem Auto (vpravo nahoře).'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft_cq_series_continues_noreply_log':(
+  'FT Auto mode: no reply; the CQ series continues.','FT modalità Auto: nessuna risposta; la serie di CQ continua.',
+  'FT mode Auto : pas de réponse ; la série de CQ continue.','FT Auto-Modus: keine Antwort; die CQ-Serie läuft weiter.',
+  'FT Auto-modus: ingen svar; CQ-serien fortsetter.','FT režim Auto: žádná odpověď; série CQ pokračuje.'),
+}.items()})
