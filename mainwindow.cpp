@@ -9770,8 +9770,13 @@ void MainWindow::setupFt8Page()
         "Counts completed FT4/FT8 QSOs since MultiModeModem was started and shows callers waiting in the passive FIFO."));
     m_chkFt8FullAutoQso = new QCheckBox(uiText("ft8_auto_qso", "Auto QSO"), controlGroup);
     m_chkFt8FullAutoQso->setToolTip(uiText("ft8_auto_qso_tooltip", "WSJT-Z-style gated automation. Decoded CQs are buffered and prioritized by new country, new grid square, new band, new mode, distance and SNR before answering."));
-    m_chkFt8FullAutoQso->setStyleSheet(QStringLiteral("QCheckBox { font-weight: 500; }"));
-    M3Ui::setSemanticRole(m_chkFt8FullAutoQso, QStringLiteral("accent"));
+    m_chkFt8FullAutoQso->setObjectName(QStringLiteral("ftAutoQsoButton"));
+    m_chkFt8FullAutoQso->setCursor(Qt::PointingHandCursor);
+    m_chkFt8FullAutoQso->setStyleSheet(QStringLiteral(
+        "QCheckBox#ftAutoQsoButton { border: 1px solid palette(mid); border-radius: 4px; padding: 4px 12px; }"
+        "QCheckBox#ftAutoQsoButton::indicator { width: 0px; height: 0px; }"
+        "QCheckBox#ftAutoQsoButton:checked { background-color: #F28C00; color: #1A1A1A; font-weight: bold; border-color: #F28C00; }"
+        "QCheckBox#ftAutoQsoButton:disabled { color: palette(mid); }"));
     m_chkFt8HoldTxFreq = new QCheckBox(uiText("hold_tx_frequency", "Hold TX frequency"), controlGroup);
     m_chkFt8HoldTxFreq->setToolTip(uiText("hold_tx_frequency_tooltip", "Legacy shortcut: force the red TX marker to stay fixed. The TX strategy selector in the FT settings page is the primary control."));
     m_cmbFt8TxStrategy = new QComboBox(controlGroup);
@@ -9825,7 +9830,8 @@ void MainWindow::setupFt8Page()
 
     // Auto QSO sits directly below Auto log; the caller queue gets its own
     // row laid out like the CQ queue row (checkbox left, list button right).
-    controlGrid->addWidget(m_chkFt8FullAutoQso, 2, 4, 1, 2);
+    // Auto QSO as a button beside STOP (orange when on); same checkbox object underneath.
+    controlGrid->addWidget(m_chkFt8FullAutoQso, 0, 5);
     m_btnFt8CallerList=new QPushButton(controlGroup);
     m_btnFt8CallerList->setObjectName(QStringLiteral("ftCallerQueueOpen"));
     controlGrid->addWidget(m_chkFt8CallerQueue, 4, 0, 1, 4);
