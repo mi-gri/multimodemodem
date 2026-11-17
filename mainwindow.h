@@ -1721,6 +1721,8 @@ private:
     double txReferenceDialHz() const;
     QString currentTxBand() const;
     bool txBandPermitted(bool automatic) const;
+    static QString txBandKey(double hz);
+    bool ftOperatorEngaged() const;
     QString txBandRefusalReason() const;
     bool confirmTxBand(const QString &what);
     void logAutoTxBandRefusal(const QString &key) const;

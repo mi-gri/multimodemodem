@@ -13305,7 +13305,8 @@ void MainWindow::handleRigFrequencyChanged(double frequencyHz)
     {
         const QString fromBand = M3StandardFrequencies::bandOf(previousFrequencyHz);
         const QString toBand = M3StandardFrequencies::bandOf(frequencyHz);
-        if (previousFrequencyHz > 0.0 && fromBand != toBand) abortTxForBandChange(fromBand, toBand);
+        // Also a QSY between two places outside the amateur bands (different 100 kHz bucket).
+        if (previousFrequencyHz > 0.0 && txBandKey(previousFrequencyHz) != txBandKey(frequencyHz)) abortTxForBandChange(fromBand, toBand);
     }
     m_lastRigFrequencyHz = frequencyHz;
     if (!m_lastRigPttOn && !m_ftSplitPreparedForTx) m_lastRxDialHz = frequencyHz;
@@ -19801,6 +19802,14 @@ bool MainWindow::activateNextFt8LateFinal()
     return false;
 }
 
+// The operator has a CQ running or waits for an answer to a call of theirs.
+bool MainWindow::ftOperatorEngaged() const
+{
+    return m_ftSession.qsoActive || m_ftSession.cqRepeatActive ||
+           m_ftSession.state == Ft8SequencerState::CallingCq ||
+           m_ftSession.state == Ft8SequencerState::WaitingDxReply;
+}
+
 bool MainWindow::activateNextFt8QueuedCaller()
 {
     {
@@ -19814,6 +19823,8 @@ bool MainWindow::activateNextFt8QueuedCaller()
         m_ft8OperatorStopLatched || !Ft8Mode::isFamilyMode(ui->cmbMode->currentText())) {
         return false;
     }
+    // Serving the next caller of the queue starts a QSO by itself: automatic TX.
+    if (!autoTxPermitted()) return false;
 
     const bool busy = m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning ||
                       (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning()) ||
@@ -19907,6 +19918,19 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         (parsed.final73 || parsed.rr73 || parsed.rrr || parsed.addressedToMe)) {
         appendLog(QString("FT sequencer: ignoring late/repeated post-QSO decode from %1; QSO was already completed.")
                       .arg(parsed.senderCall));
+        return;
+    }
+
+    // A call that would start a QSO while the operator has done nothing (no CQ,
+    // no QSO) is an automatic transmission: only with Auto mode, never while the
+    // QSY plan runs, and on a band with TX permission.
+    if (decision.startsQso && !m_ftSession.qsoActive && !ftOperatorEngaged() && !autoTxPermitted()) {
+        static QString lastCaller;
+        if (lastCaller != parsed.senderCall) {
+            lastCaller = parsed.senderCall;
+            appendLog(uiText("ft_unsolicited_not_answered_log", "FT: the call from %1 is not answered automatically (no CQ or QSO of yours; automatic TX is off, paused by the QSY plan or not allowed on this band).")
+                          .arg(parsed.senderCall));
+        }
         return;
     }
 
@@ -25199,7 +25223,16 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
     SessionDiagnostics::instance().settings(m_settings);
     SessionDiagnostics::instance().record("resources",{{"cpu",M3Cpu::summary()},{"policy",M3Runtime::SystemResourceManager::instance().startupSummary()}});
     if (m_qrzLookupPanel) m_qrzLookupPanel->setAccountCredentials(m_settings.qrzUsername, m_settings.qrzPassword);
-    m_settings.schedulerQsyPlanJson = BandSchedulerDialog::serializeEntries(dialog.schedulerEntries());
+    {
+        const QString newPlan = BandSchedulerDialog::serializeEntries(dialog.schedulerEntries());
+        if (newPlan != m_settings.schedulerQsyPlanJson) {
+            // A changed plan revokes the WSPR-beacon permission of the old one; the
+            // active entry of the new plan gives it back only if it is marked.
+            m_settings.schedulerQsyPlanJson = newPlan;
+            schedulerWsprTxEnd(QStringLiteral("QSY plan edited"));
+            schedulerRestoreActiveWsprTx(QStringLiteral("plan edited"));
+        }
+    }
     savePersistentSettings();
     if (oldSettings.hamlibCatEnabled != m_settings.hamlibCatEnabled) {
         // Switching CAT off/on: the entered frequency is not trusted across it.

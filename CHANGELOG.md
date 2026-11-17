@@ -4,6 +4,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Safety (audit of the TX gates): FT no longer answers an unsolicited call (no CQ or QSO of yours) unless
+  automatic TX is allowed (Auto mode, no running QSY plan, TX band); the caller queue starts a QSO only
+  under the same condition. A changed QSY plan revokes the WSPR-beacon permission of the old one. One
+  confirmation for TX outside the amateur bands covers only its 100 kHz area; a QSY there stops TX.
+  The plan-import dialog shows file text as plain text.
 - MadModem's settings are no longer imported at the first start (only its ADIF logbook still is), so format
   changes of MadModem never reach m³.
 - Configuration files are now `settings.m3cfg` and `configs/NAME.m3cfg` (was `.mad`, MadModem's name). Old files

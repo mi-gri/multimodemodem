@@ -27,7 +27,15 @@
 #include <QToolButton>
 
 namespace {
-QString overrideKey(const QString &band) { return band.isEmpty() ? QStringLiteral("other") : band; }
+}
+
+// Identifies "where the rig is" for the receive-only confirmation: the amateur
+// band, outside the bands a 100 kHz bucket (one confirmation never covers a
+// QSY from 4.6 MHz to 27.5 MHz).
+QString MainWindow::txBandKey(double hz)
+{
+    const QString band = M3StandardFrequencies::bandOf(hz);
+    return band.isEmpty() ? QStringLiteral("other:%1").arg(qRound64(hz / 100000.0)) : band;
 }
 
 // Dial frequency the next transmission goes out on: CAT (the RX dial while an
@@ -54,7 +62,7 @@ bool MainWindow::txBandPermitted(bool automatic) const
     const QString band = M3StandardFrequencies::bandOf(hz);
     if (M3BandPolicy::txAllowedOn(m_settings.bandsConfigured, m_settings.txBands, band)) return true;
     if (automatic) return false;
-    return m_txBandOverride == overrideKey(band);
+    return m_txBandOverride == txBandKey(hz);
 }
 
 QString MainWindow::txBandRefusalReason() const
@@ -103,7 +111,7 @@ bool MainWindow::confirmTxBand(const QString &what)
         appendLog(QStringLiteral("%1 not sent: %2").arg(label, reason));
         return false;
     }
-    m_txBandOverride = overrideKey(band);
+    m_txBandOverride = txBandKey(hz);
     appendLog(uiText("tx_band_confirmed_log", "TX on %1 confirmed by the operator (band is receive only); valid until the band changes.")
                   .arg(band.isEmpty() ? formatRigFrequency(hz) : band));
     return true;

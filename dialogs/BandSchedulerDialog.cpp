@@ -476,6 +476,7 @@ void BandSchedulerDialog::importPlan()
             L(QStringLiteral("scheduler_import_tx_confirm"),
               QStringLiteral("%1 entries of this plan send WSPR beacons (automatic TX). Keep them as TX entries?")).arg(sending.size()),
             QMessageBox::NoButton, this);
+        box.setTextFormat(Qt::PlainText);   // band/date text comes from a file
         box.setDetailedText(lines.join(QLatin1Char('\n')));
         box.setInformativeText(lines.mid(0, 12).join(QLatin1Char('\n')));
         QPushButton *keep = box.addButton(L(QStringLiteral("scheduler_import_tx_keep"), QStringLiteral("Keep TX")), QMessageBox::AcceptRole);

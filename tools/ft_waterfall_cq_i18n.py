@@ -1429,3 +1429,12 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'WSPR kan ikke sende kallesignalet %1: bare standard kallesignal (f.eks. DO3BOX) og kallesignal med prefiks eller suffiks (f.eks. DL/DO3BOX) passer. Baken forblir av; mottak fungerer.',
   'WSPR nemůže vysílat značku %1: vyhovují jen standardní značky (např. DO3BOX) a značky s prefixem nebo příponou (např. DL/DO3BOX). Maják zůstane vypnutý; příjem funguje.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft_unsolicited_not_answered_log':(
+  'FT: the call from %1 is not answered automatically (no CQ or QSO of yours; automatic TX is off, paused by the QSY plan or not allowed on this band).',
+  'FT: la chiamata di %1 non riceve risposta automatica (nessun tuo CQ o QSO; la TX automatica è disattivata, sospesa dal piano QSY o non consentita su questa banda).',
+  'FT : l’appel de %1 ne reçoit pas de réponse automatique (pas de CQ ni de QSO de votre part ; la TX automatique est coupée, suspendue par le plan de QSY ou non autorisée sur cette bande).',
+  'FT: Der Anruf von %1 wird nicht automatisch beantwortet (kein eigenes CQ oder QSO; automatisches TX ist aus, durch den QSY-Plan pausiert oder auf diesem Band nicht erlaubt).',
+  'FT: Anropet fra %1 besvares ikke automatisk (ingen egen CQ eller QSO; automatisk TX er av, satt på pause av QSY-planen eller ikke tillatt på dette båndet).',
+  'FT: Volání od %1 se automaticky neodpovídá (žádné vlastní CQ ani QSO; automatické TX je vypnuto, pozastaveno plánem QSY nebo na tomto pásmu nepovoleno).'),
+}.items()})
