@@ -1513,7 +1513,6 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'filter_hide_blocked':(
   'Hide excluded countries and continents in the views','Nascondi paesi e continenti esclusi nelle viste','Masquer les pays et continents exclus dans les vues',
   'Ausgeschlossene Länder und Kontinente in den Ansichten ausblenden','Skjul utelukkede land og kontinenter i visningene','Skrýt vyloučené země a kontinenty v zobrazeních'),
- 'menu_decode':('Decode','Decodifica','Décodage','Dekodierung','Dekoding','Dekódování'),
  'menu_station':('Station','Stazione','Station','Station','Stasjon','Stanice'),
  'menu_operation':('Operation','Operatività','Exploitation','Betrieb','Drift','Provoz'),
  'menu_view':('View','Vista','Affichage','Ansicht','Visning','Zobrazení'),
