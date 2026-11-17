@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- MadModem's settings are no longer imported at the first start (only its ADIF logbook still is), so format
+  changes of MadModem never reach m³.
 - Configuration files are now `settings.m3cfg` and `configs/NAME.m3cfg` (was `.mad`, MadModem's name). Old files
   are converted at start by renaming; an existing `.m3cfg` is never replaced. `--config` also takes an old
   `.mad` path (continues as `.m3cfg`). Older program versions do not find the renamed file.

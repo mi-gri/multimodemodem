@@ -8,7 +8,7 @@
 // Program file, application name, settings and data folders, source
 // identifiers (M3*), the CMake target and the WSJT-X UDP id all use the fork's
 // name; "MadModem" remains only in references to the original program and
-// where old data is read (see M3Installation::adoptUpstreamUserData).
+// where the old ADIF logbook is read (see M3Installation::adoptUpstreamUserData).
 // brand() still maps "MadModem"/"MM" in texts that come from elsewhere.
 namespace ProductName {
 

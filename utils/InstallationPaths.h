@@ -43,10 +43,11 @@ inline QString userFile(const QString &executableDir, const QString &userDir, co
     QDir().mkpath(userDir);
     return target;
 }
-// MultiModeModem (m³) runs under its own application name, so Qt's user
-// folders moved from …/MultiModeModem to …/MultiModeModem. Copy the settings and the
-// default logbook from the MultiModeModem folders once; never overwrite, never
-// delete, so MultiModeModem itself keeps working. Diagnostics are not copied.
+// m³ runs under its own application name, so Qt's user folders differ from
+// MadModem's.  The default ADIF logbook is copied once from MadModem's folder
+// (never overwritten, never deleted; ADIF is a standard format).  Settings are
+// NOT imported: m³ has its own configuration files (*.m3cfg) so that changes
+// of MadModem's format never reach it.  Diagnostics are not copied.
 // Settings files hold account secrets; keep them readable by the owner only.
 inline void restrictToOwner(const QString &file)
 {
@@ -165,28 +166,20 @@ inline QString settingsFileFor(const QString &executableDir, const QString &conf
 
 inline void adoptUpstreamUserData()
 {
-    // Settings next to the program take precedence over MultiModeModem's folder.
+    // m³'s own settings next to the program (portable builds, older versions)
+    // move to the config folder; MadModem's settings are not read.
     if (!qEnvironmentVariableIsSet("M3_CONFIG_DIR"))
         defaultSettingsFile(QCoreApplication::applicationDirPath(), configDirectory());
-    const struct { QStandardPaths::StandardLocation location; const char *file; } items[] = {
-        {QStandardPaths::AppConfigLocation, "settings.mad"},
-        {QStandardPaths::AppLocalDataLocation, "logbook.adi"},
-    };
-    for (const auto &item : items) {
-        const QString target = QStandardPaths::writableLocation(item.location);
-        if (target.isEmpty()) continue;
-        if (item.location == QStandardPaths::AppConfigLocation && qEnvironmentVariableIsSet("M3_CONFIG_DIR")) continue;
-        if (item.location == QStandardPaths::AppConfigLocation &&
-            QFileInfo::exists(QDir(target).filePath(QStringLiteral("settings") + configExtension()))) continue;   // already converted
-        QDir upstreamDir(target);
-        if (upstreamDir.dirName() == QStringLiteral("MadModem")) continue;
-        upstreamDir.cdUp();
-        const QString source = upstreamDir.filePath(QStringLiteral("MadModem/") + QLatin1String(item.file));
-        const QString destination = QDir(target).filePath(QLatin1String(item.file));
-        if (QFileInfo::exists(destination) || !QFileInfo::exists(source)) continue;
-        QDir().mkpath(target);
-        QFile::copy(source, destination);
-    }
+    const QString target = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    if (target.isEmpty()) return;
+    QDir upstreamDir(target);
+    if (upstreamDir.dirName() == QStringLiteral("MadModem")) return;
+    upstreamDir.cdUp();
+    const QString source = upstreamDir.filePath(QStringLiteral("MadModem/logbook.adi"));
+    const QString destination = QDir(target).filePath(QStringLiteral("logbook.adi"));
+    if (QFileInfo::exists(destination) || !QFileInfo::exists(source)) return;
+    QDir().mkpath(target);
+    QFile::copy(source, destination);
 }
 
 // Settings always live in the platform's config folder (Linux:
