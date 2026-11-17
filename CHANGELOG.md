@@ -4,6 +4,7 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Settings → Frequencies: a row whose frequency you change moves to its place; the list stays sorted by frequency.
 - JS8: directed queries that JS8 answers automatically (SNR? GRID? INFO? STATUS? HEARING? QUERY ...
   AGN? MSG) are refused when the target is an @group or @ALLCALL ("select a station first"); a new
   CMD menu next to SNR? sends the common queries to the station in To.

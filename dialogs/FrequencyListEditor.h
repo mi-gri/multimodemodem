@@ -39,7 +39,8 @@ public:
 private:
     QString L(const QString &source) const;
     void load(const QVector<M3StandardFrequencies::Entry> &entries);
-    void appendRow(const M3StandardFrequencies::Entry &entry);
+    void appendRow(const M3StandardFrequencies::Entry &entry, int at = -1);
+    int sortRowIntoPlace(int row);   // after a frequency edit: keep the list sorted by frequency
     void updateRow(int row);
     void applyFilter();
     void unpreferOthers(int row);

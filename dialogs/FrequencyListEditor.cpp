@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "FrequencyListEditor.h"
 
+#include <QTimer>
 #include <QAbstractItemView>
 #include <QBrush>
 #include <QCheckBox>
@@ -99,7 +100,23 @@ FrequencyListEditor::FrequencyListEditor(const QVector<M3StandardFrequencies::En
     connect(m_filter, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() { applyFilter(); });
     connect(m_table, &QTableWidget::itemChanged, this, [this](QTableWidgetItem *item) {
         if (m_loading || item == nullptr) return;
-        if (item->column() == ColFrequency) updateRow(item->row());
+        if (item->column() == ColFrequency) {
+            updateRow(item->row());
+            // Sort after the editor has closed: removing the row under an open
+            // delegate would crash.
+            const int row = item->row();
+            QTimer::singleShot(0, this, [this, row]() {
+                if (row < 0 || row >= m_table->rowCount()) return;
+                const int now = sortRowIntoPlace(row);
+                if (now != row) {
+                    m_table->clearSelection();
+                    m_table->selectRow(now);
+                    m_table->setCurrentCell(now, ColFrequency);
+                    m_table->scrollToItem(m_table->item(now, ColFrequency));
+                }
+                updateSummary();
+            });
+        }
         if (item->column() == ColPreferred && item->checkState() == Qt::Checked) unpreferOthers(item->row());
         updateSummary();
     });
@@ -155,11 +172,11 @@ void FrequencyListEditor::load(const QVector<M3StandardFrequencies::Entry> &entr
     updateSummary();
 }
 
-void FrequencyListEditor::appendRow(const M3StandardFrequencies::Entry &entry)
+void FrequencyListEditor::appendRow(const M3StandardFrequencies::Entry &entry, int at)
 {
     const bool wasLoading = m_loading;
     m_loading = true;
-    const int row = m_table->rowCount();
+    const int row = (at >= 0 && at <= m_table->rowCount()) ? at : m_table->rowCount();
     m_table->insertRow(row);
 
     auto *mode = new QComboBox(m_table);
@@ -192,6 +209,45 @@ void FrequencyListEditor::appendRow(const M3StandardFrequencies::Entry &entry)
     m_table->setItem(row, ColDescription, new QTableWidgetItem(entry.description));
     updateRow(row);
     m_loading = wasLoading;
+}
+
+// The edited row moves to where its frequency belongs (after rows of equal
+// frequency).  Rows with an unreadable frequency stay where they are and are
+// skipped when looking for the place.  Returns the row's new index.
+int FrequencyListEditor::sortRowIntoPlace(int row)
+{
+    bool ok = false;
+    const double hz = rowHz(row, &ok);
+    if (!ok) return row;
+    // Already in place: the nearest valid neighbours bracket the frequency.
+    bool inPlace = true;
+    for (int r = row - 1; r >= 0; --r) {
+        bool v = false; const double h = rowHz(r, &v);
+        if (v) { inPlace = inPlace && h <= hz; break; }
+    }
+    for (int r = row + 1; r < m_table->rowCount(); ++r) {
+        bool v = false; const double h = rowHz(r, &v);
+        if (v) { inPlace = inPlace && h >= hz; break; }
+    }
+    if (inPlace) return row;
+
+    M3StandardFrequencies::Entry e;
+    e.hz = hz;
+    e.mode = rowMode(row);
+    e.region = rowRegion(row);
+    if (auto *p = m_table->item(row, ColPreferred)) e.preferred = p->checkState() == Qt::Checked;
+    if (auto *d = m_table->item(row, ColDescription)) e.description = d->text();
+    m_loading = true;
+    m_table->removeRow(row);
+    int pos = m_table->rowCount();
+    for (int r = 0; r < m_table->rowCount(); ++r) {
+        bool v = false; const double h = rowHz(r, &v);
+        if (v && h > hz) { pos = r; break; }
+    }
+    appendRow(e, pos);
+    m_loading = false;
+    applyFilter();
+    return pos;
 }
 
 QString FrequencyListEditor::rowMode(int row) const
