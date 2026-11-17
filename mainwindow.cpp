@@ -9471,11 +9471,15 @@ void MainWindow::setupFt8Page()
         daysAction->setDefaultWidget(daysRow);
         filterMenu->addAction(daysAction);
     }
-    // JTDX "Hide messages from countries": DXCC primary prefixes (cty.dat).
-    m_actFt8FilterCountries = filterMenu->addAction(uiText("ft_filter_countries", "Hide countries"));
+    // Menu bar "Filter": the block list (countries/continents) for every automatic mode,
+    // and the switches that say how the views and the automation use it.
+    m_menuFilter = new QMenu(uiText("ft_filter", "Filter"), this);
+    m_menuFilter->setToolTipsVisible(true);
+    // JTDX-style country filter: DXCC primary prefixes (cty.dat).
+    m_actFt8FilterCountries = m_menuFilter->addAction(uiText("filter_block_countries", "Block countries"));
     m_actFt8FilterCountries->setCheckable(true);
     m_actFt8FilterCountries->setChecked(m_settings.ftDecodeFilterCountries);
-    m_actFt8FilterCountries->setToolTip(uiText("ft_filter_countries_tooltip", "Hides stations from the DXCC countries listed below; Auto QSO does not call them either. Stations on the watch list stay visible."));
+    m_actFt8FilterCountries->setToolTip(uiText("filter_block_countries_tooltip", "Stations from the DXCC countries listed below are never answered or called automatically (FT8/FT4 Auto QSO, JS8 auto reply). Stations on the watch list stay allowed."));
     {
         QWidget *countriesRow = new QWidget(filterMenu);
         QHBoxLayout *countriesLayout = new QHBoxLayout(countriesRow);
@@ -9508,8 +9512,8 @@ void MainWindow::setupFt8Page()
         showResolved(m_editFt8FilterCountries->text());
         connect(m_editFt8FilterCountries, &QLineEdit::textChanged, this, showResolved);
         countriesAction->setDefaultWidget(countriesRow);
-        filterMenu->addAction(countriesAction);
-        filterMenu->addAction(resolvedAction);
+        m_menuFilter->addAction(countriesAction);
+        m_menuFilter->addAction(resolvedAction);
         connect(m_editFt8FilterCountries, &QLineEdit::textEdited, this, [this](const QString &text) {
             const int pos = m_editFt8FilterCountries->cursorPosition();
             m_editFt8FilterCountries->setText(text.toUpper());
@@ -9517,9 +9521,9 @@ void MainWindow::setupFt8Page()
         });
     }
     // JTDX "Hide messages from continents".
-    m_menuFt8FilterContinents = filterMenu->addMenu(uiText("ft_filter_continents", "Hide continents"));
+    m_menuFt8FilterContinents = m_menuFilter->addMenu(uiText("filter_block_continents", "Block continents"));
     m_menuFt8FilterContinents->setToolTipsVisible(true);
-    m_menuFt8FilterContinents->setToolTip(uiText("ft_filter_continents_tooltip", "Hides stations from the ticked continents (cty.dat); Auto QSO does not call them either. Stations on the watch list stay visible."));
+    m_menuFt8FilterContinents->setToolTip(uiText("filter_block_continents_tooltip", "Stations from the ticked continents (cty.dat) are never answered or called automatically. Stations on the watch list stay allowed."));
     {
         const QStringList hiddenContinents = FtDecodeFilter::continentList(m_settings.ftDecodeFilterContinentList);
         const QStringList continentNames = {
@@ -9536,11 +9540,36 @@ void MainWindow::setupFt8Page()
             m_actFt8FilterContinents << action;
         }
     }
+    m_menuFilter->addSeparator();
+    m_actFilterHideBlocked = m_menuFilter->addAction(uiText("filter_hide_blocked", "Hide blocked countries and continents in the views"));
+    m_actFilterHideBlocked->setCheckable(true);
+    m_actFilterHideBlocked->setChecked(m_settings.ftDecodeFilterHideBlocked);
+    m_actFilterHideBlocked->setToolTip(uiText("filter_hide_blocked_tooltip", "Decode lists (FT8/FT4, RTTY skimmer) do not show stations from blocked countries and continents. Off: they are shown, but still not answered automatically."));
+    m_actFilterKeepMine = m_menuFilter->addAction(uiText("filter_keep_mine", "Always show messages to me"));
+    m_actFilterKeepMine->setCheckable(true);
+    m_actFilterKeepMine->setChecked(m_settings.ftDecodeFilterKeepMine);
+    m_actFilterKeepMine->setToolTip(uiText("filter_keep_mine_tooltip", "Messages addressed to your station (also to a special call shown as <CALL>) stay visible whatever the filters hide. Off: they are filtered like all others."));
+    m_actFilterAnswerCalls = m_menuFilter->addAction(uiText("filter_answer_calls", "Answer calls without own CQ"));
+    m_actFilterAnswerCalls->setCheckable(true);
+    m_actFilterAnswerCalls->setChecked(m_settings.ftAnswerUnsolicited);
+    m_actFilterAnswerCalls->setToolTip(uiText("filter_answer_calls_tooltip", "Auto mode answers a station that calls you although you are in standby (no CQ, no QSO). Off: such calls are only shown; answer them yourself (double-click). The station you just worked is always answered (repeated report)."));
+    {
+        QAction *insertBefore = m_actionAppSettings != nullptr ? m_actionAppSettings : (ui->menuHelp != nullptr ? ui->menuHelp->menuAction() : nullptr);
+        if (insertBefore != nullptr && ui->menubar->actions().contains(insertBefore)) ui->menubar->insertMenu(insertBefore, m_menuFilter);
+        else ui->menubar->addMenu(m_menuFilter);
+    }
+    filterMenu->addSeparator();
+    filterMenu->addAction(uiText("filter_open_block_menu", "Blocked countries and continents …"), this, [this]() {
+        if (m_menuFilter != nullptr) m_menuFilter->popup(QCursor::pos());
+    });
     filterMenu->setToolTipsVisible(true);
     m_btnFt8DecodeFilter->setMenu(filterMenu);
     const auto filterChanged = [this]() {
         m_settings.ftDecodeFilterCqEnd = m_actFt8FilterCqEnd->isChecked();
         m_settings.ftDecodeFilterWorked = m_actFt8FilterWorked->isChecked();
+        m_settings.ftDecodeFilterHideBlocked = m_actFilterHideBlocked->isChecked();
+        m_settings.ftDecodeFilterKeepMine = m_actFilterKeepMine->isChecked();
+        m_settings.ftAnswerUnsolicited = m_actFilterAnswerCalls->isChecked();
         m_settings.ftDecodeFilterWorkedDays = m_spinFt8FilterWorkedDays->value();
         m_settings.ftDecodeFilterCountryList =
             FtDecodeFilter::countryPrefixList(m_editFt8FilterCountries->text()).join(QLatin1Char(','));
@@ -9558,9 +9587,13 @@ void MainWindow::setupFt8Page()
         m_settings.ftDecodeFilterContinentList = hiddenContinents.join(QLatin1Char(','));
         updateFt8DecodeFilterButton();
         applyFt8DecodeFilter();
+        renderRttyBrowser();
         m_settings.save();
     };
     connect(m_actFt8FilterCqEnd, &QAction::toggled, this, filterChanged);
+    connect(m_actFilterHideBlocked, &QAction::toggled, this, filterChanged);
+    connect(m_actFilterKeepMine, &QAction::toggled, this, filterChanged);
+    connect(m_actFilterAnswerCalls, &QAction::toggled, this, filterChanged);
     connect(m_actFt8FilterWorked, &QAction::toggled, this, filterChanged);
     connect(m_spinFt8FilterWorkedDays, QOverload<int>::of(&QSpinBox::valueChanged), this, filterChanged);
     connect(m_actFt8FilterCountries, &QAction::toggled, this, filterChanged);
@@ -19957,7 +19990,7 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
     seqContext.startToleranceHz = 25;
     seqContext.stopToleranceHz = 50;
 
-    const FtQsoSequencer::Decision decision = FtQsoSequencer::evaluateDecode(seqDecode, seqContext);
+    FtQsoSequencer::Decision decision = FtQsoSequencer::evaluateDecode(seqDecode, seqContext);
     const FtQsoSequencer::ParsedMessage &parsed = decision.parsed;
     if (decision.action != FtQsoSequencer::Action::Ignore || parsed.addressedToMe ||
         (!m_ftSession.dxCall.isEmpty() && FtDecodedText::callMatches(parsed.senderCall,m_ftSession.dxCall)))
@@ -19972,22 +20005,57 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         qAbs(m_lastCompletedFt8Utc.secsTo(QDateTime::currentDateTimeUtc())) <= 120;
     if (!m_ftSession.qsoActive && sameAsRecentlyCompleted &&
         (parsed.final73 || parsed.rr73 || parsed.rrr || parsed.addressedToMe)) {
-        appendLog(QString("FT sequencer: ignoring late/repeated post-QSO decode from %1; QSO was already completed.")
-                      .arg(parsed.senderCall));
-        return;
+        // The partner repeats his R report: he did not hear my RR73. Send it again
+        // (twice at most, only with automatic TX permitted); anything else is a late
+        // duplicate and ignored.
+        const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+        const QString partnerKey = parsed.senderCall.trimmed().toUpper();
+        if (m_ftResendCall != partnerKey || nowMs - m_ftResendFirstMs > 180000) {
+            m_ftResendCall = partnerKey;
+            m_ftResendCount = 0;
+            m_ftResendFirstMs = nowMs;
+        }
+        const bool repeatedReport = parsed.addressedToMe && parsed.rReport && !parsed.final73 && !parsed.rr73 && !parsed.rrr;
+        if (!(repeatedReport && m_ftResendCount < 2 && autoTxPermitted() && !m_ft8OperatorStopLatched &&
+              ftAutoQsoFilterReason(parsed.senderCall).isEmpty())) {
+            appendLog(QString("FT sequencer: ignoring late/repeated post-QSO decode from %1; QSO was already completed.")
+                          .arg(parsed.senderCall));
+            return;
+        }
+        ++m_ftResendCount;
+        appendLog(QString("FT sequencer: %1 repeats the report; RR73 is sent again (%2/2).").arg(parsed.senderCall).arg(m_ftResendCount));
+        m_ftSession.startQso(parsed.senderCall, QString(), decode.frequencyHz);
+        m_ftSession.state = FtQsoSession::State::WaitingRReport;
+        m_ftSession.autoLogDone = true;   // already logged
+        seqContext = m_ftSession.makeContext(
+            myCall,
+            (m_spinFt8RxFreq != nullptr) ? m_spinFt8RxFreq->value() : m_settings.ft8RxFrequencyHz,
+            (m_spinFt8TxFreq != nullptr) ? m_spinFt8TxFreq->value() : m_settings.ft8TxFrequencyHz);
+        seqContext.txActive = false;
+        seqContext.startToleranceHz = 25;
+        seqContext.stopToleranceHz = 50;
+        decision = FtQsoSequencer::evaluateDecode(seqDecode, seqContext);
     }
 
     // A call that would start a QSO while the operator has done nothing (no CQ,
     // no QSO) is an automatic transmission: only with Auto mode, never while the
     // QSY plan runs, and on a band with TX permission.
-    if (decision.startsQso && !m_ftSession.qsoActive && !ftOperatorEngaged() && !autoTxPermitted()) {
-        static QString lastCaller;
-        if (lastCaller != parsed.senderCall) {
-            lastCaller = parsed.senderCall;
-            appendLog(uiText("ft_unsolicited_not_answered_log", "FT: the call from %1 is not answered automatically (no CQ or QSO of yours; automatic TX is off, paused by the QSY plan or not allowed on this band).")
-                          .arg(parsed.senderCall));
+    if (decision.startsQso && !m_ftSession.qsoActive && !ftOperatorEngaged()) {
+        // Unsolicited caller: needs automatic TX, the switch "Answer calls without own
+        // CQ" (Filter menu) and a country/continent that is not blocked.
+        const QString blockReason = ftAutoQsoFilterReason(parsed.senderCall);
+        if (!(autoTxPermitted() && m_settings.ftAnswerUnsolicited) || !blockReason.isEmpty()) {
+            static QString lastCaller;
+            if (lastCaller != parsed.senderCall) {
+                lastCaller = parsed.senderCall;
+                appendLog(QStringLiteral("FT: the call from %1 is not answered automatically (%2).")
+                              .arg(parsed.senderCall,
+                                   !blockReason.isEmpty() ? blockReason
+                                   : !autoTxPermitted() ? QStringLiteral("automatic TX is off, paused by the QSY plan or not allowed on this band")
+                                                        : QStringLiteral("\"Answer calls without own CQ\" is off")));
+            }
+            return;
         }
-        return;
     }
 
     if (decision.action == FtQsoSequencer::Action::StopTx) {
@@ -20950,8 +21018,9 @@ bool MainWindow::ft8DecodeRowPassesFilter(int row) const
 {
     const bool cqEnd = m_settings.ftDecodeFilterCqEnd;
     const bool worked = m_settings.ftDecodeFilterWorked;
-    const bool countries = m_settings.ftDecodeFilterCountries;
-    const QStringList hiddenContinents = FtDecodeFilter::continentList(m_settings.ftDecodeFilterContinentList);
+    const bool hideBlocked = m_settings.ftDecodeFilterHideBlocked;
+    const bool countries = m_settings.ftDecodeFilterCountries && hideBlocked;
+    const QStringList hiddenContinents = hideBlocked ? FtDecodeFilter::continentList(m_settings.ftDecodeFilterContinentList) : QStringList();
     const bool continents = !hiddenContinents.isEmpty();
     if (m_tableFt8Rx == nullptr || (!cqEnd && !worked && !countries && !continents)) {
         return true;
@@ -20969,10 +21038,11 @@ bool MainWindow::ft8DecodeRowPassesFilter(int row) const
     QString message = messageItem->data(kFtOriginalMessageRole).toString();
     if (message.isEmpty()) message = messageItem->text();
     const QString myCall = stationCallsign();
-    if (FtDecodeFilter::lineKind(message, myCall) == FtDecodeFilter::LineKind::MyCall) {
-        return true;   // lines to me always stay
+    const bool keepMine = m_settings.ftDecodeFilterKeepMine;
+    if (keepMine && FtDecodeFilter::lineKind(message, myCall) == FtDecodeFilter::LineKind::MyCall) {
+        return true;   // lines to me stay (switch in the Filter menu)
     }
-    if (cqEnd && !FtDecodeFilter::passesCqEnd(message, myCall)) {
+    if (cqEnd && !FtDecodeFilter::passesCqEnd(message, keepMine ? myCall : QString())) {
         return false;
     }
     if (countries && !messageItem->data(kFtWatchedRole).toBool() &&
@@ -21005,8 +21075,8 @@ void MainWindow::updateFt8DecodeFilterButton()
         return;
     }
     const int active = (m_settings.ftDecodeFilterCqEnd ? 1 : 0) + (m_settings.ftDecodeFilterWorked ? 1 : 0) +
-                       (m_settings.ftDecodeFilterCountries ? 1 : 0) +
-                       (FtDecodeFilter::continentList(m_settings.ftDecodeFilterContinentList).isEmpty() ? 0 : 1);
+                       ((m_settings.ftDecodeFilterHideBlocked && m_settings.ftDecodeFilterCountries) ? 1 : 0) +
+                       ((m_settings.ftDecodeFilterHideBlocked && !FtDecodeFilter::continentList(m_settings.ftDecodeFilterContinentList).isEmpty()) ? 1 : 0);
     const QString title = uiText("ft_filter", "Filter");
     m_btnFt8DecodeFilter->setText(active > 0 ? QStringLiteral("%1 (%2) ▾").arg(title).arg(active)
                                              : title + QStringLiteral(" ▾"));

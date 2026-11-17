@@ -673,6 +673,9 @@ void AppSettings::load()
     ftDecodeFilterWorked = settings.value("FT8/decodeFilterWorked", ftDecodeFilterWorked).toBool();
     ftDecodeFilterWorkedDays = qBound(0, settings.value("FT8/decodeFilterWorkedDays", ftDecodeFilterWorkedDays).toInt(), 3650);
     ftDecodeFilterCountries = settings.value("FT8/decodeFilterCountries", ftDecodeFilterCountries).toBool();
+    ftAnswerUnsolicited = settings.value("FT8/answerUnsolicited", ftAnswerUnsolicited).toBool();
+    ftDecodeFilterKeepMine = settings.value("FT8/decodeFilterKeepMine", ftDecodeFilterKeepMine).toBool();
+    ftDecodeFilterHideBlocked = settings.value("FT8/decodeFilterHideBlocked", ftDecodeFilterHideBlocked).toBool();
     ftDecodeFilterCountryList = settings.value("FT8/decodeFilterCountryList", ftDecodeFilterCountryList).toString();
     ftDecodeFilterContinentList = settings.value("FT8/decodeFilterContinentList", ftDecodeFilterContinentList).toString();
     ftHighlightNewCountryEnabled = settings.value("FT8/highlightNewCountryEnabled", ftHighlightNewCountryEnabled).toBool();
@@ -1120,6 +1123,9 @@ bool AppSettings::save() const
     settings.setValue("FT8/decodeFilterWorked", ftDecodeFilterWorked);
     settings.setValue("FT8/decodeFilterWorkedDays", ftDecodeFilterWorkedDays);
     settings.setValue("FT8/decodeFilterCountries", ftDecodeFilterCountries);
+    settings.setValue("FT8/answerUnsolicited", ftAnswerUnsolicited);
+    settings.setValue("FT8/decodeFilterKeepMine", ftDecodeFilterKeepMine);
+    settings.setValue("FT8/decodeFilterHideBlocked", ftDecodeFilterHideBlocked);
     settings.setValue("FT8/decodeFilterCountryList", ftDecodeFilterCountryList);
     settings.setValue("FT8/decodeFilterContinentList", ftDecodeFilterContinentList);
     settings.setValue("FT8/highlightNewCountryEnabled", ftHighlightNewCountryEnabled);

@@ -853,6 +853,18 @@ void MainWindow::js8ProcessCommand(const Js8Command &command)
     ctx.info = m_editJs8Info != nullptr ? Js8Message::normalizeText(m_editJs8Info->text()) : QString();
     ctx.status = m_editJs8StatusText != nullptr ? Js8Message::normalizeText(m_editJs8StatusText->text()) : QString();
     ctx.autoReply = autoTxPermitted() && m_chkJs8Auto != nullptr && m_chkJs8Auto->isChecked() && !m_js8WatchdogTripped;
+    if (ctx.autoReply && !command.from.isEmpty()) {
+        // Central block list (Filter menu): no automatic reply to blocked countries/continents.
+        const QString blockReason = ftAutoQsoFilterReason(Js8Message::baseCallsign(command.from));
+        if (!blockReason.isEmpty()) {
+            ctx.autoReply = false;
+            static QString lastBlocked;
+            if (lastBlocked != command.from) {
+                lastBlocked = command.from;
+                appendLog(QStringLiteral("JS8: no automatic reply to %1 (%2).").arg(command.from, blockReason));
+            }
+        }
+    }
     ctx.heartbeatAck = m_chkJs8HbAck != nullptr && m_chkJs8HbAck->isChecked();
     ctx.relay = m_chkJs8Relay != nullptr && m_chkJs8Relay->isChecked();
     ctx.heardRecentFirst = js8RecentCalls();

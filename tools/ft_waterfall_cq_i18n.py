@@ -1456,3 +1456,54 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'PSK Reporter: spots satt på pause i %1 s etter frekvensendringen til %2.',
   'PSK Reporter: spoty pozastaveny na %1 s po změně kmitočtu na %2.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'filter_block_countries':('Block countries','Blocca paesi','Bloquer des pays','Länder sperren','Blokker land','Blokovat země'),
+ 'filter_block_countries_tooltip':(
+  'Stations from the DXCC countries listed below are never answered or called automatically (FT8/FT4 Auto QSO, JS8 auto reply). Stations on the watch list stay allowed.',
+  'Le stazioni dei paesi DXCC elencati sotto non vengono mai chiamate né ricevono risposta automatica (Auto QSO FT8/FT4, risposta automatica JS8). Le stazioni della lista di controllo restano consentite.',
+  'Les stations des pays DXCC listés ci-dessous ne sont jamais appelées ni répondues automatiquement (Auto QSO FT8/FT4, réponse automatique JS8). Les stations de la liste de surveillance restent autorisées.',
+  'Stationen aus den unten aufgeführten DXCC-Ländern werden nie automatisch angerufen oder beantwortet (Auto-QSO FT8/FT4, JS8-Autoantwort). Stationen der Beobachtungsliste bleiben erlaubt.',
+  'Stasjoner fra DXCC-landene nedenfor blir aldri kalt eller besvart automatisk (Auto QSO FT8/FT4, JS8 autosvar). Stasjoner på overvåkingslisten er fortsatt tillatt.',
+  'Stanice z níže uvedených zemí DXCC se nikdy automaticky nevolají ani neodpovídá se jim (Auto QSO FT8/FT4, automatická odpověď JS8). Stanice ze seznamu sledovaných zůstávají povolené.'),
+ 'filter_block_continents':('Block continents','Blocca continenti','Bloquer des continents','Kontinente sperren','Blokker kontinenter','Blokovat kontinenty'),
+ 'filter_block_continents_tooltip':(
+  'Stations from the ticked continents (cty.dat) are never answered or called automatically. Stations on the watch list stay allowed.',
+  'Le stazioni dei continenti selezionati (cty.dat) non vengono mai chiamate né ricevono risposta automatica. Le stazioni della lista di controllo restano consentite.',
+  'Les stations des continents cochés (cty.dat) ne sont jamais appelées ni répondues automatiquement. Les stations de la liste de surveillance restent autorisées.',
+  'Stationen der angehakten Kontinente (cty.dat) werden nie automatisch angerufen oder beantwortet. Stationen der Beobachtungsliste bleiben erlaubt.',
+  'Stasjoner fra de avkryssede kontinentene (cty.dat) blir aldri kalt eller besvart automatisk. Stasjoner på overvåkingslisten er fortsatt tillatt.',
+  'Stanice z označených kontinentů (cty.dat) se nikdy automaticky nevolají ani neodpovídá se jim. Stanice ze seznamu sledovaných zůstávají povolené.'),
+ 'filter_hide_blocked':(
+  'Hide blocked countries and continents in the views','Nascondi paesi e continenti bloccati nelle viste','Masquer les pays et continents bloqués dans les vues',
+  'Gesperrte Länder und Kontinente in den Ansichten ausblenden','Skjul blokkerte land og kontinenter i visningene','Skrýt blokované země a kontinenty v zobrazeních'),
+ 'filter_hide_blocked_tooltip':(
+  'Decode lists (FT8/FT4, RTTY skimmer) do not show stations from blocked countries and continents. Off: they are shown, but still not answered automatically.',
+  'Le liste di decodifica (FT8/FT4, skimmer RTTY) non mostrano le stazioni di paesi e continenti bloccati. Disattivato: vengono mostrate, ma senza risposta automatica.',
+  'Les listes de décodage (FT8/FT4, skimmer RTTY) n’affichent pas les stations des pays et continents bloqués. Désactivé : elles sont affichées, mais toujours sans réponse automatique.',
+  'Dekodierlisten (FT8/FT4, RTTY-Skimmer) zeigen keine Stationen aus gesperrten Ländern und Kontinenten. Aus: Sie werden angezeigt, aber trotzdem nicht automatisch beantwortet.',
+  'Dekodelistene (FT8/FT4, RTTY-skimmer) viser ikke stasjoner fra blokkerte land og kontinenter. Av: de vises, men besvares fortsatt ikke automatisk.',
+  'Seznamy dekódování (FT8/FT4, skimmer RTTY) nezobrazují stanice z blokovaných zemí a kontinentů. Vypnuto: zobrazí se, ale stále se na ně automaticky neodpovídá.'),
+ 'filter_keep_mine':(
+  'Always show messages to me','Mostra sempre i messaggi per me','Toujours afficher les messages pour moi',
+  'Nachrichten an mich immer anzeigen','Vis alltid meldinger til meg','Vždy zobrazit zprávy pro mě'),
+ 'filter_keep_mine_tooltip':(
+  'Messages addressed to your station (also to a special call shown as <CALL>) stay visible whatever the filters hide. Off: they are filtered like all others.',
+  'I messaggi indirizzati alla tua stazione (anche a un nominativo speciale mostrato come <CALL>) restano visibili qualunque cosa nascondano i filtri. Disattivato: vengono filtrati come tutti gli altri.',
+  'Les messages adressés à votre station (aussi à un indicatif spécial affiché comme <CALL>) restent visibles quels que soient les filtres. Désactivé : ils sont filtrés comme les autres.',
+  'Nachrichten an deine Station (auch an ein Sonderrufzeichen, das als <CALL> erscheint) bleiben sichtbar, was die Filter auch ausblenden. Aus: Sie werden wie alle anderen gefiltert.',
+  'Meldinger til stasjonen din (også til et spesialkallesignal vist som <CALL>) forblir synlige uansett hva filtrene skjuler. Av: de filtreres som alle andre.',
+  'Zprávy pro vaši stanici (i pro speciální značku zobrazenou jako <CALL>) zůstanou viditelné, ať filtry skrývají cokoli. Vypnuto: filtrují se jako všechny ostatní.'),
+ 'filter_answer_calls':(
+  'Answer calls without own CQ','Rispondi alle chiamate senza CQ proprio','Répondre aux appels sans CQ propre',
+  'Anrufe ohne eigenes CQ beantworten','Svar på anrop uten eget CQ','Odpovídat na volání bez vlastního CQ'),
+ 'filter_answer_calls_tooltip':(
+  'Auto mode answers a station that calls you although you are in standby (no CQ, no QSO). Off: such calls are only shown; answer them yourself (double-click). The station you just worked is always answered (repeated report).',
+  'La modalità Auto risponde a una stazione che ti chiama anche se sei in standby (nessun CQ, nessun QSO). Disattivato: queste chiamate vengono solo mostrate; rispondi tu stesso (doppio clic). La stazione appena collegata riceve sempre risposta (rapporto ripetuto).',
+  'Le mode Auto répond à une station qui vous appelle bien que vous soyez en veille (ni CQ ni QSO). Désactivé : ces appels sont seulement affichés ; répondez vous-même (double-clic). La station que vous venez de contacter reçoit toujours une réponse (report répété).',
+  'Der Auto-Modus beantwortet eine Station, die dich anruft, obwohl du in Bereitschaft bist (kein CQ, kein QSO). Aus: solche Anrufe werden nur angezeigt; beantworte sie selbst (Doppelklick). Die eben gearbeitete Station wird immer beantwortet (wiederholter Rapport).',
+  'Auto-modus svarer på en stasjon som kaller deg selv om du står i beredskap (ingen CQ, ingen QSO). Av: slike anrop vises bare; svar selv (dobbeltklikk). Stasjonen du nettopp kjørte får alltid svar (gjentatt rapport).',
+  'Režim Auto odpovídá stanici, která vás volá, i když jste v pohotovosti (žádné CQ, žádné QSO). Vypnuto: taková volání se pouze zobrazí; odpovězte sami (dvojklik). Stanici, se kterou jste právě pracovali, se odpovídá vždy (opakovaný report).'),
+ 'filter_open_block_menu':(
+  'Blocked countries and continents …','Paesi e continenti bloccati …','Pays et continents bloqués …',
+  'Gesperrte Länder und Kontinente …','Blokkerte land og kontinenter …','Blokované země a kontinenty …'),
+}.items()})

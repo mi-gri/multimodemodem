@@ -4,6 +4,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- New menu bar item "Filter": one block list (countries, continents) for all automatic modes (FT8/FT4 Auto QSO and
+  callers, JS8 auto reply), switch "Hide blocked countries and continents in the views" (FT list, RTTY skimmer),
+  "Always show messages to me" (exception for all view filters), "Answer calls without own CQ" (default off).
+- FT: a partner who repeats his R report because he missed your RR73 gets RR73 again (twice at most, automatic TX
+  permitted); before, these repeats were ignored.
 - Decode filter: messages to a special/nonstandard own call (shown as "<DL75WAU> ...") were hidden by the
   "CQ/73 only" filter and not coloured as "to me"; they now always stay.
 - Start in a mode with a band selector (MFSK, PSK, Q65, MSK144 ...) no longer QSYs to its first band (160m) while the rig

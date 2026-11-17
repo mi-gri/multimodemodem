@@ -309,6 +309,9 @@ public:
     bool ftDecodeFilterCqEnd = false;       // only CQ/RR73/73
     bool ftDecodeFilterWorked = false;      // hide stations already worked ...
     int ftDecodeFilterWorkedDays = 0;       // ... within this many days, 0 = all worked
+    bool ftAnswerUnsolicited = false;       // Auto mode answers a call although no CQ/QSO of mine is running
+    bool ftDecodeFilterKeepMine = true;     // messages to my station stay visible whatever the filters say
+    bool ftDecodeFilterHideBlocked = true;  // views hide the blocked countries/continents (the block list itself drives the automation)
     bool ftDecodeFilterCountries = false;   // hide stations from these DXCC entities
     QString ftDecodeFilterCountryList;      // comma separated cty.dat primary prefixes
     QString ftDecodeFilterContinentList;    // hidden continents, e.g. "AS,OC" (empty = off)

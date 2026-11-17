@@ -154,8 +154,9 @@ void MainWindow::renderRttyBrowser()
     }
     std::sort(rows.begin(), rows.end(), [](const RttyBrowserRow &a, const RttyBrowserRow &b) { return a.frequencyHz < b.frequencyHz; });
 
-    const QStringList hiddenCountries = m_settings.ftDecodeFilterCountries ? hiddenCountryPrimaryPrefixes() : QStringList();
-    const QStringList hiddenContinents = FtDecodeFilter::continentList(m_settings.ftDecodeFilterContinentList);
+    const bool hideBlocked = m_settings.ftDecodeFilterHideBlocked;
+    const QStringList hiddenCountries = (hideBlocked && m_settings.ftDecodeFilterCountries) ? hiddenCountryPrimaryPrefixes() : QStringList();
+    const QStringList hiddenContinents = hideBlocked ? FtDecodeFilter::continentList(m_settings.ftDecodeFilterContinentList) : QStringList();
     const QString band = m_lastRigFrequencyHz > 0.0 ? bandFromFrequencyHz(m_lastRigFrequencyHz).toLower() : QString();
     const QColor muted = M3Ui::themeColor(M3Ui::ThemeColorRole::MutedText);
     const QColor accent = M3Ui::themeColor(M3Ui::ThemeColorRole::Accent);

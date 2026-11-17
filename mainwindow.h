@@ -2460,6 +2460,11 @@ private:
     mutable const void *m_hiddenCountryCacheCty = nullptr;
     mutable QStringList m_hiddenCountryCache;
     QLineEdit *m_editFt8FilterCountries = nullptr; // ... cty.dat prefixes, comma separated
+    QMenu *m_menuFilter = nullptr;                 // menu bar "Filter": block list + switches for all auto modes
+    QAction *m_actFilterHideBlocked = nullptr, *m_actFilterKeepMine = nullptr, *m_actFilterAnswerCalls = nullptr;
+    QString m_ftResendCall;                        // RR73 repeated for a partner who did not hear it
+    int m_ftResendCount = 0;
+    qint64 m_ftResendFirstMs = 0;
     QMenu *m_menuFt8FilterContinents = nullptr;    // hide continents (JTDX)
     QList<QAction *> m_actFt8FilterContinents;     // one per cty.dat continent code
     QTableWidget *m_tableFt8TxMessages = nullptr;
