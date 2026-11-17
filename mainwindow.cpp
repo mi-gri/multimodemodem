@@ -1906,6 +1906,9 @@ bool MainWindow::reportPskSpot(const QString &call, const QString &grid, double 
                                int snrDb, bool hasSnr, bool requireGrid)
 {
     if (!m_settings.pskReporterEnabled || m_offlineAnalysisActive || m_txRunning) return false;
+    // After a QSY the decodes of the last old-band slot arrive with the new dial
+    // frequency: nothing is reported until they are through (notePskDialChange).
+    if (QDateTime::currentMSecsSinceEpoch() < m_pskHoldUntilMs) return false;
     const QString myCall = stationCallsign();
     const QString myGrid = stationLocator();
     if (myCall.isEmpty() || myGrid.size() < 4 || mode.trimmed().isEmpty()) return false;
@@ -1927,6 +1930,39 @@ bool MainWindow::reportPskSpot(const QString &call, const QString &grid, double 
     spot.hasSnr = hasSnr;
     spot.unixTime = quint32(QDateTime::currentSecsSinceEpoch());
     return m_pskReporter->addSpot(spot);
+}
+
+// One period of the current mode plus 3 s: every slot that began before the
+// QSY has been decoded by then.  Text modes decode almost at once.
+int MainWindow::pskHoldMs() const
+{
+    const QString mode = ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QString();
+    int periodMs = 0;
+    if (Ft8Mode::isFamilyMode(mode)) periodMs = Ft8Mode::profileForMode(mode).slotMs;
+    else if (Js8Mode::isMode(mode)) periodMs = Js8Mode::parameters(currentJs8Submode()).periodSeconds * 1000;
+    else if (Q65Mode::isFamilyMode(mode)) periodMs = (m_cmbQ65Period != nullptr ? m_cmbQ65Period->currentData().toInt() : 60) * 1000;
+    else if (Msk144Mode::isMode(mode)) periodMs = (m_cmbMsk144Period != nullptr ? m_cmbMsk144Period->currentData().toInt() : 15) * 1000;
+    else if (WsprMode::isMode(mode)) periodMs = 120000;
+    else if (mode == RttyDecoder::modeName() || mode == Bpsk31Decoder::modeName() || mode == MfskDecoder::modeName() ||
+             mode == CwDecoder::modeName() || mode == HellschreiberDecoder::modeName())
+        return 5000;
+    else return 20000;
+    return periodMs > 0 ? periodMs + 3000 : 20000;
+}
+
+// A QSY of 1 kHz or more: hold the PSK Reporter spots back; on a band change
+// send what is queued (the old band's spots) right away.
+void MainWindow::notePskDialChange(double previousHz, double newHz)
+{
+    if (previousHz <= 0.0 || newHz <= 0.0 || qAbs(newHz - previousHz) < 1000.0) return;
+    const int holdMs = pskHoldMs();
+    m_pskHoldUntilMs = QDateTime::currentMSecsSinceEpoch() + holdMs;
+    appendLog(uiText("psk_hold_log", "PSK Reporter: spots paused for %1 s after the frequency change to %2.")
+                  .arg(holdMs / 1000).arg(formatRigFrequency(newHz)));
+    if (M3StandardFrequencies::bandOf(previousHz) != M3StandardFrequencies::bandOf(newHz)) {
+        ++m_pskSendReportCalls;
+        if (m_pskReporter != nullptr) m_pskReporter->sendReport();
+    }
 }
 
 void MainWindow::spotFromDecodedText(const QString &channel, const QString &text, double audioHz, const QString &mode)
@@ -13320,7 +13356,11 @@ void MainWindow::handleRigFrequencyChanged(double frequencyHz)
         if (previousFrequencyHz > 0.0 && txBandKey(previousFrequencyHz) != txBandKey(frequencyHz)) abortTxForBandChange(fromBand, toBand);
     }
     m_lastRigFrequencyHz = frequencyHz;
-    if (!m_lastRigPttOn && !m_ftSplitPreparedForTx) m_lastRxDialHz = frequencyHz;
+    if (!m_lastRigPttOn && !m_ftSplitPreparedForTx) {
+        const double previousRxDialHz = m_lastRxDialHz;
+        m_lastRxDialHz = frequencyHz;
+        notePskDialChange(previousRxDialHz, frequencyHz);
+    }
     if (m_ft8RxDecoder) m_ft8RxDecoder->setRadioFrequencyHz(frequencyHz);
     if (previousFrequencyHz > 0 && qAbs(frequencyHz - previousFrequencyHz) >= 1.0 &&
         m_settings.cwSkimmerEnabled && ui->cmbMode->currentText() == CwDecoder::modeName()) {

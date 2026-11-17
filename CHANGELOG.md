@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- PSK Reporter: after a QSY of 1 kHz or more no spots are reported for one mode period + 3 s (FT8 18 s,
+  FT4 10.5 s, text modes 5 s): the decodes of the last old-band slot arrived with the new band's frequency.
+  A band change sends the queued spots at once.
 - FT CQ retry in Auto mode: when a reply to a running CQ series becomes a QSO, the series restarts with a fresh
   count after the QSO (not after STOP, not without Auto mode). The decode table scrolls once per pass instead of
   once per late row (it seemed to jump up and down), and the own TX line follows the Auto-scroll setting.

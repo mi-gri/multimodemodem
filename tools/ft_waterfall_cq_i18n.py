@@ -1447,3 +1447,12 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'QSO fullført: Auto-modus starter CQ-serien på nytt med nullstilt teller.',
   'QSO dokončeno: režim Auto znovu spouští sérii CQ s vynulovaným počítadlem.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'psk_hold_log':(
+  'PSK Reporter: spots paused for %1 s after the frequency change to %2.',
+  'PSK Reporter: segnalazioni sospese per %1 s dopo il cambio di frequenza su %2.',
+  'PSK Reporter : spots suspendus pendant %1 s après le changement de fréquence vers %2.',
+  'PSK Reporter: Spots für %1 s ausgesetzt nach dem Frequenzwechsel auf %2.',
+  'PSK Reporter: spots satt på pause i %1 s etter frekvensendringen til %2.',
+  'PSK Reporter: spoty pozastaveny na %1 s po změně kmitočtu na %2.'),
+}.items()})

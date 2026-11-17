@@ -2502,6 +2502,12 @@ private:
     QString m_ftAutomationTraceId;
     QHash<QString, QPair<QByteArray, qint64>> m_ftAutomationLastTrace;
     bool m_ft8OperatorStopLatched = false;
+    // PSK Reporter: no spots for one mode period after a QSY (decodes of the old
+    // band would get the new band's frequency).
+    qint64 m_pskHoldUntilMs = 0;
+    int m_pskSendReportCalls = 0;      // test hook: counts the "send now" calls
+    int pskHoldMs() const;
+    void notePskDialChange(double previousHz, double newHz);
     bool m_ft8ScrollPending = false;
     void scheduleFt8DecodeScroll();   // one scroll to the newest line per event-loop pass
     bool m_ftCqResumeAfterQso = false;   // a CQ series was running when its reply became a QSO
