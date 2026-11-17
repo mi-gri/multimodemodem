@@ -337,6 +337,9 @@ void MainWindow::qsyForModeChange(const QString &modeName)
 
     // Modes with a band selector: take the rig's band, then tune.
     if (m_modeBandWidgets.contains(listMode)) {
+        // Rig frequency still unknown (start, CAT not yet connected): the band
+        // selector then only shows its first entry (160m) - never tune to that.
+        if (rigHz <= 0.0) return;
         followCatForModeBands(rigHz);
         qsyModeBand(listMode);
         return;
