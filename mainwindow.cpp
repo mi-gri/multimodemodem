@@ -12,6 +12,7 @@
 #include "runtime/WeakSignalTxPreparer.h"
 #include "logbook/CqWwRtty.h"
 #include "mainwindow.h"
+#include "dialogs/AutoModeNoticeDialog.h"
 #include "audio/AudioDeviceCache.h"
 #include "utils/StartupTrace.h"
 #include "runtime/SstvImageArchive.h"
@@ -1621,6 +1622,7 @@ MainWindow::MainWindow(QWidget *parent)
     setupModeMenu();
     refreshQsoMaps();
     setupLanguageMenu();
+    QTimer::singleShot(0, this, &MainWindow::rebuildMenuBar);
     applyUiLanguage();
     M3Ui::polishCockpitWidgetTree(this);
 
@@ -5327,6 +5329,7 @@ QString MainWindow::shortModeLabel(const QString &modeName) const
 void MainWindow::setupModeMenu()
 {
     QMenu *modeMenu = new QMenu("Mode", this);
+    m_menuMode = modeMenu;
     hardenPopupMenuForFullscreen(modeMenu);
     QActionGroup *modeGroup = new QActionGroup(modeMenu);
     modeGroup->setExclusive(true);
@@ -9015,6 +9018,7 @@ void MainWindow::setupMsk144Page()
 
     if (ui != nullptr && ui->menubar != nullptr && m_cmbMsk144DecodeDepth != nullptr) {
         QMenu *decodeMenu = new QMenu(uiText("menu_decode", "Decode"), this);
+        m_menuDecode = decodeMenu;
         hardenPopupMenuForFullscreen(decodeMenu);
 
         QMenu *mskDepthMenu = decodeMenu->addMenu(uiText("msk144_decode_depth", "MSK144 decode depth"));
@@ -10118,6 +10122,7 @@ void MainWindow::loadFt8SettingsToUi()
     // Auto mode (Auto QSO) only after it was enabled in Settings with the notice.
     m_ft8AutoModeEnabled = m_settings.ftAutoModeEnabled;
     updateFt8AutoModeVisibility();
+    syncAutoModeUi();
     m_chkFt8HoldTxFreq->setChecked(m_settings.ft8TxFrequencyStrategy == QStringLiteral("fixed") || m_settings.ft8HoldTxFrequency);
     const int strategyIndex = m_cmbFt8TxStrategy->findData(m_settings.ft8TxFrequencyStrategy);
     m_cmbFt8TxStrategy->setCurrentIndex(strategyIndex >= 0 ? strategyIndex : m_cmbFt8TxStrategy->findData(QStringLiteral("auto_free")));
@@ -11425,6 +11430,146 @@ void MainWindow::applyUiLanguageToObjectTree(QObject *root)
     translateObjectTree(root);
 }
 
+// ---------------------------------------------------------------------------
+// Menu bar: File | Mode | Station | Operation | Filter | Decode | View | Tools | Help,
+// plus an always visible Auto mode switch in the corner.  The pages of the
+// unified Settings window are reachable directly from the menus (F2 still opens
+// the whole window).
+void MainWindow::rebuildMenuBar()
+{
+    if (m_menuStation != nullptr || ui == nullptr || ui->menubar == nullptr) return;
+    QMenuBar *bar = ui->menubar;
+    const auto newMenu = [this]() {
+        auto *menu = new QMenu(this);
+        hardenPopupMenuForFullscreen(menu);
+        menu->setToolTipsVisible(true);
+        return menu;
+    };
+    m_menuStation = newMenu();
+    m_menuOperation = newMenu();
+    m_menuView = newMenu();
+    m_menuTools = newMenu();
+    using Page = AppSettingsDialog::InitialPage;
+    const auto addPage = [this](QMenu *menu, const QString &id, Page page) {
+        QAction *action = menu->addAction(QString());
+        m_menuActions.insert(id, action);
+        connect(action, &QAction::triggered, this, [this, page]() { showAppSettingsDialogPage(page); });
+    };
+    addPage(m_menuStation, QStringLiteral("user_qth"), Page::UserQthMacros);
+    addPage(m_menuStation, QStringLiteral("audio_cat"), Page::AudioPtt);
+    addPage(m_menuStation, QStringLiteral("rotator"), Page::Rotator);
+    addPage(m_menuStation, QStringLiteral("calibration"), Page::SoundCardCalibration);
+    addPage(m_menuStation, QStringLiteral("logbook"), Page::Logbook);
+    m_menuStation->addSeparator();
+    if (m_actionAppSettings != nullptr) {
+        bar->removeAction(m_actionAppSettings);
+        m_menuStation->addAction(m_actionAppSettings);   // F2: the whole Settings window
+    }
+    addPage(m_menuOperation, QStringLiteral("bands"), Page::Bands);
+    addPage(m_menuOperation, QStringLiteral("frequencies"), Page::Frequencies);
+    addPage(m_menuOperation, QStringLiteral("scheduler"), Page::Scheduler);
+    m_menuOperation->addSeparator();
+    m_actAutoMode = m_menuOperation->addAction(QString());
+    m_actAutoMode->setCheckable(true);
+    connect(m_actAutoMode, &QAction::triggered, this, [this](bool on) { setAutoModeEnabledFromUi(on); });
+    if (m_menuDecode != nullptr) {
+        m_menuDecode->addSeparator();
+        addPage(m_menuDecode, QStringLiteral("ft_decoder"), Page::FtDecoder);
+    }
+    addPage(m_menuView, QStringLiteral("display"), Page::Display);
+    if (m_menuLanguage != nullptr) {
+        bar->removeAction(m_menuLanguage->menuAction());
+        m_menuView->addMenu(m_menuLanguage);
+    }
+    addPage(m_menuTools, QStringLiteral("diagnostics"), Page::Diagnostics);
+
+    // New order.
+    const QList<QAction *> old = bar->actions();
+    for (QAction *action : old) bar->removeAction(action);
+    for (QMenu *menu : {ui->menuFile, m_menuMode, m_menuStation, m_menuOperation, m_menuFilter, m_menuDecode,
+                        m_menuView, m_menuTools, ui->menuHelp}) {
+        if (menu != nullptr) bar->addMenu(menu);
+    }
+
+    m_btnAutoMode = new QToolButton(bar);
+    m_btnAutoMode->setObjectName(QStringLiteral("autoModeButton"));
+    m_btnAutoMode->setCheckable(true);
+    m_btnAutoMode->setAutoRaise(false);
+    connect(m_btnAutoMode, &QToolButton::clicked, this, [this](bool on) { setAutoModeEnabledFromUi(on); });
+    bar->setCornerWidget(m_btnAutoMode, Qt::TopRightCorner);
+    m_btnAutoMode->show();
+    retranslateMenuBar();
+    syncAutoModeUi();
+}
+
+void MainWindow::retranslateMenuBar()
+{
+    if (m_menuStation == nullptr) return;
+    m_menuStation->setTitle(uiText("menu_station", "Station"));
+    m_menuOperation->setTitle(uiText("menu_operation", "Operation"));
+    m_menuView->setTitle(uiText("menu_view", "View"));
+    m_menuTools->setTitle(uiText("menu_tools", "Tools"));
+    if (m_menuDecode != nullptr) m_menuDecode->setTitle(uiText("menu_decode", "Decode"));
+    if (m_menuFilter != nullptr) m_menuFilter->setTitle(uiText("ft_filter", "Filter"));
+    const auto set = [this](const char *id, const QString &text) {
+        if (QAction *action = m_menuActions.value(QString::fromLatin1(id))) action->setText(text);
+    };
+    set("user_qth", uiText("mi_user_qth", "User / QTH / Macros …"));
+    set("audio_cat", uiText("mi_audio_cat", "Audio / PTT / CAT …"));
+    set("rotator", uiText("mi_rotator", "Rotator …"));
+    set("calibration", uiText("mi_calibration", "Soundcard calibration …"));
+    set("logbook", uiText("mi_logbook", "Logbook …"));
+    set("bands", uiText("mi_bands", "Bands …"));
+    set("frequencies", uiText("mi_frequencies", "Frequencies …"));
+    set("scheduler", uiText("mi_scheduler", "Scheduler (QSY plan) …"));
+    set("ft_decoder", uiText("mi_ft_decoder", "FT8 / FT4 decoder options …"));
+    set("display", uiText("mi_display", "Display / FT colours …"));
+    set("diagnostics", uiText("mi_diagnostics", "Diagnostics …"));
+    if (m_actAutoMode != nullptr) m_actAutoMode->setText(uiText("mi_auto_mode", "Auto mode"));
+    if (m_actionAppSettings != nullptr) m_actionAppSettings->setText(uiText("mi_all_settings", "All settings …"));
+    if (m_btnAutoMode != nullptr) {
+        m_btnAutoMode->setText(uiText("auto_mode_button", "Auto"));
+        m_btnAutoMode->setToolTip(uiText("auto_mode_button_tooltip", "Auto mode on/off for all modes (FT8/FT4 Auto QSO, JS8 automatic operation). Switching it on shows a legal and safety notice."));
+    }
+}
+
+void MainWindow::syncAutoModeUi()
+{
+    if (m_btnAutoMode != nullptr) {
+        const QSignalBlocker block(m_btnAutoMode);
+        m_btnAutoMode->setChecked(m_ft8AutoModeEnabled);
+        M3Ui::setSemanticRole(m_btnAutoMode, m_ft8AutoModeEnabled ? QStringLiteral("accent") : QStringLiteral("muted"));
+        QFont f = m_btnAutoMode->font();
+        f.setBold(m_ft8AutoModeEnabled);
+        m_btnAutoMode->setFont(f);
+    }
+    if (m_actAutoMode != nullptr) {
+        const QSignalBlocker block(m_actAutoMode);
+        m_actAutoMode->setChecked(m_ft8AutoModeEnabled);
+    }
+}
+
+void MainWindow::setAutoModeEnabledFromUi(bool on)
+{
+    if (on == m_ft8AutoModeEnabled) {
+        syncAutoModeUi();
+        return;
+    }
+    if (on && !AutoModeNotice::confirm(this, [this](const QString &source) { return uiTextFromSource(QStringLiteral("text"), source); })) {
+        syncAutoModeUi();   // notice declined
+        return;
+    }
+    m_settings.ftAutoModeEnabled = on;
+    m_ft8AutoModeEnabled = on;
+    if (!on && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked())
+        m_chkFt8FullAutoQso->setChecked(false);
+    updateFt8AutoModeVisibility();
+    appendLog(on ? QStringLiteral("Auto mode switched on (notice confirmed).")
+                 : QStringLiteral("Auto mode switched off; Auto QSO is off."));
+    m_settings.save();
+    syncAutoModeUi();
+}
+
 void MainWindow::applyUiLanguage()
 {
     if (m_languageActionGroup != nullptr) {
@@ -11446,6 +11591,7 @@ void MainWindow::applyUiLanguage()
     if (ui->menuSettings != nullptr) ui->menuSettings->setTitle(uiText("menu.settings", "Settings"));
     if (ui->menuHelp != nullptr) ui->menuHelp->setTitle(uiText("menu.help", "Help"));
     if (m_menuLanguage != nullptr) m_menuLanguage->setTitle(uiText("menu.language", "Language"));
+    retranslateMenuBar();
     // Startup motto removed in v2.42: keep the menu bar clean.
 
     if (ui->actionExit != nullptr) {
@@ -11456,7 +11602,7 @@ void MainWindow::applyUiLanguage()
     }
     if (m_actionAppSettings != nullptr) {
         // 0.5.63: Settings is a direct menubar action, not a drop-down menu.
-        m_actionAppSettings->setText(uiText("menu.settings", "Settings"));
+        m_actionAppSettings->setText(uiText("mi_all_settings", "All settings …"));
         m_actionAppSettings->setToolTip(uiText("action.appSettings", "Settings..."));
         m_actionAppSettings->setStatusTip(m_actionAppSettings->toolTip());
     }
@@ -11698,7 +11844,7 @@ void MainWindow::setupUiConnections()
         ui->menuSettings->clear();
         ui->menubar->removeAction(oldMenuAction);
         ui->menubar->insertAction(insertBefore, m_actionAppSettings);
-        m_actionAppSettings->setText(uiText("menu.settings", "Settings"));
+        m_actionAppSettings->setText(uiText("mi_all_settings", "All settings …"));
         m_actionAppSettings->setToolTip(uiText("action.appSettings", "Settings..."));
         m_actionAppSettings->setStatusTip(m_actionAppSettings->toolTip());
     }
@@ -12973,6 +13119,7 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
         if (!m_ft8AutoModeEnabled && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked())
             m_chkFt8FullAutoQso->setChecked(false);
         updateFt8AutoModeVisibility();
+        syncAutoModeUi();
         appendLog(m_ft8AutoModeEnabled ? QStringLiteral("Auto mode enabled in Settings (notice confirmed).")
                                        : QStringLiteral("Auto mode disabled in Settings; Auto QSO is off."));
     }

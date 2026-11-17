@@ -2460,6 +2460,15 @@ private:
     mutable const void *m_hiddenCountryCacheCty = nullptr;
     mutable QStringList m_hiddenCountryCache;
     QLineEdit *m_editFt8FilterCountries = nullptr; // ... cty.dat prefixes, comma separated
+    QMenu *m_menuMode = nullptr, *m_menuDecode = nullptr, *m_menuStation = nullptr, *m_menuOperation = nullptr,
+          *m_menuView = nullptr, *m_menuTools = nullptr;
+    QToolButton *m_btnAutoMode = nullptr;           // always visible Auto mode switch (menu bar corner)
+    QAction *m_actAutoMode = nullptr;
+    QHash<QString, QAction *> m_menuActions;
+    void rebuildMenuBar();
+    void retranslateMenuBar();
+    void setAutoModeEnabledFromUi(bool on);
+    void syncAutoModeUi();
     QMenu *m_menuFilter = nullptr;                 // menu bar "Filter": block list + switches for all auto modes
     QAction *m_actFilterHideBlocked = nullptr, *m_actFilterKeepMine = nullptr, *m_actFilterAnswerCalls = nullptr;
     QString m_ftResendCall;                        // RR73 repeated for a partner who did not hear it

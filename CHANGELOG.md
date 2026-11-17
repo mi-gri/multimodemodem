@@ -4,6 +4,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Menu bar restructured: File | Mode | Station | Operation | Filter | Decode | View | Tools | Help. The pages of the
+  Settings window are menu items (F2 still opens the whole window). New always visible "Auto" switch in the
+  menu bar corner (confirmation notice as before), also as menu item "Auto mode". "Block" renamed "Exclude"
+  (countries/continents).
 - New menu bar item "Filter": one block list (countries, continents) for all automatic modes (FT8/FT4 Auto QSO and
   callers, JS8 auto reply), switch "Hide blocked countries and continents in the views" (FT list, RTTY skimmer),
   "Always show messages to me" (exception for all view filters), "Answer calls without own CQ" (default off).

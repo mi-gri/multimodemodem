@@ -418,7 +418,7 @@ void MainWindow::setupJs8Page()
     autoGrid->setContentsMargins(8, 8, 8, 8);
     int arow = 0;
     // Replies, heartbeat/CQ timers and relays only with Auto mode (Settings).
-    m_lblJs8AutoModeOff = new QLabel(uiText("js8_auto_mode_off", "Auto mode is off: enable it in Settings → FT8 / FT4 → Auto mode."), autoGroup);
+    m_lblJs8AutoModeOff = new QLabel(uiText("js8_auto_mode_off", "Auto mode is off: switch it on with the Auto button (top right)."), autoGroup);
     m_lblJs8AutoModeOff->setWordWrap(true);
     M3Ui::setSemanticRole(m_lblJs8AutoModeOff, QStringLiteral("negative"));
     autoGrid->addWidget(m_lblJs8AutoModeOff, arow++, 0, 1, 4);
