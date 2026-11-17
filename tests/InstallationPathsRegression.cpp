@@ -77,6 +77,17 @@ int main(int argc, char **argv) {
     check(M3Installation::settingsFileFor(portable, config, "ftx-1") == config + "/configs/ftx-1.m3cfg" &&
           read(config + "/configs/ftx-1.m3cfg") == "ftx-1 old" && !QFileInfo::exists(config + "/configs/ftx-1.mad"),
           "configs/NAME.mad is renamed to NAME.m3cfg at start");
+    // a stale instance lock of the old name is cleaned up when its config is converted
+    {
+        const QString oldFile = config + "/configs/stale.mad", lockPath = oldFile + ".instance";
+        QLockFile lf(lockPath); lf.setStaleLockTime(0);
+        QByteArray content;
+        if (lf.tryLock(0)) { QFile f(lockPath); if (f.open(QIODevice::ReadOnly)) content = f.readAll(); lf.unlock(); }
+        QStringList lines = QString::fromUtf8(content).split('\n'); if (!lines.isEmpty()) lines[0] = "2147483646";   // no such process
+        check(write(oldFile, "stale old") && write(lockPath, lines.join('\n').toUtf8()) && QFileInfo::exists(lockPath), "stale lock fixture");
+        M3Installation::settingsFileFor(portable, config, "stale");
+        check(!QFileInfo::exists(lockPath) && QFileInfo::exists(config + "/configs/stale.m3cfg"), "stale NAME.mad.instance removed when the config is converted");
+    }
     const QString contest = config + "/configs/contest.m3cfg";
     check(M3Installation::settingsFileFor(portable, config, "contest") == contest &&
           read(contest) == "central settings", "new named configuration starts as copy of default");

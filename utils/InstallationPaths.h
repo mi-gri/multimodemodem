@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QLockFile>
 #include <QRegularExpression>
 #include <QStandardPaths>
 
@@ -101,10 +102,24 @@ inline QString configLabel(const QString &config)
     return isConfigFileArgument(config) ? QFileInfo(config).completeBaseName() : config;
 }
 
+// An instance lock of the old name (NAME.mad.instance) that a crashed or
+// killed instance left behind would stay forever: nobody asks for that name any
+// more.  QLockFile removes it if its process is gone; a lock held by a running
+// (older) instance is left alone.
+inline void cleanLegacyInstanceLock(const QString &newFile)
+{
+    if (!newFile.endsWith(configExtension(), Qt::CaseInsensitive)) return;
+    const QString lockPath = newFile.left(newFile.size() - configExtension().size()) + legacyConfigExtension() + QStringLiteral(".instance");
+    if (!QFileInfo::exists(lockPath)) return;
+    QLockFile oldLock(lockPath);
+    if (oldLock.tryLock(0)) oldLock.unlock();
+}
+
 // An old NAME.mad becomes NAME.m3cfg (a rename; an existing NAME.m3cfg is never
 // replaced and the old file is then left alone).  Returns true if @p newFile exists afterwards.
 inline bool migrateLegacyConfig(const QString &newFile)
 {
+    cleanLegacyInstanceLock(newFile);
     if (QFileInfo::exists(newFile)) return true;
     if (!newFile.endsWith(configExtension(), Qt::CaseInsensitive)) return false;
     const QString legacy = newFile.left(newFile.size() - configExtension().size()) + legacyConfigExtension();
@@ -114,6 +129,7 @@ inline bool migrateLegacyConfig(const QString &newFile)
         if (!QFile::copy(legacy, newFile)) return false;
     }
     restrictToOwner(newFile);
+    cleanLegacyInstanceLock(newFile);
     return QFileInfo::exists(newFile);
 }
 
@@ -124,7 +140,7 @@ inline bool migrateLegacyConfig(const QString &newFile)
 inline QString defaultSettingsFile(const QString &executableDir, const QString &configDir)
 {
     const QString target = QDir(configDir).filePath(QStringLiteral("settings") + configExtension());
-    if (QFileInfo::exists(target)) return target;
+    if (QFileInfo::exists(target)) { cleanLegacyInstanceLock(target); return target; }
     if (migrateLegacyConfig(target)) return target;
     const QString legacy = userFile(executableDir, configDir, QStringLiteral("settings") + legacyConfigExtension());
     if (QFileInfo(legacy).absoluteFilePath() == QFileInfo(QDir(configDir).filePath(QStringLiteral("settings") + legacyConfigExtension())).absoluteFilePath()
