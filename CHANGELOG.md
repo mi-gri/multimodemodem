@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Decode filter: messages to a special/nonstandard own call (shown as "<DL75WAU> ...") were hidden by the
+  "CQ/73 only" filter and not coloured as "to me"; they now always stay.
 - Start in a mode with a band selector (MFSK, PSK, Q65, MSK144 ...) no longer QSYs to its first band (160m) while the rig
   frequency is still unknown; the rig stays where it is.
 - RTTY skimmer: a signal appears in the list only after it has decoded 4 characters; steady carriers and noise peaks

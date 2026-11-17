@@ -116,6 +116,10 @@ int main()
     {
         using FtDecodeFilter::passesCqEnd;
         check(passesCqEnd("CQ DL1ABC JO62", "DO3BOX") && passesCqEnd("CQ DX K1ABC FN42", "DO3BOX"), "filter: CQ passes");
+        check(passesCqEnd("<DL75WAU> DL5ZA JO51", "DL75WAU") && passesCqEnd("<DL75WAU> DL5ZA R-23", "DL75WAU") &&
+              FtDecodeFilter::lineKind("<DL75WAU> DL5ZA R-23", "DL75WAU") == FtDecodeFilter::LineKind::MyCall &&
+              !passesCqEnd("<DL9XYZ> DL5ZA R-23", "DL75WAU"),
+              "filter: a message to my hashed call <DL75WAU> always passes");
         check(passesCqEnd("DL1ABC K1ABC RR73", "DO3BOX") && passesCqEnd("DL1ABC K1ABC 73", "DO3BOX"), "filter: RR73/73 pass");
         check(!passesCqEnd("DL1ABC K1ABC -12", "DO3BOX") && !passesCqEnd("DL1ABC K1ABC R-07", "DO3BOX") &&
               !passesCqEnd("DL1ABC K1ABC RRR", "DO3BOX") && !passesCqEnd("DL1ABC K1ABC FN42", "DO3BOX"),

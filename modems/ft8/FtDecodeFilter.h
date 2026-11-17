@@ -9,13 +9,21 @@
 // free to be called - those calling CQ and those ending a QSO with RR73 or 73.
 // A line addressed to my call always passes.
 namespace FtDecodeFilter {
+// A hashed (non-standard) call such as the special call DL75WAU appears in
+// messages as "<DL75WAU>": compare without the angle brackets.
+inline QString plainCall(QString call)
+{
+    call.remove(QLatin1Char('<')).remove(QLatin1Char('>'));
+    return call.trimmed().toUpper();
+}
+
 inline bool passesCqEnd(const QString &message, const QString &myCall)
 {
     const QStringList words = message.trimmed().toUpper().split(QLatin1Char(' '), Qt::SkipEmptyParts);
     if (words.isEmpty()) return false;
     if (words.first() == QStringLiteral("CQ")) return true;
-    const QString me = myCall.trimmed().toUpper();
-    if (!me.isEmpty() && words.first() == me) return true;
+    const QString me = plainCall(myCall);
+    if (!me.isEmpty() && plainCall(words.first()) == me) return true;
     return words.last() == QStringLiteral("RR73") || words.last() == QStringLiteral("73");
 }
 
@@ -26,8 +34,8 @@ inline LineKind lineKind(const QString &message, const QString &myCall)
 {
     const QStringList words = message.trimmed().toUpper().split(QLatin1Char(' '), Qt::SkipEmptyParts);
     if (words.isEmpty()) return LineKind::Standard;
-    const QString me = myCall.trimmed().toUpper();
-    if (!me.isEmpty() && words.first() == me) return LineKind::MyCall;
+    const QString me = plainCall(myCall);
+    if (!me.isEmpty() && plainCall(words.first()) == me) return LineKind::MyCall;
     if (words.first() == QStringLiteral("CQ")) return LineKind::Cq;
     if (words.last() == QStringLiteral("RR73") || words.last() == QStringLiteral("73")) return LineKind::End;
     return LineKind::Standard;
