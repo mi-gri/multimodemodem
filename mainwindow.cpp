@@ -11495,6 +11495,10 @@ void MainWindow::rebuildMenuBar()
     m_btnAutoMode->setObjectName(QStringLiteral("autoModeButton"));
     m_btnAutoMode->setCheckable(true);
     m_btnAutoMode->setAutoRaise(false);
+    // Switched on: orange background, readable in light and dark themes.
+    m_btnAutoMode->setStyleSheet(QStringLiteral(
+        "QToolButton#autoModeButton { padding: 2px 12px; border-radius: 4px; }"
+        "QToolButton#autoModeButton:checked { background-color: #F28C00; color: #1A1A1A; font-weight: bold; }"));
     connect(m_btnAutoMode, &QToolButton::clicked, this, [this](bool on) { setAutoModeEnabledFromUi(on); });
     bar->setCornerWidget(m_btnAutoMode, Qt::TopRightCorner);
     m_btnAutoMode->show();
@@ -11538,7 +11542,6 @@ void MainWindow::syncAutoModeUi()
     if (m_btnAutoMode != nullptr) {
         const QSignalBlocker block(m_btnAutoMode);
         m_btnAutoMode->setChecked(m_ft8AutoModeEnabled);
-        M3Ui::setSemanticRole(m_btnAutoMode, m_ft8AutoModeEnabled ? QStringLiteral("accent") : QStringLiteral("muted"));
         QFont f = m_btnAutoMode->font();
         f.setBold(m_ft8AutoModeEnabled);
         m_btnAutoMode->setFont(f);
