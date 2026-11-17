@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Safety (second audit): after a single manual CQ the sequencer no longer counts as "engaged" for hours; an unsolicited
+  call is only answered within three slots after your own transmission (or with a CQ series/QSO), else it needs Auto mode.
 - PSK Reporter: after a QSY of 1 kHz or more no spots are reported for one mode period + 3 s (FT8 18 s,
   FT4 10.5 s, text modes 5 s): the decodes of the last old-band slot arrived with the new band's frequency.
   A band change sends the queued spots at once.

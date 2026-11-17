@@ -19856,9 +19856,14 @@ bool MainWindow::activateNextFt8LateFinal()
 // The operator has a CQ running or waits for an answer to a call of theirs.
 bool MainWindow::ftOperatorEngaged() const
 {
-    return m_ftSession.qsoActive || m_ftSession.cqRepeatActive ||
-           m_ftSession.state == Ft8SequencerState::CallingCq ||
-           m_ftSession.state == Ft8SequencerState::WaitingDxReply;
+    if (m_ftSession.qsoActive || m_ftSession.cqRepeatActive) return true;
+    if (m_ftSession.state != Ft8SequencerState::CallingCq &&
+        m_ftSession.state != Ft8SequencerState::WaitingDxReply) return false;
+    // A single manual CQ or call leaves the state standing: it only counts
+    // while a reply can still be expected (three slots after our last
+    // transmission), not for hours (audit 2026-11-17).
+    const qint64 last = m_ftSession.lastTxPlan.slotBoundaryUtcMs;
+    return last > 0 && QDateTime::currentMSecsSinceEpoch() - last <= 45000;
 }
 
 bool MainWindow::activateNextFt8QueuedCaller()
