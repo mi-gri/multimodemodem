@@ -9,6 +9,9 @@ constexpr double kTwoPi = 6.2831853071795864769;
 constexpr int kMinFreqHz = 100, kMaxFreqHz = 4900;   // up to the waterfall top
 constexpr int kScanStepHz = 5, kTrackBucketHz = 35;
 constexpr int kTrackHoldMs = 4000, kScanIntervalMs = 350;
+// A track is listed only after it has decoded this many characters: carriers,
+// birdies and other signals with two peaks 170 Hz apart opened empty rows.
+constexpr int kMinCharsToPublish = 4;
 constexpr int kScanWindowSamples = 8192;
 }
 
@@ -189,6 +192,7 @@ void RttyMultiDecoder::appendTrackText(RttyDecoder* decoder, const QString& text
             else if (c.isSpace()) clean += QLatin1Char(' ');
         }
         track.recentText = (track.recentText + clean).right(192);
+        for (QChar c : clean) if (!c.isSpace()) ++track.chars;
         track.cq.append(clean, double(m_samplesProcessed) / m_sampleRate);
         return;
     }
@@ -197,6 +201,7 @@ void RttyMultiDecoder::publishSpots() {
     QVector<SkimmerSpot> result;
     for (auto& track : m_tracks) {
         track.cq.expire(double(m_samplesProcessed) / m_sampleRate);
+        if (track.chars < kMinCharsToPublish) continue;   // nothing decoded (yet): not a station
         SkimmerSpot spot; spot.id = track.id;
         spot.frequencyHz = (track.markHz + track.spaceHz) * .5;
         spot.lowerToneHz = track.markHz; spot.upperToneHz = track.spaceHz;

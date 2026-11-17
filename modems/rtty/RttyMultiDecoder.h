@@ -26,6 +26,7 @@ private:
         double score = 0;
         qint64 lastSeenSample = 0;
         QString recentText;
+        int chars = 0;          // printable characters decoded so far
         SkimmerCqTracker cq;
     };
     QVector<Candidate> scanCandidates(const AudioBlock& block) const;

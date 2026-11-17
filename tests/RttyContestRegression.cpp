@@ -94,5 +94,28 @@ int main(int argc,char **argv) {
   QStringList labels=heard.values();std::cout<<"MULTI "<<rate<<" max_ms="<<maxMs<<" labels="<<labels.join("|").toStdString()<<"\n";
   check(labels.size()==2 && labels.count("IZ6NNH")==1 && labels.count("DL1ABC")==1,"two stations decoded without duplicate callouts");
  }
+ // Noise only: the skimmer must not list rows without a single decoded character
+ // (empty rows kept appearing on a quiet band).  Real signals still show up.
+ for(int rate:{48000}) {
+  std::mt19937 rng(20261117);std::normal_distribution<float> gauss(0.f,0.05f);
+  RttyMultiDecoder multi;multi.configure(45.45,170,false,true,12);
+  int rowsWithoutText=0,maxRows=0;
+  QObject::connect(&multi,&RttyMultiDecoder::skimmerSpotsChanged,[&](const QVector<SkimmerSpot>& spots){maxRows=std::max(maxRows,int(spots.size()));for(const auto &v:spots)if(v.text.simplified().isEmpty())++rowsWithoutText;});
+  for(int i=0;i<rate*90;i+=1024){AudioBlock block;block.sampleRate=rate;block.samples.resize(1024);for(auto &x:block.samples)x=gauss(rng);multi.processAudioBlock(block);if((i/1024)%64==0)QCoreApplication::processEvents();}
+  std::cout<<"NOISE rows_without_text="<<rowsWithoutText<<" max_rows="<<maxRows<<"\n";
+  check(rowsWithoutText==0,"skimmer lists no empty rows for pure noise");
+  // Steady carriers 170 Hz apart (a birdie pair, or two digital signals): the same.
+  {RttyMultiDecoder multi3;multi3.configure(45.45,170,false,true,12);int carrierRowsWithoutText=0,carrierRows=0;
+   QObject::connect(&multi3,&RttyMultiDecoder::skimmerSpotsChanged,[&](const QVector<SkimmerSpot>& spots){for(const auto &v:spots){++carrierRows;if(v.text.simplified().isEmpty())++carrierRowsWithoutText;}});
+   std::mt19937 rng3(7);std::normal_distribution<float> g3(0.f,0.02f);double ph1=0,ph2=0;
+   for(int i=0;i<rate*60;i+=1024){AudioBlock block;block.sampleRate=rate;block.samples.resize(1024);for(auto &x:block.samples){ph1+=6.283185307*1500.0/rate;ph2+=6.283185307*1670.0/rate;x=float(0.3*std::sin(ph1)+0.3*std::sin(ph2))+g3(rng3);}multi3.processAudioBlock(block);if((i/1024)%64==0)QCoreApplication::processEvents();}
+   std::cout<<"CARRIERS rows="<<carrierRows<<" without_text="<<carrierRowsWithoutText<<"\n";
+   check(carrierRowsWithoutText==0,"skimmer lists no empty rows for a steady carrier pair");}
+  auto sig=reference(QString("CQ CQ DE IZ6NNH CQ ").repeated(4),rate);
+  RttyMultiDecoder multi2;multi2.configure(45.45,170,false,true,12);int signalRows=0;
+  QObject::connect(&multi2,&RttyMultiDecoder::skimmerSpotsChanged,[&](const QVector<SkimmerSpot>& spots){for(const auto &v:spots)if(!v.text.simplified().isEmpty())++signalRows;});
+  for(int i=0;i<sig.size();i+=1024){AudioBlock block;block.sampleRate=rate;block.samples=sig.mid(i,1024);multi2.processAudioBlock(block);QCoreApplication::processEvents();}
+  check(signalRows>0,"a real signal still produces a row with text");
+ }
  return ok?0:1;
 }
