@@ -21641,13 +21641,28 @@ void MainWindow::finishFt8ResponseWait(quint64 retryGeneration, qint64 replySlot
                       .arg(dx));
     }
     traceFtAutomation("qso.timeout","no_reply",{{"cooldown_seconds",fullAutoEnabled ? 900 : 0},{"reply_slot_utc_ms",replySlotUtcMs}});
+    // Auto mode: a CQ series that was running when this caller answered goes on
+    // after the unanswered attempt, as after a completed QSO (decided before the stop).
+    const bool resumeCq = m_ftCqResumeAfterQso && autoTxPermitted() && m_chkFt8CqRepeat != nullptr &&
+                          m_chkFt8CqRepeat->isChecked() && !m_ft8OperatorStopLatched;
     stopFt8Sequencer(QString("no response after %1 unanswered transmission(s)%2")
                          .arg(qBound(1, m_settings.ft8NoResponseRetryCount, 12))
                          .arg(dx.isEmpty() ? QString() : QStringLiteral(" from ") + dx));
     if (!m_rxRunning && !m_txRunning && m_audioEngine != nullptr && !m_audioEngine->isRunning()) {
         startFt8RxShell();
     }
-    QTimer::singleShot(0, this, [this]() { activateNextFt8QueuedCaller(); });
+    m_ftCqResumeAfterQso = false;
+    QTimer::singleShot(0, this, [this, resumeCq]() {
+        if (activateNextFt8QueuedCaller()) {
+            m_ftCqResumeAfterQso = resumeCq;   // the next QSO also continues the series
+            return;
+        }
+        if (resumeCq && !m_ftSession.qsoActive && !m_ft8OperatorStopLatched && autoTxPermitted() &&
+            m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked()) {
+            appendLog(QStringLiteral("FT Auto mode: no reply; the CQ series continues."));
+            startFt8CqRepeat();
+        }
+    });
     updateFt8SequencerUi();
 }
 

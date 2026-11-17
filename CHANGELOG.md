@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- FT Auto mode: after an unanswered QSO attempt (no reply after the set number of transmissions) a CQ series that was
+  running before continues, as after a completed QSO (before, m³ stayed silent).
 - Menu bar restructured: File | Mode | Station | Operation | Filter | Decode | View | Tools | Help. The pages of the
   Settings window are menu items (F2 still opens the whole window). New always visible "Auto" switch in the
   menu bar corner (confirmation notice as before), also as menu item "Auto mode". "Block" renamed "Exclude"
