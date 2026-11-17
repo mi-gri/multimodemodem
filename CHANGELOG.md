@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- FT CQ retry in Auto mode: when a reply to a running CQ series becomes a QSO, the series restarts with a fresh
+  count after the QSO (not after STOP, not without Auto mode). The decode table scrolls once per pass instead of
+  once per late row (it seemed to jump up and down), and the own TX line follows the Auto-scroll setting.
 - A stale instance lock of the old config name (NAME.mad.instance) is removed at start.
 - Safety (audit of the TX gates): FT no longer answers an unsolicited call (no CQ or QSO of yours) unless
   automatic TX is allowed (Auto mode, no running QSY plan, TX band); the caller queue starts a QSO only

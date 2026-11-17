@@ -4697,6 +4697,17 @@ void MainWindow::scheduleTerminalHighlight(QPlainTextEdit *terminal)
     }
 }
 
+void MainWindow::scheduleFt8DecodeScroll()
+{
+    if (m_ft8ScrollPending || m_tableFt8Rx == nullptr) return;
+    m_ft8ScrollPending = true;
+    QTimer::singleShot(0, this, [this]() {
+        m_ft8ScrollPending = false;
+        if (m_tableFt8Rx != nullptr && (m_chkFt8AutoScroll == nullptr || m_chkFt8AutoScroll->isChecked()))
+            m_tableFt8Rx->scrollToBottom();
+    });
+}
+
 void MainWindow::refreshFt8DecodeWorkedHighlights()
 {
     if (m_tableFt8Rx == nullptr) return;
@@ -20040,6 +20051,8 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         // A decoded reply has turned an unanswered CQ into a real QSO.
         // Stop CQ-repeat state here; after the QSO MM must remain in RX and
         // wait for an explicit operator action, not restart CQ automatically.
+        // Auto mode: the series goes on after the QSO (completeFt8Qso).
+        m_ftCqResumeAfterQso = m_ftSession.cqRepeatActive && m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked();
         m_ftSession.cqRepeatActive = false;
         m_ftSession.resumeCqAfterQso = false;
     }
@@ -20249,13 +20262,29 @@ void MainWindow::completeFt8Qso(const QString &reason)
     m_deferredFt8TxPlan = FtTxPlan();
     m_ftSession.deferredState = Ft8SequencerState::Idle;
     const bool autoQsoArmed = autoTxPermitted() && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked();
+    // Auto mode: a CQ series that was running when the reply came continues
+    // after every QSO with a fresh count.  Without Auto mode, or after STOP,
+    // m³ stays in RX until the operator starts CQ again.
+    const bool resumeCq = m_ftCqResumeAfterQso && !autoQsoArmed && autoTxPermitted() &&
+                          m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked() && !m_ft8OperatorStopLatched;
+    m_ftCqResumeAfterQso = false;
     if (autoQsoArmed) {
         appendLog(currentAdifMode() + " QSO complete: Auto QSO remains armed and will answer the next decoded CQ subject to blacklist and decode filters.");
+    } else if (resumeCq) {
+        appendLog(uiText("ft_cq_series_continues_log", "QSO complete: Auto mode restarts the CQ series with a fresh count."));
     } else {
         appendLog(currentAdifMode() + " QSO complete: CQ auto-resume disabled; staying in RX.");
     }
     updateFt8SequencerUi();
-    QTimer::singleShot(0, this, [this]() { activateNextFt8QueuedCaller(); });
+    QTimer::singleShot(0, this, [this, resumeCq]() {
+        if (activateNextFt8QueuedCaller()) {
+            m_ftCqResumeAfterQso = resumeCq;   // the next QSO also continues the series
+            return;
+        }
+        if (resumeCq && !m_ftSession.qsoActive && !m_ft8OperatorStopLatched && autoTxPermitted() &&
+            m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked())
+            startFt8CqRepeat();
+    });
 }
 
 void MainWindow::autoLogFt8Qso(const QString &reason)
@@ -21226,7 +21255,8 @@ void MainWindow::appendFt8LocalTxRow(const QString &message, int frequencyHz, co
     while (m_tableFt8Rx->rowCount() > 600) {
         m_tableFt8Rx->removeRow(0);
     }
-    m_tableFt8Rx->scrollToBottom();
+    // Own TX line: follows the Auto-scroll setting like every other row.
+    if (m_chkFt8AutoScroll == nullptr || m_chkFt8AutoScroll->isChecked()) scheduleFt8DecodeScroll();
 
     appendFt8QsoHistoryRow(utc,
                            QStringLiteral("TX"),
@@ -21967,9 +21997,12 @@ void MainWindow::handleFt8DecodeReady(const Ft8RxDecoder::Decode &decode)
         m_tableFt8Rx->removeRow(0);
     }
     m_ftDisplayDiagRowsAfter = m_tableFt8Rx->rowCount();
+    // Rows that arrive one by one (late decodes) would scroll the table once
+    // per row while the layout is still catching up: it seems to jump up and
+    // down.  One scroll after all pending rows instead.
     if (!m_ft8UiBatchApplying &&
         (m_chkFt8AutoScroll == nullptr || m_chkFt8AutoScroll->isChecked())) {
-        m_tableFt8Rx->scrollToBottom();
+        scheduleFt8DecodeScroll();
     }
 
     addFt8WaterfallOverlayForDecode(decode, blacklistedDecode);

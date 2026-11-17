@@ -1438,3 +1438,12 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'FT: Anropet fra %1 besvares ikke automatisk (ingen egen CQ eller QSO; automatisk TX er av, satt på pause av QSY-planen eller ikke tillatt på dette båndet).',
   'FT: Volání od %1 se automaticky neodpovídá (žádné vlastní CQ ani QSO; automatické TX je vypnuto, pozastaveno plánem QSY nebo na tomto pásmu nepovoleno).'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft_cq_series_continues_log':(
+  'QSO complete: Auto mode restarts the CQ series with a fresh count.',
+  'QSO completato: la modalità Auto riavvia la serie CQ con il conteggio ripristinato.',
+  'QSO terminé : le mode Auto relance la série CQ avec un compteur remis à zéro.',
+  'QSO abgeschlossen: Der Auto-Modus startet die CQ-Serie mit zurückgesetztem Zähler neu.',
+  'QSO fullført: Auto-modus starter CQ-serien på nytt med nullstilt teller.',
+  'QSO dokončeno: režim Auto znovu spouští sérii CQ s vynulovaným počítadlem.'),
+}.items()})

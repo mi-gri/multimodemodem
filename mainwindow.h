@@ -2502,6 +2502,9 @@ private:
     QString m_ftAutomationTraceId;
     QHash<QString, QPair<QByteArray, qint64>> m_ftAutomationLastTrace;
     bool m_ft8OperatorStopLatched = false;
+    bool m_ft8ScrollPending = false;
+    void scheduleFt8DecodeScroll();   // one scroll to the newest line per event-loop pass
+    bool m_ftCqResumeAfterQso = false;   // a CQ series was running when its reply became a QSO
     bool m_ft8SelectionOnly = false;
     QVector<Ft8FullAutoCqCandidate> m_ft8FullAutoCqCandidates;
     QHash<QString, qint64> m_ft8AutoCqBusySlots;
