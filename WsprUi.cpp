@@ -11,6 +11,7 @@
 #include "third_party/wsjtx_gpl/wspr/WsprCodec.h"
 #include "runtime/SessionDiagnostics.h"
 #include "settings/AppSettings.h"
+#include "utils/CockpitTheme.h"
 #include "utils/RuntimeI18n.h"
 #include "widgets/QsoMapWidget.h"
 
@@ -322,7 +323,10 @@ QStringList MainWindow::wsprTxMessages(QString *error) const
             if (error != nullptr)
                 *error = call.isEmpty() || grid.size() < 4
                     ? uiText("wspr_tx_need_station", "Enter your callsign and locator in Settings first.")
-                    : uiText("wspr_tx_cannot_pack", "\"%1\" cannot be sent as WSPR: %2").arg(message, QString::fromStdString(why));
+                    : !call.contains(QLatin1Char('/'))
+                        // The usual reason: a special-event or club call (DL75WAU) has no WSPR format.
+                        ? uiText("wspr_tx_call_unsupported", "WSPR cannot send the callsign %1: only standard callsigns (e.g. DO3BOX) and calls with a prefix or suffix (e.g. DL/DO3BOX) fit. The beacon stays off; receiving works.").arg(call)
+                        : uiText("wspr_tx_cannot_pack", "\"%1\" cannot be sent as WSPR: %2").arg(message, QString::fromStdString(why));
             return {};
         }
     }
@@ -338,7 +342,20 @@ void MainWindow::updateWsprTxAvailability()
     if (!possible && m_chkWsprTx->isChecked()) m_chkWsprTx->setChecked(false);   // stops the beacon
     m_chkWsprTx->setEnabled(possible);
     if (m_lblWsprTxStatus == nullptr) return;
-    if (!m_ft8AutoModeEnabled) {
+    // A callsign problem comes first (and is shown whatever Auto mode says):
+    // otherwise the operator enables Auto mode and only then learns the beacon cannot work.
+    const bool stationProblem = messages.isEmpty() && !error.isEmpty();
+    M3Ui::setSemanticRole(m_lblWsprTxStatus, stationProblem ? QStringLiteral("warning") : QString());
+    if (stationProblem) {
+        static QString lastLogged;
+        if (lastLogged != error) {
+            lastLogged = error;
+            appendLog(error);
+        }
+    }
+    if (stationProblem) {
+        m_lblWsprTxStatus->setText(error);
+    } else if (!m_ft8AutoModeEnabled) {
         m_lblWsprTxStatus->setText(uiText("wspr_tx_needs_auto", "Beacon TX is automatic operation: enable Auto mode in Settings first."));
     } else if (messages.isEmpty()) {
         m_lblWsprTxStatus->setText(error);

@@ -1420,3 +1420,12 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
   'For klubb- og spesialkallesignal: kallesignalet til personen som opererer. Det loggføres som OPERATOR (ADIF); stasjonens kallesignal forblir STATION_CALLSIGN. Tomt: stasjonens kallesignal brukes.',
   'Pro klubové a speciální značky: značka osoby u zařízení. Loguje se jako OPERATOR (ADIF); značka stanice zůstává STATION_CALLSIGN. Prázdné: použije se značka stanice.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'wspr_tx_call_unsupported':(
+  'WSPR cannot send the callsign %1: only standard callsigns (e.g. DO3BOX) and calls with a prefix or suffix (e.g. DL/DO3BOX) fit. The beacon stays off; receiving works.',
+  'WSPR non può inviare il nominativo %1: sono possibili solo nominativi standard (ad es. DO3BOX) e nominativi con prefisso o suffisso (ad es. DL/DO3BOX). Il beacon resta spento; la ricezione funziona.',
+  'WSPR ne peut pas émettre l’indicatif %1 : seuls les indicatifs standard (p. ex. DO3BOX) et ceux avec préfixe ou suffixe (p. ex. DL/DO3BOX) conviennent. La balise reste coupée ; la réception fonctionne.',
+  'WSPR kann das Rufzeichen %1 nicht senden: Es passen nur Standardrufzeichen (z. B. DO3BOX) und Rufzeichen mit Präfix oder Suffix (z. B. DL/DO3BOX). Die Bake bleibt aus; Empfang funktioniert.',
+  'WSPR kan ikke sende kallesignalet %1: bare standard kallesignal (f.eks. DO3BOX) og kallesignal med prefiks eller suffiks (f.eks. DL/DO3BOX) passer. Baken forblir av; mottak fungerer.',
+  'WSPR nemůže vysílat značku %1: vyhovují jen standardní značky (např. DO3BOX) a značky s prefixem nebo příponou (např. DL/DO3BOX). Maják zůstane vypnutý; příjem funguje.'),
+}.items()})

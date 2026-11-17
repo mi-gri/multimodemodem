@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- WSPR: a callsign WSPR cannot send (special-event/club calls such as DL75WAU) is reported on the WSPR page
+  and in the log with the reason - before and independent of the Auto-mode hint.
 - JS8 relay/reply parsing accepts special-event calls with two digits (DL75WAU).
 - Settings → User/QTH: optional Operator callsign for club and special-event stations; logged as
   OPERATOR (ADIF) with the station call as STATION_CALLSIGN; empty = the station call as before.
