@@ -4,6 +4,7 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- Default theme is now Classic Dark (new installations and the "Defaults" button); an existing theme choice stays.
 - macOS/Windows: crash at start fixed ("Thread stack size exceeded" in the WSPR decoder thread). Decoder threads
   (WSPR, FT worker pool, FT coordinator, late decode pool) now get a 16 MB stack; std::thread only had 512 KB (macOS)
   or 1 MB (Windows), while the WSPR engine and the reference FT decoders use frames of up to 1.4 MB.

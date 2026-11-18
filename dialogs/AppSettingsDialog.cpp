@@ -1798,7 +1798,7 @@ QWidget *AppSettingsDialog::makeAppearancePage()
     m_comboUiTheme->addItem(L(QStringLiteral("Classic Dark")), QStringLiteral("classic_dark"));
     m_comboUiTheme->addItem(L(QStringLiteral("High Contrast")), QStringLiteral("high_contrast"));
     const int themeIndex = m_comboUiTheme->findData(m_initialSettings.uiTheme.trimmed().isEmpty()
-                                                        ? QStringLiteral("avionica")
+                                                        ? QStringLiteral("classic_dark")
                                                         : m_initialSettings.uiTheme.trimmed().toLower());
     m_comboUiTheme->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
     m_comboUiTheme->setToolTip(L(QStringLiteral("Select the global MultiModeModem colour palette.")));
@@ -1847,7 +1847,7 @@ QWidget *AppSettingsDialog::makeAppearancePage()
     reset->setToolTip(L(QStringLiteral("Restore Avionica theme and theme-managed font settings.")));
     connect(reset, &QPushButton::clicked, this, [this, updateFontOverrideEnabled]() {
         if (m_comboUiTheme != nullptr) {
-            const int idx = m_comboUiTheme->findData(QStringLiteral("avionica"));
+            const int idx = m_comboUiTheme->findData(QStringLiteral("classic_dark"));
             if (idx >= 0) m_comboUiTheme->setCurrentIndex(idx);
         }
         if (m_chkUiUseThemeFont != nullptr) m_chkUiUseThemeFont->setChecked(true);

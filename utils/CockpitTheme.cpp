@@ -1224,7 +1224,7 @@ QString normalizedThemeKey(const QString &themeKey)
         key == QStringLiteral("high_contrast")) {
         return key;
     }
-    return QStringLiteral("avionica");
+    return QStringLiteral("classic_dark");
 }
 
 QString activeThemeKey()

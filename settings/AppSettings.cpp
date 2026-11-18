@@ -235,7 +235,7 @@ void AppSettings::load()
     uiTheme = settings.value("Display/uiTheme", uiTheme).toString().trimmed().toLower();
     if (uiTheme != "avionica" && uiTheme != "qt_default" && uiTheme != "hacker_green" &&
         uiTheme != "classic_dark" && uiTheme != "high_contrast") {
-        uiTheme = "avionica";
+        uiTheme = "classic_dark";
     }
     uiUseThemeFont = settings.value("Display/uiUseThemeFont", uiUseThemeFont).toBool();
     uiFontFamily = settings.value("Display/uiFontFamily", uiFontFamily).toString().trimmed();

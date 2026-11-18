@@ -13109,11 +13109,11 @@ void MainWindow::applyUiAppearanceSettings()
     }
 
     QString theme = m_settings.uiTheme.trimmed().toLower();
-    if (theme.isEmpty()) theme = QStringLiteral("avionica");
+    if (theme.isEmpty()) theme = QStringLiteral("classic_dark");
     if (theme != QStringLiteral("avionica") && theme != QStringLiteral("qt_default") &&
         theme != QStringLiteral("hacker_green") && theme != QStringLiteral("classic_dark") &&
         theme != QStringLiteral("high_contrast")) {
-        theme = QStringLiteral("avionica");
+        theme = QStringLiteral("classic_dark");
     }
 
     auto recommendedFont = [&]() -> QFont {
