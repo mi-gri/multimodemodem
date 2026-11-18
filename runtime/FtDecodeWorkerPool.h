@@ -1,5 +1,6 @@
 #pragma once
 #include "../utils/SystemResourceManager.h"
+#include "../utils/BigStackThread.h"
 #include <algorithm>
 #include <condition_variable>
 #include <exception>
@@ -24,7 +25,7 @@ public:
     ~FtDecodeWorkerPool() {
         { std::lock_guard<std::mutex> lock(m_mutex); m_stopping = true; }
         m_available.notify_all();
-        for (auto &worker : m_workers) if (worker.joinable()) worker.join();
+        for (auto &worker : m_workers) if (worker && worker->joinable()) worker->join();
     }
     FtDecodeWorkerPool(const FtDecodeWorkerPool &) = delete;
     FtDecodeWorkerPool &operator=(const FtDecodeWorkerPool &) = delete;
@@ -73,7 +74,7 @@ public:
                     // allocation failure must not destroy a joinable temporary.
                     m_workers.reserve(static_cast<size_t>(tasks));
                     const int index = static_cast<int>(m_workers.size());
-                    m_workers.emplace_back([this, index] { workerLoop(index); });
+                    m_workers.emplace_back(std::make_unique<M3BigStackThread>([this, index] { workerLoop(index); }));
                 } catch (const std::system_error &) {
                     break; // OS thread limit: use the workers already available.
                 }
@@ -109,6 +110,6 @@ private:
     mutable std::mutex m_mutex;
     std::condition_variable m_available;
     std::list<std::function<void()>> m_queue;
-    std::vector<std::thread> m_workers;
+    std::vector<std::unique_ptr<M3BigStackThread>> m_workers;   // large stacks (reference decoders)
     bool m_stopping = false;
 };

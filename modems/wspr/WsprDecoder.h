@@ -90,5 +90,7 @@ private:
     std::condition_variable m_jobsAvailable;
     std::deque<Job> m_jobs;
     bool m_stop = false;
-    std::thread m_thread;
+    // QThread with an explicit stack: std::thread gets only 512 KB (macOS) or 1 MB (Windows),
+    // which the WSPR engine exceeded (crash at start on macOS/Windows, build 37).
+    class QThread *m_thread = nullptr;
 };

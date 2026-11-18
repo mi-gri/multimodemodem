@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "WsprDecoder.h"
 
+#include <QThread>
+#include <memory>
+
 #include "WsprEngine.h"
 #include "WsprMode.h"
 
@@ -22,7 +25,9 @@ WsprDecoder::WsprDecoder(QObject *parent)
     qRegisterMetaType<QVector<WsprSpot>>("QVector<WsprSpot>");
     qRegisterMetaType<WsprDecoder::PeriodState>("WsprDecoder::PeriodState");
     m_resampler.configure(kRate);
-    m_thread = std::thread([this] { decodeLoop(); });
+    m_thread = QThread::create([this] { decodeLoop(); });
+    m_thread->setStackSize(16u * 1024u * 1024u);
+    m_thread->start();
 }
 
 WsprDecoder::~WsprDecoder()
@@ -34,7 +39,11 @@ WsprDecoder::~WsprDecoder()
         m_jobs.clear();
     }
     m_jobsAvailable.notify_one();
-    if (m_thread.joinable()) m_thread.join();
+    if (m_thread != nullptr) {
+        m_thread->wait();
+        delete m_thread;
+        m_thread = nullptr;
+    }
 }
 
 void WsprDecoder::invalidate()
@@ -161,7 +170,9 @@ void WsprDecoder::submit(const QDateTime &periodUtc, QVector<float> samples)
 void WsprDecoder::decodeLoop()
 {
     // The engine and its callsign hash table belong to this thread alone.
-    M3Wspr::Engine engine;
+    // On the heap: the engine holds large tables (about 1.5 MB).
+    auto engineOwner = std::make_unique<M3Wspr::Engine>();
+    M3Wspr::Engine &engine = *engineOwner;
     for (;;) {
         Job job;
         {

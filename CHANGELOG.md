@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- macOS/Windows: crash at start fixed ("Thread stack size exceeded" in the WSPR decoder thread). Decoder threads
+  (WSPR, FT worker pool, FT coordinator, late decode pool) now get a 16 MB stack; std::thread only had 512 KB (macOS)
+  or 1 MB (Windows), while the WSPR engine and the reference FT decoders use frames of up to 1.4 MB.
 - Version scheme: 0.YY.MM (year, month); builds within a month are told apart by the build number
   (GitHub) or the dev number (local). 0.26.11 follows 0.6.7.
 - Menu Tools now holds Runtime log and Update country file (moved from Help); About lists both source repositories

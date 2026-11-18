@@ -7,6 +7,7 @@
 #include <QScopeGuard>
 #include "../../runtime/SessionDiagnostics.h"
 #include "Ft8RxDecoder.h"
+#include "../../utils/BigStackThread.h"
 #include <QElapsedTimer>
 #include "../../dsp/gpu/FtSyncCompute.h"
 #include "Ft8Mode.h"
@@ -135,7 +136,7 @@ private:
     std::condition_variable m_cv;
     std::deque<std::function<void()>> m_jobs;
     bool m_stopping = false;
-    std::thread m_thread;
+    M3BigStackThread m_thread;   // large stack: reference decoders
 };
 
 namespace {
@@ -7818,6 +7819,7 @@ void Ft8RxDecoder::startLateReferenceRecovery(const QVector<double> &samples, co
     if (!m_latePool) {   // created on the first live boundary decode only
         m_latePool.reset(new QThreadPool);
         m_latePool->setMaxThreadCount(1);
+        m_latePool->setStackSize(M3BigStackThread::kStackBytes);   // reference decoders need large frames
     }
     if (m_latePool->activeThreadCount() > 0) return;   // never queue behind a running late job
     const qint64 deadline = slot.toMSecsSinceEpoch() + slotMs + lateDecodeWindowMs(slotMs);
