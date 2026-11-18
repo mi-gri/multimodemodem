@@ -4126,8 +4126,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
     }
     if (event != nullptr && watched != nullptr && watched == m_rigDigitOverlay && event->type() == QEvent::Paint) {
         QPainter painter(m_rigDigitOverlay);
-        painter.setPen(QPen(QColor(0xF2, 0x8C, 0x00), 2));
-        painter.drawRect(m_rigDigitOverlay->rect().adjusted(1, 1, -1, -1));
+        painter.fillRect(m_rigDigitOverlay->rect(), QColor(0xF2, 0x8C, 0x00));   // bar under the digit
         return true;
     }
     if (event != nullptr && watched != nullptr && watched == m_lcdRigReadoutFrequency) {
@@ -13465,7 +13464,26 @@ void MainWindow::setupRigReadoutPanel()
     m_btnTune->setToolTip(uiText("tune_button_tip", "Transmits a steady carrier on the TX audio frequency of the current mode for tuning (ATU, power, ALC), at the Tune level. Click again to stop; it stops by itself after 60 s. PWR, SWR and ALC are shown next to it."));
     connect(m_btnTune, &QPushButton::clicked, this, [this](bool) { toggleTune(); });
     layout->addWidget(m_lcdRigReadoutFrequency, 0, 0, 3, 1);
-    layout->addWidget(unit, 0, 1, 3, 1, Qt::AlignLeft | Qt::AlignBottom);
+    // Up/down for the clicked digit, beside the display (never over a digit).
+    const auto makeArrow = [this, readout](Qt::ArrowType type, int dir) {
+        auto *button = new QToolButton(readout);
+        button->setText(type == Qt::UpArrow ? QStringLiteral("\u25B2") : QStringLiteral("\u25BC"));
+        QFont f = button->font();
+        f.setPointSizeF(qMax(6.0, f.pointSizeF() * 0.7));
+        button->setFont(f);
+        button->setStyleSheet(QStringLiteral("QToolButton { color: #F28C00; padding: 0px; }"));
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setAutoRepeat(true);
+        button->setFixedSize(18, 14);
+        button->setVisible(false);
+        connect(button, &QToolButton::clicked, this, [this, dir]() { tuneRigByStep(dir, m_rigDigitPower); });
+        return button;
+    };
+    m_btnRigDigitUp = makeArrow(Qt::UpArrow, 1);
+    m_btnRigDigitDown = makeArrow(Qt::DownArrow, -1);
+    layout->addWidget(m_btnRigDigitUp, 0, 1, Qt::AlignLeft | Qt::AlignTop);
+    layout->addWidget(m_btnRigDigitDown, 1, 1, Qt::AlignLeft | Qt::AlignTop);
+    layout->addWidget(unit, 2, 1, Qt::AlignLeft | Qt::AlignBottom);
     layout->addWidget(m_btnTune, 0, 2, 3, 1, Qt::AlignVCenter);
     layout->addWidget(m_lblRigReadoutPower, 0, 3, Qt::AlignLeft | Qt::AlignVCenter);
     layout->addWidget(m_lblRigReadoutSwr, 1, 3, Qt::AlignLeft | Qt::AlignVCenter);
@@ -13510,15 +13528,29 @@ bool MainWindow::tuneRigTo(double frequencyHz, const QString &reason)
     return true;
 }
 
+// QLCDNumber digit geometry (as Qt draws it, qlcdnumber.cpp drawString):
+// segment length from width and height, digits centred, small decimal points
+// take two fifths of a segment.  Index 0 is the leftmost digit.
+static void lcdDigitGeometry(const QLCDNumber *lcd, int *xOffset, int *xAdvance, int *segLen, int *yOffset)
+{
+    const int n = qMax(1, lcd->digitCount());
+    const int digitSpace = lcd->smallDecimalPoint() ? 2 : 1;
+    const int xSegLen = lcd->width() * 5 / (n * (5 + digitSpace) + digitSpace);
+    const int ySegLen = lcd->height() * 5 / 12;
+    *segLen = qMax(1, qMin(xSegLen, ySegLen));
+    *xAdvance = *segLen * (5 + digitSpace) / 5;
+    *xOffset = (lcd->width() - n * *xAdvance + *segLen / 5) / 2;
+    *yOffset = (lcd->height() - *segLen * 2) / 2;
+}
+
 int MainWindow::rigDigitPowerAt(double x) const
 {
     if (m_lcdRigReadoutFrequency == nullptr) return -1;
-    // QLCDNumber right-aligns its digits in equal cells; the small decimal
-    // points take no cell.  The cell under the pointer selects the step.
-    const int digits = qMax(1, m_lcdRigReadoutFrequency->digitCount());
-    const double width = qMax(1, m_lcdRigReadoutFrequency->width());
-    const int cell = qBound(0, int(x * digits / width), digits - 1);
-    return qBound(0, digits - 1 - cell, 9);
+    int xOffset = 0, xAdvance = 1, segLen = 1, yOffset = 0;
+    lcdDigitGeometry(m_lcdRigReadoutFrequency, &xOffset, &xAdvance, &segLen, &yOffset);
+    const int n = qMax(1, m_lcdRigReadoutFrequency->digitCount());
+    const int cell = qBound(0, int(std::floor((x - xOffset) / qMax(1, xAdvance))), n - 1);
+    return qBound(0, n - 1 - cell, 9);
 }
 
 void MainWindow::tuneRigByStep(int notches, int power)
@@ -13574,17 +13606,6 @@ void MainWindow::selectRigDigit(int power)
         m_rigDigitOverlay = new QWidget(m_lcdRigReadoutFrequency);
         m_rigDigitOverlay->setAttribute(Qt::WA_TransparentForMouseEvents);
         m_rigDigitOverlay->installEventFilter(this);
-        const auto makeArrow = [this](Qt::ArrowType type, int dir) {
-            auto *button = new QToolButton(m_lcdRigReadoutFrequency);
-            button->setArrowType(type);
-            button->setFocusPolicy(Qt::NoFocus);
-            button->setAutoRepeat(true);
-            button->setFixedSize(16, 11);
-            connect(button, &QToolButton::clicked, this, [this, dir]() { tuneRigByStep(dir, m_rigDigitPower); });
-            return button;
-        };
-        m_btnRigDigitUp = makeArrow(Qt::UpArrow, 1);
-        m_btnRigDigitDown = makeArrow(Qt::DownArrow, -1);
     }
     m_rigDigitPower = power;
     layoutRigDigitMarkers();
@@ -13592,24 +13613,23 @@ void MainWindow::selectRigDigit(int power)
 
 void MainWindow::layoutRigDigitMarkers()
 {
-    if (m_lcdRigReadoutFrequency == nullptr || m_rigDigitOverlay == nullptr) return;
+    if (m_lcdRigReadoutFrequency == nullptr) return;
     const bool on = m_rigDigitPower >= 0;
+    if (m_btnRigDigitUp != nullptr) m_btnRigDigitUp->setVisible(on);
+    if (m_btnRigDigitDown != nullptr) m_btnRigDigitDown->setVisible(on);
+    if (m_rigDigitOverlay == nullptr) return;
     m_rigDigitOverlay->setVisible(on);
-    m_btnRigDigitUp->setVisible(on);
-    m_btnRigDigitDown->setVisible(on);
     if (!on) return;
-    const int digits = qMax(1, m_lcdRigReadoutFrequency->digitCount());
-    const double cellW = double(m_lcdRigReadoutFrequency->width()) / digits;
-    const int cell = digits - 1 - m_rigDigitPower;
-    const int x = int(cell * cellW), w = qMax(8, int(cellW));
-    const int h = m_lcdRigReadoutFrequency->height();
-    m_rigDigitOverlay->setGeometry(x, 0, w, h);
-    const int cx = x + w / 2 - m_btnRigDigitUp->width() / 2;
-    m_btnRigDigitUp->move(cx, 0);
-    m_btnRigDigitDown->move(cx, h - m_btnRigDigitDown->height());
+    // An orange bar under the digit; nothing covers the digit itself.
+    int xOffset = 0, xAdvance = 1, segLen = 1, yOffset = 0;
+    lcdDigitGeometry(m_lcdRigReadoutFrequency, &xOffset, &xAdvance, &segLen, &yOffset);
+    const int n = qMax(1, m_lcdRigReadoutFrequency->digitCount());
+    const int cell = qBound(0, n - 1 - m_rigDigitPower, n - 1);
+    const int x = xOffset + cell * xAdvance;
+    const int barH = 3;
+    const int y = qMin(m_lcdRigReadoutFrequency->height() - barH, yOffset + 2 * segLen + 1);
+    m_rigDigitOverlay->setGeometry(x, y, qMax(4, segLen + segLen / 5), barH);
     m_rigDigitOverlay->raise();
-    m_btnRigDigitUp->raise();
-    m_btnRigDigitDown->raise();
     m_rigDigitOverlay->update();
 }
 
