@@ -10799,7 +10799,11 @@ void MainWindow::setupProcessingConnections()
                     m_rigTxAlc = alc;
                     // SWR protection: two readings in a row above the limit stop the
                     // transmission (not Tune, which is used to tune the ATU).
-                    if (transmitting && !m_tuneTxRunning && !m_tuneTxRequested && !m_pendingFt8TxPlan.tune && m_settings.txSwrAbort &&
+                    // Tune in any form (Tune button, FT Tune armed or running) is never stopped.
+                    const bool tuning = m_tuneTxRunning || m_tuneTxRequested || m_pendingFt8TxPlan.tune ||
+                                        (m_ftSession.lastTxPlan.tune && (m_txRunning || m_ftTxWorkerRunning)) ||
+                                        (m_btnTune != nullptr && m_btnTune->isChecked());
+                    if (transmitting && !tuning && m_settings.txSwrAbort &&
                         swr >= 1.0 && swr > m_settings.txSwrAbortLimit) {
                         if (++m_swrHighReadings >= 2) {
                             m_swrHighReadings = 0;
