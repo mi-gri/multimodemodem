@@ -54,6 +54,7 @@ public:
         int slotPeriodMs = 15000;
         double driftHzPerSec = 0.0; // Only CRC-valid optional RX recovery results.
         double driftSyncEvidence = 0.0;
+        bool apDecode = false;      // found with a-priori knowledge (own call assumed): never starts a QSO by itself
     };
 
     struct PerfStats

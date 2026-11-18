@@ -20118,6 +20118,22 @@ bool MainWindow::activateNextFt8QueuedCaller()
     return m_ftSession.qsoActive || m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan;
 }
 
+// A caller that may start a QSO automatically must look like a real callsign:
+// prefix + number(s) + suffix in one '/'-part, and a DXCC entity in cty.dat.
+// Catches garbage such as 929OZS or QE0AHG (a-priori false decodes).
+static bool ftCallerPlausible(const QString &call)
+{
+    const QString c = call.trimmed().toUpper();
+    if (c.isEmpty() || c.contains(QLatin1Char('<')) || c.contains(QStringLiteral("..."))) return false;
+    static const QRegularExpression structure(QStringLiteral("^(?:[A-Z]{1,2}|[A-Z][0-9]|[0-9][A-Z])[0-9]{1,4}[A-Z]{1,4}$"));
+    bool shaped = false;
+    for (const QString &part : c.split(QLatin1Char('/'), Qt::SkipEmptyParts))
+        if (structure.match(part).hasMatch()) shaped = true;
+    if (!shaped) return false;
+    const CtyCountryFile &cty = CtyCountryFile::instance();
+    return !cty.isLoaded() || cty.lookupCallsign(c).valid;
+}
+
 void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
 {
     if (m_ft8OperatorStopLatched) {
@@ -20196,6 +20212,22 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
     // A call that would start a QSO while the operator has done nothing (no CQ,
     // no QSO) is an automatic transmission: only with Auto mode, never while the
     // QSY plan runs, and on a band with TX permission.
+    if (decision.startsQso && !m_ftSession.qsoActive) {
+        // A new QSO never starts from an a-priori (AP) decode or an implausible
+        // callsign: AP decodes assume my own call and can produce phantom callers.
+        const QString phantom = decode.apDecode ? QStringLiteral("a-priori (AP) decode")
+                              : !ftCallerPlausible(parsed.senderCall) ? QStringLiteral("implausible callsign")
+                                                                     : QString();
+        if (!phantom.isEmpty()) {
+            static QString lastPhantom;
+            if (lastPhantom != parsed.senderCall) {
+                lastPhantom = parsed.senderCall;
+                appendLog(QStringLiteral("FT: %1 does not start a QSO automatically (%2); double-click to answer.")
+                              .arg(parsed.senderCall, phantom));
+            }
+            return;
+        }
+    }
     if (decision.startsQso && !m_ftSession.qsoActive && !ftOperatorEngaged()) {
         // Unsolicited caller: needs automatic TX, the switch "Answer calls without own
         // CQ" (Filter menu) and a country/continent that is not blocked.

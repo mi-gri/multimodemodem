@@ -7798,6 +7798,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::lateReferenceRecovery(const QVector<
         if (std::any_of(known.cbegin(), known.cend(), same) || std::any_of(found.cbegin(), found.cend(), same)) return;
         if (!plausibleDeepFtMessage(r.message)) return;
         Decode d; d.message = r.message; d.frequencyHz = r.frequency; d.snrDb = r.snr; d.dt = r.dt; d.syncScore = r.quality;
+        d.apDecode = r.method.contains(QStringLiteral("AP"), Qt::CaseInsensitive);
         d.utc = slot.time().toString(QStringLiteral("HHmmss")); d.slotStartUtcMs = request.slotUtcMs; d.slotPeriodMs = profile.slotMs;
         found.append(d);
     };
@@ -7865,7 +7866,7 @@ void Ft8RxDecoder::appendReferenceRecovery(const QVector<double>&samples,const Q
         const bool known=std::any_of(out.cbegin(),out.cend(),[&](const Decode&d){return d.message.trimmed().compare(r.message,Qt::CaseInsensitive)==0;});
         if(known)return;
         if(!plausibleDeepFtMessage(r.message)){if(stats)++stats->referenceRejected;return;}
-        Decode d;d.message=r.message;d.frequencyHz=r.frequency;d.snrDb=r.snr;d.dt=r.dt;d.syncScore=r.quality;d.utc=slot.time().toString(QStringLiteral("HHmmss"));d.slotStartUtcMs=request.slotUtcMs;d.slotPeriodMs=profile.slotMs;
+        Decode d;d.message=r.message;d.frequencyHz=r.frequency;d.snrDb=r.snr;d.dt=r.dt;d.syncScore=r.quality;d.apDecode=r.method.contains(QStringLiteral("AP"),Qt::CaseInsensitive);d.utc=slot.time().toString(QStringLiteral("HHmmss"));d.slotStartUtcMs=request.slotUtcMs;d.slotPeriodMs=profile.slotMs;
         out.append(d);if(stats)++stats->referenceDecodes;if(publish)publish(QVector<Decode>{d});
     };
     try {
