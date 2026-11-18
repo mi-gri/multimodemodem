@@ -4116,12 +4116,8 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
     }
     if (event != nullptr && watched != nullptr && watched == m_quickBandRow && event->type() == QEvent::Wheel) {
         auto *wheelEvent = static_cast<QWheelEvent *>(event);
-        if (wheelEvent->modifiers() & Qt::ControlModifier) {
-            m_bandWheelRemainder += wheelEvent->angleDelta().y();
-            const int notches = m_bandWheelRemainder / 120;
-            m_bandWheelRemainder %= 120;
-            if (notches != 0) stepBandByWheel(notches);
-        }
+        if ((wheelEvent->modifiers() & Qt::ControlModifier) && wheelEvent->angleDelta().y() != 0)
+            stepBandByWheel(wheelEvent->angleDelta().y() > 0 ? 1 : -1);
         return true;
     }
     if (event != nullptr && watched != nullptr && watched == m_rigDigitOverlay && event->type() == QEvent::Paint) {
@@ -4135,12 +4131,8 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         if (event->type() == QEvent::Wheel) {
             // Ctrl + wheel changes the band (preferred bands); the plain wheel does nothing.
             auto *wheelEvent = static_cast<QWheelEvent *>(event);
-            if (wheelEvent->modifiers() & Qt::ControlModifier) {
-                m_bandWheelRemainder += wheelEvent->angleDelta().y();
-                const int notches = m_bandWheelRemainder / 120;
-                m_bandWheelRemainder %= 120;
-                if (notches != 0) stepBandByWheel(notches);
-            }
+            if ((wheelEvent->modifiers() & Qt::ControlModifier) && wheelEvent->angleDelta().y() != 0)
+                stepBandByWheel(wheelEvent->angleDelta().y() > 0 ? 1 : -1);
             event->accept();
             return true;
         }
@@ -13573,13 +13565,22 @@ void MainWindow::tuneRigByStep(int notches, int power)
 void MainWindow::stepBandByWheel(int notches)
 {
     if (ui == nullptr || ui->cmbMode == nullptr || m_txRunning || m_txPreparationPending) return;
+    // One band per wheel gesture step: mice with smooth scrolling or acceleration send
+    // several events (or large deltas) per notch, which jumped straight to the end.
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    if (nowMs - m_bandWheelLastStepMs < 250) return;
+    m_bandWheelLastStepMs = nowMs;
     const QString mode = ui->cmbMode->currentText();
     QStringList bands;
     for (const QString &band : M3BandPolicy::preferredInBandOrder(m_settings.preferredBands))
         if (quickBandDialHz(mode, band) > 0.0) bands << band;
     if (bands.isEmpty()) return;
     const double dial = m_settings.hamlibCatEnabled ? m_lastRigFrequencyHz : m_manualDialHz;
-    const QString from = !m_bandWheelTarget.isEmpty() ? m_bandWheelTarget : M3StandardFrequencies::bandOf(dial);
+    // The rig reports the new band only after the CAT readback: until then (2.5 s)
+    // the band just commanded is the starting point, not the old readback.
+    const bool sentRecently = !m_bandWheelSentBand.isEmpty() && nowMs - m_bandWheelSentMs < 2500;
+    const QString from = !m_bandWheelTarget.isEmpty() ? m_bandWheelTarget
+                         : sentRecently ? m_bandWheelSentBand : M3StandardFrequencies::bandOf(dial);
     int index = bands.indexOf(from);
     if (index < 0) index = notches > 0 ? -1 : bands.size();
     index = qBound(0, index + notches, bands.size() - 1);
@@ -13593,7 +13594,14 @@ void MainWindow::stepBandByWheel(int notches)
         connect(m_bandWheelTimer, &QTimer::timeout, this, [this]() {
             const QString band = m_bandWheelTarget;
             m_bandWheelTarget.clear();
-            if (!band.isEmpty()) quickBandSelected(band);
+            const double dial = m_settings.hamlibCatEnabled ? m_lastRigFrequencyHz : m_manualDialHz;
+            if (!band.isEmpty() && band != M3StandardFrequencies::bandOf(dial)) {
+                m_bandWheelSentBand = band;
+                m_bandWheelSentMs = QDateTime::currentMSecsSinceEpoch();
+                quickBandSelected(band);
+            } else {
+                updateQuickBandButtons();
+            }
         });
     }
     m_bandWheelTimer->start();

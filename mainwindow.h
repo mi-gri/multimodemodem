@@ -2723,7 +2723,9 @@ private:
     qint64 m_rigTuneHoldUntilMs = 0;
     QString m_bandWheelTarget;            // Ctrl + mouse wheel: band chosen, QSY after a short pause
     QTimer *m_bandWheelTimer = nullptr;
-    int m_bandWheelRemainder = 0;
+    qint64 m_bandWheelLastStepMs = 0;
+    QString m_bandWheelSentBand;          // band last commanded by Ctrl+wheel (until the readback follows)
+    qint64 m_bandWheelSentMs = 0;
     void stepBandByWheel(int notches);
     int m_rigDigitPower = -1;             // selected readout digit (click), -1 = none
     QWidget *m_rigDigitOverlay = nullptr; // frame around the selected digit
