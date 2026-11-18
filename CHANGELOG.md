@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- TX protection (Settings → Bands, on by default): a transmission (not Tune) is stopped when the rig reports an SWR above
+  the limit (default 2.5) twice in a row; automatic operation stays stopped and a warning appears.
 - Ctrl + mouse wheel over the frequency display or the band buttons steps through the preferred bands (QSY 400 ms
   after the last notch, so a fast spin sends one command).
 - Frequency display: no more mouse-wheel tuning (accidental QSY while scrolling). Click a digit (orange frame), then

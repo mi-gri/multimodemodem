@@ -129,6 +129,32 @@ void MainWindow::logAutoTxBandRefusal(const QString &key) const
 
 // Everything that would transmit on: a band change during a transmission or a
 // running sequence never carries it over to the new band, allowed or not.
+void MainWindow::abortTxForSwr(double swr)
+{
+    const bool ftActive = m_ftTxWorkerRunning || m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan ||
+                          m_pendingFt8PttKeyed || m_ftSession.qsoActive || m_ftSession.cqRepeatActive;
+    const bool wsprOn = m_chkWsprTx != nullptr && m_chkWsprTx->isChecked();
+    const QString text = uiText("tx_swr_abort_log", "SWR %1 above the limit %2: transmission stopped; automatic operation stays stopped until you start it again. Check antenna and tuner.")
+                             .arg(swr, 0, 'f', 1).arg(m_settings.txSwrAbortLimit, 0, 'f', 1);
+    appendLog(text);
+    SessionDiagnostics::instance().record("tx.swr_abort", {{"swr", swr}, {"limit", m_settings.txSwrAbortLimit}});
+    // Nothing automatic keys up again on the same antenna: FT stop latch, beacon and JS8 queue off.
+    m_ft8OperatorStopLatched = true;
+    if (wsprOn) wsprStopBeacon(QStringLiteral("high SWR"), false);
+    if (!m_js8TxQueue.isEmpty()) m_js8TxQueue.clear();
+    if (m_nativeWeakSignalTxPending) cancelNativeWeakSignalPeriodTx(QStringLiteral("high SWR"));
+    if (ftActive) {
+        stopFt8ShellImpl(false);
+        stopFt8Sequencer(QStringLiteral("high SWR"));
+    }
+    if (m_txRunning || m_txPreparationPending || m_cwSerialActive) stopImageTx();
+    updateTxControlState();
+    auto *box = new QMessageBox(QMessageBox::Warning, uiText("tx_swr_abort_title", "High SWR"), text, QMessageBox::Ok, this);
+    box->setAttribute(Qt::WA_DeleteOnClose);
+    box->setModal(false);
+    box->show();
+}
+
 void MainWindow::abortTxForBandChange(const QString &from, const QString &to)
 {
     m_txBandOverride.clear();

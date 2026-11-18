@@ -1730,6 +1730,8 @@ private:
     bool confirmTxBand(const QString &what);
     void logAutoTxBandRefusal(const QString &key) const;
     void abortTxForBandChange(const QString &from, const QString &to);
+    void abortTxForSwr(double swr);           // high SWR during TX (not Tune): stop everything
+    int m_swrHighReadings = 0;
     void setManualDialFrequency(double hz, const QString &source);
     bool qsyOrSetManual(double hz, const QString &reason);
     double quickBandDialHz(const QString &modeName, const QString &band) const;

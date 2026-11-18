@@ -1584,3 +1584,25 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Dial-frekvens lest via CAT. Klikk på et siffer og endre det med piltastene opp/ned eller de små pilene; venstre/høyre velger neste siffer, Esc avslutter. Ctrl + musehjul bytter bånd. Dobbeltklikk for å skrive inn en frekvens (MHz, kHz eller Hz). Ikke mulig under sending.',
   'Kmitočet dialu načtený přes CAT. Klikněte na číslici a měňte ji šipkami nahoru/dolů nebo malými šipkami; vlevo/vpravo vybere další číslici, Esc ukončí. Ctrl + kolečko myši mění pásmo. Dvojklik zadá kmitočet (MHz, kHz nebo Hz). Během vysílání nelze.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'tx_swr_abort_log':(
+  'SWR %1 above the limit %2: transmission stopped; automatic operation stays stopped until you start it again. Check antenna and tuner.',
+  'ROS %1 sopra il limite %2: trasmissione interrotta; il funzionamento automatico resta fermo finché non lo riavvii. Controlla antenna e accordatore.',
+  'ROS %1 au-dessus de la limite %2 : émission arrêtée ; le fonctionnement automatique reste arrêté jusqu’à ce que vous le relanciez. Vérifiez antenne et boîte d’accord.',
+  'SWR %1 über der Grenze %2: Aussendung abgebrochen; der automatische Betrieb bleibt gestoppt, bis du ihn neu startest. Antenne und Tuner prüfen.',
+  'SWR %1 over grensen %2: sending stoppet; automatisk drift forblir stoppet til du starter den igjen. Sjekk antenne og tuner.',
+  'PSV %1 nad limitem %2: vysílání zastaveno; automatický provoz zůstává zastaven, dokud jej znovu nespustíte. Zkontrolujte anténu a ladicí člen.'),
+ 'tx_swr_abort_title':('High SWR','ROS elevato','ROS élevé','Hohes SWR','Høyt SWR','Vysoký PSV'),
+}.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Stop transmissions (not Tune) when the SWR is above':(
+  'Stop transmissions (not Tune) when the SWR is above','Interrompi le trasmissioni (non Tune) se il ROS supera','Arrêter les émissions (pas Tune) si le ROS dépasse',
+  'Aussendungen (nicht Tune) abbrechen bei SWR über','Stopp sendinger (ikke Tune) når SWR er over','Zastavit vysílání (ne Tune) při PSV nad'),
+ 'Uses the SWR the transceiver reports by CAT during transmission. Two readings in a row above the limit stop the transmission and the automatic operation; Tune is not stopped.':(
+  'Uses the SWR the transceiver reports by CAT during transmission. Two readings in a row above the limit stop the transmission and the automatic operation; Tune is not stopped.',
+  'Usa il ROS riportato dal ricetrasmettitore via CAT durante la trasmissione. Due letture consecutive sopra il limite interrompono la trasmissione e il funzionamento automatico; Tune non viene interrotto.',
+  'Utilise le ROS transmis par le transceiver via CAT pendant l’émission. Deux lectures de suite au-dessus de la limite arrêtent l’émission et le fonctionnement automatique ; Tune n’est pas arrêté.',
+  'Nutzt das SWR, das der Transceiver während der Aussendung per CAT meldet. Zwei Messwerte nacheinander über der Grenze brechen die Aussendung und den automatischen Betrieb ab; Tune wird nicht abgebrochen.',
+  'Bruker SWR som transceiveren rapporterer via CAT under sending. To målinger på rad over grensen stopper sendingen og den automatiske driften; Tune stoppes ikke.',
+  'Používá PSV, které transceiver hlásí přes CAT během vysílání. Dvě po sobě jdoucí hodnoty nad limitem zastaví vysílání a automatický provoz; Tune se nezastaví.'),
+}.items()})

@@ -887,6 +887,24 @@ QWidget *AppSettingsDialog::makeBandsPage()
     m_bandsTable->resizeColumnsToContents();
     m_bandsTable->horizontalHeader()->setStretchLastSection(true);
     layout->addWidget(m_bandsTable, 1);
+    // TX protection: high SWR stops a transmission (Tune is exempt: it is used to tune the ATU).
+    auto *swrRow = new QHBoxLayout();
+    m_chkTxSwrAbort = new QCheckBox(L(QStringLiteral("Stop transmissions (not Tune) when the SWR is above")), page);
+    m_chkTxSwrAbort->setObjectName(QStringLiteral("txSwrAbort"));
+    m_chkTxSwrAbort->setChecked(m_initialSettings.txSwrAbort);
+    m_chkTxSwrAbort->setToolTip(L(QStringLiteral("Uses the SWR the transceiver reports by CAT during transmission. Two readings in a row above the limit stop the transmission and the automatic operation; Tune is not stopped.")));
+    m_spinTxSwrAbortLimit = new QDoubleSpinBox(page);
+    m_spinTxSwrAbortLimit->setObjectName(QStringLiteral("txSwrAbortLimit"));
+    m_spinTxSwrAbortLimit->setRange(1.2, 10.0);
+    m_spinTxSwrAbortLimit->setSingleStep(0.1);
+    m_spinTxSwrAbortLimit->setDecimals(1);
+    m_spinTxSwrAbortLimit->setValue(m_initialSettings.txSwrAbortLimit);
+    m_spinTxSwrAbortLimit->setEnabled(m_chkTxSwrAbort->isChecked());
+    connect(m_chkTxSwrAbort, &QCheckBox::toggled, m_spinTxSwrAbortLimit, &QWidget::setEnabled);
+    swrRow->addWidget(m_chkTxSwrAbort);
+    swrRow->addWidget(m_spinTxSwrAbortLimit);
+    swrRow->addStretch(1);
+    layout->addLayout(swrRow);
     return page;
 }
 
@@ -2764,6 +2782,8 @@ void AppSettingsDialog::collectSettings()
     if (m_chkFtGpuSync) merged.ftGpuSyncEnabled = m_chkFtGpuSync->isChecked();
     if (m_chkFtGpuDecode) merged.ftGpuDecodeEnabled = m_chkFtGpuDecode->isChecked();
 
+    if (m_chkTxSwrAbort != nullptr) merged.txSwrAbort = m_chkTxSwrAbort->isChecked();
+    if (m_spinTxSwrAbortLimit != nullptr) merged.txSwrAbortLimit = m_spinTxSwrAbortLimit->value();
     if (m_bandsTable != nullptr) {
         merged.bandsConfigured = true;
         merged.preferredBands.clear();

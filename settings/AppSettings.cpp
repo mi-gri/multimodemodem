@@ -674,6 +674,8 @@ void AppSettings::load()
     ftDecodeFilterWorkedDays = qBound(0, settings.value("FT8/decodeFilterWorkedDays", ftDecodeFilterWorkedDays).toInt(), 3650);
     ftDecodeFilterCountries = settings.value("FT8/decodeFilterCountries", ftDecodeFilterCountries).toBool();
     ftAnswerUnsolicited = settings.value("FT8/answerUnsolicited", ftAnswerUnsolicited).toBool();
+    txSwrAbort = settings.value("TX/swrAbort", txSwrAbort).toBool();
+    txSwrAbortLimit = qBound(1.2, settings.value("TX/swrAbortLimit", txSwrAbortLimit).toDouble(), 10.0);
     ftDecodeFilterKeepMine = settings.value("FT8/decodeFilterKeepMine", ftDecodeFilterKeepMine).toBool();
     ftDecodeFilterHideBlocked = settings.value("FT8/decodeFilterHideBlocked", ftDecodeFilterHideBlocked).toBool();
     ftDecodeFilterCountryList = settings.value("FT8/decodeFilterCountryList", ftDecodeFilterCountryList).toString();
@@ -1125,6 +1127,8 @@ bool AppSettings::save() const
     settings.setValue("FT8/decodeFilterWorkedDays", ftDecodeFilterWorkedDays);
     settings.setValue("FT8/decodeFilterCountries", ftDecodeFilterCountries);
     settings.setValue("FT8/answerUnsolicited", ftAnswerUnsolicited);
+    settings.setValue("TX/swrAbort", txSwrAbort);
+    settings.setValue("TX/swrAbortLimit", txSwrAbortLimit);
     settings.setValue("FT8/decodeFilterKeepMine", ftDecodeFilterKeepMine);
     settings.setValue("FT8/decodeFilterHideBlocked", ftDecodeFilterHideBlocked);
     settings.setValue("FT8/decodeFilterCountryList", ftDecodeFilterCountryList);

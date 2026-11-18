@@ -10797,6 +10797,17 @@ void MainWindow::setupProcessingConnections()
                     m_rigTxWatts = watts;
                     m_rigTxSwr = swr;
                     m_rigTxAlc = alc;
+                    // SWR protection: two readings in a row above the limit stop the
+                    // transmission (not Tune, which is used to tune the ATU).
+                    if (transmitting && !m_tuneTxRunning && !m_tuneTxRequested && m_settings.txSwrAbort &&
+                        swr >= 1.0 && swr > m_settings.txSwrAbortLimit) {
+                        if (++m_swrHighReadings >= 2) {
+                            m_swrHighReadings = 0;
+                            abortTxForSwr(swr);
+                        }
+                    } else {
+                        m_swrHighReadings = 0;
+                    }
                     updateRigReadout();
                 },
                 Qt::QueuedConnection);

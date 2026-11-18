@@ -177,6 +177,8 @@ private:
     BandSchedulerDialog *m_schedulerPage = nullptr;
     class FrequencyListEditor *m_frequencyPage = nullptr;
     class QTableWidget *m_bandsTable = nullptr;   // Band | preferred | TX allowed
+    class QCheckBox *m_chkTxSwrAbort = nullptr;
+    class QDoubleSpinBox *m_spinTxSwrAbortLimit = nullptr;
     QWidget *makeBandsPage();
     SoundCardCalibrationDialog *m_calibrationPage = nullptr;
     QWidget *m_rotatorPage = nullptr;
