@@ -692,6 +692,7 @@ void AppSettings::load()
     if (ft8CqRepeatCount < 1 || ft8CqRepeatCount > 99) {
         ft8CqRepeatCount = 3;
     }
+    ft8CqResumeWaitSlots = qBound(0, settings.value("FT8/cqResumeWaitSlots", ft8CqResumeWaitSlots).toInt(), 10);
     ft8NoResponseRetryCount = settings.value("FT8/noResponseRetryCount", ft8NoResponseRetryCount).toInt();
     if (ft8NoResponseRetryCount < 1 || ft8NoResponseRetryCount > 12) {
         ft8NoResponseRetryCount = 3;
@@ -1139,6 +1140,7 @@ bool AppSettings::save() const
     settings.setValue("FT8/autoQsoOnlyCqTarget", ftAutoQsoOnlyCqTarget);
     settings.setValue("FT8/cqRepeatCount", ft8CqRepeatCount);
     settings.setValue("FT8/noResponseRetryCount", ft8NoResponseRetryCount);
+    settings.setValue("FT8/cqResumeWaitSlots", ft8CqResumeWaitSlots);
 
 
     settings.setValue("Rotator/enabled", rotatorEnabled);

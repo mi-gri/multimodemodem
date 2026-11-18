@@ -335,6 +335,7 @@ public:
     // Maximum number of unanswered FT TX attempts during a started QSO.
     // Counts the first call plus automatic retries; after this MM stops and returns to RX standby.
     int ft8NoResponseRetryCount = 3;
+    int ft8CqResumeWaitSlots = 1;          // Auto mode: wait slots before the CQ series continues after an unanswered QSO (0-10)
 
 
     // CatRotator integration. The original CatRotator WSJT-X/AirScout

@@ -9834,6 +9834,20 @@ void MainWindow::setupFt8Page()
     controlGrid->addWidget(m_chkFt8FullAutoQso, 0, 5);
     m_btnFt8CallerList=new QPushButton(controlGroup);
     m_btnFt8CallerList->setObjectName(QStringLiteral("ftCallerQueueOpen"));
+    m_spinFt8CqResumeWait = new QSpinBox(controlGroup);
+    m_spinFt8CqResumeWait->setRange(0, 10);
+    m_spinFt8CqResumeWait->setValue(qBound(0, m_settings.ft8CqResumeWaitSlots, 10));
+    m_spinFt8CqResumeWait->setToolTip(uiText("ft8_cq_resume_wait_tooltip", "Auto mode: after a started QSO got no reply, the CQ series continues after this many slots (0 = in the next own slot)."));
+    {
+        auto *lbl = new QLabel(uiText("ft8_cq_resume_wait", "CQ again after no reply, wait slots"), controlGroup);
+        lbl->setToolTip(m_spinFt8CqResumeWait->toolTip());
+        controlGrid->addWidget(lbl, 6, 0, 1, 2);
+        controlGrid->addWidget(m_spinFt8CqResumeWait, 6, 2);
+    }
+    connect(m_spinFt8CqResumeWait, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int v) {
+        m_settings.ft8CqResumeWaitSlots = v;
+        m_settings.save();
+    });
     controlGrid->addWidget(m_chkFt8CallerQueue, 4, 0, 1, 4);
     controlGrid->addWidget(m_btnFt8CallerList, 4, 4, 1, 2);
     connect(m_btnFt8CallerList,&QPushButton::clicked,this,&MainWindow::showFt8CallerQueue);
@@ -21689,11 +21703,18 @@ void MainWindow::finishFt8ResponseWait(quint64 retryGeneration, qint64 replySlot
             m_ftCqResumeAfterQso = resumeCq;   // the next QSO also continues the series
             return;
         }
-        if (resumeCq && !m_ftSession.qsoActive && !m_ft8OperatorStopLatched && autoTxPermitted() &&
-            m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked()) {
-            appendLog(uiText("ft_cq_series_continues_noreply_log", "FT Auto mode: no reply; the CQ series continues."));
+        if (!resumeCq) return;
+        // Wait the configured number of slots (a late reply still gets its chance),
+        // then check every condition again before calling CQ.
+        const int waitSlots = qBound(0, m_settings.ft8CqResumeWaitSlots, 10);
+        const QString mode = ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QStringLiteral("FT8");
+        const int slotMs = Ft8Mode::profileForMode(mode).slotMs;
+        QTimer::singleShot(waitSlots * slotMs, this, [this, waitSlots]() {
+            if (m_ftSession.qsoActive || m_ftSession.cqRepeatActive || m_ft8OperatorStopLatched || !autoTxPermitted() ||
+                m_chkFt8CqRepeat == nullptr || !m_chkFt8CqRepeat->isChecked()) return;
+            appendLog(uiText("ft_cq_series_continues_noreply_wait_log", "FT Auto mode: no reply; the CQ series continues after %1 wait slot(s).").arg(waitSlots));
             startFt8CqRepeat();
-        }
+        });
     });
     updateFt8SequencerUi();
 }

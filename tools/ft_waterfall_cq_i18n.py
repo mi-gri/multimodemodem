@@ -1549,3 +1549,17 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'FT mode Auto : pas de réponse ; la série de CQ continue.','FT Auto-Modus: keine Antwort; die CQ-Serie läuft weiter.',
   'FT Auto-modus: ingen svar; CQ-serien fortsetter.','FT režim Auto: žádná odpověď; série CQ pokračuje.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft8_cq_resume_wait':('CQ again after no reply, wait slots','CQ di nuovo dopo nessuna risposta, slot di attesa','CQ à nouveau sans réponse, slots d’attente','CQ erneut nach fehlender Antwort, Warteslots','CQ igjen etter manglende svar, venteslots','CQ znovu po chybějící odpovědi, čekací sloty'),
+ 'ft8_cq_resume_wait_tooltip':(
+  'Auto mode: after a started QSO got no reply, the CQ series continues after this many slots (0 = in the next own slot).',
+  'Modalità Auto: se un QSO avviato non riceve risposta, la serie di CQ riprende dopo questo numero di slot (0 = nel prossimo slot proprio).',
+  'Mode Auto : si un QSO commencé reste sans réponse, la série de CQ reprend après ce nombre de slots (0 = dans le prochain slot propre).',
+  'Auto-Modus: Bleibt ein begonnenes QSO ohne Antwort, läuft die CQ-Serie nach so vielen Slots weiter (0 = im nächsten eigenen Slot).',
+  'Auto-modus: får et påbegynt QSO ikke svar, fortsetter CQ-serien etter så mange slots (0 = i neste egne slot).',
+  'Režim Auto: pokud zahájené QSO nedostane odpověď, série CQ pokračuje po tomto počtu slotů (0 = v příštím vlastním slotu).'),
+ 'ft_cq_series_continues_noreply_wait_log':(
+  'FT Auto mode: no reply; the CQ series continues after %1 wait slot(s).','FT modalità Auto: nessuna risposta; la serie di CQ continua dopo %1 slot di attesa.',
+  'FT mode Auto : pas de réponse ; la série de CQ continue après %1 slot(s) d’attente.','FT Auto-Modus: keine Antwort; die CQ-Serie läuft nach %1 Warteslot(s) weiter.',
+  'FT Auto-modus: ingen svar; CQ-serien fortsetter etter %1 venteslot(s).','FT režim Auto: žádná odpověď; série CQ pokračuje po %1 čekacích slotech.'),
+}.items()})

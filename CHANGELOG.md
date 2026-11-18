@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- FT Auto mode: new setting "CQ again after no reply, wait slots" (0-10, default 1) on the FT page: the CQ series
+  continues only after that many slots following an unanswered QSO; all conditions are checked again then.
 - FT: a new QSO is never started automatically from an a-priori (AP) decode or a caller with an implausible callsign
   (no callsign structure or no DXCC entity); such phantom callers (e.g. "<DL75WAU> W59IZF R GN30") are only shown.
 - FT Auto mode: after an unanswered QSO attempt (no reply after the set number of transmissions) a CQ series that was

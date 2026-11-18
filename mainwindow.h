@@ -2605,6 +2605,7 @@ private:
     QPushButton *m_btnFtDecodeAnalyzeWav = nullptr;
     QSpinBox *m_spinFt8CqTimeoutMin = nullptr;
     QSpinBox *m_spinFt8NoResponseLimit = nullptr;
+    QSpinBox *m_spinFt8CqResumeWait = nullptr;      // wait slots before CQ continues after an unanswered QSO
     QLabel *m_lblFt8NoResponseLimit = nullptr;
     QLabel *m_lblFt8TxBanner = nullptr;
     QLabel *m_lblFt8LastSnr = nullptr;
