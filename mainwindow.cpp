@@ -10801,7 +10801,8 @@ void MainWindow::setupProcessingConnections()
                     // transmission (not Tune, which is used to tune the ATU).
                     // Tune in any form (Tune button, FT Tune armed or running) is never stopped.
                     const bool tuning = m_tuneTxRunning || m_tuneTxRequested || m_pendingFt8TxPlan.tune ||
-                                        (m_ftSession.lastTxPlan.tune && (m_txRunning || m_ftTxWorkerRunning)) ||
+                                        (m_ftSession.lastTxPlan.tune && m_ftTxWorkerRunning && ui != nullptr && ui->cmbMode != nullptr &&
+                                         Ft8Mode::isFamilyMode(ui->cmbMode->currentText())) ||
                                         (m_btnTune != nullptr && m_btnTune->isChecked());
                     if (transmitting && !tuning && m_settings.txSwrAbort &&
                         swr >= 1.0 && swr > m_settings.txSwrAbortLimit) {
@@ -28746,6 +28747,8 @@ void MainWindow::handleTxStopped()
 {
     setTxLevelTune(false);
     m_tuneTxRunning = false;
+    // A finished FT Tune must not leave its mark: the SWR stop reads lastTxPlan.tune.
+    if (m_ftSession.lastTxPlan.tune) m_ftSession.lastTxPlan.tune = false;
     QTimer::singleShot(0, this, [this] { updateTuneButton(); });
     m_hellTxRaster = QImage();   // stopped: the paper keeps only what was sent
     m_hellTxColumnsPainted = 0;
