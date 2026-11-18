@@ -28747,8 +28747,6 @@ void MainWindow::handleTxStopped()
 {
     setTxLevelTune(false);
     m_tuneTxRunning = false;
-    // A finished FT Tune must not leave its mark: the SWR stop reads lastTxPlan.tune.
-    if (m_ftSession.lastTxPlan.tune) m_ftSession.lastTxPlan.tune = false;
     QTimer::singleShot(0, this, [this] { updateTuneButton(); });
     m_hellTxRaster = QImage();   // stopped: the paper keeps only what was sent
     m_hellTxColumnsPainted = 0;
