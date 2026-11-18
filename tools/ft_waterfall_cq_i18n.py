@@ -1609,3 +1609,31 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
 KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'about_sources_label':('Source code:','Codice sorgente:','Code source :','Quelltext:','Kildekode:','Zdrojový kód:'),
 }.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Auto mode lets m³ transmit without your intervention:':(
+  'Auto mode lets m³ transmit without your intervention:','La modalità Auto permette a m³ di trasmettere senza il tuo intervento:',
+  'Le mode Auto permet à m³ d’émettre sans votre intervention :','Der Auto-Modus lässt m³ ohne dein Zutun senden:',
+  'Auto-modus lar m³ sende uten at du griper inn:','Režim Auto umožňuje m³ vysílat bez vašeho zásahu:'),
+ 'FT8/FT4: answers CQ calls (Auto QSO) and completes QSOs, continues a running CQ series after a QSO or an unanswered attempt, sends RR73 again when the partner repeats his report, works the queue of callers and - if switched on in the Filter menu - answers calls without your own CQ.':(
+  'FT8/FT4: answers CQ calls (Auto QSO) and completes QSOs, continues a running CQ series after a QSO or an unanswered attempt, sends RR73 again when the partner repeats his report, works the queue of callers and - if switched on in the Filter menu - answers calls without your own CQ.',
+  'FT8/FT4: risponde ai CQ (Auto QSO) e completa i QSO, prosegue una serie di CQ in corso dopo un QSO o un tentativo senza risposta, rinvia RR73 se il corrispondente ripete il rapporto, gestisce la coda dei chiamanti e - se attivato nel menu Filtro - risponde alle chiamate senza un tuo CQ.',
+  'FT8/FT4 : répond aux CQ (Auto QSO) et termine les QSO, poursuit une série de CQ en cours après un QSO ou une tentative sans réponse, renvoie RR73 si le correspondant répète son report, traite la file des appelants et - si activé dans le menu Filtre - répond aux appels sans CQ de votre part.',
+  'FT8/FT4: beantwortet CQ-Rufe (Auto QSO) und schließt QSOs ab, setzt eine laufende CQ-Serie nach einem QSO oder einem unbeantworteten Versuch fort, sendet RR73 erneut, wenn die Gegenstation ihren Rapport wiederholt, arbeitet die Anrufer-Warteschlange ab und beantwortet - wenn im Menü Filter eingeschaltet - Anrufe ohne eigenes CQ.',
+  'FT8/FT4: svarer på CQ (Auto QSO) og fullfører QSO-er, fortsetter en pågående CQ-serie etter et QSO eller et ubesvart forsøk, sender RR73 på nytt når motstasjonen gjentar rapporten, behandler køen av anropere og - hvis slått på i Filter-menyen - svarer på anrop uten eget CQ.',
+  'FT8/FT4: odpovídá na CQ (Auto QSO) a dokončuje QSO, pokračuje v běžící sérii CQ po QSO nebo nezodpovězeném pokusu, znovu pošle RR73, když protistanice opakuje report, zpracovává frontu volajících a - je-li zapnuto v menu Filtr - odpovídá na volání bez vlastního CQ.'),
+ 'JS8: answers queries, relays messages and sends heartbeats or CQ by timer.':(
+  'JS8: answers queries, relays messages and sends heartbeats or CQ by timer.','JS8: risponde alle richieste, inoltra messaggi e invia heartbeat o CQ a intervalli.',
+  'JS8 : répond aux requêtes, relaie les messages et envoie heartbeats ou CQ selon une minuterie.','JS8: beantwortet Abfragen, leitet Nachrichten weiter und sendet Heartbeats oder CQ im Takt.',
+  'JS8: svarer på forespørsler, videresender meldinger og sender heartbeat eller CQ etter tidsur.','JS8: odpovídá na dotazy, předává zprávy a posílá heartbeat nebo CQ podle časovače.'),
+ 'WSPR: beacon transmissions of QSY plan entries that are explicitly marked for it.':(
+  'WSPR: beacon transmissions of QSY plan entries that are explicitly marked for it.','WSPR: trasmissioni beacon delle voci del piano QSY espressamente contrassegnate.',
+  'WSPR : émissions de balise des entrées du plan QSY explicitement marquées pour cela.','WSPR: Bakensendungen von Einträgen im QSY-Plan, die ausdrücklich dafür markiert sind.',
+  'WSPR: fyrsendinger for oppføringer i QSY-planen som er uttrykkelig merket for det.','WSPR: vysílání majáku u položek plánu QSY, které jsou k tomu výslovně označeny.'),
+ 'Always in force: no automatic transmission on receive-only bands, to excluded countries/continents, after STOP or after a stop for high SWR. Other modes never transmit automatically.':(
+  'Always in force: no automatic transmission on receive-only bands, to excluded countries/continents, after STOP or after a stop for high SWR. Other modes never transmit automatically.',
+  'Sempre valido: nessuna trasmissione automatica su bande di sola ricezione, verso paesi/continenti esclusi, dopo STOP o dopo un arresto per ROS elevato. Gli altri modi non trasmettono mai automaticamente.',
+  'Toujours en vigueur : aucune émission automatique sur les bandes en réception seule, vers des pays/continents exclus, après STOP ou après un arrêt pour ROS élevé. Les autres modes n’émettent jamais automatiquement.',
+  'Gilt immer: keine automatische Aussendung auf Nur-Empfang-Bändern, an ausgeschlossene Länder/Kontinente, nach STOP oder nach einem Abbruch wegen hohem SWR. Andere Modi senden nie automatisch.',
+  'Gjelder alltid: ingen automatisk sending på bånd kun for mottak, til utelukkede land/kontinenter, etter STOP eller etter stopp for høyt SWR. Andre moduser sender aldri automatisk.',
+  'Platí vždy: žádné automatické vysílání na pásmech jen pro příjem, do vyloučených zemí/kontinentů, po STOP nebo po zastavení kvůli vysokému PSV. Ostatní režimy nikdy nevysílají automaticky.'),
+}.items()})

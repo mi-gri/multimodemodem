@@ -33,7 +33,15 @@ bool confirm(QWidget *parent, const std::function<QString(const QString &)> &tra
     text->setWordWrap(true);
     text->setTextFormat(Qt::PlainText);
     text->setMinimumWidth(460);
-    text->setText(L(QStringLiteral("Auto mode answers CQ calls and completes QSOs (FT8/FT4), answers queries, relays messages and sends heartbeats or CQ by timer (JS8) without your intervention."))
+    text->setText(L(QStringLiteral("Auto mode lets m³ transmit without your intervention:"))
+                  + QStringLiteral("\n• ")
+                  + L(QStringLiteral("FT8/FT4: answers CQ calls (Auto QSO) and completes QSOs, continues a running CQ series after a QSO or an unanswered attempt, sends RR73 again when the partner repeats his report, works the queue of callers and - if switched on in the Filter menu - answers calls without your own CQ."))
+                  + QStringLiteral("\n• ")
+                  + L(QStringLiteral("JS8: answers queries, relays messages and sends heartbeats or CQ by timer."))
+                  + QStringLiteral("\n• ")
+                  + L(QStringLiteral("WSPR: beacon transmissions of QSY plan entries that are explicitly marked for it."))
+                  + QStringLiteral("\n• ")
+                  + L(QStringLiteral("Always in force: no automatic transmission on receive-only bands, to excluded countries/continents, after STOP or after a stop for high SWR. Other modes never transmit automatically."))
                   + QStringLiteral("\n\n• ")
                   + L(QStringLiteral("Automatic operation may not be permitted in every country. Check the rules of your licence."))
                   + QStringLiteral("\n• ")
@@ -59,6 +67,8 @@ bool confirm(QWidget *parent, const std::function<QString(const QString &)> &tra
     QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     layout->addWidget(buttons);
+    // The notice is long (all automatic functions + legal points): give the wrapped text room.
+    dialog.setMinimumSize(680, 600);
 
     return dialog.exec() == QDialog::Accepted && understood->isChecked();
 }
