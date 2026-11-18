@@ -2721,6 +2721,10 @@ private:
     QMap<QString, QToolButton *> m_quickBandButtons;
     double m_rigTuneTargetHz = 0.0;       // frequency shown while a readout QSY is on its way
     qint64 m_rigTuneHoldUntilMs = 0;
+    QString m_bandWheelTarget;            // Ctrl + mouse wheel: band chosen, QSY after a short pause
+    QTimer *m_bandWheelTimer = nullptr;
+    int m_bandWheelRemainder = 0;
+    void stepBandByWheel(int notches);
     int m_rigDigitPower = -1;             // selected readout digit (click), -1 = none
     QWidget *m_rigDigitOverlay = nullptr; // frame around the selected digit
     QToolButton *m_btnRigDigitUp = nullptr, *m_btnRigDigitDown = nullptr;

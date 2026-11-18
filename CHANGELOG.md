@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Ctrl + mouse wheel over the frequency display or the band buttons steps through the preferred bands (QSY 400 ms
+  after the last notch, so a fast spin sends one command).
 - Frequency display: no more mouse-wheel tuning (accidental QSY while scrolling). Click a digit (orange frame), then
   change it with Up/Down or the small arrows; Left/Right selects the next digit, Esc ends. Selection fields in the main
   window (band, mode ...) ignore the mouse wheel; the wheel scrolls the page instead.

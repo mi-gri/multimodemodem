@@ -13,6 +13,7 @@
 #include "logbook/CqWwRtty.h"
 #include "mainwindow.h"
 #include "dialogs/AutoModeNoticeDialog.h"
+#include "utils/BandPolicy.h"
 #include "audio/AudioDeviceCache.h"
 #include "utils/StartupTrace.h"
 #include "runtime/SstvImageArchive.h"
@@ -4113,6 +4114,16 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             }
         }
     }
+    if (event != nullptr && watched != nullptr && watched == m_quickBandRow && event->type() == QEvent::Wheel) {
+        auto *wheelEvent = static_cast<QWheelEvent *>(event);
+        if (wheelEvent->modifiers() & Qt::ControlModifier) {
+            m_bandWheelRemainder += wheelEvent->angleDelta().y();
+            const int notches = m_bandWheelRemainder / 120;
+            m_bandWheelRemainder %= 120;
+            if (notches != 0) stepBandByWheel(notches);
+        }
+        return true;
+    }
     if (event != nullptr && watched != nullptr && watched == m_rigDigitOverlay && event->type() == QEvent::Paint) {
         QPainter painter(m_rigDigitOverlay);
         painter.setPen(QPen(QColor(0xF2, 0x8C, 0x00), 2));
@@ -4123,7 +4134,15 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         // No mouse-wheel tuning (accidental QSYs while scrolling): click a digit,
         // then change it with the arrow keys or the small arrow buttons.
         if (event->type() == QEvent::Wheel) {
-            event->ignore();
+            // Ctrl + wheel changes the band (preferred bands); the plain wheel does nothing.
+            auto *wheelEvent = static_cast<QWheelEvent *>(event);
+            if (wheelEvent->modifiers() & Qt::ControlModifier) {
+                m_bandWheelRemainder += wheelEvent->angleDelta().y();
+                const int notches = m_bandWheelRemainder / 120;
+                m_bandWheelRemainder %= 120;
+                if (notches != 0) stepBandByWheel(notches);
+            }
+            event->accept();
             return true;
         }
         if (event->type() == QEvent::MouseButtonPress) {
@@ -11575,6 +11594,7 @@ void MainWindow::rebuildMenuBar()
     // Selection fields (band, frequency, mode ...) never change on the mouse
     // wheel: scrolling over them moved the rig (accidental QSY).
     for (QComboBox *combo : findChildren<QComboBox *>()) combo->installEventFilter(this);
+    if (m_quickBandRow != nullptr) m_quickBandRow->installEventFilter(this);
 }
 
 void MainWindow::retranslateMenuBar()
@@ -13454,7 +13474,7 @@ void MainWindow::setupRigReadoutPanel()
     layout->setColumnStretch(0, 1);
     layout->setColumnMinimumWidth(3, m_lblRigReadoutPower->fontMetrics().horizontalAdvance(uiText("rig_readout_power", "PWR %1 W").arg(100)) + 4);
     readout->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power, SWR and ALC reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
-    m_lcdRigReadoutFrequency->setToolTip(uiText("rig_readout_digit_tooltip", "Dial frequency read by CAT. Click a digit, then change it with the arrow keys Up/Down or the small arrows; Left/Right selects the next digit, Esc ends. Double-click enters a frequency (MHz, kHz or Hz). Not possible while transmitting."));
+    m_lcdRigReadoutFrequency->setToolTip(uiText("rig_readout_digit_tooltip", "Dial frequency read by CAT. Click a digit, then change it with the arrow keys Up/Down or the small arrows; Left/Right selects the next digit, Esc ends. Ctrl + mouse wheel changes the band. Double-click enters a frequency (MHz, kHz or Hz). Not possible while transmitting."));
     m_lcdRigReadoutFrequency->setFocusPolicy(Qt::ClickFocus);
     m_lcdRigReadoutFrequency->installEventFilter(this);
     m_lcdRigReadoutFrequency->setCursor(Qt::PointingHandCursor);
@@ -13513,6 +13533,38 @@ void MainWindow::tuneRigByStep(int notches, int power)
     m_rigTuneTargetHz = qMax(100000.0, base + notches * step);
     m_rigTuneTimer->start();
     updateRigReadout();
+}
+
+// Ctrl + mouse wheel over the frequency display or the band buttons: next or
+// previous preferred band (with a frequency for this mode).  The QSY goes out
+// 400 ms after the last notch, so a fast spin sends one command.
+void MainWindow::stepBandByWheel(int notches)
+{
+    if (ui == nullptr || ui->cmbMode == nullptr || m_txRunning || m_txPreparationPending) return;
+    const QString mode = ui->cmbMode->currentText();
+    QStringList bands;
+    for (const QString &band : M3BandPolicy::preferredInBandOrder(m_settings.preferredBands))
+        if (quickBandDialHz(mode, band) > 0.0) bands << band;
+    if (bands.isEmpty()) return;
+    const double dial = m_settings.hamlibCatEnabled ? m_lastRigFrequencyHz : m_manualDialHz;
+    const QString from = !m_bandWheelTarget.isEmpty() ? m_bandWheelTarget : M3StandardFrequencies::bandOf(dial);
+    int index = bands.indexOf(from);
+    if (index < 0) index = notches > 0 ? -1 : bands.size();
+    index = qBound(0, index + notches, bands.size() - 1);
+    m_bandWheelTarget = bands.at(index);
+    for (auto it = m_quickBandButtons.cbegin(); it != m_quickBandButtons.cend(); ++it)
+        it.value()->setChecked(it.key() == m_bandWheelTarget);
+    if (m_bandWheelTimer == nullptr) {
+        m_bandWheelTimer = new QTimer(this);
+        m_bandWheelTimer->setSingleShot(true);
+        m_bandWheelTimer->setInterval(400);
+        connect(m_bandWheelTimer, &QTimer::timeout, this, [this]() {
+            const QString band = m_bandWheelTarget;
+            m_bandWheelTarget.clear();
+            if (!band.isEmpty()) quickBandSelected(band);
+        });
+    }
+    m_bandWheelTimer->start();
 }
 
 void MainWindow::selectRigDigit(int power)
