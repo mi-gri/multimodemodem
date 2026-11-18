@@ -1606,3 +1606,6 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
   'Bruker SWR som transceiveren rapporterer via CAT under sending. To målinger på rad over grensen stopper sendingen og den automatiske driften; Tune stoppes ikke.',
   'Používá PSV, které transceiver hlásí přes CAT během vysílání. Dvě po sobě jdoucí hodnoty nad limitem zastaví vysílání a automatický provoz; Tune se nezastaví.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'about_sources_label':('Source code:','Codice sorgente:','Code source :','Quelltext:','Kildekode:','Zdrojový kód:'),
+}.items()})

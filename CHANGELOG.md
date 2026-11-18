@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Menu Tools now holds Runtime log and Update country file (moved from Help); About lists both source repositories
+  (GitHub and git.darc.de) as links.
 - TX protection (Settings → Bands, on by default): a transmission (not Tune) is stopped when the rig reports an SWR above
   the limit (default 2.5) twice in a row; automatic operation stays stopped and a warning appears.
 - Ctrl + mouse wheel over the frequency display or the band buttons steps through the preferred bands (QSY 400 ms

@@ -11571,6 +11571,12 @@ void MainWindow::rebuildMenuBar()
         m_menuView->addMenu(m_menuLanguage);
     }
     addPage(m_menuTools, QStringLiteral("diagnostics"), Page::Diagnostics);
+    // Runtime log and country-file update belong to the tools, not to Help.
+    for (QAction *action : {m_actionRuntimeLog, m_actionCtyUpdate}) {
+        if (action == nullptr) continue;
+        if (ui->menuHelp != nullptr) ui->menuHelp->removeAction(action);
+        m_menuTools->addAction(action);
+    }
 
     // New order.
     const QList<QAction *> old = bar->actions();
@@ -26148,6 +26154,10 @@ void MainWindow::showAboutM3()
         QStringLiteral("<p>") +
         line(uiText("about_fork_label", "MultiModeModem:"),
              uiText("about_fork_text", "fork of %1 maintained by Michael Grigutsch, DO3BOX, github.com/mi-gri/MultiModeModem.").arg(ProductName::upstreamName())) +
+        QStringLiteral("<br><b>%1</b> "
+                       "<a href=\"https://github.com/mi-gri/multimodemodem\">github.com/mi-gri/MultiModeModem</a> · "
+                       "<a href=\"https://git.darc.de/DO3BOX/m3\">git.darc.de/DO3BOX/m3</a>")
+            .arg(uiText("about_sources_label", "Source code:").toHtmlEscaped()) +
         QStringLiteral("<br>") +
         line(ProductName::upstreamName() + QLatin1Char(':'),
              uiText("about_madmodem_text", "Papadopol Lucian-Ioan, IZ6NNH, www.madexp.it")) +
