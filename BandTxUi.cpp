@@ -138,8 +138,11 @@ void MainWindow::abortTxForSwr(double swr)
                              .arg(swr, 0, 'f', 1).arg(m_settings.txSwrAbortLimit, 0, 'f', 1);
     appendLog(text);
     SessionDiagnostics::instance().record("tx.swr_abort", {{"swr", swr}, {"limit", m_settings.txSwrAbortLimit}});
-    // Nothing automatic keys up again on the same antenna: FT stop latch, beacon and JS8 queue off.
+    // Nothing automatic keys up again on the same antenna: FT stop latch, beacon off,
+    // JS8 automation held (as by its watchdog) until the next operator action.
+    ++m_ftCqResumeGen;
     m_ft8OperatorStopLatched = true;
+    m_js8WatchdogTripped = true;
     if (wsprOn) wsprStopBeacon(QStringLiteral("high SWR"), false);
     if (!m_js8TxQueue.isEmpty()) m_js8TxQueue.clear();
     if (m_nativeWeakSignalTxPending) cancelNativeWeakSignalPeriodTx(QStringLiteral("high SWR"));
@@ -157,6 +160,7 @@ void MainWindow::abortTxForSwr(double swr)
 
 void MainWindow::abortTxForBandChange(const QString &from, const QString &to)
 {
+    ++m_ftCqResumeGen;
     m_txBandOverride.clear();
     m_autoTxBlockLoggedKey.clear();
     const bool ftActive = m_ftTxWorkerRunning || m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan ||

@@ -1732,6 +1732,7 @@ private:
     void abortTxForBandChange(const QString &from, const QString &to);
     void abortTxForSwr(double swr);           // high SWR during TX (not Tune): stop everything
     int m_swrHighReadings = 0;
+    quint64 m_ftCqResumeGen = 0;              // bumped by STOP/Tune/mode/band/SWR: cancels a pending CQ resume
     void setManualDialFrequency(double hz, const QString &source);
     bool qsyOrSetManual(double hz, const QString &reason);
     double quickBandDialHz(const QString &modeName, const QString &band) const;

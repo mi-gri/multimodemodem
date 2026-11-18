@@ -10799,7 +10799,7 @@ void MainWindow::setupProcessingConnections()
                     m_rigTxAlc = alc;
                     // SWR protection: two readings in a row above the limit stop the
                     // transmission (not Tune, which is used to tune the ATU).
-                    if (transmitting && !m_tuneTxRunning && !m_tuneTxRequested && m_settings.txSwrAbort &&
+                    if (transmitting && !m_tuneTxRunning && !m_tuneTxRequested && !m_pendingFt8TxPlan.tune && m_settings.txSwrAbort &&
                         swr >= 1.0 && swr > m_settings.txSwrAbortLimit) {
                         if (++m_swrHighReadings >= 2) {
                             m_swrHighReadings = 0;
@@ -15139,6 +15139,7 @@ void MainWindow::applyWaterfallRangeForMode(const QString &modeName)
 
 void MainWindow::handleModeChanged(const QString &modeName)
 {
+    ++m_ftCqResumeGen;   // a pending automatic CQ resume never survives a mode change
     if (!WsprMode::isMode(modeName) && m_chkWsprTx != nullptr && m_chkWsprTx->isChecked())
         wsprStopBeacon(QStringLiteral("mode changed"));
     restoreTxLevelForContext();
@@ -19915,6 +19916,7 @@ void MainWindow::startFt8CqRepeat()
 
 void MainWindow::stopFt8Sequencer(const QString &reason)
 {
+    ++m_ftCqResumeGen;
     traceFtAutomation("sequencer.stop",reason);
     if (m_ft8OperatorStopLatched) { m_ftCqWorkList.running = false; refreshFtCqWorkListUi(); }
     m_ftSession.resetAll();
@@ -21913,8 +21915,12 @@ void MainWindow::finishFt8ResponseWait(quint64 retryGeneration, qint64 replySlot
         const int waitSlots = qBound(0, m_settings.ft8CqResumeWaitSlots, 10);
         const QString mode = ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QStringLiteral("FT8");
         const int slotMs = Ft8Mode::profileForMode(mode).slotMs;
-        QTimer::singleShot(waitSlots * slotMs, this, [this, waitSlots]() {
-            if (m_ftSession.qsoActive || m_ftSession.cqRepeatActive || m_ft8OperatorStopLatched || !autoTxPermitted() ||
+        const quint64 gen = m_ftCqResumeGen;   // STOP, Tune, mode/band change or SWR stop cancel it
+        QTimer::singleShot(waitSlots * slotMs, this, [this, waitSlots, gen, mode]() {
+            const QString nowMode = ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QString();
+            if (gen != m_ftCqResumeGen || nowMode != mode ||
+                m_ftSession.qsoActive || m_ftSession.cqRepeatActive || m_ft8OperatorStopLatched || !autoTxPermitted() ||
+                m_txRunning || m_txPreparationPending || m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan || m_pendingFt8TxPlan.tune ||
                 m_chkFt8CqRepeat == nullptr || !m_chkFt8CqRepeat->isChecked()) return;
             appendLog(uiText("ft_cq_series_continues_noreply_wait_log", "FT Auto mode: no reply; the CQ series continues after %1 wait slot(s).").arg(waitSlots));
             startFt8CqRepeat();
@@ -22891,6 +22897,7 @@ void MainWindow::stopFt8Shell()
 
 void MainWindow::stopFt8ShellImpl(bool keepAutomation)
 {
+    ++m_ftCqResumeGen;
     setTxLevelTune(false);
     if (m_txWaveformPreparer) m_txWaveformPreparer->cancel();
     if(m_ftTxWorker)m_ftTxWorker->cancelPendingStart();
@@ -23153,6 +23160,7 @@ void MainWindow::updateTuneButton()
 
 void MainWindow::tuneFt8Shell()
 {
+    ++m_ftCqResumeGen;
     applyFt8Settings();
 
     const bool tuneActive = m_pendingFt8TxPlan.tune ||
