@@ -1,11 +1,11 @@
-# MultiModeModem (m³) 0.6.7
+# MultiModeModem (m³) 0.26.11
 
 MultiModeModem (m³) is a fork of MadModem 0.6.5 by Lucian-Ioan Papadopol, IZ6NNH,
 maintained by Michael Grigutsch, DO3BOX. From 0.6.6 on m³ numbers its own versions;
 the m³ build number counts on top. Source: https://github.com/mi-gri/MultiModeModem
 License: GPL-3.0-or-later (see LICENSE.md).
 
-## New in MultiModeModem 0.6.7
+## New in MultiModeModem 0.26.11
 
 - WSPR-2 receive and beacon: a C++ port of the WSJT-X wsprd decoder with spot table and
   PSK Reporter upload; the beacon transmits in even minutes with an adjustable TX share

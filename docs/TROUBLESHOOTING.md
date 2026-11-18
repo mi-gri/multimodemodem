@@ -1,4 +1,4 @@
-# Troubleshooting — MultiModeModem 0.6.7
+# Troubleshooting — MultiModeModem 0.26.11
 
 Include the complete window title or `MultiModeModem --build-info`, operating system,
 mode, radio/audio configuration and the time of the problem in a report.

@@ -1,4 +1,4 @@
-# Architecture — MultiModeModem 0.6.7
+# Architecture — MultiModeModem 0.26.11
 
 MultiModeModem is a C++17 Qt Widgets application. Audio capture and bounded decoder
 queues run independently of GUI rendering. CAT/PTT, waveform preparation and

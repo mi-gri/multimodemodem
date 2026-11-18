@@ -2,8 +2,10 @@
 
 MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow below.
 
-## m³ 0.6.7
+## m³ 0.26.11
 
+- Version scheme: 0.YY.MM (year, month); builds within a month are told apart by the build number
+  (GitHub) or the dev number (local). 0.26.11 follows 0.6.7.
 - Menu Tools now holds Runtime log and Update country file (moved from Help); About lists both source repositories
   (GitHub and git.darc.de) as links.
 - TX protection (Settings → Bands, on by default): a transmission (not Tune) is stopped when the rig reports an SWR above

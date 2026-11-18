@@ -1,4 +1,4 @@
-# MultiModeModem (m³) 0.6.7
+# MultiModeModem (m³) 0.26.11
 
 **MultiModeModem (m³)** is a fork of **[MadModem](https://github.com/l-papadopol/MM)**
 by **Lucian-Ioan Papadopol, IZ6NNH** ([madexp.it](https://www.madexp.it)), maintained by
