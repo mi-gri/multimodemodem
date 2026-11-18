@@ -1563,3 +1563,6 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'FT mode Auto : pas de réponse ; la série de CQ continue après %1 slot(s) d’attente.','FT Auto-Modus: keine Antwort; die CQ-Serie läuft nach %1 Warteslot(s) weiter.',
   'FT Auto-modus: ingen svar; CQ-serien fortsetter etter %1 venteslot(s).','FT režim Auto: žádná odpověď; série CQ pokračuje po %1 čekacích slotech.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'ft8_cq_resume_wait':('Wait slots before CQ','Slot di attesa prima del CQ','Slots d’attente avant CQ','Warteslots vor CQ','Venteslots før CQ','Čekací sloty před CQ'),
+}.items()})

@@ -2509,7 +2509,8 @@ private:
     QCheckBox *m_chkFt8CqRepeat = nullptr;
     QLabel *m_lblFt8CqTimeout = nullptr;
     QCheckBox *m_chkFt8AutoLog = nullptr;
-    QCheckBox *m_chkFt8FullAutoQso = nullptr;
+    QCheckBox *m_chkFt8FullAutoQso = nullptr;     // model of Auto QSO (hidden); shown as m_btnFt8AutoQso
+    QPushButton *m_btnFt8AutoQso = nullptr;
     QCheckBox *m_chkFt8CallerQueue = nullptr;
     QLabel *m_lblFt8SessionQueue = nullptr;
     bool m_ft8AutoModeEnabled = false;  // Settings: Auto mode (Auto QSO) after the legal notice

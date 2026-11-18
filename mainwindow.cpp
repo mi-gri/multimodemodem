@@ -9770,13 +9770,24 @@ void MainWindow::setupFt8Page()
         "Counts completed FT4/FT8 QSOs since MultiModeModem was started and shows callers waiting in the passive FIFO."));
     m_chkFt8FullAutoQso = new QCheckBox(uiText("ft8_auto_qso", "Auto QSO"), controlGroup);
     m_chkFt8FullAutoQso->setToolTip(uiText("ft8_auto_qso_tooltip", "WSJT-Z-style gated automation. Decoded CQs are buffered and prioritized by new country, new grid square, new band, new mode, distance and SNR before answering."));
-    m_chkFt8FullAutoQso->setObjectName(QStringLiteral("ftAutoQsoButton"));
-    m_chkFt8FullAutoQso->setCursor(Qt::PointingHandCursor);
-    m_chkFt8FullAutoQso->setStyleSheet(QStringLiteral(
-        "QCheckBox#ftAutoQsoButton { border: 1px solid palette(mid); border-radius: 4px; padding: 4px 12px; }"
-        "QCheckBox#ftAutoQsoButton::indicator { width: 0px; height: 0px; }"
-        "QCheckBox#ftAutoQsoButton:checked { background-color: #F28C00; color: #1A1A1A; font-weight: bold; border-color: #F28C00; }"
-        "QCheckBox#ftAutoQsoButton:disabled { color: palette(mid); }"));
+    // Shown as a real push button beside STOP (orange frame, orange when on); the
+    // checkbox stays the model all Auto QSO logic reads.
+    m_btnFt8AutoQso = new QPushButton(m_chkFt8FullAutoQso->text(), controlGroup);
+    m_btnFt8AutoQso->setObjectName(QStringLiteral("ftAutoQsoButton"));
+    m_btnFt8AutoQso->setCheckable(true);
+    m_btnFt8AutoQso->setToolTip(m_chkFt8FullAutoQso->toolTip());
+    m_btnFt8AutoQso->setStyleSheet(QStringLiteral(
+        "QPushButton#ftAutoQsoButton { border: 2px solid #F28C00; border-radius: 4px; padding: 4px 10px; }"
+        "QPushButton#ftAutoQsoButton:checked { background-color: #F28C00; color: #1A1A1A; font-weight: bold; }"
+        "QPushButton#ftAutoQsoButton:disabled { border-color: palette(mid); color: palette(mid); }"));
+    connect(m_btnFt8AutoQso, &QPushButton::toggled, this, [this](bool on) {
+        if (m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked() != on) m_chkFt8FullAutoQso->setChecked(on);
+    });
+    connect(m_chkFt8FullAutoQso, &QCheckBox::toggled, this, [this](bool on) {
+        if (m_btnFt8AutoQso == nullptr) return;
+        const QSignalBlocker block(m_btnFt8AutoQso);
+        m_btnFt8AutoQso->setChecked(on);
+    });
     m_chkFt8HoldTxFreq = new QCheckBox(uiText("hold_tx_frequency", "Hold TX frequency"), controlGroup);
     m_chkFt8HoldTxFreq->setToolTip(uiText("hold_tx_frequency_tooltip", "Legacy shortcut: force the red TX marker to stay fixed. The TX strategy selector in the FT settings page is the primary control."));
     m_cmbFt8TxStrategy = new QComboBox(controlGroup);
@@ -9831,7 +9842,8 @@ void MainWindow::setupFt8Page()
     // Auto QSO sits directly below Auto log; the caller queue gets its own
     // row laid out like the CQ queue row (checkbox left, list button right).
     // Auto QSO as a button beside STOP (orange when on); same checkbox object underneath.
-    controlGrid->addWidget(m_chkFt8FullAutoQso, 0, 5);
+    controlGrid->addWidget(m_btnFt8AutoQso, 0, 5);
+    m_chkFt8FullAutoQso->hide();
     m_btnFt8CallerList=new QPushButton(controlGroup);
     m_btnFt8CallerList->setObjectName(QStringLiteral("ftCallerQueueOpen"));
     m_spinFt8CqResumeWait = new QSpinBox(controlGroup);
@@ -9839,7 +9851,7 @@ void MainWindow::setupFt8Page()
     m_spinFt8CqResumeWait->setValue(qBound(0, m_settings.ft8CqResumeWaitSlots, 10));
     m_spinFt8CqResumeWait->setToolTip(uiText("ft8_cq_resume_wait_tooltip", "Auto mode: after a started QSO got no reply, the CQ series continues after this many slots (0 = in the next own slot)."));
     {
-        auto *lbl = new QLabel(uiText("ft8_cq_resume_wait", "CQ again after no reply, wait slots"), controlGroup);
+        auto *lbl = new QLabel(uiText("ft8_cq_resume_wait", "Wait slots before CQ"), controlGroup);
         lbl->setToolTip(m_spinFt8CqResumeWait->toolTip());
         controlGrid->addWidget(lbl, 6, 0, 1, 2);
         controlGrid->addWidget(m_spinFt8CqResumeWait, 6, 2);
@@ -14682,6 +14694,7 @@ void MainWindow::updateFt8ControlStates()
         if (m_chkFt8CqRepeat != nullptr) m_chkFt8CqRepeat->setEnabled(!m_offlineAnalysisActive);
         if (m_chkFt8AutoLog != nullptr) m_chkFt8AutoLog->setEnabled(!m_offlineAnalysisActive);
         if (m_chkFt8FullAutoQso != nullptr) m_chkFt8FullAutoQso->setEnabled(!m_offlineAnalysisActive && m_ft8AutoModeEnabled);
+        if (m_btnFt8AutoQso != nullptr) m_btnFt8AutoQso->setEnabled(!m_offlineAnalysisActive && m_ft8AutoModeEnabled);
         if (m_spinFt8CqTimeoutMin != nullptr) m_spinFt8CqTimeoutMin->setEnabled(!m_offlineAnalysisActive);
         if (m_spinFt8NoResponseLimit != nullptr) m_spinFt8NoResponseLimit->setEnabled(!m_offlineAnalysisActive);
         if (m_btnFt8AnalyzeWav != nullptr) m_btnFt8AnalyzeWav->setEnabled(!m_txRunning && !m_offlineAnalysisActive);
@@ -19046,8 +19059,12 @@ void MainWindow::updateFt8AutoModeVisibility()
         m_spinFt8NoResponseLimit->setEnabled(!m_offlineAnalysisActive);
     }
     if (m_chkFt8FullAutoQso != nullptr) {
-        m_chkFt8FullAutoQso->setVisible(visible);
+        m_chkFt8FullAutoQso->setVisible(false);   // model only; the button is shown
         m_chkFt8FullAutoQso->setEnabled(visible && !m_offlineAnalysisActive);
+        if (m_btnFt8AutoQso != nullptr) {
+            m_btnFt8AutoQso->setVisible(visible);
+            m_btnFt8AutoQso->setEnabled(visible && !m_offlineAnalysisActive);
+        }
         if (!visible && m_chkFt8FullAutoQso->isChecked()) {
             const QSignalBlocker block(m_chkFt8FullAutoQso);
             m_chkFt8FullAutoQso->setChecked(false);
