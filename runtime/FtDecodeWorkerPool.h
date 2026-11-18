@@ -74,7 +74,9 @@ public:
                     // allocation failure must not destroy a joinable temporary.
                     m_workers.reserve(static_cast<size_t>(tasks));
                     const int index = static_cast<int>(m_workers.size());
-                    m_workers.emplace_back(std::make_unique<M3BigStackThread>([this, index] { workerLoop(index); }));
+                    auto worker = std::make_unique<M3BigStackThread>([this, index] { workerLoop(index); });
+                    if (!worker->started()) break;   // OS thread limit / no stack: use the workers already running
+                    m_workers.emplace_back(std::move(worker));
                 } catch (const std::system_error &) {
                     break; // OS thread limit: use the workers already available.
                 }

@@ -21,13 +21,20 @@ public:
     M3BigStackThread &operator=(const M3BigStackThread &) = delete;
     ~M3BigStackThread() { join(); }
 
-    void start(std::function<void()> fn)
+    // false if the OS refused the thread (QThread::start does not throw like std::thread).
+    bool start(std::function<void()> fn)
     {
         join();
         m_thread.reset(QThread::create(std::move(fn)));
         m_thread->setStackSize(kStackBytes);
         m_thread->start();
+        if (!m_thread->isRunning() && !m_thread->isFinished()) {
+            m_thread.reset();
+            return false;
+        }
+        return true;
     }
+    bool started() const { return m_thread != nullptr; }
     bool joinable() const { return m_thread != nullptr; }
     void join()
     {
