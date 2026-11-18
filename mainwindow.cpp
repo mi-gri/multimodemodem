@@ -4099,21 +4099,57 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
         m_hellPaperWidthTimer.start();
     }
+    if (event != nullptr && event->type() == QEvent::Wheel) {
+        if (auto *combo = qobject_cast<QComboBox *>(watched)) {
+            if (combo->view() == nullptr || !combo->view()->isVisible()) {
+                // Hand the wheel to the surrounding scroll area instead.
+                for (QWidget *p = combo->parentWidget(); p != nullptr; p = p->parentWidget()) {
+                    if (auto *area = qobject_cast<QAbstractScrollArea *>(p)) {
+                        QCoreApplication::sendEvent(area->viewport(), event);
+                        break;
+                    }
+                }
+                return true;
+            }
+        }
+    }
+    if (event != nullptr && watched != nullptr && watched == m_rigDigitOverlay && event->type() == QEvent::Paint) {
+        QPainter painter(m_rigDigitOverlay);
+        painter.setPen(QPen(QColor(0xF2, 0x8C, 0x00), 2));
+        painter.drawRect(m_rigDigitOverlay->rect().adjusted(1, 1, -1, -1));
+        return true;
+    }
     if (event != nullptr && watched != nullptr && watched == m_lcdRigReadoutFrequency) {
+        // No mouse-wheel tuning (accidental QSYs while scrolling): click a digit,
+        // then change it with the arrow keys or the small arrow buttons.
         if (event->type() == QEvent::Wheel) {
-            auto *wheel = static_cast<QWheelEvent *>(event);
-#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
-            const double x = wheel->position().x();
-#else
-            const double x = wheel->posF().x();
-#endif
-            m_rigWheelRemainder += wheel->angleDelta().y();
-            const int notches = m_rigWheelRemainder / 120;
-            m_rigWheelRemainder %= 120;
-            if (notches != 0) tuneRigFromReadoutWheel(notches, x);
-            event->accept();
+            event->ignore();
             return true;
         }
+        if (event->type() == QEvent::MouseButtonPress) {
+            auto *mouse = static_cast<QMouseEvent *>(event);
+            if (mouse->button() == Qt::LeftButton) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+                selectRigDigit(rigDigitPowerAt(mouse->position().x()));
+#else
+                selectRigDigit(rigDigitPowerAt(mouse->pos().x()));
+#endif
+                m_lcdRigReadoutFrequency->setFocus(Qt::MouseFocusReason);
+                return true;
+            }
+        }
+        if (event->type() == QEvent::KeyPress && m_rigDigitPower >= 0) {
+            const int key = static_cast<QKeyEvent *>(event)->key();
+            if (key == Qt::Key_Up || key == Qt::Key_Down) { tuneRigByStep(key == Qt::Key_Up ? 1 : -1, m_rigDigitPower); return true; }
+            if (key == Qt::Key_Left) { selectRigDigit(qMin(m_rigDigitPower + 1, m_lcdRigReadoutFrequency->digitCount() - 1)); return true; }
+            if (key == Qt::Key_Right) { selectRigDigit(qMax(m_rigDigitPower - 1, 0)); return true; }
+            if (key == Qt::Key_Escape) { selectRigDigit(-1); return true; }
+        }
+        if (event->type() == QEvent::FocusOut) {
+            // The arrow buttons take no focus; anything else ends the selection.
+            selectRigDigit(-1);
+        }
+        if (event->type() == QEvent::Resize) layoutRigDigitMarkers();
         if (event->type() == QEvent::MouseButtonDblClick) {
             promptRigFrequency();
             event->accept();
@@ -11536,6 +11572,9 @@ void MainWindow::rebuildMenuBar()
     m_btnAutoMode->show();
     retranslateMenuBar();
     syncAutoModeUi();
+    // Selection fields (band, frequency, mode ...) never change on the mouse
+    // wheel: scrolling over them moved the rig (accidental QSY).
+    for (QComboBox *combo : findChildren<QComboBox *>()) combo->installEventFilter(this);
 }
 
 void MainWindow::retranslateMenuBar()
@@ -13415,9 +13454,10 @@ void MainWindow::setupRigReadoutPanel()
     layout->setColumnStretch(0, 1);
     layout->setColumnMinimumWidth(3, m_lblRigReadoutPower->fontMetrics().horizontalAdvance(uiText("rig_readout_power", "PWR %1 W").arg(100)) + 4);
     readout->setToolTip(uiText("rig_readout_tooltip", "Dial frequency read from the transceiver by CAT. During transmission the output power, SWR and ALC reported by the transceiver are shown; afterwards the last reading stays visible in grey. -- means the transceiver does not report the value."));
-    m_lcdRigReadoutFrequency->setToolTip(uiText("rig_readout_tune_tooltip", "Dial frequency read by CAT. Mouse wheel over a digit tunes that digit; double-click enters a frequency (MHz, kHz or Hz). Not possible while transmitting."));
+    m_lcdRigReadoutFrequency->setToolTip(uiText("rig_readout_digit_tooltip", "Dial frequency read by CAT. Click a digit, then change it with the arrow keys Up/Down or the small arrows; Left/Right selects the next digit, Esc ends. Double-click enters a frequency (MHz, kHz or Hz). Not possible while transmitting."));
+    m_lcdRigReadoutFrequency->setFocusPolicy(Qt::ClickFocus);
     m_lcdRigReadoutFrequency->installEventFilter(this);
-    m_lcdRigReadoutFrequency->setCursor(Qt::SizeVerCursor);
+    m_lcdRigReadoutFrequency->setCursor(Qt::PointingHandCursor);
     m_rigTuneTimer = new QTimer(this);
     m_rigTuneTimer->setSingleShot(true);
     m_rigTuneTimer->setInterval(150);
@@ -13450,25 +13490,75 @@ bool MainWindow::tuneRigTo(double frequencyHz, const QString &reason)
     return true;
 }
 
-void MainWindow::tuneRigFromReadoutWheel(int notches, double x)
+int MainWindow::rigDigitPowerAt(double x) const
 {
-    if (m_lcdRigReadoutFrequency == nullptr || notches == 0 || m_txRunning || m_txPreparationPending) return;
-    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-    const bool pending = m_rigTuneTargetHz > 0.0 && (m_rigTuneTimer->isActive() || nowMs < m_rigTuneHoldUntilMs);
-    const double base = pending ? m_rigTuneTargetHz : m_lastRigFrequencyHz;
-    if (base <= 0.0) return;
+    if (m_lcdRigReadoutFrequency == nullptr) return -1;
     // QLCDNumber right-aligns its digits in equal cells; the small decimal
     // points take no cell.  The cell under the pointer selects the step.
     const int digits = qMax(1, m_lcdRigReadoutFrequency->digitCount());
     const double width = qMax(1, m_lcdRigReadoutFrequency->width());
     const int cell = qBound(0, int(x * digits / width), digits - 1);
-    const int power = qBound(0, digits - 1 - cell, 9);
+    return qBound(0, digits - 1 - cell, 9);
+}
+
+void MainWindow::tuneRigByStep(int notches, int power)
+{
+    if (m_lcdRigReadoutFrequency == nullptr || notches == 0 || power < 0 || m_txRunning || m_txPreparationPending) return;
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    const bool pending = m_rigTuneTargetHz > 0.0 && (m_rigTuneTimer->isActive() || nowMs < m_rigTuneHoldUntilMs);
+    const double base = pending ? m_rigTuneTargetHz : m_lastRigFrequencyHz;
+    if (base <= 0.0) return;
     double step = 1.0;
     for (int i = 0; i < power; ++i) step *= 10.0;
-    const double target = qMax(100000.0, base + notches * step);
-    m_rigTuneTargetHz = target;
+    m_rigTuneTargetHz = qMax(100000.0, base + notches * step);
     m_rigTuneTimer->start();
     updateRigReadout();
+}
+
+void MainWindow::selectRigDigit(int power)
+{
+    if (m_lcdRigReadoutFrequency == nullptr) return;
+    if (m_rigDigitOverlay == nullptr) {
+        m_rigDigitOverlay = new QWidget(m_lcdRigReadoutFrequency);
+        m_rigDigitOverlay->setAttribute(Qt::WA_TransparentForMouseEvents);
+        m_rigDigitOverlay->installEventFilter(this);
+        const auto makeArrow = [this](Qt::ArrowType type, int dir) {
+            auto *button = new QToolButton(m_lcdRigReadoutFrequency);
+            button->setArrowType(type);
+            button->setFocusPolicy(Qt::NoFocus);
+            button->setAutoRepeat(true);
+            button->setFixedSize(16, 11);
+            connect(button, &QToolButton::clicked, this, [this, dir]() { tuneRigByStep(dir, m_rigDigitPower); });
+            return button;
+        };
+        m_btnRigDigitUp = makeArrow(Qt::UpArrow, 1);
+        m_btnRigDigitDown = makeArrow(Qt::DownArrow, -1);
+    }
+    m_rigDigitPower = power;
+    layoutRigDigitMarkers();
+}
+
+void MainWindow::layoutRigDigitMarkers()
+{
+    if (m_lcdRigReadoutFrequency == nullptr || m_rigDigitOverlay == nullptr) return;
+    const bool on = m_rigDigitPower >= 0;
+    m_rigDigitOverlay->setVisible(on);
+    m_btnRigDigitUp->setVisible(on);
+    m_btnRigDigitDown->setVisible(on);
+    if (!on) return;
+    const int digits = qMax(1, m_lcdRigReadoutFrequency->digitCount());
+    const double cellW = double(m_lcdRigReadoutFrequency->width()) / digits;
+    const int cell = digits - 1 - m_rigDigitPower;
+    const int x = int(cell * cellW), w = qMax(8, int(cellW));
+    const int h = m_lcdRigReadoutFrequency->height();
+    m_rigDigitOverlay->setGeometry(x, 0, w, h);
+    const int cx = x + w / 2 - m_btnRigDigitUp->width() / 2;
+    m_btnRigDigitUp->move(cx, 0);
+    m_btnRigDigitDown->move(cx, h - m_btnRigDigitDown->height());
+    m_rigDigitOverlay->raise();
+    m_btnRigDigitUp->raise();
+    m_btnRigDigitDown->raise();
+    m_rigDigitOverlay->update();
 }
 
 void MainWindow::promptRigFrequency()

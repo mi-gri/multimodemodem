@@ -4,6 +4,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.6.7
 
+- Frequency display: no more mouse-wheel tuning (accidental QSY while scrolling). Click a digit (orange frame), then
+  change it with Up/Down or the small arrows; Left/Right selects the next digit, Esc ends. Selection fields in the main
+  window (band, mode ...) ignore the mouse wheel; the wheel scrolls the page instead.
 - FT Auto mode: new setting "CQ again after no reply, wait slots" (0-10, default 1) on the FT page: the CQ series
   continues only after that many slots following an unanswered QSO; all conditions are checked again then.
 - FT: a new QSO is never started automatically from an a-priori (AP) decode or a caller with an implausible callsign

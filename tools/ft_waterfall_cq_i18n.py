@@ -1566,3 +1566,12 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'ft8_cq_resume_wait':('Wait slots before CQ','Slot di attesa prima del CQ','Slots d’attente avant CQ','Warteslots vor CQ','Venteslots før CQ','Čekací sloty před CQ'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'rig_readout_digit_tooltip':(
+  'Dial frequency read by CAT. Click a digit, then change it with the arrow keys Up/Down or the small arrows; Left/Right selects the next digit, Esc ends. Double-click enters a frequency (MHz, kHz or Hz). Not possible while transmitting.',
+  'Frequenza di dial letta via CAT. Fai clic su una cifra, poi modificala con i tasti freccia su/giù o con le piccole frecce; sinistra/destra sceglie la cifra successiva, Esc termina. Doppio clic per inserire una frequenza (MHz, kHz o Hz). Non possibile durante la trasmissione.',
+  'Fréquence de dial lue par CAT. Cliquez sur un chiffre, puis modifiez-le avec les flèches haut/bas ou les petites flèches ; gauche/droite choisit le chiffre suivant, Échap termine. Double-clic pour saisir une fréquence (MHz, kHz ou Hz). Impossible pendant l’émission.',
+  'Per CAT gelesene Dial-Frequenz. Eine Ziffer anklicken, dann mit den Pfeiltasten hoch/runter oder den kleinen Pfeilen ändern; links/rechts wählt die nächste Ziffer, Esc beendet. Doppelklick gibt eine Frequenz ein (MHz, kHz oder Hz). Während des Sendens nicht möglich.',
+  'Dial-frekvens lest via CAT. Klikk på et siffer og endre det med piltastene opp/ned eller de små pilene; venstre/høyre velger neste siffer, Esc avslutter. Dobbeltklikk for å skrive inn en frekvens (MHz, kHz eller Hz). Ikke mulig under sending.',
+  'Kmitočet dialu načtený přes CAT. Klikněte na číslici a měňte ji šipkami nahoru/dolů nebo malými šipkami; vlevo/vpravo vybere další číslici, Esc ukončí. Dvojklik zadá kmitočet (MHz, kHz nebo Hz). Během vysílání nelze.'),
+}.items()})

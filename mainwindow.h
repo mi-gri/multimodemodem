@@ -1584,7 +1584,10 @@ private:
     void setupRigReadoutPanel();
     void updateRigReadout();
     /// Mouse wheel on the frequency readout: tunes the digit under the pointer.
-    void tuneRigFromReadoutWheel(int notches, double x);
+    int rigDigitPowerAt(double x) const;          // decimal power (0 = Hz) of the readout digit at x
+    void tuneRigByStep(int notches, int power);
+    void selectRigDigit(int power);               // -1 ends the digit selection
+    void layoutRigDigitMarkers();
     /// Double-click on the frequency readout: asks for a dial frequency.
     void promptRigFrequency();
     /// QSY by CAT (connects first if needed); false if CAT is off or TX runs.
@@ -2718,7 +2721,9 @@ private:
     QMap<QString, QToolButton *> m_quickBandButtons;
     double m_rigTuneTargetHz = 0.0;       // frequency shown while a readout QSY is on its way
     qint64 m_rigTuneHoldUntilMs = 0;
-    int m_rigWheelRemainder = 0;          // partial wheel steps (touchpads)
+    int m_rigDigitPower = -1;             // selected readout digit (click), -1 = none
+    QWidget *m_rigDigitOverlay = nullptr; // frame around the selected digit
+    QToolButton *m_btnRigDigitUp = nullptr, *m_btnRigDigitDown = nullptr;
     QTimer *m_rigTuneTimer = nullptr;
     QDoubleSpinBox *m_spinTxLevel = nullptr;  // TX level in dB, see audio/TxLevel.h
     bool m_txLevelTune = false;               // the control shows and sets the Tune level
