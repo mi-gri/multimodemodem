@@ -58,6 +58,12 @@ THEMES = {
     },
 }
 
+THEMES["classic_blue_gray"] = {
+    **THEMES["classic_dark"],
+    "window": "#2E3745",
+    "base": "#202832",
+}
+
 
 def luminance(hex_colour: str) -> float:
     channels = [int(hex_colour[i:i + 2], 16) / 255.0 for i in (1, 3, 5)]
@@ -130,4 +136,4 @@ for marker in ('mmRole="positive"', 'mmRole="negative"', 'mmRole="warning"',
     assert marker in THEME, marker
 assert "m_lblFt8TxBanner->setStyleSheet(style)" not in WINDOW
 
-print("UI theme integrity audit: PASS (5/5 complete themes)")
+print(f"UI theme integrity audit: PASS ({len(THEMES)}/{len(THEMES)} complete themes)")

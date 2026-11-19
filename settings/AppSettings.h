@@ -83,7 +83,7 @@ public:
     QMap<QString, bool> waterfallShowTx;
     bool waterfallShowTxFor(const QString &modeKey) const;
     // Global UI appearance. Theme names are stable keys, not translated labels:
-    // avionica, qt_default, hacker_green, classic_dark, high_contrast.
+    // avionica, qt_default, hacker_green, classic_dark, classic_blue_gray, high_contrast.
     QString uiTheme = "classic_dark";   // default since 0.26.11
     bool uiUseThemeFont = true;
     QString uiFontFamily;
