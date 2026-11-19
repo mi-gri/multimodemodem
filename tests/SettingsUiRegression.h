@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <QCollator>
 #include <QStyleFactory>
 #include <QFont>
 #include <QScrollArea>
@@ -72,7 +73,6 @@ inline int runSettingsUiRegression(QApplication &app) {
         parent.show();
         ok &= runPttSettingsRegression(app, parent, out);
         AppSettings settings;
-        settings.uiTheme = QStringLiteral("classic_blue_gray");
         const QFont originalFont = app.font();
         for (const QString &styleName : QStyleFactory::keys()) {
         app.setStyle(QStyleFactory::create(styleName));
@@ -127,6 +127,29 @@ inline int runSettingsUiRegression(QApplication &app) {
                 (*theme)->currentText() != QStringLiteral("m³ blue default")) {
                 out << "FAIL Theme selection " << language << '\n';
                 languageOk = false;
+            } else {
+                auto *combo = *theme;
+                const int green = combo->findData(QStringLiteral("m3_green"));
+                const int red = combo->findData(QStringLiteral("m3_red"));
+                const QCollator collator{QLocale(language)};
+                bool orderOk = combo->count() == 8 && combo->currentIndex() == 0 &&
+                    green > 0 && red > 0 && combo->itemText(green) == QStringLiteral("m³ green") &&
+                    combo->itemText(red) == QStringLiteral("m³ red");
+                for (int i = 2; i < combo->count(); ++i) {
+                    orderOk &= collator.compare(combo->itemText(i - 1), combo->itemText(i)) <= 0;
+                }
+                auto *resetTheme = dialog.findChild<QPushButton *>(QStringLiteral("resetThemeDefaults"));
+                if (resetTheme && orderOk) {
+                    combo->setCurrentIndex(red);
+                    resetTheme->click();
+                    orderOk &= combo->currentIndex() == 0;
+                } else {
+                    orderOk = false;
+                }
+                if (!orderOk) {
+                    out << "FAIL Theme order or defaults " << language << '\n';
+                    languageOk = false;
+                }
             }
             out << (languageOk ? "PASS" : "FAIL") << " Settings geometry/buttons " << styleName << " " << pointSize << "pt " << language << "\n";
             ok &= languageOk;

@@ -13109,6 +13109,7 @@ void MainWindow::applyUiAppearanceSettings()
     }
 
     const QString theme = M3Ui::normalizedThemeKey(m_settings.uiTheme);
+    const bool m3ColorTheme = M3Ui::isM3ColorTheme(theme);
 
     auto recommendedFont = [&]() -> QFont {
         if (theme == QStringLiteral("hacker_green")) {
@@ -13119,7 +13120,7 @@ void MainWindow::applyUiAppearanceSettings()
         QFont f = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
         if (theme == QStringLiteral("avionica")) {
             f.setPointSize(9);
-        } else if (theme == QStringLiteral("classic_blue_gray")) {
+        } else if (m3ColorTheme) {
             f.setPixelSize(12);
         } else if (f.pointSize() <= 0) {
             f.setPointSize(theme == QStringLiteral("high_contrast") ? 12 : 10);
@@ -13142,7 +13143,7 @@ void MainWindow::applyUiAppearanceSettings()
     const bool fontChanged = app->font() != font;
     if (fontChanged) app->setFont(font);
     if (!M3Ui::isUiThemeApplied(theme) ||
-        (fontChanged && theme == QStringLiteral("classic_blue_gray"))) {
+        (fontChanged && m3ColorTheme)) {
         M3Ui::applyUiTheme(*app, theme);
     }
     M3Ui::polishCockpitWidgetTree(this);

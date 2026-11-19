@@ -1,7 +1,8 @@
 #pragma once
 
+#include "UiThemeKeys.h"
+
 #include <QColor>
-#include <QString>
 
 class QApplication;
 class QMainWindow;
@@ -24,7 +25,6 @@ enum class ThemeColorRole {
     MapBorder
 };
 
-QString normalizedThemeKey(const QString &themeKey);
 QString activeThemeKey();
 /// True once applyUiTheme() applied @p themeKey; re-applying it would only re-polish every widget.
 bool isUiThemeApplied(const QString &themeKey);

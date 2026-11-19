@@ -58,6 +58,15 @@ KEYS={key:dict(zip(LANGS,values)) for key,values in VALUES.items()}
 # Source-text strings of the settings dialog (looked up as "text." + normalised source)
 SOURCES={
  'm³ blue default':dict.fromkeys(LANGS, 'm³ blue default'),
+ 'm³ green':dict.fromkeys(LANGS, 'm³ green'),
+ 'm³ red':dict.fromkeys(LANGS, 'm³ red'),
+ 'Restore the default theme and its font settings.':dict(zip(LANGS,(
+  'Restore the default theme and its font settings.',
+  'Ripristina il tema predefinito e le relative impostazioni del carattere.',
+  'Rétablir le thème par défaut et ses réglages de police.',
+  'Standardtheme und zugehörige Schrifteinstellungen wiederherstellen.',
+  'Gjenopprett standardtemaet og skriftinnstillingene for det.',
+  'Obnoví výchozí motiv a jeho nastavení písma.'))),
  'FT8 waterfall row time':dict(zip(LANGS,(
   'FT8 waterfall row time','Tempo per riga del waterfall FT8','Durée par ligne de la chute d’eau FT8',
   'FT8-Wasserfall: Zeit pro Zeile','FT8-fossefall: tid per linje','Čas na řádek vodopádu FT8'))),
