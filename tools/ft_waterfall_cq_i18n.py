@@ -57,7 +57,7 @@ KEYS={key:dict(zip(LANGS,values)) for key,values in VALUES.items()}
 
 # Source-text strings of the settings dialog (looked up as "text." + normalised source)
 SOURCES={
- 'm³ default':dict.fromkeys(LANGS, 'm³ default'),
+ 'm³ blue default':dict.fromkeys(LANGS, 'm³ blue default'),
  'FT8 waterfall row time':dict(zip(LANGS,(
   'FT8 waterfall row time','Tempo per riga del waterfall FT8','Durée par ligne de la chute d’eau FT8',
   'FT8-Wasserfall: Zeit pro Zeile','FT8-fossefall: tid per linje','Čas na řádek vodopádu FT8'))),
