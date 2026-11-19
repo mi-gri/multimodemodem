@@ -134,7 +134,7 @@ int main(int argc,char **argv){
     }
     std::cout<<"PASS Ed25519 RFC 8032 vectors, canonical S, signed checksum list accepted, forged/unsigned/foreign-key lists refused\n";
     QSettings settings(AppSettings::settingsFilePath(),QSettings::IniFormat);
-    settings.setValue("Updates/checkAtStartup",false);settings.sync();
+    settings.setValue("Updates/checkAtStartup",false);settings.setValue("Updates/channel","beta");settings.sync();   // the paged-prerelease flow below is the beta channel
     QWidget window;QMenu menu;bool idle=false;
     SimulatedUpdate updater(&window,&menu,[&]{return idle;});
     updater.pages[0]=firstPage;
@@ -147,6 +147,13 @@ int main(int argc,char **argv){
     check(updater.requested.size()==2,"release pages were not retrieved");
     check(updater.chosen.value("tag_name")==newTag,"check did not offer the next-page prerelease");
     check(updater.requested[0].contains("/releases?") && !updater.requested[0].contains("/latest"),"checker still uses Latest endpoint");
+    // Stable channel (the default): the same pages must not offer the newer pre-release.
+    settings.setValue("Updates/channel","stable");settings.sync();
+    SimulatedUpdate stableUpdater(&window,&menu,[&]{return idle;});
+    stableUpdater.pages[0]=firstPage;stableUpdater.pages[1]=QJsonArray{release(newTag,true)};
+    { QEventLoop stableLoop;QTimer::singleShot(1500,&stableLoop,&QEventLoop::quit);stableUpdater.check();stableLoop.exec(); }
+    check(stableUpdater.requested.size()==2,"stable channel did not read all release pages");
+    check(stableUpdater.chosen.isEmpty(),"stable channel offered a pre-release");
     std::cout<<"PASS real checker paginates simulated responses, defers busy operation, and reaches the offer for a newer prerelease\n";
     std::cout<<"PASS published stable/prerelease selection, Latest independence, version/build ordering, repeat/downgrade/draft/invalid rejection, local bridge and paged merge\n";
 }
