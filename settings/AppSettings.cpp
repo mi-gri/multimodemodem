@@ -234,7 +234,7 @@ void AppSettings::load()
     waterfallMaxHz = qBound(3000, settings.value("Display/waterfallMaxHz", waterfallMaxHz).toInt(), 5000);
     uiTheme = settings.value("Display/uiTheme", uiTheme).toString().trimmed().toLower();
     if (uiTheme != "avionica" && uiTheme != "qt_default" && uiTheme != "hacker_green" &&
-        uiTheme != "classic_dark" && uiTheme != "high_contrast") {
+        uiTheme != "classic_dark" && uiTheme != "classic_blue_gray" && uiTheme != "high_contrast") {
         uiTheme = "classic_dark";
     }
     uiUseThemeFont = settings.value("Display/uiUseThemeFont", uiUseThemeFont).toBool();

@@ -91,8 +91,8 @@ ThemeSpec themeSpec(const QString &requestedKey)
             QColor("#167A3A"), false
         };
     }
-    if (key == QStringLiteral("classic_dark")) {
-        return {
+    if (key == QStringLiteral("classic_dark") || key == QStringLiteral("classic_blue_gray")) {
+        ThemeSpec spec {
             QColor("#24272D"), QColor("#E8EBEF"), QColor("#15171B"), QColor("#2B2E35"),
             QColor("#343840"), QColor("#F0F2F5"), QColor("#626A76"), QColor("#404650"),
             QColor("#6FA8FF"), QColor("#0E1622"), QColor("#7D838C"), QColor("#30343B"),
@@ -101,6 +101,12 @@ ThemeSpec themeSpec(const QString &requestedKey)
             QColor("#66B8FF"), QColor("#1C222A"), QColor("#EDF3F8"), QColor("#A9B0BA"),
             QColor("#596573"), false
         };
+        if (key == QStringLiteral("classic_blue_gray")) {
+            spec.window = QColor("#2E3745");
+            spec.base = QColor("#202832");
+            spec.alternateBase = QColor("#2B3542");
+        }
+        return spec;
     }
     if (key == QStringLiteral("high_contrast")) {
         return {
@@ -1221,7 +1227,7 @@ QString normalizedThemeKey(const QString &themeKey)
     const QString key = themeKey.trimmed().toLower();
     if (key == QStringLiteral("avionica") || key == QStringLiteral("qt_default") ||
         key == QStringLiteral("hacker_green") || key == QStringLiteral("classic_dark") ||
-        key == QStringLiteral("high_contrast")) {
+        key == QStringLiteral("classic_blue_gray") || key == QStringLiteral("high_contrast")) {
         return key;
     }
     return QStringLiteral("classic_dark");

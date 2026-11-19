@@ -13108,13 +13108,7 @@ void MainWindow::applyUiAppearanceSettings()
         return;
     }
 
-    QString theme = m_settings.uiTheme.trimmed().toLower();
-    if (theme.isEmpty()) theme = QStringLiteral("classic_dark");
-    if (theme != QStringLiteral("avionica") && theme != QStringLiteral("qt_default") &&
-        theme != QStringLiteral("hacker_green") && theme != QStringLiteral("classic_dark") &&
-        theme != QStringLiteral("high_contrast")) {
-        theme = QStringLiteral("classic_dark");
-    }
+    const QString theme = M3Ui::normalizedThemeKey(m_settings.uiTheme);
 
     auto recommendedFont = [&]() -> QFont {
         if (theme == QStringLiteral("hacker_green")) {
