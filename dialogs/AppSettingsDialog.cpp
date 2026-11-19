@@ -1817,7 +1817,7 @@ QWidget *AppSettingsDialog::makeAppearancePage()
     m_comboUiTheme->addItem(L(QStringLiteral("Qt Default")), QStringLiteral("qt_default"));
     m_comboUiTheme->addItem(L(QStringLiteral("Hacker Green")), QStringLiteral("hacker_green"));
     m_comboUiTheme->addItem(L(QStringLiteral("Classic Dark")), QStringLiteral("classic_dark"));
-    m_comboUiTheme->addItem(L(QStringLiteral("m³ default")), QStringLiteral("classic_blue_gray"));
+    m_comboUiTheme->addItem(L(QStringLiteral("m³ blue default")), QStringLiteral("classic_blue_gray"));
     m_comboUiTheme->addItem(L(QStringLiteral("High Contrast")), QStringLiteral("high_contrast"));
     const int themeIndex = m_comboUiTheme->findData(m_initialSettings.uiTheme.trimmed().isEmpty()
                                                         ? QStringLiteral("classic_dark")

@@ -96,7 +96,7 @@ inline int runSettingsUiRegression(QApplication &app) {
                 return combo->findData(settings.uiTheme) >= 0;
             });
             if (theme == combos.cend() || (*theme)->currentData().toString() != settings.uiTheme ||
-                (*theme)->currentText() != QStringLiteral("m³ default")) {
+                (*theme)->currentText() != QStringLiteral("m³ blue default")) {
                 out << "FAIL Theme selection " << language << '\n';
                 languageOk = false;
             }
