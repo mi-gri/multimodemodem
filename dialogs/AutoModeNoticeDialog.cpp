@@ -67,8 +67,9 @@ bool confirm(QWidget *parent, const std::function<QString(const QString &)> &tra
     QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     layout->addWidget(buttons);
-    // The notice is long (all automatic functions + legal points): give the wrapped text room.
-    dialog.setMinimumSize(680, 600);
+    layout->activate();
+    const int initialWidth = qMax(600, layout->minimumSize().width());
+    dialog.resize(initialWidth, layout->totalHeightForWidth(initialWidth));
 
     return dialog.exec() == QDialog::Accepted && understood->isChecked();
 }
