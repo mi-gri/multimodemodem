@@ -102,13 +102,14 @@ ThemeSpec themeSpec(const QString &requestedKey)
             QColor("#596573"), false
         };
         if (key == QStringLiteral("classic_blue_gray")) {
-            spec.window = QColor("#283241");
-            spec.windowText = QColor("#FAFCFF");
-            spec.base = QColor("#1A222D");
-            spec.alternateBase = QColor("#25303D");
+            spec.window = QColor("#222D3A");
+            spec.windowText = QColor("#FFFFFF");
+            spec.base = QColor("#121B27");
+            spec.alternateBase = QColor("#202B38");
+            spec.button = QColor("#2B3543");
             spec.buttonText = QColor("#FFFFFF");
-            spec.disabledText = QColor("#A6B2C2");
-            spec.mutedText = QColor("#C5D1DF");
+            spec.disabledText = QColor("#BAC7D6");
+            spec.mutedText = QColor("#D7E0EB");
         }
         return spec;
     }

@@ -60,12 +60,13 @@ THEMES = {
 
 THEMES["classic_blue_gray"] = {
     **THEMES["classic_dark"],
-    "window": "#283241",
-    "window_text": "#FAFCFF",
-    "base": "#1A222D",
+    "window": "#222D3A",
+    "window_text": "#FFFFFF",
+    "base": "#121B27",
+    "button": "#2B3543",
     "button_text": "#FFFFFF",
-    "muted": "#C5D1DF",
-    "menu_disabled": "#A6B2C2",
+    "muted": "#D7E0EB",
+    "menu_disabled": "#BAC7D6",
 }
 
 
