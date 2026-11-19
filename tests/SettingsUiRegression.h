@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <QStyleFactory>
 #include <QFont>
 #include <QScrollArea>
@@ -71,6 +72,7 @@ inline int runSettingsUiRegression(QApplication &app) {
         parent.show();
         ok &= runPttSettingsRegression(app, parent, out);
         AppSettings settings;
+        settings.uiTheme = QStringLiteral("classic_blue_gray");
         const QFont originalFont = app.font();
         for (const QString &styleName : QStyleFactory::keys()) {
         app.setStyle(QStyleFactory::create(styleName));
@@ -89,6 +91,15 @@ inline int runSettingsUiRegression(QApplication &app) {
             const QRect available = dialog.screen()->availableGeometry();
             bool languageOk = !dialog.isFullScreen() &&
                 dialog.width() <= available.width() && dialog.height() <= available.height();
+            const auto combos = dialog.findChildren<QComboBox *>();
+            const auto theme = std::find_if(combos.cbegin(), combos.cend(), [&](const QComboBox *combo) {
+                return combo->findData(settings.uiTheme) >= 0;
+            });
+            if (theme == combos.cend() || (*theme)->currentData().toString() != settings.uiTheme ||
+                (*theme)->currentText() != QStringLiteral("m³ default")) {
+                out << "FAIL Theme selection " << language << '\n';
+                languageOk = false;
+            }
             if (auto *tabs = dialog.findChild<QTabWidget *>()) {
                 for (int page = 0; page < tabs->count(); ++page) {
                     tabs->setCurrentIndex(page);
