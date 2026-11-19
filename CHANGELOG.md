@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- Update channel: Help → "Include beta versions in update checks". Default stable (real releases only); beta also offers
+  the numbered pre-releases. Release candidates of 0.26.11 and betas of 0.26.12 are built from separate branches.
 - Auto mode notice lists everything Auto mode does (FT8/FT4, JS8, WSPR beacon) and the locks that always apply.
 - Default theme is now Classic Dark (new installations and the "Defaults" button); an existing theme choice stays.
 - macOS/Windows: crash at start fixed ("Thread stack size exceeded" in the WSPR decoder thread). Decoder threads

@@ -1637,3 +1637,6 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
   'Gjelder alltid: ingen automatisk sending på bånd kun for mottak, til utelukkede land/kontinenter, etter STOP eller etter stopp for høyt SWR. Andre moduser sender aldri automatisk.',
   'Platí vždy: žádné automatické vysílání na pásmech jen pro příjem, do vyloučených zemí/kontinentů, po STOP nebo po zastavení kvůli vysokému PSV. Ostatní režimy nikdy nevysílají automaticky.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'update_include_beta':('Include beta versions in update checks','Includi le versioni beta nel controllo aggiornamenti','Inclure les versions bêta dans la recherche de mises à jour','Beta-Versionen in die Update-Suche einbeziehen','Ta med betaversjoner i oppdateringssøk','Zahrnout beta verze do kontroly aktualizací'),
+}.items()})

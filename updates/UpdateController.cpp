@@ -101,6 +101,15 @@ UpdateController::UpdateController(QWidget* window, QMenu* help, std::function<b
         if (enabled) m_automaticCheck->start(8000);
         else m_automaticCheck->stop();
     });
+    // Update channel: stable (default) offers only real releases; beta also the numbered pre-releases.
+    auto* beta = help->addAction(uiText("update_include_beta", "Include beta versions in update checks"));
+    beta->setObjectName("betaUpdatesAction");
+    beta->setCheckable(true);
+    beta->setChecked(settings.value("Updates/channel", "stable").toString() == QStringLiteral("beta"));
+    connect(beta, &QAction::toggled, this, [](bool enabled) {
+        QSettings s(AppSettings::settingsFilePath(), QSettings::IniFormat);
+        s.setValue("Updates/channel", enabled ? "beta" : "stable");
+    });
     if (automatic->isChecked() && QCoreApplication::arguments().size() == 1) m_automaticCheck->start(8000);
 }
 bool UpdateController::eventFilter(QObject* watched, QEvent* event) {
@@ -228,10 +237,18 @@ void UpdateController::fetchReleasePage(int page) {
     fetch(url, 4*1024*1024, [this, page](QByteArray bytes) {
         const auto document = QJsonDocument::fromJson(bytes);
         if (!document.isArray()) { fail(uiText("update_invalid", "Invalid release information.")); return; }
-        const auto releases = document.array();
+        QJsonArray releases = document.array();
+        const bool pageFull = releases.size() >= 100;
+        const bool beta = QSettings(AppSettings::settingsFilePath(), QSettings::IniFormat).value("Updates/channel", "stable").toString() == QStringLiteral("beta");
+        if (!beta) {   // stable channel: real releases only (drafts and pre-releases are not offered)
+            QJsonArray stableOnly;
+            for (const auto &value : releases)
+                if (!value.toObject().value("prerelease").toBool()) stableOnly.append(value);
+            releases = stableOnly;
+        }
         const auto candidate = newestPublishedRelease(releases);
         if (compareRelease(candidate, m_newestRelease) > 0) m_newestRelease = candidate;
-        if (releases.size() >= 100) {
+        if (pageFull) {
             // Never silently say "up to date" after a truncated history.
             if (page >= 50) { fail(uiText("update_history_limit", "The release history is too large to finish checking. Open the releases page.")); return; }
             fetchReleasePage(page + 1); return;

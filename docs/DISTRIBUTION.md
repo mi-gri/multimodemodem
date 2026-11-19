@@ -13,6 +13,10 @@ It builds Windows UCRT64, Ubuntu 24.04, Fedora 43 and both macOS architectures.
 After all jobs succeed, it publishes portable archives, EXE/RUN/DEB/RPM/PKG
 installers and SHA256SUMS. Native Linux packages are the same payloads wrapped by RUN.
 
+Branches: `release/<version>` carries the release candidate (only bug fixes, builds `build-<version>-N`
+pre-releases); `main` carries the beta of the next version. The tag `v<version>` on the release branch
+publishes the real release. Installations offer only real releases unless "Include beta versions" is on.
+
 A branch build creates a numbered prerelease (`build-0.26.11-N`). Tag `v0.26.11` creates
 a version release. The tag must match all source metadata; the source-check job
 rejects mixed versions. Run the workflow on the new commit, not an older run.
