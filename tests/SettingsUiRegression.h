@@ -91,15 +91,6 @@ inline int runSettingsUiRegression(QApplication &app) {
             const QRect available = dialog.screen()->availableGeometry();
             bool languageOk = !dialog.isFullScreen() &&
                 dialog.width() <= available.width() && dialog.height() <= available.height();
-            const auto combos = dialog.findChildren<QComboBox *>();
-            const auto theme = std::find_if(combos.cbegin(), combos.cend(), [&](const QComboBox *combo) {
-                return combo->findData(settings.uiTheme) >= 0;
-            });
-            if (theme == combos.cend() || (*theme)->currentData().toString() != settings.uiTheme ||
-                (*theme)->currentText() != QStringLiteral("m³ blue default")) {
-                out << "FAIL Theme selection " << language << '\n';
-                languageOk = false;
-            }
             if (auto *tabs = dialog.findChild<QTabWidget *>()) {
                 for (int page = 0; page < tabs->count(); ++page) {
                     tabs->setCurrentIndex(page);
@@ -128,6 +119,15 @@ inline int runSettingsUiRegression(QApplication &app) {
                     }
                 }
             } else languageOk = false;
+            const auto combos = dialog.findChildren<QComboBox *>();
+            const auto theme = std::find_if(combos.cbegin(), combos.cend(), [&](const QComboBox *combo) {
+                return combo->findData(settings.uiTheme) >= 0;
+            });
+            if (theme == combos.cend() || (*theme)->currentData().toString() != settings.uiTheme ||
+                (*theme)->currentText() != QStringLiteral("m³ blue default")) {
+                out << "FAIL Theme selection " << language << '\n';
+                languageOk = false;
+            }
             out << (languageOk ? "PASS" : "FAIL") << " Settings geometry/buttons " << styleName << " " << pointSize << "pt " << language << "\n";
             ok &= languageOk;
             dialog.close();
