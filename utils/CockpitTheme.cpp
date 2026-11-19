@@ -91,7 +91,8 @@ ThemeSpec themeSpec(const QString &requestedKey)
             QColor("#167A3A"), false
         };
     }
-    if (key == QStringLiteral("classic_dark") || key == QStringLiteral("classic_blue_gray")) {
+    const bool m3ColorTheme = M3Ui::isM3ColorTheme(key);
+    if (key == QStringLiteral("classic_dark") || m3ColorTheme) {
         ThemeSpec spec {
             QColor("#24272D"), QColor("#E8EBEF"), QColor("#15171B"), QColor("#2B2E35"),
             QColor("#343840"), QColor("#F0F2F5"), QColor("#626A76"), QColor("#404650"),
@@ -101,15 +102,27 @@ ThemeSpec themeSpec(const QString &requestedKey)
             QColor("#66B8FF"), QColor("#1C222A"), QColor("#EDF3F8"), QColor("#A9B0BA"),
             QColor("#596573"), false
         };
-        if (key == QStringLiteral("classic_blue_gray")) {
-            spec.window = QColor("#222D3A");
+        if (m3ColorTheme) {
             spec.windowText = QColor("#FFFFFF");
-            spec.base = QColor("#121B27");
-            spec.alternateBase = QColor("#202B38");
-            spec.button = QColor("#2B3543");
             spec.buttonText = QColor("#FFFFFF");
             spec.disabledText = QColor("#BAC7D6");
             spec.mutedText = QColor("#D7E0EB");
+            if (key == QStringLiteral("m3_green")) {
+                spec.window = QColor("#1E3028");
+                spec.base = QColor("#102019");
+                spec.alternateBase = QColor("#1A2D23");
+                spec.button = QColor("#283B31");
+            } else if (key == QStringLiteral("m3_red")) {
+                spec.window = QColor("#35282E");
+                spec.base = QColor("#25171D");
+                spec.alternateBase = QColor("#32242A");
+                spec.button = QColor("#403138");
+            } else {
+                spec.window = QColor("#222D3A");
+                spec.base = QColor("#121B27");
+                spec.alternateBase = QColor("#202B38");
+                spec.button = QColor("#2B3543");
+            }
         }
         return spec;
     }
@@ -1227,17 +1240,6 @@ void polishCockpitWidgetTree(QWidget *root)
     }
 }
 
-QString normalizedThemeKey(const QString &themeKey)
-{
-    const QString key = themeKey.trimmed().toLower();
-    if (key == QStringLiteral("avionica") || key == QStringLiteral("qt_default") ||
-        key == QStringLiteral("hacker_green") || key == QStringLiteral("classic_dark") ||
-        key == QStringLiteral("classic_blue_gray") || key == QStringLiteral("high_contrast")) {
-        return key;
-    }
-    return QStringLiteral("classic_dark");
-}
-
 QString activeThemeKey()
 {
     return g_activeThemeKey;
@@ -1294,7 +1296,7 @@ void applyUiTheme(QApplication &app, const QString &themeKey)
         const ThemeSpec spec = themeSpec(key);
         app.setPalette(paletteForTheme(spec));
         QString styleSheet = genericThemeStyleSheet(spec);
-        if (key == QStringLiteral("classic_blue_gray")) {
+        if (isM3ColorTheme(key)) {
             // Popup menus can get a separate, smaller font from the Qt platform theme.
             const QFont font = app.font();
             const QString size = font.pointSizeF() > 0

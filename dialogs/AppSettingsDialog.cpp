@@ -24,6 +24,7 @@
 #include <QAbstractItemView>
 #include <QCheckBox>
 #include <QColorDialog>
+#include <QCollator>
 #include <QCursor>
 #include <QDialogButtonBox>
 #include <QComboBox>
@@ -1813,16 +1814,24 @@ QWidget *AppSettingsDialog::makeAppearancePage()
     themeGrid->setColumnStretch(1, 1);
 
     m_comboUiTheme = new QComboBox(themeGroup);
-    m_comboUiTheme->addItem(L(QStringLiteral("Avionica")), QStringLiteral("avionica"));
-    m_comboUiTheme->addItem(L(QStringLiteral("Qt Default")), QStringLiteral("qt_default"));
-    m_comboUiTheme->addItem(L(QStringLiteral("Hacker Green")), QStringLiteral("hacker_green"));
-    m_comboUiTheme->addItem(L(QStringLiteral("Classic Dark")), QStringLiteral("classic_dark"));
-    m_comboUiTheme->addItem(L(QStringLiteral("m³ blue default")), QStringLiteral("classic_blue_gray"));
-    m_comboUiTheme->addItem(L(QStringLiteral("High Contrast")), QStringLiteral("high_contrast"));
-    const int themeIndex = m_comboUiTheme->findData(m_initialSettings.uiTheme.trimmed().isEmpty()
-                                                        ? QStringLiteral("classic_dark")
-                                                        : m_initialSettings.uiTheme.trimmed().toLower());
-    m_comboUiTheme->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
+    m_comboUiTheme->addItem(L(QStringLiteral("m³ blue default")), M3Ui::defaultUiThemeKey());
+    QList<QPair<QString, QString>> themes = {
+        {L(QStringLiteral("Avionica")), QStringLiteral("avionica")},
+        {L(QStringLiteral("Qt Default")), QStringLiteral("qt_default")},
+        {L(QStringLiteral("Hacker Green")), QStringLiteral("hacker_green")},
+        {L(QStringLiteral("Classic Dark")), QStringLiteral("classic_dark")},
+        {L(QStringLiteral("High Contrast")), QStringLiteral("high_contrast")},
+        {L(QStringLiteral("m³ green")), QStringLiteral("m3_green")},
+        {L(QStringLiteral("m³ red")), QStringLiteral("m3_red")},
+    };
+    const QCollator collator{QLocale(M3I18n::languageCode())};
+    std::sort(themes.begin(), themes.end(), [&collator](const auto &a, const auto &b) {
+        return collator.compare(a.first, b.first) < 0;
+    });
+    for (const auto &theme : themes) {
+        m_comboUiTheme->addItem(theme.first, theme.second);
+    }
+    m_comboUiTheme->setCurrentIndex(m_comboUiTheme->findData(M3Ui::normalizedThemeKey(m_initialSettings.uiTheme)));
     m_comboUiTheme->setToolTip(L(QStringLiteral("Select the global MultiModeModem colour palette.")));
 
     m_chkUiUseThemeFont = new QCheckBox(L(QStringLiteral("Use theme default font")), themeGroup);
@@ -1866,10 +1875,11 @@ QWidget *AppSettingsDialog::makeAppearancePage()
     updateFontOverrideEnabled();
 
     QPushButton *reset = new QPushButton(L(QStringLiteral("Reset theme defaults")), themeGroup);
-    reset->setToolTip(L(QStringLiteral("Restore Avionica theme and theme-managed font settings.")));
+    reset->setObjectName(QStringLiteral("resetThemeDefaults"));
+    reset->setToolTip(L(QStringLiteral("Restore the default theme and its font settings.")));
     connect(reset, &QPushButton::clicked, this, [this, updateFontOverrideEnabled]() {
         if (m_comboUiTheme != nullptr) {
-            const int idx = m_comboUiTheme->findData(QStringLiteral("classic_dark"));
+            const int idx = m_comboUiTheme->findData(M3Ui::defaultUiThemeKey());
             if (idx >= 0) m_comboUiTheme->setCurrentIndex(idx);
         }
         if (m_chkUiUseThemeFont != nullptr) m_chkUiUseThemeFont->setChecked(true);

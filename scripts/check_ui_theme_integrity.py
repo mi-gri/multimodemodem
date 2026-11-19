@@ -7,6 +7,7 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 THEME = (ROOT / "utils/CockpitTheme.cpp").read_text(encoding="utf-8")
 THEME_H = (ROOT / "utils/CockpitTheme.h").read_text(encoding="utf-8")
+THEME_KEYS = (ROOT / "utils/UiThemeKeys.h").read_text(encoding="utf-8")
 MAIN = (ROOT / "main.cpp").read_text(encoding="utf-8")
 WINDOW = (ROOT / "mainwindow.cpp").read_text(encoding="utf-8")
 APP_SETTINGS = (ROOT / "dialogs/AppSettingsDialog.cpp").read_text(encoding="utf-8")
@@ -68,6 +69,18 @@ THEMES["classic_blue_gray"] = {
     "muted": "#D7E0EB",
     "menu_disabled": "#BAC7D6",
 }
+THEMES["m3_green"] = {
+    **THEMES["classic_blue_gray"],
+    "window": "#1E3028",
+    "base": "#102019",
+    "button": "#283B31",
+}
+THEMES["m3_red"] = {
+    **THEMES["classic_blue_gray"],
+    "window": "#35282E",
+    "base": "#25171D",
+    "button": "#403138",
+}
 
 
 def luminance(hex_colour: str) -> float:
@@ -83,7 +96,7 @@ def contrast(a: str, b: str) -> float:
 
 
 for key, colours in THEMES.items():
-    assert f'QStringLiteral("{key}")' in THEME, key
+    assert f'QStringLiteral("{key}")' in THEME_KEYS, key
     checks = {
         "window text": contrast(colours["window_text"], colours["window"]),
         "editor text": contrast(colours["window_text"], colours["base"]),

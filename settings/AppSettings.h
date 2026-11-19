@@ -1,6 +1,8 @@
 #ifndef APPSETTINGS_H
 #define APPSETTINGS_H
 
+#include "../utils/UiThemeKeys.h"
+
 #include <QHash>
 #include <QMap>
 #include <QDateTime>
@@ -83,8 +85,7 @@ public:
     QMap<QString, bool> waterfallShowTx;
     bool waterfallShowTxFor(const QString &modeKey) const;
     // Global UI appearance. Theme names are stable keys, not translated labels:
-    // avionica, qt_default, hacker_green, classic_dark, classic_blue_gray, high_contrast.
-    QString uiTheme = "classic_dark";   // default since 0.26.11
+    QString uiTheme = M3Ui::defaultUiThemeKey();
     bool uiUseThemeFont = true;
     QString uiFontFamily;
     int uiFontPointSize = 10;
