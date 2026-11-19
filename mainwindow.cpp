@@ -13119,11 +13119,12 @@ void MainWindow::applyUiAppearanceSettings()
         QFont f = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
         if (theme == QStringLiteral("avionica")) {
             f.setPointSize(9);
+        } else if (theme == QStringLiteral("classic_blue_gray")) {
+            f.setPixelSize(12);
         } else if (f.pointSize() <= 0) {
             f.setPointSize(theme == QStringLiteral("high_contrast") ? 12 : 10);
         }
         if (theme == QStringLiteral("high_contrast") && f.pointSize() < 12) f.setPointSize(12);
-        if (theme == QStringLiteral("classic_blue_gray") && f.pointSize() < 14) f.setPointSize(14);
         return f;
     };
 
