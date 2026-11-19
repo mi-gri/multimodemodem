@@ -60,8 +60,12 @@ THEMES = {
 
 THEMES["classic_blue_gray"] = {
     **THEMES["classic_dark"],
-    "window": "#2E3745",
-    "base": "#202832",
+    "window": "#283241",
+    "window_text": "#FAFCFF",
+    "base": "#1A222D",
+    "button_text": "#FFFFFF",
+    "muted": "#C5D1DF",
+    "menu_disabled": "#A6B2C2",
 }
 
 
@@ -91,6 +95,8 @@ for key, colours in THEMES.items():
         "map text": contrast(colours["map_text"], colours["map_backdrop"]),
         "map muted text": contrast(colours["map_muted"], colours["map_backdrop"]),
     }
+    if "menu_disabled" in colours:
+        checks["disabled menu text"] = contrast(colours["menu_disabled"], colours["base"])
     for surface, ratio in checks.items():
         assert ratio >= 4.5, f"{key} {surface}: contrast {ratio:.2f} < 4.5"
         print(f"PASS contrast {key} {surface}: {ratio:.2f}:1")

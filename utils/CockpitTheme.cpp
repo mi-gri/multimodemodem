@@ -102,9 +102,13 @@ ThemeSpec themeSpec(const QString &requestedKey)
             QColor("#596573"), false
         };
         if (key == QStringLiteral("classic_blue_gray")) {
-            spec.window = QColor("#2E3745");
-            spec.base = QColor("#202832");
-            spec.alternateBase = QColor("#2B3542");
+            spec.window = QColor("#283241");
+            spec.windowText = QColor("#FAFCFF");
+            spec.base = QColor("#1A222D");
+            spec.alternateBase = QColor("#25303D");
+            spec.buttonText = QColor("#FFFFFF");
+            spec.disabledText = QColor("#A6B2C2");
+            spec.mutedText = QColor("#C5D1DF");
         }
         return spec;
     }
@@ -1288,7 +1292,16 @@ void applyUiTheme(QApplication &app, const QString &themeKey)
     } else {
         const ThemeSpec spec = themeSpec(key);
         app.setPalette(paletteForTheme(spec));
-        app.setStyleSheet(genericThemeStyleSheet(spec));
+        QString styleSheet = genericThemeStyleSheet(spec);
+        if (key == QStringLiteral("classic_blue_gray")) {
+            // Popup menus can get a separate, smaller font from the Qt platform theme.
+            const QFont font = app.font();
+            const QString size = font.pointSizeF() > 0
+                ? QString::number(font.pointSizeF()) + QStringLiteral("pt")
+                : QString::number(font.pixelSize()) + QStringLiteral("px");
+            styleSheet += QStringLiteral("\nQMenuBar, QMenu { font-size: %1; }\n").arg(size);
+        }
+        app.setStyleSheet(styleSheet);
     }
 
     // Existing dialogs and combo popups may survive a live theme switch. Apply
