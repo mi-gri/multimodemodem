@@ -9658,7 +9658,7 @@ void MainWindow::setupFt8Page()
 
     m_tableFt8Rx = new QTableWidget(0, 9, rxGroup);
     m_tableFt8Rx->setHorizontalHeaderLabels(QStringList()
-        << "UTC" << uiText("db", "dB") << uiText("dt", "DT") << uiText("frequency", "Freq")
+        << "UTC" << uiText("db", "dB") << uiText("dt", "DT") << QStringLiteral("Hz")
         << uiText("message", "Message") << uiText("callsign", "Call")
         << uiText("locator", "Locator") << uiText("bearing", "Bearing")
         << uiText("country", "Country"));
@@ -9672,7 +9672,7 @@ void MainWindow::setupFt8Page()
     m_tableFt8Rx->setColumnWidth(0, 58);  // UTC HHMMSS
     m_tableFt8Rx->setColumnWidth(1, 42);  // dB
     m_tableFt8Rx->setColumnWidth(2, 42);  // DT
-    m_tableFt8Rx->setColumnWidth(3, 58);  // Freq
+    m_tableFt8Rx->setColumnWidth(3, 58);  // Hz
     m_tableFt8Rx->setColumnWidth(4, 260); // Message
     m_tableFt8Rx->setColumnWidth(5, 90);  // Call
     m_tableFt8Rx->setColumnWidth(6, 72);  // Locator
@@ -9693,7 +9693,7 @@ void MainWindow::setupFt8Page()
     m_tableFt8QsoHistory = new QTableWidget(0, 6, qsoActivityGroup);
     m_tableFt8QsoHistory->setHorizontalHeaderLabels(QStringList()
         << "UTC" << uiText("direction", "Dir") << uiText("db_tag", "dB/Tag")
-        << uiText("dt", "DT") << uiText("frequency", "Freq") << uiText("message", "Message"));
+        << uiText("dt", "DT") << QStringLiteral("Hz") << uiText("message", "Message"));
     m_tableFt8QsoHistory->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_tableFt8QsoHistory->setSelectionMode(QAbstractItemView::SingleSelection);
     m_tableFt8QsoHistory->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -9704,7 +9704,7 @@ void MainWindow::setupFt8Page()
     m_tableFt8QsoHistory->setColumnWidth(1, 34); // Dir
     m_tableFt8QsoHistory->setColumnWidth(2, 54); // dB/Tag
     m_tableFt8QsoHistory->setColumnWidth(3, 42); // DT
-    m_tableFt8QsoHistory->setColumnWidth(4, 58); // Freq
+    m_tableFt8QsoHistory->setColumnWidth(4, 58); // Hz
     m_tableFt8QsoHistory->setAlternatingRowColors(false);
     applyDecodeTableVisualSettings(m_tableFt8QsoHistory);
     qsoActivityLayout->addWidget(m_tableFt8QsoHistory);
