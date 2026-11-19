@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <QHelpCollectionProject version="1.0">
     <assistant>
-        <title>m³-hjelp - Norsk 0.26.11</title>
-        <startPage>qthelp://org.m3.mm.02611.no/doc/no/index.html</startPage>
+        <title>m³-hjelp - Norsk 0.26.12</title>
+        <startPage>qthelp://org.m3.mm.02612.no/doc/no/index.html</startPage>
         <applicationIcon>../../icons/multimodemodem_32.png</applicationIcon>
     </assistant>
     <docFiles>

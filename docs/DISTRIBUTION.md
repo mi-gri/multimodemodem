@@ -1,4 +1,4 @@
-# GitHub distribution — MultiModeModem 0.26.11
+# GitHub distribution — MultiModeModem 0.26.12
 
 Copy the complete source directory contents into the repository root, including
 `.github`. To clean up documents left after overlaying an older source tree,
@@ -17,7 +17,7 @@ Branches: `release/<version>` carries the release candidate (only bug fixes, bui
 pre-releases); `main` carries the beta of the next version. The tag `v<version>` on the release branch
 publishes the real release. Installations offer only real releases unless "Include beta versions" is on.
 
-A branch build creates a numbered prerelease (`build-0.26.11-N`). Tag `v0.26.11` creates
+A branch build creates a numbered prerelease (`build-0.26.12-N`). Tag `v0.26.12` creates
 a version release. The tag must match all source metadata; the source-check job
 rejects mixed versions. Run the workflow on the new commit, not an older run.
 Only the publish job requests `contents: write`; the normal GitHub token is used.

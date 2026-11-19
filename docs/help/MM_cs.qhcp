@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <QHelpCollectionProject version="1.0">
     <assistant>
-        <title>Nápověda m³ - Čeština 0.26.11</title>
-        <startPage>qthelp://org.m3.mm.02611.cs/doc/cs/index.html</startPage>
+        <title>Nápověda m³ - Čeština 0.26.12</title>
+        <startPage>qthelp://org.m3.mm.02612.cs/doc/cs/index.html</startPage>
         <applicationIcon>../../icons/multimodemodem_32.png</applicationIcon>
     </assistant>
     <docFiles>

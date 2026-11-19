@@ -1,4 +1,4 @@
-# CW and RTTY skimmers — MultiModeModem 0.26.11
+# CW and RTTY skimmers — MultiModeModem 0.26.12
 
 ## Ownership and data flow
 

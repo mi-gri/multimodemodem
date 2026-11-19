@@ -2,6 +2,10 @@
 
 MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow below.
 
+## m³ 0.26.12 (beta, branch main)
+
+- New features go here; the release candidate 0.26.11 lives on branch release/0.26.11 (bug fixes only).
+
 ## m³ 0.26.11
 
 - Update channel: Help → "Include beta versions in update checks". Default stable (real releases only); beta also offers

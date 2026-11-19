@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(MultiModeModem
-    VERSION 0.26.11
+    VERSION 0.26.12
     LANGUAGES CXX
 )
 

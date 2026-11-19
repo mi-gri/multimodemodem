@@ -1,4 +1,4 @@
-# Installation — MultiModeModem 0.26.11
+# Installation — MultiModeModem 0.26.12
 
 Download the installer or portable package matching your system from
 [GitHub Releases](https://github.com/mi-gri/MultiModeModem/releases). Close MM before installation.

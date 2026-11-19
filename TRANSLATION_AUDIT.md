@@ -1,4 +1,4 @@
-# MultiModeModem 0.26.11 translation maintenance
+# MultiModeModem 0.26.12 translation maintenance
 
 The six runtime dictionaries are English, Italian, French, German, Norwegian and Czech. Complete sentences are translated by stable key; protocol names and units remain shared where appropriate. Do not construct translated prose by replacing individual English words.
 

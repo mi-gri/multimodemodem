@@ -1,10 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <QtHelpProject version="1.0">
-    <namespace>org.m3.mm.02611.no</namespace>
+    <namespace>org.m3.mm.02612.no</namespace>
     <virtualFolder>doc</virtualFolder>
     <filterSection>
         <filterAttribute>MM</filterAttribute>
-        <filterAttribute>0.26.11</filterAttribute>
+        <filterAttribute>0.26.12</filterAttribute>
         <filterAttribute>no</filterAttribute>
         <toc>
             <section title="m³-hjelp" ref="no/index.html">
