@@ -13137,8 +13137,12 @@ void MainWindow::applyUiAppearanceSettings()
     // Applying the theme or the font re-polishes every widget (about a second
     // with the full window); do it only when it changes.  Widgets created
     // since then still get the cockpit roles from polishCockpitWidgetTree().
-    if (!M3Ui::isUiThemeApplied(theme)) M3Ui::applyUiTheme(*app, theme);
-    if (app->font() != font) app->setFont(font);
+    const bool fontChanged = app->font() != font;
+    if (fontChanged) app->setFont(font);
+    if (!M3Ui::isUiThemeApplied(theme) ||
+        (fontChanged && theme == QStringLiteral("classic_blue_gray"))) {
+        M3Ui::applyUiTheme(*app, theme);
+    }
     M3Ui::polishCockpitWidgetTree(this);
     for (QPlainTextEdit *terminal : {m_txtRttyRx, m_txtBpsk31Rx, m_txtMfskRx,
                                      m_txtCwRx, m_txtCwRxB}) {
