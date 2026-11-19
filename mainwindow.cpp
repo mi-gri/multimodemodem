@@ -13123,6 +13123,7 @@ void MainWindow::applyUiAppearanceSettings()
             f.setPointSize(theme == QStringLiteral("high_contrast") ? 12 : 10);
         }
         if (theme == QStringLiteral("high_contrast") && f.pointSize() < 12) f.setPointSize(12);
+        if (theme == QStringLiteral("classic_blue_gray") && f.pointSize() < 14) f.setPointSize(14);
         return f;
     };
 
