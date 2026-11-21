@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- New start parameter `--startupmenu`: a dialog lists the existing configurations (default + configs/*.m3cfg, running ones marked)
+  and the chosen one is used; the last choice is preselected; `--config` takes precedence.
 - Without CAT a mode change (e.g. FT4 -> FT8 on 40 m) and an FT/JS8 band change now set the displayed dial frequency to the
   default frequency of the new mode, as WSJT-X does (only when a dial frequency was entered before).
 - Tune carrier length is a setting (Settings -> Bands, 5-120 s, default 60 s); FT8/FT4 Tune rounds up to whole slots.

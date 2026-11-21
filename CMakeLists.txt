@@ -682,6 +682,8 @@ add_executable(MultiModeModem
     dialogs/AppSettingsDialog.h
     dialogs/AppSettingsDialog.cpp
     dialogs/AutoModeNoticeDialog.cpp
+    dialogs/ConfigChooserDialog.cpp
+    dialogs/ConfigChooserDialog.h
     dialogs/AutoModeNoticeDialog.h
     dialogs/AudioSettingsDialog.ui
     dialogs/AudioSettingsDialog.h
