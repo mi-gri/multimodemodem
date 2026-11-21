@@ -1650,3 +1650,38 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
 KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'update_include_beta':('Include beta versions in update checks','Includi le versioni beta nel controllo aggiornamenti','Inclure les versions bêta dans la recherche de mises à jour','Beta-Versionen in die Update-Suche einbeziehen','Ta med betaversjoner i oppdateringssøk','Zahrnout beta verze do kontroly aktualizací'),
 }.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Write technical details into the comment field of automatic log entries':(
+  'Write technical details into the comment field of automatic log entries','Scrivi dettagli tecnici nel campo commento delle voci di log automatiche','Écrire des détails techniques dans le champ commentaire des entrées de log automatiques',
+  'Technische Details ins Kommentarfeld automatischer Logeinträge schreiben','Skriv tekniske detaljer i kommentarfeltet til automatiske loggoppføringer','Zapisovat technické údaje do pole poznámky automatických záznamů deníku'),
+ 'FT auto log: adds "reason; RX audio ... Hz; TX audio ... Hz; final: message" to the ADIF comment. Switch off if your logging program has problems with it. Comments you type yourself are never changed.':(
+  'FT auto log: adds "reason; RX audio ... Hz; TX audio ... Hz; final: message" to the ADIF comment. Switch off if your logging program has problems with it. Comments you type yourself are never changed.',
+  'FT auto log: aggiunge "motivo; audio RX ... Hz; audio TX ... Hz; finale: messaggio" al commento ADIF. Disattivare se il programma di log ha problemi. I commenti inseriti da te non vengono mai modificati.',
+  'FT auto log : ajoute « raison ; audio RX ... Hz ; audio TX ... Hz ; final : message » au commentaire ADIF. À désactiver si votre logiciel de log a des problèmes. Les commentaires saisis par vous ne sont jamais modifiés.',
+  'FT-Auto-Log: schreibt „Grund; RX audio ... Hz; TX audio ... Hz; final: Nachricht“ in den ADIF-Kommentar. Ausschalten, wenn dein Logprogramm damit Probleme hat. Selbst eingegebene Kommentare werden nie verändert.',
+  'FT auto-logg: legger «årsak; RX audio ... Hz; TX audio ... Hz; final: melding» i ADIF-kommentaren. Slå av hvis loggprogrammet har problemer. Kommentarer du skriver selv endres aldri.',
+  'FT automatický deník: přidá „důvod; RX audio ... Hz; TX audio ... Hz; konec: zpráva“ do komentáře ADIF. Vypněte, pokud s tím má váš deníkový program potíže. Vámi zadané komentáře se nikdy nemění.'),
+}.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'tune_start_log':(
+  'Tune: carrier %1 Hz (max. %2 s; Tune again stops it).','Tune: portante %1 Hz (max. %2 s; Tune di nuovo la ferma).',
+  "Tune : porteuse %1 Hz (max. %2 s ; Tune à nouveau l'arrête).",'Tune: Träger %1 Hz (max. %2 s; erneut Tune beendet ihn).',
+  'Tune: bærebølge %1 Hz (maks. %2 s; Tune igjen stopper den).','Tune: nosná %1 Hz (max. %2 s; dalším Tune ji zastavíte).'),
+ 'tune_button_tip':(
+  'Transmits a steady carrier on the TX audio frequency of the current mode for tuning (ATU, power, ALC), at the Tune level. Click again to stop; it stops by itself after the set Tune time (Settings -> Bands, default 60 s). PWR, SWR and ALC are shown next to it.',
+  "Trasmette una portante continua sulla frequenza audio TX del modo attuale per l'accordo (ATU, potenza, ALC), al livello Tune. Clicca di nuovo per fermarla; si ferma da sola dopo il tempo Tune impostato (Impostazioni -> Bande, predefinito 60 s). PWR, SWR e ALC sono mostrati accanto.",
+  "Émet une porteuse continue sur la fréquence audio TX du mode actuel pour l'accord (ATU, puissance, ALC), au niveau Tune. Cliquez à nouveau pour l'arrêter ; elle s'arrête seule après la durée Tune réglée (Réglages -> Bandes, 60 s par défaut). PWR, SWR et ALC sont affichés à côté.",
+  'Sendet einen Dauerträger auf der TX-Audiofrequenz des aktuellen Modus zum Abstimmen (ATU, Leistung, ALC), mit dem Tune-Pegel. Erneuter Klick beendet ihn; nach der eingestellten Tune-Zeit (Einstellungen -> Bänder, Standard 60 s) endet er von selbst. PWR, SWR und ALC stehen daneben.',
+  'Sender en kontinuerlig bærebølge på TX-lydfrekvensen for gjeldende modus for avstemming (ATU, effekt, ALC), med Tune-nivået. Klikk igjen for å stoppe; den stopper selv etter innstilt Tune-tid (Innstillinger -> Bånd, standard 60 s). PWR, SWR og ALC vises ved siden av.',
+  'Vysílá trvalou nosnou na TX zvukovém kmitočtu aktuálního druhu provozu pro ladění (ATU, výkon, ALC) s úrovní Tune. Dalším kliknutím ji zastavíte; po nastavené době Tune (Nastavení -> Pásma, výchozí 60 s) skončí sama. PWR, SWR a ALC jsou zobrazeny vedle.'),
+}.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Tune carrier length (seconds)':('Tune carrier length (seconds)','Durata della portante Tune (secondi)','Durée de la porteuse Tune (secondes)','Länge des Tune-Trägers (Sekunden)','Lengde på Tune-bærebølgen (sekunder)','Délka nosné Tune (sekundy)'),
+ 'How long the Tune button transmits its carrier at most (it stops earlier when you press Tune again or STOP). FT8/FT4 round up to whole slots.':(
+  'How long the Tune button transmits its carrier at most (it stops earlier when you press Tune again or STOP). FT8/FT4 round up to whole slots.',
+  'Per quanto tempo al massimo il pulsante Tune trasmette la portante (si ferma prima premendo di nuovo Tune o STOP). FT8/FT4 arrotondano a slot interi.',
+  'Durée maximale d’émission de la porteuse par le bouton Tune (elle s’arrête plus tôt avec Tune ou STOP). FT8/FT4 arrondissent à des slots entiers.',
+  'Wie lange der Tune-Knopf den Träger höchstens sendet (früher beendet durch erneutes Tune oder STOP). FT8/FT4 runden auf ganze Slots auf.',
+  'Hvor lenge Tune-knappen maksimalt sender bærebølgen (stopper tidligere med Tune igjen eller STOP). FT8/FT4 runder opp til hele slots.',
+  'Jak dlouho tlačítko Tune nejvýše vysílá nosnou (dříve ji zastaví další Tune nebo STOP). FT8/FT4 zaokrouhlují na celé sloty.'),
+}.items()})

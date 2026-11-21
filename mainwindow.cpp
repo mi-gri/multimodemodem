@@ -13476,7 +13476,7 @@ void MainWindow::setupRigReadoutPanel()
     m_btnTune->setObjectName(QStringLiteral("rigReadoutTune"));
     m_btnTune->setCheckable(true);
     m_btnTune->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    m_btnTune->setToolTip(uiText("tune_button_tip", "Transmits a steady carrier on the TX audio frequency of the current mode for tuning (ATU, power, ALC), at the Tune level. Click again to stop; it stops by itself after 60 s. PWR, SWR and ALC are shown next to it."));
+    m_btnTune->setToolTip(uiText("tune_button_tip", "Transmits a steady carrier on the TX audio frequency of the current mode for tuning (ATU, power, ALC), at the Tune level. Click again to stop; it stops by itself after the set Tune time (Settings -> Bands, default 60 s). PWR, SWR and ALC are shown next to it."));
     connect(m_btnTune, &QPushButton::clicked, this, [this](bool) { toggleTune(); });
     layout->addWidget(m_lcdRigReadoutFrequency, 0, 0, 3, 1);
     // Up/down for the clicked digit, beside the display (never over a digit).
@@ -14005,9 +14005,9 @@ void MainWindow::updateFtBandFrequencyUi()
                                 haveCat && !onSlot ? QStringLiteral("negative") : QString());
 }
 
-void MainWindow::qsyRigToSelectedFtBand()
+void MainWindow::qsyRigToSelectedFtBand(bool modeChange)
 {
-    if (m_cmbFt8Band == nullptr || m_rigController == nullptr) {
+    if (m_cmbFt8Band == nullptr) {
         return;
     }
     const QString modeName = (ui != nullptr && ui->cmbMode != nullptr) ? ui->cmbMode->currentText() : QStringLiteral("FT8");
@@ -14018,9 +14018,13 @@ void MainWindow::qsyRigToSelectedFtBand()
         return;
     }
     if (!m_settings.hamlibCatEnabled) {
-        appendLog(QStringLiteral("%1 band %2 selected; CAT is disabled, rig not tuned.").arg(modeName, band));
+        // Without CAT the displayed dial frequency follows (as in WSJT-X); the operator tunes the rig.
+        if (modeChange && m_lastRigFrequencyHz <= 0.0) return;   // no dial frequency entered yet
+        if (m_lastRigFrequencyHz > 0.0 && qAbs(m_lastRigFrequencyHz - targetHz) < 1.0) return;
+        setManualDialFrequency(targetHz, QStringLiteral("%1 %2").arg(modeName, band));
         return;
     }
+    if (m_rigController == nullptr) return;
     if (m_rigController != nullptr && !m_rigController->isConnected()) {
         // Queue CAT configuration before the frequency write.  Queued calls to
         // the rig controller are processed in order, so selecting an FT band
@@ -15315,7 +15319,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
                 m_cmbJs8Band->setCurrentIndex(idx);
             }
         }
-        if (m_settings.frequencyQsyOnModeChange && !m_suppressModeChangeQsy) js8QsyToSelectedBand();
+        if (m_settings.frequencyQsyOnModeChange && !m_suppressModeChangeQsy) js8QsyToSelectedBand(true);
         js8UpdateBandUi();
         setDecoderReady(QStringLiteral("JS8 ") + Js8Mode::submodeName(currentJs8Submode()));
     } else if (Ft8Mode::isFamilyMode(modeName)) {
@@ -15323,7 +15327,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
             ui->stkModeSettings->setCurrentWidget(m_pageFt8Settings);
         }
         applyFt8Settings();
-        if (m_settings.frequencyQsyOnModeChange && !m_suppressModeChangeQsy) qsyRigToSelectedFtBand();
+        if (m_settings.frequencyQsyOnModeChange && !m_suppressModeChangeQsy) qsyRigToSelectedFtBand(true);
         const Ft8Mode::Profile profile = Ft8Mode::profileForMode(modeName);
         if (profile.interoperableCoreAvailable) {
             setDecoderReady(profile.shortLabel);
@@ -20855,6 +20859,8 @@ void MainWindow::autoLogFt8QsoFor(const FtQsoSession &session, const QString &re
     }
     entry.utc = session.qsoStartUtc.isValid() ? session.qsoStartUtc : QDateTime::currentDateTimeUtc();
     entry.utcEnd = QDateTime::currentDateTimeUtc();
+    // Technical details only when switched on (Settings -> Logbook): some logging programs choke on them.
+    if (m_settings.logTechnicalComment)
     entry.comment = QString("%1; RX audio %2 Hz; TX audio %3 Hz; final: %4")
                         .arg(reason,
                              QString::number(session.audioFreqHz > 0 ? session.audioFreqHz : (m_spinFt8RxFreq != nullptr ? m_spinFt8RxFreq->value() : 0)),
@@ -23141,7 +23147,7 @@ void MainWindow::toggleTune()
     }
     if (m_wsprTxTimer.isActive() && m_chkWsprTx && m_chkWsprTx->isChecked())
         wsprStopBeacon(QStringLiteral("tune"));
-    appendLog(uiText("tune_start_log", "Tune: carrier %1 Hz (max. 60 s; Tune again stops it).").arg(qRound(tuneToneHz())));
+    appendLog(uiText("tune_start_log", "Tune: carrier %1 Hz (max. %2 s; Tune again stops it).").arg(qRound(tuneToneHz())).arg(m_settings.tuneSeconds));
     m_tuneTxRequested = true;
     m_tuneTxRunning = true;
     setTxLevelTune(true);
@@ -27331,7 +27337,10 @@ std::unique_ptr<TxModulator> MainWindow::buildCurrentTxModulator(const QString &
         const int logicalTxHz = (m_spinFt8TxFreq != nullptr) ? m_spinFt8TxFreq->value() : 1500;
         const double txHz = static_cast<double>(ftEffectiveTxAudioFrequency(logicalTxHz));
         if (m_pendingFt8TxPlan.tune) {
-            Ft8Transmitter *tone = new Ft8Transmitter(profile.modeName, 48000, txHz, static_cast<double>(profile.slotMs) / 1000.0, true);
+            // Tune length from the settings, rounded up to whole slots (the FT TX path is slot based).
+            const double slotSeconds = static_cast<double>(profile.slotMs) / 1000.0;
+            const double tuneSeconds = qMax(slotSeconds, std::ceil(qBound(5, m_settings.tuneSeconds, 120) / slotSeconds) * slotSeconds);
+            Ft8Transmitter *tone = new Ft8Transmitter(profile.modeName, 48000, txHz, tuneSeconds, true);
             if (!tone->generationSucceeded()) {
                 delete tone;
                 return nullptr;
@@ -28173,7 +28182,7 @@ void MainWindow::startImageTx()
         }
     } else if (tuneTx) {
         const int rate = (m_settings.audioSampleRate == 44100 || m_settings.audioSampleRate == 96000) ? m_settings.audioSampleRate : 48000;
-        modulator = std::make_unique<TuneModulator>(tuneToneHz(), rate, 60.0);
+        modulator = std::make_unique<TuneModulator>(tuneToneHz(), rate, double(qBound(5, m_settings.tuneSeconds, 120)));
     } else {
         modulator = buildCurrentTxModulator(textSnapshot);
     }

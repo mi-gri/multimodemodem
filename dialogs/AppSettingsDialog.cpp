@@ -906,6 +906,20 @@ QWidget *AppSettingsDialog::makeBandsPage()
     swrRow->addWidget(m_spinTxSwrAbortLimit);
     swrRow->addStretch(1);
     layout->addLayout(swrRow);
+    // Tune carrier length: some antenna tuners need longer than the default.
+    auto *tuneRow = new QHBoxLayout();
+    auto *tuneLabel = new QLabel(L(QStringLiteral("Tune carrier length (seconds)")), page);
+    m_spinTuneSeconds = new QSpinBox(page);
+    m_spinTuneSeconds->setObjectName(QStringLiteral("tuneSeconds"));
+    m_spinTuneSeconds->setRange(5, 120);
+    m_spinTuneSeconds->setSuffix(QStringLiteral(" s"));
+    m_spinTuneSeconds->setValue(m_initialSettings.tuneSeconds);
+    m_spinTuneSeconds->setToolTip(L(QStringLiteral("How long the Tune button transmits its carrier at most (it stops earlier when you press Tune again or STOP). FT8/FT4 round up to whole slots.")));
+    tuneLabel->setToolTip(m_spinTuneSeconds->toolTip());
+    tuneRow->addWidget(tuneLabel);
+    tuneRow->addWidget(m_spinTuneSeconds);
+    tuneRow->addStretch(1);
+    layout->addLayout(tuneRow);
     return page;
 }
 
@@ -1356,6 +1370,13 @@ QWidget *AppSettingsDialog::makeLogbookPage()
     logbookLayout->addWidget(m_logbookPage);
 
     layout->addWidget(logbookGroup);
+
+    // Some logging programs (e.g. UCX-Log) choke on the technical text; off by default.
+    m_chkLogTechnicalComment = new QCheckBox(L(QStringLiteral("Write technical details into the comment field of automatic log entries")), holder);
+    m_chkLogTechnicalComment->setObjectName(QStringLiteral("logTechnicalComment"));
+    m_chkLogTechnicalComment->setChecked(m_initialSettings.logTechnicalComment);
+    m_chkLogTechnicalComment->setToolTip(L(QStringLiteral("FT auto log: adds \"reason; RX audio ... Hz; TX audio ... Hz; final: message\" to the ADIF comment. Switch off if your logging program has problems with it. Comments you type yourself are never changed.")));
+    layout->addWidget(m_chkLogTechnicalComment);
 
     QGroupBox *displayGroup = new QGroupBox(L(QStringLiteral("Logbook display")), holder);
     displayGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
@@ -2793,6 +2814,7 @@ void AppSettingsDialog::collectSettings()
     if (m_chkFtGpuSync) merged.ftGpuSyncEnabled = m_chkFtGpuSync->isChecked();
     if (m_chkFtGpuDecode) merged.ftGpuDecodeEnabled = m_chkFtGpuDecode->isChecked();
 
+    if (m_spinTuneSeconds != nullptr) merged.tuneSeconds = m_spinTuneSeconds->value();
     if (m_chkTxSwrAbort != nullptr) merged.txSwrAbort = m_chkTxSwrAbort->isChecked();
     if (m_spinTxSwrAbortLimit != nullptr) merged.txSwrAbortLimit = m_spinTxSwrAbortLimit->value();
     if (m_bandsTable != nullptr) {
@@ -2928,6 +2950,7 @@ void AppSettingsDialog::collectSettings()
         m_selectedLogbookPath = m_logbookPage->selectedPath().trimmed();
         merged.logbookFilePath = m_selectedLogbookPath;
     }
+    if (m_chkLogTechnicalComment != nullptr) merged.logTechnicalComment = m_chkLogTechnicalComment->isChecked();
     if (m_chkCtyWeeklyUpdate != nullptr) {
         merged.ctyWeeklyUpdate = m_chkCtyWeeklyUpdate->isChecked();
     }

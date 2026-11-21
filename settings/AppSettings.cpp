@@ -187,6 +187,7 @@ void AppSettings::load()
     QSettings settings(settingsFilePath(), QSettings::IniFormat);
     sessionDiagnosticsEnabled = settings.value("Diagnostics/sessionEnabled", false).toBool();
     ctyWeeklyUpdate = settings.value("Cty/weeklyUpdate", false).toBool();
+    logTechnicalComment = settings.value("Logbook/technicalComment", false).toBool();
     ctyLastCheckUtc = settings.value("Cty/lastCheckUtc").toDateTime();
     sessionDiagnosticsFolder = settings.value("Diagnostics/folder").toString();
     // The former default folder of MultiModeModem (…/MultiModeModem/diagnostics) becomes
@@ -670,6 +671,7 @@ void AppSettings::load()
     ftDecodeFilterWorkedDays = qBound(0, settings.value("FT8/decodeFilterWorkedDays", ftDecodeFilterWorkedDays).toInt(), 3650);
     ftDecodeFilterCountries = settings.value("FT8/decodeFilterCountries", ftDecodeFilterCountries).toBool();
     ftAnswerUnsolicited = settings.value("FT8/answerUnsolicited", ftAnswerUnsolicited).toBool();
+    tuneSeconds = qBound(5, settings.value("TX/tuneSeconds", tuneSeconds).toInt(), 120);
     txSwrAbort = settings.value("TX/swrAbort", txSwrAbort).toBool();
     txSwrAbortLimit = qBound(1.2, settings.value("TX/swrAbortLimit", txSwrAbortLimit).toDouble(), 10.0);
     ftDecodeFilterKeepMine = settings.value("FT8/decodeFilterKeepMine", ftDecodeFilterKeepMine).toBool();
@@ -884,6 +886,7 @@ bool AppSettings::save() const
     QSettings settings(settingsFilePath(), QSettings::IniFormat);
     settings.setValue("Diagnostics/sessionEnabled", sessionDiagnosticsEnabled);
     settings.setValue("Cty/weeklyUpdate", ctyWeeklyUpdate);
+    settings.setValue("Logbook/technicalComment", logTechnicalComment);
     settings.setValue("Cty/lastCheckUtc", ctyLastCheckUtc);
     settings.setValue("Diagnostics/folder", sessionDiagnosticsFolder);
 
@@ -1123,6 +1126,7 @@ bool AppSettings::save() const
     settings.setValue("FT8/decodeFilterWorkedDays", ftDecodeFilterWorkedDays);
     settings.setValue("FT8/decodeFilterCountries", ftDecodeFilterCountries);
     settings.setValue("FT8/answerUnsolicited", ftAnswerUnsolicited);
+    settings.setValue("TX/tuneSeconds", tuneSeconds);
     settings.setValue("TX/swrAbort", txSwrAbort);
     settings.setValue("TX/swrAbortLimit", txSwrAbortLimit);
     settings.setValue("FT8/decodeFilterKeepMine", ftDecodeFilterKeepMine);

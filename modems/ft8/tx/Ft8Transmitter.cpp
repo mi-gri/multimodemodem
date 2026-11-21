@@ -427,7 +427,7 @@ void Ft8Transmitter::buildTuneWaveform(double frequencyHz, double durationSecond
 
     const int totalSamples = qBound(m_sampleRate,
                                     static_cast<int>(qRound(durationSeconds * static_cast<double>(m_sampleRate))),
-                                    60 * m_sampleRate);
+                                    120 * m_sampleRate);
 
     m_samples.resize(totalSamples);
 

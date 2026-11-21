@@ -302,20 +302,24 @@ void MainWindow::qsyModeBand(const QString &listMode)
     if (w.band == nullptr || w.band->currentData().toString().isEmpty()) return;
     const QString group = w.band->currentData().toString();
     const double target = M3StandardFrequencies::dialHz(listMode, group);
-    if (target <= 0.0 || !m_settings.hamlibCatEnabled) return;
+    if (target <= 0.0) return;
+    // Without CAT the dial frequency is the manual entry (kept in m_lastRigFrequencyHz too).
+    if (!m_settings.hamlibCatEnabled && m_lastRigFrequencyHz <= 0.0) return;
     if (m_lastRigFrequencyHz > 0.0 && std::fabs(m_lastRigFrequencyHz - target) < 1.0) return;
-    tuneRigTo(target, listMode + QLatin1Char(' ') + frequencyGroupLabel(group));
+    qsyOrSetManual(target, listMode + QLatin1Char(' ') + frequencyGroupLabel(group));
 }
 
 void MainWindow::qsyForModeChange(const QString &modeName)
 {
     refreshFrequencyPickers();   // the FT page lists FT8 or FT4 entries
     // FT and JS8 tune in their own branches of handleModeChanged().
-    if (!m_settings.frequencyQsyOnModeChange || m_suppressModeChangeQsy || !m_settings.hamlibCatEnabled) return;
+    if (!m_settings.frequencyQsyOnModeChange || m_suppressModeChangeQsy) return;
     if (Ft8Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName)) return;
     const QString listMode = M3StandardFrequencies::listModeForName(modeName);
     if (listMode.isEmpty()) return;
-    const double rigHz = m_lastRigFrequencyHz;
+    const double rigHz = m_lastRigFrequencyHz;   // without CAT: the manual dial frequency
+    // Without CAT only follow a dial frequency the operator has entered.
+    if (!m_settings.hamlibCatEnabled && rigHz <= 0.0) return;
 
     // Already on a stored frequency of the new mode (a weather fax or RTTY
     // station, an activity frequency): stay.
@@ -328,7 +332,7 @@ void MainWindow::qsyForModeChange(const QString &modeName)
     // Weather fax stations are outside the amateur bands: go to the preferred one.
     if (listMode == QStringLiteral("WEFAX")) {
         const double target = M3StandardFrequencies::preferredAnyBandHz(listMode);
-        if (target > 0.0) tuneRigTo(target, modeName);
+        if (target > 0.0) qsyOrSetManual(target, modeName);
         return;
     }
 
@@ -348,5 +352,5 @@ void MainWindow::qsyForModeChange(const QString &modeName)
     // Other modes: the preferred frequency of the band the rig is on.
     if (rigHz <= 0.0) return;
     const double target = M3StandardFrequencies::dialHz(listMode, M3StandardFrequencies::bandOf(rigHz));
-    if (target > 0.0 && std::fabs(rigHz - target) >= 1.0) tuneRigTo(target, modeName);
+    if (target > 0.0 && std::fabs(rigHz - target) >= 1.0) qsyOrSetManual(target, modeName);
 }
