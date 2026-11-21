@@ -5,8 +5,6 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 ## m³ 0.26.12 (beta, branch main)
 
 - New features go here; the release candidate 0.26.11 lives on branch release/0.26.11 (bug fixes only).
-- New start parameter `--startupmenu`: a dialog lists the existing configurations (default + configs/*.m3cfg, running ones marked)
-  and the chosen one is used; the last choice is preselected; `--config` takes precedence.
 
 ## m³ 0.26.11
 
