@@ -303,9 +303,10 @@ void MainWindow::qsyModeBand(const QString &listMode)
     const QString group = w.band->currentData().toString();
     const double target = M3StandardFrequencies::dialHz(listMode, group);
     if (target <= 0.0) return;
-    // Without CAT the dial frequency is the manual entry (kept in m_lastRigFrequencyHz too).
-    if (!m_settings.hamlibCatEnabled && m_lastRigFrequencyHz <= 0.0) return;
-    if (m_lastRigFrequencyHz > 0.0 && std::fabs(m_lastRigFrequencyHz - target) < 1.0) return;
+    // Without CAT the dial frequency is the manual entry only (m_lastRigFrequencyHz may be a stale CAT value).
+    const double dial = m_settings.hamlibCatEnabled ? m_lastRigFrequencyHz : m_manualDialHz;
+    if (!m_settings.hamlibCatEnabled && dial <= 0.0) return;
+    if (dial > 0.0 && std::fabs(dial - target) < 1.0) return;
     qsyOrSetManual(target, listMode + QLatin1Char(' ') + frequencyGroupLabel(group));
 }
 
@@ -317,7 +318,7 @@ void MainWindow::qsyForModeChange(const QString &modeName)
     if (Ft8Mode::isFamilyMode(modeName) || Js8Mode::isMode(modeName)) return;
     const QString listMode = M3StandardFrequencies::listModeForName(modeName);
     if (listMode.isEmpty()) return;
-    const double rigHz = m_lastRigFrequencyHz;   // without CAT: the manual dial frequency
+    const double rigHz = m_settings.hamlibCatEnabled ? m_lastRigFrequencyHz : m_manualDialHz;   // without CAT: the manual dial frequency only
     // Without CAT only follow a dial frequency the operator has entered.
     if (!m_settings.hamlibCatEnabled && rigHz <= 0.0) return;
 

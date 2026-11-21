@@ -1374,8 +1374,8 @@ void MainWindow::js8QsyToSelectedBand(bool modeChange)
     if (target <= 0.0) return;
     if (!m_settings.hamlibCatEnabled) {
         // Without CAT the displayed dial frequency follows (as in WSJT-X); the operator tunes the rig.
-        if (modeChange && m_lastRigFrequencyHz <= 0.0) return;
-        if (m_lastRigFrequencyHz > 0.0 && qAbs(m_lastRigFrequencyHz - target) < 1.0) return;
+        if (modeChange && m_manualDialHz <= 0.0) return;   // no dial frequency entered yet
+        if (m_manualDialHz > 0.0 && qAbs(m_manualDialHz - target) < 1.0) return;
         setManualDialFrequency(target, QStringLiteral("JS8 ") + m_cmbJs8Band->currentText());
         js8Settings().setValue(QStringLiteral("JS8/band"), m_cmbJs8Band->currentText());
         return;
