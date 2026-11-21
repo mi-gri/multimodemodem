@@ -906,20 +906,6 @@ QWidget *AppSettingsDialog::makeBandsPage()
     swrRow->addWidget(m_spinTxSwrAbortLimit);
     swrRow->addStretch(1);
     layout->addLayout(swrRow);
-    // Tune carrier length: some antenna tuners need longer than the default.
-    auto *tuneRow = new QHBoxLayout();
-    auto *tuneLabel = new QLabel(L(QStringLiteral("Tune carrier length (seconds)")), page);
-    m_spinTuneSeconds = new QSpinBox(page);
-    m_spinTuneSeconds->setObjectName(QStringLiteral("tuneSeconds"));
-    m_spinTuneSeconds->setRange(5, 120);
-    m_spinTuneSeconds->setSuffix(QStringLiteral(" s"));
-    m_spinTuneSeconds->setValue(m_initialSettings.tuneSeconds);
-    m_spinTuneSeconds->setToolTip(L(QStringLiteral("How long the Tune button transmits its carrier at most (it stops earlier when you press Tune again or STOP). FT8/FT4 round up to whole slots.")));
-    tuneLabel->setToolTip(m_spinTuneSeconds->toolTip());
-    tuneRow->addWidget(tuneLabel);
-    tuneRow->addWidget(m_spinTuneSeconds);
-    tuneRow->addStretch(1);
-    layout->addLayout(tuneRow);
     return page;
 }
 
@@ -1319,6 +1305,24 @@ QWidget *AppSettingsDialog::makeAudioCatPage()
     compactEmbeddedSettingsWidgets(m_audioPage);
     audioLayout->addWidget(m_audioPage);
     layout->addWidget(audioGroup);
+
+    // Tune carrier length: some antenna tuners need longer than the default.
+    QGroupBox *tuneGroup = new QGroupBox(L(QStringLiteral("Tune")), holder);
+    tuneGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+    auto *tuneRow = new QHBoxLayout(tuneGroup);
+    tuneRow->setContentsMargins(10, 8, 10, 10);
+    auto *tuneLabel = new QLabel(L(QStringLiteral("Tune carrier length (seconds)")), tuneGroup);
+    m_spinTuneSeconds = new QSpinBox(tuneGroup);
+    m_spinTuneSeconds->setObjectName(QStringLiteral("tuneSeconds"));
+    m_spinTuneSeconds->setRange(5, 120);
+    m_spinTuneSeconds->setSuffix(QStringLiteral(" s"));
+    m_spinTuneSeconds->setValue(m_initialSettings.tuneSeconds);
+    m_spinTuneSeconds->setToolTip(L(QStringLiteral("How long the Tune button transmits its carrier at most (it stops earlier when you press Tune again or STOP). FT8/FT4 round up to whole slots.")));
+    tuneLabel->setToolTip(m_spinTuneSeconds->toolTip());
+    tuneRow->addWidget(tuneLabel);
+    tuneRow->addWidget(m_spinTuneSeconds);
+    tuneRow->addStretch(1);
+    layout->addWidget(tuneGroup);
 
     QGroupBox *catGroup = new QGroupBox(L(QStringLiteral("Radio / CAT")), holder);
     catGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
