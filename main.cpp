@@ -22,6 +22,7 @@
 #include "modems/ft8/Ft8RxDecoder.h"
 #include "utils/CockpitTheme.h"
 #include "utils/RuntimeI18n.h"
+#include "dialogs/ConfigChooserDialog.h"
 #include "dialogs/AppSettingsDialog.h"
 #include <QMessageBox>
 #include <QPushButton>
@@ -154,6 +155,12 @@ int main(int argc, char *argv[])
         }
     }
     M3Installation::adoptUpstreamUserData();
+    // --startupmenu: pick the configuration in a dialog first (an explicit --config wins).
+    if (app.arguments().contains(QStringLiteral("--startupmenu")) && M3Installation::activeConfig().isEmpty()) {
+        QString chosen;
+        if (!M3ConfigChooser::choose(&chosen)) return 0;
+        M3Installation::activeConfig() = chosen;
+    }
     QCoreApplication::setApplicationVersion(QStringLiteral(M3_VERSION_STRING));
     app.setApplicationDisplayName(M3Identity::windowTitle());
     app.setWindowIcon(M3AppIcon::icon());
@@ -206,6 +213,9 @@ int main(int argc, char *argv[])
                        "created as a copy of the default settings) or a path to a .m3cfg file (old .mad files are converted)."),
         QStringLiteral("name|file"));
     commandLine.addOption(configOption);
+    const QCommandLineOption startupMenuOption(QStringLiteral("startupmenu"),
+        QStringLiteral("Show a dialog with the existing configurations before starting and use the chosen one (ignored with --config)."));
+    commandLine.addOption(startupMenuOption);
     const QCommandLineOption runtimeRegressionOption(QStringLiteral("runtime-regression"),QStringLiteral("Check RX worker and asynchronous CAT without radio hardware."));
     const QCommandLineOption windowRegressionOption(QStringLiteral("window-rotator-regression"),QStringLiteral("Check main-window popups and manual rotator controls without radio hardware."));
     const QCommandLineOption portableRuntimeOption(QStringLiteral("portable-runtime-regression"), QStringLiteral("Verify bundled Linux plugins, QML and TLS without radio hardware."));

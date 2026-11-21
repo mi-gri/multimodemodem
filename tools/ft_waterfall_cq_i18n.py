@@ -1685,3 +1685,10 @@ SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
   'Hvor lenge Tune-knappen maksimalt sender bærebølgen (stopper tidligere med Tune igjen eller STOP). FT8/FT4 runder opp til hele slots.',
   'Jak dlouho tlačítko Tune nejvýše vysílá nosnou (dříve ji zastaví další Tune nebo STOP). FT8/FT4 zaokrouhlují na celé sloty.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'cfgchooser_title':('Select configuration','Seleziona configurazione','Choisir la configuration','Konfiguration wählen','Velg konfigurasjon','Vyberte konfiguraci'),
+ 'cfgchooser_text':('Which configuration should MultiModeModem start with?','Con quale configurazione deve avviarsi MultiModeModem?','Avec quelle configuration MultiModeModem doit-il démarrer ?','Mit welcher Konfiguration soll MultiModeModem starten?','Hvilken konfigurasjon skal MultiModeModem starte med?','S jakou konfigurací se má MultiModeModem spustit?'),
+ 'cfgchooser_default':('Default configuration','Configurazione predefinita','Configuration par défaut','Standardkonfiguration','Standardkonfigurasjon','Výchozí konfigurace'),
+ 'cfgchooser_running':('(already running)','(già in esecuzione)','(déjà en cours)','(läuft bereits)','(kjører allerede)','(již běží)'),
+ 'cfgchooser_start':('Start','Avvia','Démarrer','Starten','Start','Spustit'),
+}.items()})
