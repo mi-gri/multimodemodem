@@ -160,6 +160,8 @@ int main(int argc, char *argv[])
         QString chosen;
         if (!M3ConfigChooser::choose(&chosen)) return 0;
         M3Installation::activeConfig() = chosen;
+        M3Installation::startupMenuUsed() = true;
+        M3Installation::startupMenuChoice() = chosen;
     }
     QCoreApplication::setApplicationVersion(QStringLiteral(M3_VERSION_STRING));
     app.setApplicationDisplayName(M3Identity::windowTitle());

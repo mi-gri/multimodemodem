@@ -1748,6 +1748,10 @@ MainWindow::MainWindow(QWidget *parent)
     appendLog("MM started.");
     appendLog(QStringLiteral("%1 %2 | %3 | source %4 | commit %5").arg(ProductName::longName(), QStringLiteral(M3_VERSION_STRING), M3Identity::buildLabel(), QStringLiteral(M3_SOURCE_REVISION), QStringLiteral(M3_BUILD_COMMIT)));
     appendLog("Settings file: " + AppSettings::settingsFilePath());
+    if (M3Installation::startupMenuUsed())
+        appendLog(uiText("startup_menu_choice_log", "Configuration chosen in the start menu: %1")
+                      .arg(M3Installation::startupMenuChoice().isEmpty() ? uiText("cfgchooser_default", "Default configuration")
+                                                                           : M3Installation::startupMenuChoice()));
     organizeSidePanel();
     appendLog("Receiver is ready. Use Status → ▶ RX to start live decoding, or analyze a WAV test file from the mode panel.");
     updateMainStateButton();
@@ -13476,7 +13480,7 @@ void MainWindow::setupRigReadoutPanel()
     m_btnTune->setObjectName(QStringLiteral("rigReadoutTune"));
     m_btnTune->setCheckable(true);
     m_btnTune->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    m_btnTune->setToolTip(uiText("tune_button_tip", "Transmits a steady carrier on the TX audio frequency of the current mode for tuning (ATU, power, ALC), at the Tune level. Click again to stop; it stops by itself after the set Tune time (Settings -> Bands, default 60 s). PWR, SWR and ALC are shown next to it."));
+    m_btnTune->setToolTip(uiText("tune_button_tip", "Transmits a steady carrier on the TX audio frequency of the current mode for tuning (ATU, power, ALC), at the Tune level. Click again to stop; it stops by itself after the set Tune time (Settings -> Audio / PTT / CAT, default 60 s). PWR, SWR and ALC are shown next to it."));
     connect(m_btnTune, &QPushButton::clicked, this, [this](bool) { toggleTune(); });
     layout->addWidget(m_lcdRigReadoutFrequency, 0, 0, 3, 1);
     // Up/down for the clicked digit, beside the display (never over a digit).
