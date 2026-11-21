@@ -767,7 +767,7 @@ private slots:
     void followCatForModeBands(double frequencyHz);
     void qsyModeBand(const QString &listMode);
     void qsyForModeChange(const QString &modeName);
-    void js8QsyToSelectedBand();
+    void js8QsyToSelectedBand(bool modeChange = false);
     void updateJs8BandFromCat(double frequencyHz);
     void js8UpdateInboxButton();
     void showJs8Inbox();
@@ -1612,7 +1612,7 @@ private:
     QString ftBandFromFrequencyHz(double frequencyHz) const;
     bool isFtFrequencyOnStandardSlot(double frequencyHz, const QString &modeName, const QString &band) const;
     void updateFtBandFrequencyUi();
-    void qsyRigToSelectedFtBand();
+    void qsyRigToSelectedFtBand(bool modeChange = false);
     QString stationCallsign() const;
     QString operatorCallsign() const;
     QString stationLocator() const;

@@ -23,6 +23,7 @@ public:
     bool sessionDiagnosticsEnabled = false;
     // Country file (cty.csv): optional weekly check on country-files.com.
     bool ctyWeeklyUpdate = false;
+    bool logTechnicalComment = false;   // FT auto-log: write RX/TX audio frequency and last message into the ADIF comment
     QDateTime ctyLastCheckUtc;
     QString sessionDiagnosticsFolder;
     QString qrzUsername;
@@ -309,6 +310,7 @@ public:
     bool ftDecodeFilterCqEnd = false;       // only CQ/RR73/73
     bool ftDecodeFilterWorked = false;      // hide stations already worked ...
     int ftDecodeFilterWorkedDays = 0;       // ... within this many days, 0 = all worked
+    int tuneSeconds = 60;                   // length of the Tune carrier (5-120 s); FT rounds up to whole slots
     bool txSwrAbort = true;                 // stop a transmission (not Tune) when the rig reports a high SWR
     double txSwrAbortLimit = 2.5;
     bool ftAnswerUnsolicited = false;       // Auto mode answers a call although no CQ/QSO of mine is running

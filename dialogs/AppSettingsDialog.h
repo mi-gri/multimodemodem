@@ -177,6 +177,7 @@ private:
     BandSchedulerDialog *m_schedulerPage = nullptr;
     class FrequencyListEditor *m_frequencyPage = nullptr;
     class QTableWidget *m_bandsTable = nullptr;   // Band | preferred | TX allowed
+    class QSpinBox *m_spinTuneSeconds = nullptr;
     class QCheckBox *m_chkTxSwrAbort = nullptr;
     class QDoubleSpinBox *m_spinTxSwrAbortLimit = nullptr;
     QWidget *makeBandsPage();
@@ -208,6 +209,7 @@ private:
     QCheckBox *m_chkLogbookStrikeWorkedCalls = nullptr;
     QCheckBox *m_chkLogbookUdpEnabled = nullptr;
     QCheckBox *m_chkCtyWeeklyUpdate = nullptr;
+    QCheckBox *m_chkLogTechnicalComment = nullptr;
     QCheckBox *m_chkPskReporterEnabled = nullptr;
     QPushButton *m_btnAntennaByBand = nullptr;
     QMap<QString, QString> m_antennaByBand;

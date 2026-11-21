@@ -4,6 +4,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- Without CAT a mode change (e.g. FT4 -> FT8 on 40 m) and an FT/JS8 band change now set the displayed dial frequency to the
+  default frequency of the new mode, as WSJT-X does (only when a dial frequency was entered before).
+- Tune carrier length is a setting (Settings -> Bands, 5-120 s, default 60 s); FT8/FT4 Tune rounds up to whole slots.
+- The technical text in the comment field of automatic FT log entries (RX/TX audio frequency, last message) is now off
+  by default and switchable in the logbook settings (some logging programs, e.g. UCX-Log, choke on it).
 - Update channel: Help → "Include beta versions in update checks". Default stable (real releases only); beta also offers
   the numbered pre-releases. Release candidates of 0.26.11 and betas of 0.26.12 are built from separate branches.
 - Auto mode notice lists everything Auto mode does (FT8/FT4, JS8, WSPR beacon) and the locks that always apply.
