@@ -75,6 +75,19 @@ inline QString &activeConfig()
     return config;
 }
 
+// Set by --startupmenu: the configuration the operator picked in the start dialog
+// (empty name = default).  Only used to write one line into the runtime log.
+inline QString &startupMenuChoice()
+{
+    static QString choice;
+    return choice;
+}
+inline bool &startupMenuUsed()
+{
+    static bool used = false;
+    return used;
+}
+
 // Configuration files are *.m3cfg; *.mad (MadModem's name) is still read and
 // converted to *.m3cfg when the program starts.
 inline QString configExtension() { return QStringLiteral(".m3cfg"); }

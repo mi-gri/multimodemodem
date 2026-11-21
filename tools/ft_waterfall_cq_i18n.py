@@ -1668,12 +1668,12 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   "Tune : porteuse %1 Hz (max. %2 s ; Tune à nouveau l'arrête).",'Tune: Träger %1 Hz (max. %2 s; erneut Tune beendet ihn).',
   'Tune: bærebølge %1 Hz (maks. %2 s; Tune igjen stopper den).','Tune: nosná %1 Hz (max. %2 s; dalším Tune ji zastavíte).'),
  'tune_button_tip':(
-  'Transmits a steady carrier on the TX audio frequency of the current mode for tuning (ATU, power, ALC), at the Tune level. Click again to stop; it stops by itself after the set Tune time (Settings -> Bands, default 60 s). PWR, SWR and ALC are shown next to it.',
-  "Trasmette una portante continua sulla frequenza audio TX del modo attuale per l'accordo (ATU, potenza, ALC), al livello Tune. Clicca di nuovo per fermarla; si ferma da sola dopo il tempo Tune impostato (Impostazioni -> Bande, predefinito 60 s). PWR, SWR e ALC sono mostrati accanto.",
-  "Émet une porteuse continue sur la fréquence audio TX du mode actuel pour l'accord (ATU, puissance, ALC), au niveau Tune. Cliquez à nouveau pour l'arrêter ; elle s'arrête seule après la durée Tune réglée (Réglages -> Bandes, 60 s par défaut). PWR, SWR et ALC sont affichés à côté.",
-  'Sendet einen Dauerträger auf der TX-Audiofrequenz des aktuellen Modus zum Abstimmen (ATU, Leistung, ALC), mit dem Tune-Pegel. Erneuter Klick beendet ihn; nach der eingestellten Tune-Zeit (Einstellungen -> Bänder, Standard 60 s) endet er von selbst. PWR, SWR und ALC stehen daneben.',
-  'Sender en kontinuerlig bærebølge på TX-lydfrekvensen for gjeldende modus for avstemming (ATU, effekt, ALC), med Tune-nivået. Klikk igjen for å stoppe; den stopper selv etter innstilt Tune-tid (Innstillinger -> Bånd, standard 60 s). PWR, SWR og ALC vises ved siden av.',
-  'Vysílá trvalou nosnou na TX zvukovém kmitočtu aktuálního druhu provozu pro ladění (ATU, výkon, ALC) s úrovní Tune. Dalším kliknutím ji zastavíte; po nastavené době Tune (Nastavení -> Pásma, výchozí 60 s) skončí sama. PWR, SWR a ALC jsou zobrazeny vedle.'),
+  'Transmits a steady carrier on the TX audio frequency of the current mode for tuning (ATU, power, ALC), at the Tune level. Click again to stop; it stops by itself after the set Tune time (Settings -> Audio / PTT / CAT, default 60 s). PWR, SWR and ALC are shown next to it.',
+  "Trasmette una portante continua sulla frequenza audio TX del modo attuale per l'accordo (ATU, potenza, ALC), al livello Tune. Clicca di nuovo per fermarla; si ferma da sola dopo il tempo Tune impostato (Impostazioni -> Audio / PTT / CAT, predefinito 60 s). PWR, SWR e ALC sono mostrati accanto.",
+  "Émet une porteuse continue sur la fréquence audio TX du mode actuel pour l'accord (ATU, puissance, ALC), au niveau Tune. Cliquez à nouveau pour l'arrêter ; elle s'arrête seule après la durée Tune réglée (Réglages -> Audio / PTT / CAT, 60 s par défaut). PWR, SWR et ALC sont affichés à côté.",
+  'Sendet einen Dauerträger auf der TX-Audiofrequenz des aktuellen Modus zum Abstimmen (ATU, Leistung, ALC), mit dem Tune-Pegel. Erneuter Klick beendet ihn; nach der eingestellten Tune-Zeit (Einstellungen -> Audio / PTT / CAT, Standard 60 s) endet er von selbst. PWR, SWR und ALC stehen daneben.',
+  'Sender en kontinuerlig bærebølge på TX-lydfrekvensen for gjeldende modus for avstemming (ATU, effekt, ALC), med Tune-nivået. Klikk igjen for å stoppe; den stopper selv etter innstilt Tune-tid (Innstillinger -> Lyd / PTT / CAT, standard 60 s). PWR, SWR og ALC vises ved siden av.',
+  'Vysílá trvalou nosnou na TX zvukovém kmitočtu aktuálního druhu provozu pro ladění (ATU, výkon, ALC) s úrovní Tune. Dalším kliknutím ji zastavíte; po nastavené době Tune (Nastavení -> Audio / PTT / CAT, výchozí 60 s) skončí sama. PWR, SWR a ALC jsou zobrazeny vedle.'),
 }.items()})
 SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
  'Tune carrier length (seconds)':('Tune carrier length (seconds)','Durata della portante Tune (secondi)','Durée de la porteuse Tune (secondes)','Länge des Tune-Trägers (Sekunden)','Lengde på Tune-bærebølgen (sekunder)','Délka nosné Tune (sekundy)'),
@@ -1691,4 +1691,10 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'cfgchooser_default':('Default configuration','Configurazione predefinita','Configuration par défaut','Standardkonfiguration','Standardkonfigurasjon','Výchozí konfigurace'),
  'cfgchooser_running':('(already running)','(già in esecuzione)','(déjà en cours)','(läuft bereits)','(kjører allerede)','(již běží)'),
  'cfgchooser_start':('Start','Avvia','Démarrer','Starten','Start','Spustit'),
+}.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'startup_menu_choice_log':('Configuration chosen in the start menu: %1','Configurazione scelta nel menu di avvio: %1','Configuration choisie dans le menu de démarrage : %1','Konfiguration im Startmenü gewählt: %1','Konfigurasjon valgt i startmenyen: %1','Konfigurace vybraná ve startovní nabídce: %1'),
+}.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'Tune':('Tune','Tune','Tune','Tune','Tune','Tune'),
 }.items()})
