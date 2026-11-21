@@ -14019,8 +14019,8 @@ void MainWindow::qsyRigToSelectedFtBand(bool modeChange)
     }
     if (!m_settings.hamlibCatEnabled) {
         // Without CAT the displayed dial frequency follows (as in WSJT-X); the operator tunes the rig.
-        if (modeChange && m_lastRigFrequencyHz <= 0.0) return;   // no dial frequency entered yet
-        if (m_lastRigFrequencyHz > 0.0 && qAbs(m_lastRigFrequencyHz - targetHz) < 1.0) return;
+        if (modeChange && m_manualDialHz <= 0.0) return;   // no dial frequency entered yet
+        if (m_manualDialHz > 0.0 && qAbs(m_manualDialHz - targetHz) < 1.0) return;
         setManualDialFrequency(targetHz, QStringLiteral("%1 %2").arg(modeName, band));
         return;
     }
