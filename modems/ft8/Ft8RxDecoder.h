@@ -9,6 +9,7 @@
 #include <QThreadPool>
 #include "dsp/common/TimestampResampler.h"
 #include "dsp/common/RxNoiseBlanker.h"
+#include "FtSlotMemory.h"
 #include <QDateTime>
 #include <QString>
 #include <QVector>
@@ -56,6 +57,7 @@ public:
         double driftHzPerSec = 0.0; // Only CRC-valid optional RX recovery results.
         double driftSyncEvidence = 0.0;
         bool apDecode = false;      // found with a-priori knowledge (own call assumed): never starts a QSO by itself
+        bool slotMemoryRecovered = false;
     };
 
     struct PerfStats
@@ -65,6 +67,8 @@ public:
         int referenceRejected = 0;
         double referenceMs = 0.0;
         bool referenceCutoff = false;
+        int slotMemoryAttempts = 0;
+        int slotMemoryDecodes = 0;
         QString modeName;       // FT8/FT4 owner of these stats; keeps live rolling averages mode-local
         QString slotUtc;
         int candidateCount = 0;
@@ -382,6 +386,22 @@ private:
         int coherentMetricRecovered = 0;
     };
 
+    struct SlotObservation {
+        M3Ft::FtSlotMemory::Evidence evidence;
+        std::array<std::array<float, 8>, 103> powers{};
+    };
+    struct SlotMemoryJob {
+        M3Ft::FtSlotMemory::Context context;
+        std::vector<SlotObservation> observations;
+    };
+    SlotMemoryJob beginSlotMemory(const QVector<double> &, const QDateTime &, const PerfStats *) const;
+    QVector<Decode> recoverWithSlotMemory(const SlotMemoryJob &, const QDateTime &,
+                                          const QVector<Decode> &, PerfStats *);
+    template<std::size_t Symbols, std::size_t Tones>
+    static void captureSlotObservation(SlotObservation *, const std::array<double, 174> &,
+                                       const std::array<std::array<double, Tones>, Symbols> &,
+                                       double, int, int, double);
+
     bool decodeCandidate(const QVector<double> &samples,
                          const QDateTime &slotStartUtc,
                          const Candidate &candidate,
@@ -391,7 +411,8 @@ private:
                          CandidateAttemptQuality *qualityOut = nullptr,
                          bool allowMetricRecovery = true,
                          bool allowGf2Osd = true,
-                         bool coherentRecoveryOnly = false);
+                         bool coherentRecoveryOnly = false,
+                         SlotObservation *slotObservation = nullptr);
     void subtractDecodedSignal(QVector<double> &samples, const Candidate &candidate, const Decode &decode) const;
     QVector<Decode> decodeSlotFt4(const QVector<double> &samples,
                                   const QDateTime &slotStartUtc,
@@ -409,7 +430,8 @@ private:
                             Decode &decodeOut,
                             CandidateAttemptQuality *qualityOut = nullptr,
                             DecodeRejectReason *rejectReasonOut = nullptr,
-                            std::array<int, 103> *decodedTonesOut = nullptr);
+                            std::array<int, 103> *decodedTonesOut = nullptr,
+                            SlotObservation *slotObservation = nullptr);
     void subtractFt4DecodedSignal(QVector<double> &samples,
                                   const Candidate &candidate,
                                   const std::array<int, 103> &decodedTones) const;
@@ -581,6 +603,8 @@ private:
 
     std::atomic<int> m_lastCandidateCount {0};
     std::atomic<int> m_decodeGeneration {0};
+    std::atomic<std::uint64_t> m_slotMemoryTuningGeneration{0};
+    M3Ft::FtSlotMemory m_slotMemory;
     std::atomic<bool> m_shutdown {false};
     // A complete decode pass holds this lock while its candidate workers are
     // active.  Setters therefore cannot mutate QString/configuration state
