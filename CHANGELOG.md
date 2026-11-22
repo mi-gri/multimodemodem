@@ -9,6 +9,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   3 alternate (after N QSOs), 4 CQ only when no target was there for M slots. Auto mode is never restored after a start (it is off
   every time; switching it on shows the notice). STOP, a mode change and a band change pause the stage until it is selected again.
   The stage planner is a small tested class (FtAutoPlanner); all transmit gates are unchanged.
+- Every FT transmission now logs why it happens ("TX reason: ...": Auto stage and answered CQ, caller queue, CQ series, repeat, QSO sequence, manual) in the
+  runtime log and as `tx.origin` in the session diagnostics.
 - RX noise blanker (Decode → Noise Blanker: Off / NB2 Auto / NB2, three thresholds) and MSK144 carrier notch (ZAP), ported from
   the MadModem upstream (IC8TEM). Applied before the FT8/FT4, Q65 and text-mode decoders; off by default, no delay when off;
   the 48 ms delay is subtracted from the decode times.

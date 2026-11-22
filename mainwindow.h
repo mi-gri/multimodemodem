@@ -888,6 +888,7 @@ private slots:
     bool startFt8CqRepeatIfIdle(const QString &reason);
     // Auto mode stages (see modems/ft8/FtAutoPlanner.h): one control replaces the old
     // "Auto QSO" button and the "CQ retry" box, which stay as hidden models.
+    QString ftTxOriginText(const QString &tag) const;
     void configureAutoPlanner();
     bool autoStageActive() const;
     void applyAutoPhase();
@@ -2536,6 +2537,9 @@ private:
     QSpinBox *m_spinAutoAlternate = nullptr;
     QSpinBox *m_spinAutoNoTarget = nullptr;
     QLabel *m_lblAutoStageStatus = nullptr;
+    QString m_ftTxOriginHint;             // why the next FT transmission is scheduled (set by the caller, consumed once)
+    QString m_lastFtTxOriginLine;
+    qint64 m_lastFtTxOriginMs = 0;
     bool m_autoStagePaused = false;       // STOP / mode or band change: select the stage again to continue
     bool m_applyingAutoPhase = false;
     qint64 m_autoTickSlotUtcMs = 0;

@@ -19061,6 +19061,24 @@ QString MainWindow::selectFt8TxRow(int row)
 }
 
 
+QString MainWindow::ftTxOriginText(const QString &tag) const
+{
+    const QString dx = m_ftSession.dxCall.trimmed().toUpper();
+    if (tag == QStringLiteral("CQ"))
+        return uiText("ft_origin_cq_series", "CQ series (%1 CQs per series)").arg(qMax(1, m_ftSession.cqRepeatTotal));
+    if (tag == QStringLiteral("RETRY"))
+        return uiText("ft_origin_retry", "repeat to %1 (no reply, %2 attempts left)").arg(dx).arg(m_ftSession.retryRemaining);
+    if (tag == QStringLiteral("SEQ"))
+        return uiText("ft_origin_qso", "QSO sequence with %1 (answer to his message)").arg(dx);
+    if (tag == QStringLiteral("CQ-LIST"))
+        return uiText("ft_origin_cq_list", "CQ list: call to %1").arg(dx);
+    if (tag == QStringLiteral("AUTO"))
+        return uiText("ft_origin_auto", "Auto: call to %1").arg(dx);
+    if (tag == QStringLiteral("TX"))
+        return uiText("ft_origin_manual", "manual (operator)");
+    return tag;
+}
+
 void MainWindow::scheduleFt8SequencerMessage(const QString &message,
                                              const QString &tag,
                                              bool allowManualLatePartial)
@@ -19077,7 +19095,23 @@ void MainWindow::scheduleFt8SequencerMessage(const QString &message,
     const QString txTag = tag.trimmed().isEmpty() ? QStringLiteral("TX") : tag.trimmed().toUpper();
     if (txMessage.isEmpty()) {
         appendLog("FT8 sequencer: empty message not scheduled.");
+        m_ftTxOriginHint.clear();
         return;
+    }
+    {
+        // Why does this transmission happen? One line per transmission, same wording in the log,
+        // the session diagnostics and (later) the Automodes overview.
+        QString origin = m_ftTxOriginHint;
+        m_ftTxOriginHint.clear();
+        if (origin.isEmpty()) origin = ftTxOriginText(txTag);
+        const QString line = uiText("ft_tx_origin_log", "TX reason: %1 -> %2").arg(origin, txMessage);
+        const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+        if (line != m_lastFtTxOriginLine || nowMs - m_lastFtTxOriginMs > 20000) {
+            appendLog(line);
+            traceFtAutomation("tx.origin", txTag, {{"origin", origin}, {"tx_message", txMessage}});
+        }
+        m_lastFtTxOriginLine = line;
+        m_lastFtTxOriginMs = nowMs;
     }
 
     if (m_spinFt8TxFreq != nullptr) {
@@ -19429,7 +19463,8 @@ void MainWindow::handleFt8AutoCqToggled(bool enabled)
         appendLog(QStringLiteral("FT CQ retry starts after the QSO with %1 (Clear DX ends it now).")
                       .arg(m_ftSession.dxCall.trimmed().toUpper()));
     } else {
-        QTimer::singleShot(0, this, [this]() { startFt8CqRepeatIfIdle(QStringLiteral("CQ retry enabled")); });
+        const QString startReason = autoStageActive() ? QStringLiteral("Auto stage") : QStringLiteral("CQ retry enabled");
+        QTimer::singleShot(0, this, [this, startReason]() { startFt8CqRepeatIfIdle(startReason); });
     }
 
     updateFt8SequencerUi();
@@ -19445,7 +19480,12 @@ bool MainWindow::startFt8CqRepeatIfIdle(const QString &reason)
     if (m_chkFt8CallerQueue != nullptr && m_chkFt8CallerQueue->isChecked() && !m_ft8CallerQueue.isEmpty())
         return false;
     traceFtAutomation("cq.start", reason);
+    m_ftTxOriginHint = reason == QStringLiteral("Auto stage")
+        ? uiText("ft_origin_cq_auto", "Auto (stage %1): CQ series started (%2 CQs)").arg(m_autoPlanner.stage())
+              .arg(m_spinFt8CqTimeoutMin != nullptr ? m_spinFt8CqTimeoutMin->value() : 0)
+        : uiText("ft_origin_cq_started", "CQ series started (%1)").arg(reason);
     startFt8CqRepeat();
+    m_ftTxOriginHint.clear();
     return true;
 }
 
@@ -20122,6 +20162,10 @@ bool MainWindow::startFt8FullAutoQsoFromCandidate(const Ft8FullAutoCqCandidate &
                   .arg(answer, candidate.priorityText));
     if (fromCqWorkList) appendLog(QStringLiteral("FT CQ list: fresh CQ confirmed, calling %1 via the normal sequencer.").arg(call));
     traceFtAutomation("qso.start",fromCqWorkList ? "manual_queue" : "selected_cq",{{"candidate_call",call},{"rx_message",candidate.decode.message},{"rx_slot_utc_ms",candidate.decode.slotStartUtcMs},{"answer",answer}});
+    m_ftTxOriginHint = fromCqWorkList
+        ? uiText("ft_origin_cq_list_start", "CQ list (started by the operator): call to %1").arg(call)
+        : uiText("ft_origin_answer", "Auto (stage %1, answering): reply to the CQ of %2 [%3]")
+              .arg(m_autoPlanner.stage()).arg(call, candidate.priorityText);
     scheduleFt8SequencerMessage(answer, fromCqWorkList ? QStringLiteral("CQ-LIST") : QStringLiteral("AUTO"));
     return true;
 }
@@ -20608,7 +20652,9 @@ bool MainWindow::activateNextFt8QueuedCaller()
                   .arg(queued.call)
                   .arg(m_ft8CallerQueue.size()));
     traceFtAutomation("candidate.select","direct_caller_fifo",{{"candidate_call",queued.call},{"rx_message",queued.latestDecode.message}});
+    m_ftTxOriginHint = uiText("ft_origin_queue", "caller queue: %1 called us and was waiting").arg(queued.call);
     processFt8SequencerDecode(queued.latestDecode);
+    m_ftTxOriginHint.clear();
     const bool txFollows = m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan || m_txRunning || m_ftTxWorkerRunning ||
                            !m_pendingFt8TxPlan.message.trimmed().isEmpty();
     if (!txFollows && m_ftSession.qsoActive && !m_ft8OperatorStopLatched &&
@@ -21092,8 +21138,11 @@ void MainWindow::completeFt8Qso(const QString &reason)
             return;
         }
         if (resumeCq && !m_ftSession.qsoActive && !m_ft8OperatorStopLatched && autoTxPermitted() &&
-            m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked())
+            m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked()) {
+            m_ftTxOriginHint = uiText("ft_origin_cq_resumed_qso", "CQ series continued after the QSO");
             startFt8CqRepeat();
+            m_ftTxOriginHint.clear();
+        }
     });
 }
 
@@ -22214,7 +22263,9 @@ void MainWindow::finishFt8ResponseWait(quint64 retryGeneration, qint64 replySlot
                 m_txRunning || m_txPreparationPending || m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan || m_pendingFt8TxPlan.tune ||
                 m_chkFt8CqRepeat == nullptr || !m_chkFt8CqRepeat->isChecked()) return;
             appendLog(uiText("ft_cq_series_continues_noreply_wait_log", "FT Auto mode: no reply; the CQ series continues after %1 wait slot(s).").arg(waitSlots));
+            m_ftTxOriginHint = uiText("ft_origin_cq_resumed_noreply", "CQ series continued (the called station gave no reply)");
             startFt8CqRepeat();
+            m_ftTxOriginHint.clear();
         });
     });
     updateFt8SequencerUi();
