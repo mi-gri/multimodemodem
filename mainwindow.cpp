@@ -9895,15 +9895,16 @@ void MainWindow::setupFt8Page()
     m_chkFt8CqRepeat->hide();
     m_lblFt8CqTimeout = new QLabel(uiText("ft8_cq_series_count", "CQs per series"), controlGroup);
     m_lblFt8CqTimeout->setToolTip(m_spinFt8CqTimeoutMin->toolTip());
-    controlGrid->addWidget(m_lblFt8CqTimeout, 1, 0);
-    controlGrid->addWidget(m_spinFt8CqTimeoutMin, 1, 1);
+    // CQ series length, no-response limit, wait slots, caller queue and auto log live in the Automodes dialog
+    // (buildAutomodesDialog() moves them there); hidden until then.
+    for (QWidget *w : {static_cast<QWidget *>(m_lblFt8CqTimeout), static_cast<QWidget *>(m_spinFt8CqTimeoutMin)}) w->hide();
     m_lblFt8NoResponseLimit = new QLabel(uiText("ft8_no_response_limit", "No-response limit"), controlGroup);
     m_lblFt8NoResponseLimit->setToolTip(m_spinFt8NoResponseLimit->toolTip());
-    controlGrid->addWidget(m_lblFt8NoResponseLimit, 1, 2);
-    controlGrid->addWidget(m_spinFt8NoResponseLimit, 1, 3);
+    // (moved to the Automodes dialog) no-response limit and auto log
+    for (QWidget *w : {static_cast<QWidget *>(m_lblFt8NoResponseLimit), static_cast<QWidget *>(m_spinFt8NoResponseLimit),
+                       static_cast<QWidget *>(m_chkFt8AutoLog)}) w->hide();
     controlGrid->addWidget(m_chkFt8HoldTxFreq, 2, 0);
     controlGrid->addWidget(m_cmbFt8TxStrategy, 2, 1, 1, 2);
-    controlGrid->addWidget(m_chkFt8AutoLog, 1, 4, 1, 2);
 
     // Auto QSO sits directly below Auto log; the caller queue gets its own
     // row laid out like the CQ queue row (checkbox left, list button right).
@@ -9922,10 +9923,12 @@ void MainWindow::setupFt8Page()
         "QComboBox#ftAutoStage { border: 2px solid #F28C00; border-radius: 4px; padding: 3px 6px; }"
         "QComboBox#ftAutoStage:disabled { border-color: palette(mid); }"));
     controlGrid->addWidget(m_cmbAutoStage, 0, 5);
+    // The list of stages is wider than the combo in the panel: make the pop-up as wide as its longest entry.
+    m_cmbAutoStage->view()->setMinimumWidth(m_cmbAutoStage->view()->sizeHintForColumn(0) + 36);
     m_lblAutoStageStatus = new QLabel(controlGroup);
     m_lblAutoStageStatus->setWordWrap(true);
     M3Ui::setSemanticRole(m_lblAutoStageStatus, QStringLiteral("muted"));
-    controlGrid->addWidget(m_lblAutoStageStatus, 5, 0, 1, 6);
+    controlGrid->addWidget(m_lblAutoStageStatus, 1, 0, 1, 6);
     m_spinAutoAlternate = new QSpinBox(controlGroup);
     m_spinAutoAlternate->setRange(1, 20);
     m_spinAutoAlternate->setValue(qBound(1, m_settings.ftAutoAlternateCount, 20));
@@ -9936,16 +9939,8 @@ void MainWindow::setupFt8Page()
     m_spinAutoNoTarget->setValue(qBound(1, m_settings.ftAutoNoTargetSlots, 20));
     m_spinAutoNoTarget->setSuffix(QStringLiteral(" Slots"));
     m_spinAutoNoTarget->setToolTip(uiText("ft_auto_no_target_tooltip", "Stages 3 and 4: number of slots without a station to answer after which Auto mode calls CQ."));
-    {
-        auto *lblAlt = new QLabel(uiText("ft_auto_alternate", "Switch after"), controlGroup);
-        lblAlt->setToolTip(m_spinAutoAlternate->toolTip());
-        controlGrid->addWidget(lblAlt, 7, 0, 1, 2);
-        controlGrid->addWidget(m_spinAutoAlternate, 7, 2);
-        auto *lblNt = new QLabel(uiText("ft_auto_no_target", "CQ after"), controlGroup);
-        lblNt->setToolTip(m_spinAutoNoTarget->toolTip());
-        controlGrid->addWidget(lblNt, 8, 0, 1, 2);
-        controlGrid->addWidget(m_spinAutoNoTarget, 8, 2);
-    }
+    m_spinAutoAlternate->hide();   // both live in the Automodes dialog
+    m_spinAutoNoTarget->hide();
     {
         const int idx = m_cmbAutoStage->findData(qBound(0, m_settings.ftAutoStage, 4));
         m_cmbAutoStage->setCurrentIndex(idx >= 0 ? idx : 0);
@@ -9970,18 +9965,13 @@ void MainWindow::setupFt8Page()
     m_spinFt8CqResumeWait->setRange(0, 10);
     m_spinFt8CqResumeWait->setValue(qBound(0, m_settings.ft8CqResumeWaitSlots, 10));
     m_spinFt8CqResumeWait->setToolTip(uiText("ft8_cq_resume_wait_tooltip", "Auto mode: after a started QSO got no reply, the CQ series continues after this many slots (0 = in the next own slot)."));
-    {
-        auto *lbl = new QLabel(uiText("ft8_cq_resume_wait", "Wait slots before CQ"), controlGroup);
-        lbl->setToolTip(m_spinFt8CqResumeWait->toolTip());
-        controlGrid->addWidget(lbl, 6, 0, 1, 2);
-        controlGrid->addWidget(m_spinFt8CqResumeWait, 6, 2);
-    }
+    m_spinFt8CqResumeWait->hide();   // lives in the Automodes dialog
     connect(m_spinFt8CqResumeWait, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int v) {
         m_settings.ft8CqResumeWaitSlots = v;
         m_settings.save();
     });
-    controlGrid->addWidget(m_chkFt8CallerQueue, 4, 0, 1, 4);
-    controlGrid->addWidget(m_btnFt8CallerList, 4, 4, 1, 2);
+    m_chkFt8CallerQueue->hide();   // lives in the Automodes dialog; the list button stays here
+    controlGrid->addWidget(m_btnFt8CallerList, 4, 0, 1, 6);
     connect(m_btnFt8CallerList,&QPushButton::clicked,this,&MainWindow::showFt8CallerQueue);
 
     m_btnFtCqAdd = new QPushButton(uiText("ft_cq_list_add", "Add selected CQs"), controlGroup);
@@ -11658,10 +11648,12 @@ void MainWindow::rebuildMenuBar()
         m_menuTools->addAction(action);
     }
 
+    m_menuAutomodes = newMenu();
+    buildAutomodesMenu();   // Auto mode + stage choice; the dialog follows below
     // New order.
     const QList<QAction *> old = bar->actions();
     for (QAction *action : old) bar->removeAction(action);
-    for (QMenu *menu : {ui->menuFile, m_menuMode, m_menuStation, m_menuOperation, m_menuFilter, m_menuDecode,
+    for (QMenu *menu : {ui->menuFile, m_menuMode, m_menuStation, m_menuOperation, m_menuAutomodes, m_menuFilter, m_menuDecode,
                         m_menuView, m_menuTools, ui->menuHelp}) {
         if (menu != nullptr) bar->addMenu(menu);
     }
@@ -11679,6 +11671,7 @@ void MainWindow::rebuildMenuBar()
     m_btnAutoMode->show();
     retranslateMenuBar();
     syncAutoModeUi();
+    buildAutomodesDialog();
     // Selection fields (band, frequency, mode ...) never change on the mouse
     // wheel: scrolling over them moved the rig (accidental QSY).
     for (QComboBox *combo : findChildren<QComboBox *>()) combo->installEventFilter(this);
@@ -11709,6 +11702,7 @@ void MainWindow::retranslateMenuBar()
     set("display", uiText("mi_display", "Display / FT colours …"));
     set("diagnostics", uiText("mi_diagnostics", "Diagnostics …"));
     if (m_actAutoMode != nullptr) m_actAutoMode->setText(uiText("mi_auto_mode", "Auto mode"));
+    refreshAutomodesDialog();
     if (m_actionAppSettings != nullptr) m_actionAppSettings->setText(uiText("mi_all_settings", "All settings …"));
     if (m_btnAutoMode != nullptr) {
         m_btnAutoMode->setText(uiText("auto_mode_button", "Auto"));
@@ -19117,6 +19111,7 @@ void MainWindow::scheduleFt8SequencerMessage(const QString &message,
         if (line != m_lastFtTxOriginLine || nowMs - m_lastFtTxOriginMs > 20000) {
             appendLog(line);
             traceFtAutomation("tx.origin", txTag, {{"origin", origin}, {"tx_message", txMessage}});
+            noteRecentTxOrigin(origin, txMessage);
         }
         m_lastFtTxOriginLine = line;
         m_lastFtTxOriginMs = nowMs;
@@ -19400,18 +19395,20 @@ void MainWindow::updateFt8AutoModeVisibility()
         m_chkFt8CqRepeat->setVisible(false);   // model only; the stage selector drives it
     }
     if (m_cmbAutoStage != nullptr) m_cmbAutoStage->setEnabled(!m_offlineAnalysisActive);
+    // The CQ series length and the no-response limit live in the Automodes dialog (visible once it exists).
+    const bool movedVisible = m_automodesDialog != nullptr;
     if (m_lblFt8CqTimeout != nullptr) {
-        m_lblFt8CqTimeout->setVisible(true);
+        m_lblFt8CqTimeout->setVisible(movedVisible);
     }
     if (m_spinFt8CqTimeoutMin != nullptr) {
-        m_spinFt8CqTimeoutMin->setVisible(true);
+        m_spinFt8CqTimeoutMin->setVisible(movedVisible);
         m_spinFt8CqTimeoutMin->setEnabled(!m_offlineAnalysisActive);
     }
     if (m_lblFt8NoResponseLimit != nullptr) {
-        m_lblFt8NoResponseLimit->setVisible(true);
+        m_lblFt8NoResponseLimit->setVisible(movedVisible);
     }
     if (m_spinFt8NoResponseLimit != nullptr) {
-        m_spinFt8NoResponseLimit->setVisible(true);
+        m_spinFt8NoResponseLimit->setVisible(movedVisible);
         m_spinFt8NoResponseLimit->setEnabled(!m_offlineAnalysisActive);
     }
     if (m_chkFt8FullAutoQso != nullptr) {
@@ -19634,6 +19631,7 @@ void MainWindow::updateStopLatchIndicator()
 void MainWindow::updateAutoStageStatus()
 {
     updateStopLatchIndicator();
+    QTimer::singleShot(0, this, [this]() { refreshAutomodesDialog(); });
     if (m_lblAutoStageStatus == nullptr) return;
     QString text;
     if (!m_ft8AutoModeEnabled) {

@@ -2001,8 +2001,13 @@ QWidget *AppSettingsDialog::makeFtColourEditor()
     m_editFtBlacklist->setPlaceholderText(L(QStringLiteral("one callsign per line; hidden from FT traffic and ignored by Auto QSO")));
     m_editFtBlacklist->setMinimumHeight(78);
     m_editFtBlacklist->setMaximumHeight(96);
-    grid->addWidget(blackLabel, 10, 0);
-    grid->addWidget(m_editFtBlacklist, 10, 1, 1, 4);
+    // The blacklist and the Auto target rules moved to the Automodes dialog (menu Automodes); the widgets stay
+    // (hidden) so the settings collection code keeps working with the unchanged values.
+    blackLabel->hide();
+    m_editFtBlacklist->hide();
+    QLabel *movedNote = new QLabel(L(QStringLiteral("Blacklist, Auto target rules (directed CQs, CQ DX, CQ destination) and the CQ series length are set in the Automodes dialog (menu Automodes).")), group);
+    movedNote->setWordWrap(true);
+    grid->addWidget(movedNote, 10, 0, 1, 5);
 
     QLabel *watchLabel = new QLabel(L(QStringLiteral("Watch-list calls")), group);
     m_editFtWatchList = new QPlainTextEdit(group);
@@ -2031,21 +2036,21 @@ QWidget *AppSettingsDialog::makeFtColourEditor()
     m_cmbAutoQsoCqDxRule->setToolTip(dxRuleTip);
     m_cmbAutoQsoCqDxRule->setEnabled(m_chkAutoQsoRespectCqDirective->isChecked());
     connect(m_chkAutoQsoRespectCqDirective, &QCheckBox::toggled, m_cmbAutoQsoCqDxRule, &QWidget::setEnabled);
-    grid->addWidget(m_chkAutoQsoRespectCqDirective, 13, 0, 1, 2);
-    grid->addWidget(dxRuleLabel, 13, 2, Qt::AlignRight);
-    grid->addWidget(m_cmbAutoQsoCqDxRule, 13, 3, 1, 2);
+    m_chkAutoQsoRespectCqDirective->hide();   // moved to the Automodes dialog
+    dxRuleLabel->hide();
+    m_cmbAutoQsoCqDxRule->hide();
     m_chkAutoQsoOnlyCqTarget = new QCheckBox(L(QStringLiteral("Work only stations in my CQ destination")), group);
     m_chkAutoQsoOnlyCqTarget->setObjectName(QStringLiteral("chkAutoQsoOnlyCqTarget"));
     m_chkAutoQsoOnlyCqTarget->setChecked(m_initialSettings.ftAutoQsoOnlyCqTarget);
     m_chkAutoQsoOnlyCqTarget->setToolTip(L(QStringLiteral("With a CQ destination such as CQ USA selected, Auto QSO answers only CQs from that area and the sequencer ignores callers from outside it. General CQ works everyone.")));
-    grid->addWidget(m_chkAutoQsoOnlyCqTarget, 14, 0, 1, 5);
+    m_chkAutoQsoOnlyCqTarget->hide();   // moved to the Automodes dialog
 
     QLabel *cqRepeatLabel = new QLabel(L(QStringLiteral("CQ retry count")), group);
     m_spinCqRepeatCount = new QSpinBox(group);
     m_spinCqRepeatCount->setRange(1, 99);
     m_spinCqRepeatCount->setValue(qBound(1, m_initialSettings.ft8CqRepeatCount, 99));
-    grid->addWidget(cqRepeatLabel, 15, 0);
-    grid->addWidget(m_spinCqRepeatCount, 15, 1);
+    cqRepeatLabel->hide();   // the CQ series length is set in the Automodes dialog
+    m_spinCqRepeatCount->hide();
 
     // FT8/FT4 waterfall speed: Settings > Appearance > Waterfall (per mode).
 

@@ -9,6 +9,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   3 alternate (after N QSOs), 4 CQ only when no target was there for M slots. Auto mode is never restored after a start (it is off
   every time; switching it on shows the notice). STOP, a mode change and a band change pause the stage until it is selected again.
   The stage planner is a small tested class (FtAutoPlanner); all transmit gates are unchanged.
+- New menu "Automodes" and dialog with tabs Overview, FT8/FT4, Targets, JS8 and WSPR/Safety: Auto mode and stage choice, the CQ series length, wait slots,
+  no-response limit, caller queue, unsolicited callers and auto log (moved from the FT panel and the Filter menu), the blacklist and the target rules
+  (directed CQs, CQ DX, CQ destination; moved from Settings -> Display) and the JS8 automatic group (moved from the JS8 page). The Overview lists the last
+  transmissions with the reason; the FT panel keeps only Auto stage and status.
 - A QSO that was given up without a reply (no-response limit) is kept for 15 minutes; a late message of that station (report, R-report, RR73/73)
   resumes it. A QSO started under Auto mode resumes only while Auto mode may transmit (not in stage 0); a manually started one may also resume with Auto
   off. STOP, blocked stations and bands without TX permission never resume.

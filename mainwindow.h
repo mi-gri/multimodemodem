@@ -101,6 +101,8 @@ class WavelogClient;
 class Ft8SlotClockWidget;
 class QAction;
 class QActionGroup;
+class QDialog;
+class QListWidget;
 class QMenu;
 class RttyScopeWidget;
 class QTabWidget;
@@ -899,6 +901,12 @@ private slots:
     void autoStageCqSeriesUnanswered();
     void updateAutoStageStatus();
     void updateStopLatchIndicator();
+    // Automodes menu and dialog (AutomodesUi.cpp)
+    void buildAutomodesMenu();
+    void buildAutomodesDialog();
+    void showAutomodesDialog();
+    void refreshAutomodesDialog();
+    void noteRecentTxOrigin(const QString &origin, const QString &message);
     void pauseFt8QsoForLaterReply();
     bool resumePausedFt8Qso(const FtQsoSequencer::ParsedMessage &parsed, const Ft8RxDecoder::Decode &decode);
     // Country file (cty.csv) download: Help menu and optional weekly check.
@@ -2536,6 +2544,14 @@ private:
     QCheckBox *m_chkFt8FullAutoQso = nullptr;     // model of Auto QSO (hidden); shown as m_btnFt8AutoQso
     QPushButton *m_btnFt8AutoQso = nullptr;   // hidden (replaced by the stage selector)
     M3::FtAutoPlanner m_autoPlanner;
+    QDialog *m_automodesDialog = nullptr;
+    QMenu *m_menuAutomodes = nullptr;
+    QActionGroup *m_automodesStageGroup = nullptr;
+    QLabel *m_automodesStatus = nullptr;
+    QListWidget *m_automodesRecent = nullptr;
+    QCheckBox *m_automodesAutoCheck = nullptr;
+    QComboBox *m_automodesStageCombo = nullptr;
+    QStringList m_recentTxOrigins;
     QComboBox *m_cmbAutoStage = nullptr;
     QSpinBox *m_spinAutoAlternate = nullptr;
     QSpinBox *m_spinAutoNoTarget = nullptr;

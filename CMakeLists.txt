@@ -519,6 +519,7 @@ endif()
 add_executable(MultiModeModem
     main.cpp
     FtCqWorkListUi.cpp
+    AutomodesUi.cpp
     Js8Ui.cpp
     BandTxUi.cpp
     WsprUi.cpp
