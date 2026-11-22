@@ -21626,6 +21626,7 @@ void MainWindow::handleFt8DecodeDoubleClicked(QTableWidgetItem *item)
         if (changingCorrespondent) {
             appendLog(QString("FT sequencer: correspondent changed %1 -> %2; clearing old QSO/retry/TX plan.")
                           .arg(previousDx, call));
+            pauseFt8QsoForLaterReply();   // the station that is left may still answer: his late message resumes that QSO
             m_ftSession.clearQso();
             m_ftSession.cqRepeatActive = false;
             m_ftSession.resumeCqAfterQso = false;
