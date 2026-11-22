@@ -9911,11 +9911,12 @@ void MainWindow::setupFt8Page()
     m_chkFt8FullAutoQso->hide();
     m_cmbAutoStage = new QComboBox(controlGroup);
     m_cmbAutoStage->setObjectName(QStringLiteral("ftAutoStage"));
+    m_cmbAutoStage->addItem(uiText("ft_auto_stage_0", "0 No automatic answers"), 0);
     m_cmbAutoStage->addItem(uiText("ft_auto_stage_1", "1 Respond (CQ/RR73/73)"), 1);
     m_cmbAutoStage->addItem(uiText("ft_auto_stage_2", "2 Call CQ"), 2);
     m_cmbAutoStage->addItem(uiText("ft_auto_stage_3", "3 CQ and respond alternately"), 3);
     m_cmbAutoStage->addItem(uiText("ft_auto_stage_4", "4 CQ if no target"), 4);
-    m_cmbAutoStage->setToolTip(uiText("ft_auto_stage_tooltip", "What Auto mode does: 1 answers only CQ, RR73 and 73 of other stations; 2 only calls CQ and works the stations that answer; 3 switches between answering and calling CQ after the set number of QSOs; 4 answers and calls CQ only when no target was there for the set number of slots. Applies when Auto mode is on. After STOP or a mode/band change select the stage again to continue."));
+    m_cmbAutoStage->setToolTip(uiText("ft_auto_stage_tooltip", "What Auto mode does: 0 answers nothing and calls no CQ by itself (manual QSOs only); 1 answers only CQ, RR73 and 73 of other stations; 2 only calls CQ and works the stations that answer; 3 switches between answering and calling CQ after the set number of QSOs; 4 answers and calls CQ only when no target was there for the set number of slots. Applies when Auto mode is on. After STOP or a mode/band change select the stage again to continue."));
     m_cmbAutoStage->setStyleSheet(QStringLiteral(
         "QComboBox#ftAutoStage { border: 2px solid #F28C00; border-radius: 4px; padding: 3px 6px; }"
         "QComboBox#ftAutoStage:disabled { border-color: palette(mid); }"));
@@ -9945,7 +9946,7 @@ void MainWindow::setupFt8Page()
         controlGrid->addWidget(m_spinAutoNoTarget, 8, 2);
     }
     {
-        const int idx = m_cmbAutoStage->findData(qBound(1, m_settings.ftAutoStage, 4));
+        const int idx = m_cmbAutoStage->findData(qBound(0, m_settings.ftAutoStage, 4));
         m_cmbAutoStage->setCurrentIndex(idx >= 0 ? idx : 0);
     }
     configureAutoPlanner();
@@ -19518,7 +19519,7 @@ void MainWindow::applyAutoPhase()
     QScopedValueRollback<bool> guard(m_applyingAutoPhase, true);
     bool wantAnswer = false;
     bool wantCq = false;
-    if (autoStageActive() && autoTxPermitted()) {
+    if (autoStageActive() && autoTxPermitted() && m_autoPlanner.phase() != M3::FtAutoPlanner::Phase::None) {
         (m_autoPlanner.phase() == M3::FtAutoPlanner::Phase::Cq ? wantCq : wantAnswer) = true;
     }
     // Switch the phase that is no longer wanted off first (the handlers keep them exclusive).
@@ -19624,6 +19625,8 @@ void MainWindow::updateAutoStageStatus()
         text = uiText("ft_auto_status_off", "Auto mode is off; switch it on with the Auto button.");
     } else if (m_autoStagePaused || m_ft8OperatorStopLatched) {
         text = uiText("ft_auto_status_paused", "Auto paused (STOP, mode or band change): select the stage again to continue.");
+    } else if (m_autoPlanner.phase() == M3::FtAutoPlanner::Phase::None) {
+        text = uiText("ft_auto_status_none", "Auto stage 0: no automatic answers and no automatic CQ (manual QSOs only).");
     } else if (m_autoPlanner.phase() == M3::FtAutoPlanner::Phase::Cq) {
         text = uiText("ft_auto_status_cq", "Auto stage %1: calling CQ (QSOs in this phase: %2)")
                    .arg(m_autoPlanner.stage()).arg(m_autoPlanner.qsosInPhase());
@@ -20608,6 +20611,7 @@ bool MainWindow::activateNextFt8QueuedCaller()
     }
     // Serving the next caller of the queue starts a QSO by itself: automatic TX.
     if (!autoTxPermitted()) return false;
+    if (m_autoPlanner.stage() == 0) return false;   // stage 0: no automatic answers
 
     const bool busy = m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning ||
                       (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning()) ||
@@ -20784,7 +20788,7 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         // Unsolicited caller: needs automatic TX, the switch "Answer calls without own
         // CQ" (Filter menu) and a country/continent that is not blocked.
         const QString blockReason = ftAutoQsoFilterReason(parsed.senderCall);
-        if (!(autoTxPermitted() && m_settings.ftAnswerUnsolicited) || !blockReason.isEmpty()) {
+        if (!(autoTxPermitted() && m_autoPlanner.stage() != 0 && m_settings.ftAnswerUnsolicited) || !blockReason.isEmpty()) {
             static QString lastCaller;
             if (lastCaller != parsed.senderCall) {
                 lastCaller = parsed.senderCall;

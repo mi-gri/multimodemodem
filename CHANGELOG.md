@@ -5,7 +5,7 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 ## m³ 0.26.12 (beta, branch main)
 
 - New features go here; the release candidate 0.26.11 lives on branch release/0.26.11 (bug fixes only).
-- Auto mode stages (one control instead of the "Auto QSO" button and the "CQ retry" box): 1 respond to CQ/RR73/73 only, 2 call CQ only,
+- Auto mode stages (one control instead of the "Auto QSO" button and the "CQ retry" box): 0 no automatic answers and no automatic CQ (manual QSOs only), 1 respond to CQ/RR73/73 only, 2 call CQ only,
   3 alternate (after N QSOs), 4 CQ only when no target was there for M slots. Auto mode is never restored after a start (it is off
   every time; switching it on shows the notice). STOP, a mode change and a band change pause the stage until it is selected again.
   The stage planner is a small tested class (FtAutoPlanner); all transmit gates are unchanged.

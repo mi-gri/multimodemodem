@@ -567,7 +567,7 @@ void AppSettings::load()
     ftGpuSyncEnabled = settings.value("FT/gpuSyncEnabled", false).toBool();
     ftAutoModeEnabled = false;   // after a start nothing may transmit by itself: Auto mode is always off
     ftAutoStage = settings.contains("FT/autoStage")
-        ? qBound(1, settings.value("FT/autoStage", 1).toInt(), 4)
+        ? qBound(0, settings.value("FT/autoStage", 1).toInt(), 4)
         : (settings.value("FT8/cqRepeat", false).toBool() ? 2 : 1);   // old CQ retry -> stage 2, Auto QSO -> stage 1
     ftAutoAlternateCount = qBound(1, settings.value("FT/autoAlternateCount", ftAutoAlternateCount).toInt(), 20);
     ftAutoNoTargetSlots = qBound(1, settings.value("FT/autoNoTargetSlots", ftAutoNoTargetSlots).toInt(), 20);

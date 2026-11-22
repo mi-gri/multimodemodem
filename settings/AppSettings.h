@@ -270,7 +270,7 @@ public:
     bool ftGpuSyncEnabled = false;
     bool ftGpuDecodeEnabled = false;
     bool ftAutoModeEnabled = false;    // Auto mode on; NEVER restored from the file: it is switched on by the operator (with the notice) after every start
-    int ftAutoStage = 1;               // Auto mode stage: 1 respond, 2 call CQ, 3 alternate, 4 CQ if no target (see FtAutoPlanner)
+    int ftAutoStage = 1;               // Auto mode stage: 0 none, 1 respond, 2 call CQ, 3 alternate, 4 CQ if no target (see FtAutoPlanner)
     int ftAutoAlternateCount = 3;      // stage 3: completed QSOs per phase (1-20)
     int ftAutoNoTargetSlots = 2;       // stages 3/4: slots without a target before CQ is called (1-20)
     bool ftLateDecodeEnabled = true;   // continue the R30 recovery after the reply deadline, display only

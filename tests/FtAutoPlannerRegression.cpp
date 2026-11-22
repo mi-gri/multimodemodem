@@ -17,6 +17,14 @@ static FtAutoPlanner make(int stage, int n = 3, int m = 2)
 
 int main()
 {
+    { // 0: nothing automatic
+        auto p = make(0);
+        CHECK(p.phase() == Phase::None);
+        for (int i = 0; i < 50; ++i) CHECK(!p.slotPassed(false, false));
+        CHECK(!p.qsoCompleted());
+        CHECK(!p.cqSeriesUnanswered());
+        CHECK(p.phase() == Phase::None);
+    }
     { // 1: always answering, never CQ
         auto p = make(1);
         CHECK(p.phase() == Phase::Answer);
@@ -71,8 +79,10 @@ int main()
         FtAutoPlanner p;
         p.configure({9, 0, 99});
         CHECK(p.stage() == 4);
+        p.configure({-3, 0, 0});
+        CHECK(p.stage() == 0);
         p.configure({0, 0, 0});
-        CHECK(p.stage() == 1);
+        CHECK(p.stage() == 0);
     }
     if (failures == 0) std::puts("FtAutoPlanner regression OK");
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;

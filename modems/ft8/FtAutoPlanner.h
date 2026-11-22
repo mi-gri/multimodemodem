@@ -6,6 +6,7 @@
 // transmitted at all stays with the gates of MainWindow (autoTxPermitted, STOP
 // latch, block lists ...). Pure logic, no Qt, no I/O.
 //
+//   0 Off          no automatic answers and no automatic CQ (manual QSOs only)
 //   1 Respond      only answer CQ / RR73 / 73 of other stations
 //   2 CallCq       only call CQ and work the stations that answer
 //   3 Alternate    answer N QSOs, then call CQ until N QSOs, and so on
@@ -19,17 +20,17 @@ namespace M3 {
 class FtAutoPlanner
 {
 public:
-    enum class Phase { Answer, Cq };
+    enum class Phase { None, Answer, Cq };
 
     struct Config {
-        int stage = 1;            // 1..4
+        int stage = 1;            // 0..4
         int alternateCount = 3;   // stage 3: completed QSOs per phase (1..20)
         int noTargetSlots = 2;    // stages 3/4: slots without a target before CQ (1..20)
     };
 
     void configure(const Config &config)
     {
-        m_config.stage = clamp(config.stage, 1, 4);
+        m_config.stage = clamp(config.stage, 0, 4);
         m_config.alternateCount = clamp(config.alternateCount, 1, 20);
         m_config.noTargetSlots = clamp(config.noTargetSlots, 1, 20);
         reset();
@@ -38,7 +39,7 @@ public:
     // Auto mode switched on, stage changed: start with the stage's first phase.
     void reset()
     {
-        m_phase = m_config.stage == 2 ? Phase::Cq : Phase::Answer;
+        m_phase = m_config.stage == 0 ? Phase::None : (m_config.stage == 2 ? Phase::Cq : Phase::Answer);
         m_qsosInPhase = 0;
         m_idleSlots = 0;
     }
