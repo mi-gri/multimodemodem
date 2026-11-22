@@ -5,6 +5,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 ## m³ 0.26.12 (beta, branch main)
 
 - New features go here; the release candidate 0.26.11 lives on branch release/0.26.11 (bug fixes only).
+- RX noise blanker (Decode → Noise Blanker: Off / NB2 Auto / NB2, three thresholds) and MSK144 carrier notch (ZAP), ported from
+  the MadModem upstream (IC8TEM). Applied before the FT8/FT4, Q65 and text-mode decoders; off by default, no delay when off;
+  the 48 ms delay is subtracted from the decode times.
 
 ## m³ 0.26.11
 

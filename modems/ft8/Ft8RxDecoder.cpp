@@ -1216,6 +1216,8 @@ void Ft8RxDecoder::reset()
     ++m_decodeGeneration;
     m_inputSampleRate = 0;
     m_timedResampler.reset();
+    m_noise.reset();
+    m_noiseNextUtcNs = 0;
     m_resampleAbsoluteInputIndex = 0.0;
     m_resampleNextOutputInputIndex = 0.0;
     m_resamplePreviousSample = 0.0;
@@ -1845,7 +1847,8 @@ void Ft8RxDecoder::analyzeAudioFile(const QString &filePath)
         ? static_cast<double>(mono.size()) / static_cast<double>(wav.sampleRate)
         : 0.0;
 
-    const QVector<double> resampled = offlineResampleTo12k(mono, static_cast<int>(wav.sampleRate));
+    QVector<double> resampled = offlineResampleTo12k(mono, static_cast<int>(wav.sampleRate));
+    M3Noise::RxNoiseStage::processRecording(resampled, kDecodeSampleRate); // IC8TEM: noise blanker
     if (resampled.isEmpty()) {
         emit offlineAnalysisFinished(filePath, false, 0, QStringLiteral("resampling produced no audio"));
         return;
@@ -2003,6 +2006,8 @@ void Ft8RxDecoder::resetCaptureTimeline(quint64 generation, const QString &reaso
     m_activeCaptureGeneration = generation > 0 ? generation : 1;
     m_inputSampleRate = 0;
     m_timedResampler.reset();
+    m_noise.reset();
+    m_noiseNextUtcNs = 0;
     m_resampleAbsoluteInputIndex = 0.0;
     m_resampleNextOutputInputIndex = 0.0;
     m_resamplePreviousSample = 0.0;
@@ -2284,7 +2289,24 @@ void Ft8RxDecoder::processAudioBlock(const AudioBlock &block)
     }
 
     qint64 firstOutputUtcNs = 0;
-    const QVector<double> resampled = resampleTo12k(block, &firstOutputUtcNs);
+    QVector<double> resampled = resampleTo12k(block, &firstOutputUtcNs);
+    // IC8TEM: noise blanker. Its output is the input delayed by latencyNs(), so the
+    // time of the processed samples moves back by the same amount; the slot timeline
+    // absorbs the short gap or overlap left when the blanker is switched on or off.
+    m_noise.update(kDecodeSampleRate);
+    if (m_noise.active() && !resampled.isEmpty()) {
+        if (firstOutputUtcNs > 0 && m_noiseNextUtcNs > 0 && qAbs(firstOutputUtcNs - m_noiseNextUtcNs) > 5000000LL) {
+            m_noise.reset(); // capture discontinuity: drop the samples still in the blanker
+        }
+        if (firstOutputUtcNs > 0) {
+            m_noiseNextUtcNs = firstOutputUtcNs + static_cast<qint64>(std::llround(
+                1.0e9 * static_cast<double>(resampled.size()) / static_cast<double>(kDecodeSampleRate)));
+            firstOutputUtcNs -= m_noise.latencyNs();
+        }
+        m_noise.process(resampled);
+    } else {
+        m_noiseNextUtcNs = 0;
+    }
     appendTimedResampled(resampled, firstOutputUtcNs);
 }
 

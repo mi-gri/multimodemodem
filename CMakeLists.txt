@@ -333,6 +333,20 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # -------------------------------------------------------------------------
+# RX noise blanker (NB2) and MSK144 carrier notch (port of the MSHV-IC8TEM noise
+# tools), used by the decoders before demodulation.
+# -------------------------------------------------------------------------
+add_library(m3_rx_noise STATIC
+    dsp/common/RxNoiseBlanker.h
+    dsp/common/RxNoiseBlanker.cpp
+)
+target_link_libraries(m3_rx_noise PUBLIC ${QT}::Core)
+set_target_properties(m3_rx_noise PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(m3_rx_noise PRIVATE -Wall -Wextra)
+endif()
+
+# -------------------------------------------------------------------------
 # Shared streaming resampler used by the native weak-signal engines and by
 # the application text-mode decoders. Keep the implementation in one target
 # so standalone regression executables link the exact same DSP code as MM.
@@ -364,6 +378,7 @@ endif()
 if(NOT M3_FFTW3_INCLUDE_DIR IN_LIST CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
     include_directories(SYSTEM "${M3_FFTW3_INCLUDE_DIR}")
 endif()
+target_link_libraries(m3_rx_noise PRIVATE "${M3_FFTW3_LIBRARY}")
 add_library(m3_ft_reference STATIC
     modems/ft8/FtReferenceRecovery.h modems/ft8/FtReferenceRecovery.cpp
     third_party/mshv_gpl/ft_reference/budget.cpp
@@ -423,7 +438,7 @@ target_include_directories(m3_msk144 PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mshv_gpl/port"
 )
 target_link_libraries(m3_msk144 PUBLIC m3_weak_signal_codec ${QT}::Core ${QT}::Widgets Threads::Threads)
-target_link_libraries(m3_msk144 PUBLIC m3_linear_resampler)
+target_link_libraries(m3_msk144 PUBLIC m3_linear_resampler m3_rx_noise)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(m3_msk144 PRIVATE -Wall -Wextra -Wno-unused-function -Wno-unused-variable -Wno-sign-compare -Wno-unused-parameter)
 endif()
@@ -452,7 +467,7 @@ target_include_directories(m3_q65 PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mshv_gpl/port"
 )
 target_link_libraries(m3_q65 PUBLIC m3_weak_signal_codec ${QT}::Core ${QT}::Widgets Threads::Threads)
-target_link_libraries(m3_q65 PUBLIC m3_linear_resampler)
+target_link_libraries(m3_q65 PUBLIC m3_linear_resampler m3_rx_noise)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(m3_q65 PRIVATE -Wall -Wextra -Wno-unused-function -Wno-unused-variable -Wno-sign-compare -Wno-unused-parameter)
 endif()
@@ -549,6 +564,8 @@ add_executable(MultiModeModem
     widgets/RadioTelescopeHeatmapWidget.cpp
     widgets/CwDiagnosticWidget.h
     widgets/CwDiagnosticWidget.cpp
+    widgets/RxNoiseBlankerMenu.h
+    widgets/RxNoiseBlankerMenu.cpp
     utils/RuntimeI18n.h
     utils/RuntimeI18n.cpp
     utils/CockpitTheme.h
@@ -865,6 +882,7 @@ target_link_libraries(MultiModeModem PRIVATE
     m3_weak_signal_codec
     m3_js8
     m3_linear_resampler
+    m3_rx_noise
     ${QT}::Widgets
     ${QT}::SerialPort
     ${QT}::Multimedia
@@ -1218,6 +1236,11 @@ if(BUILD_TESTING)
     add_test(NAME m3_session_diagnostics COMMAND m3_session_diagnostics)
     set_tests_properties(m3_session_diagnostics PROPERTIES TIMEOUT 30)
     find_package(${QT} REQUIRED COMPONENTS Test)
+    add_executable(m3_rx_noise_blanker tests/RxNoiseBlankerRegression.cpp)
+    target_include_directories(m3_rx_noise_blanker PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(m3_rx_noise_blanker PRIVATE m3_rx_noise)
+    set_target_properties(m3_rx_noise_blanker PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME m3_rx_noise_blanker COMMAND m3_rx_noise_blanker)
     add_executable(m3_decode_clipboard tests/DecodeTableClipboardRegression.cpp)
     target_include_directories(m3_decode_clipboard PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(m3_decode_clipboard PRIVATE ${QT}::Widgets ${QT}::Test)
@@ -1348,6 +1371,11 @@ if(BUILD_TESTING)
     target_include_directories(m3_msk144_native_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(m3_msk144_native_regression PRIVATE m3_msk144 ${QT}::Core)
     add_test(NAME m3_msk144_native_regression COMMAND m3_msk144_native_regression)
+    add_executable(m3_msk144_noise_blanker_regression tests/Msk144NoiseBlankerRegression.cpp)
+    target_include_directories(m3_msk144_noise_blanker_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_msk144_noise_blanker_regression PRIVATE m3_msk144 m3_rx_noise ${QT}::Core)
+    add_test(NAME m3_msk144_noise_blanker_regression COMMAND m3_msk144_noise_blanker_regression)
+    set_tests_properties(m3_msk144_noise_blanker_regression PROPERTIES TIMEOUT 180)
     set_tests_properties(m3_msk144_native_regression PROPERTIES TIMEOUT 180)
 
     find_package(Python3 COMPONENTS Interpreter QUIET)
