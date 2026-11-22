@@ -27788,8 +27788,16 @@ void MainWindow::keyPttForTx(std::function<void(bool)> completion)
                                       m_settings.hamlibCatEnabled && pttUsesCatPort);
     if (pttViaRigController) {
         pauseQsoSignalPeakForTransmit();
-        requestRigPtt(true,[this,completion](bool ok){
-            if(!ok){appendLog(QStringLiteral("CAT PTT ON failed, cancelled or timed out; audio TX blocked."));}
+        const auto requestGeneration = m_txRequestGeneration;
+        requestRigPtt(true,[this,completion,requestGeneration](bool ok){
+            if(!ok){
+                // A newer transmission plan (e.g. the reply that just arrived) cancels the PTT request that was
+                // prepared for the old one: nothing failed, the new plan keys the rig itself.
+                if(requestGeneration!=m_txRequestGeneration)
+                    appendLog(uiText("tx_ptt_request_replaced_log","PTT request of the earlier transmission plan was cancelled because a newer plan replaced it (no PTT error)."));
+                else
+                    appendLog(QStringLiteral("CAT PTT ON failed, cancelled or timed out; audio TX blocked."));
+            }
             completion(ok);
         });
         return;

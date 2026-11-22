@@ -1705,3 +1705,6 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
 SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
  'Tune':('Tune','Tune','Tune','Tune','Tune','Tune'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'tx_ptt_request_replaced_log':('PTT request of the earlier transmission plan was cancelled because a newer plan replaced it (no PTT error).', "La richiesta PTT del piano di trasmissione precedente è stata annullata perché un piano più recente l'ha sostituita (nessun errore PTT).", "La demande PTT du plan d'émission précédent a été annulée, car un plan plus récent l'a remplacée (pas d'erreur PTT).", 'Die PTT-Anforderung des früheren Sendeplans wurde abgebrochen, weil ein neuerer Plan ihn ersetzt hat (kein PTT-Fehler).', 'PTT-forespørselen for den tidligere sendeplanen ble avbrutt fordi en nyere plan erstattet den (ingen PTT-feil).', 'Požadavek PTT dřívějšího plánu vysílání byl zrušen, protože ho nahradil novější plán (žádná chyba PTT).'),
+}.items()})

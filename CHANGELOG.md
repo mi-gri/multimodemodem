@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- Runtime log: when a newer transmission plan replaces the one being prepared (e.g. the partner's reply arrives just before the slot), the cancelled
+  PTT request is no longer reported as "CAT PTT ON failed"; the log says it was replaced (no PTT error).
 - Auto mode: after a QSO the caller queue could activate a station whose last message gave the sequencer nothing to send (e.g. a late
   R-report). That empty QSO stayed active and blocked the CQ series and Auto mode until restart; it is now dropped and the CQ series resumes.
 - Fake It: the temporary TX frequency and the RX frequency after TX are set again (up to 3 attempts, 200 ms apart) when the radio
