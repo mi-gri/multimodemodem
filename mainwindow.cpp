@@ -20968,8 +20968,12 @@ void MainWindow::handleFt8QsoHistoryDoubleClicked(QTableWidgetItem *item)
             const bool freqMatches = freq.isEmpty() || (rxFreq != nullptr && rxFreq->text().trimmed() == freq);
             if (utcMatches && freqMatches) {
                 m_tableFt8Rx->selectRow(r);
+                // A station that calls me (or answers me) is answered at once, like a double-click in the decode
+                // table: this also switches away from the station that is being called now. Other rows are only
+                // selected (press TX).
+                const bool toMe = parseFt8MessageText(message, stationCallsign()).addressedToMe;
                 const bool previousSelectionOnly = m_ft8SelectionOnly;
-                m_ft8SelectionOnly = true;
+                m_ft8SelectionOnly = !toMe;
                 handleFt8DecodeDoubleClicked(rxMsg);
                 m_ft8SelectionOnly = previousSelectionOnly;
                 return;
