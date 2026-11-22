@@ -390,20 +390,60 @@ void fftRadix2(std::vector<std::complex<double>> &a)
     fftRadix2Transform(a, false);
 }
 
+class Ft8CostasFft
+{
+public:
+    static constexpr int size = 4096;
+    static constexpr int windowSize = 1920;
+
+    Ft8CostasFft()
+    {
+        std::lock_guard<std::mutex> lock(M3Dsp::fftwPlannerMutex);
+        m_plan = fftw_plan_dft_r2c_1d(size, m_input.data(), m_spectrum, FFTW_ESTIMATE);
+    }
+
+    ~Ft8CostasFft()
+    {
+        if (!m_plan) return;
+        std::lock_guard<std::mutex> lock(M3Dsp::fftwPlannerMutex);
+        fftw_destroy_plan(m_plan);
+    }
+
+    void powers(const double *samples, double *output, int count)
+    {
+        static const auto window = [] {
+            std::array<double, windowSize> values{};
+            for (int n = 0; n < windowSize; ++n)
+                values[n] = 0.5 - 0.5 * std::cos(kTwoPi * n / (windowSize - 1));
+            return values;
+        }();
+        for (int n = 0; n < windowSize; ++n)
+            m_input[n] = samples[n] * window[n];
+        if (m_plan) {
+            fftw_execute(m_plan);
+            for (int k = 0; k < count; ++k)
+                output[k] = m_spectrum[k][0] * m_spectrum[k][0] + m_spectrum[k][1] * m_spectrum[k][1];
+            return;
+        }
+
+        m_fallback.assign(m_input.begin(), m_input.end());
+        fftRadix2(m_fallback);
+        for (int k = 0; k < count; ++k)
+            output[k] = std::norm(m_fallback[k]);
+    }
+
+private:
+    alignas(64) std::array<double, size> m_input{};
+    alignas(64) fftw_complex m_spectrum[size / 2 + 1]{};
+    fftw_plan m_plan = nullptr;
+    std::vector<std::complex<double>> m_fallback;
+};
+
 std::vector<double> incrementalFt8Row(const QVector<double> &samples, int start)
 {
-    static const std::vector<double> window = [] {
-        std::vector<double> values(1920, 1.0);
-        for (int n=0;n<1920;++n) values[static_cast<size_t>(n)] =
-            0.5 - 0.5 * std::cos(kTwoPi * static_cast<double>(n) / static_cast<double>(1920 - 1));
-        return values;
-    }();
-    std::vector<std::complex<double>> fft(4096, {0.0,0.0});
-    const double *x=samples.constData()+start;
-    for(int n=0;n<1920;++n)fft[static_cast<size_t>(n)]={x[n]*window[static_cast<size_t>(n)],0.0};
-    fftRadix2(fft);
-    std::vector<double> energy(2048);
-    for(int bin=0;bin<2048;++bin)energy[static_cast<size_t>(bin)]=std::norm(fft[static_cast<size_t>(bin)]);
+    thread_local Ft8CostasFft fft;
+    std::vector<double> energy(Ft8CostasFft::size / 2);
+    fft.powers(samples.constData() + start, energy.data(), int(energy.size()));
     return energy;
 }
 
@@ -4440,7 +4480,7 @@ QVector<Ft8RxDecoder::Candidate> Ft8RxDecoder::findCandidates(const QVector<doub
     // limits stay unchanged for live QSO timing.
     const int kMaxPreCandidates = offlineAnalysis ? 1500 : (liveDeep ? 1100 : (liveAdaptive ? 900 : 280));
     const int kMaxCandidates = offlineAnalysis ? 950 : (liveDeep ? 420 : (liveAdaptive ? 340 : 128));
-    constexpr int kFftSize = 4096;           // power-of-two fast FFT; bin ~= 2.93 Hz
+    constexpr int kFftSize = Ft8CostasFft::size;
     constexpr double kFftBinHz = static_cast<double>(kDecodeSampleRate) / static_cast<double>(kFftSize);
     constexpr int kCostasSymbolCount = 21;
 
@@ -4465,7 +4505,6 @@ QVector<Ft8RxDecoder::Candidate> Ft8RxDecoder::findCandidates(const QVector<doub
 
     struct CostasSpectrumCache
     {
-        double binHz = 1.0;
         int rowSize = 0;
         std::vector<double> energy; // 21 contiguous rows; allocated once per worker chunk.
 
@@ -4483,40 +4522,31 @@ QVector<Ft8RxDecoder::Candidate> Ft8RxDecoder::findCandidates(const QVector<doub
             return energy.data() + static_cast<size_t>(costasIndex * rowSize);
         }
 
-        double read(double freqHz, int costasIndex) const
+        const double *rowData(int costasIndex) const
         {
-            if (costasIndex < 0 || costasIndex >= 21 || rowSize <= 0 || energy.empty()) {
-                return 0.0;
-            }
-            const double *row = energy.data() + static_cast<size_t>(costasIndex * rowSize);
-            const double pos = freqHz / binHz;
-            int bin = static_cast<int>(std::floor(pos));
-            const double frac = pos - static_cast<double>(bin);
-            if (bin < 0) {
-                return row[0];
-            }
-            if (bin + 1 >= rowSize) {
-                return row[rowSize - 1];
-            }
-            return row[bin] * (1.0 - frac) + row[bin + 1] * frac;
+            return energy.data() + static_cast<size_t>(costasIndex * rowSize);
         }
     };
 
-    static const std::vector<double> costasHannWindow = []() {
-        std::vector<double> window(static_cast<size_t>(kSamplesPerSymbol), 1.0);
-        for (int n = 0; n < kSamplesPerSymbol; ++n) {
-            window[static_cast<size_t>(n)] = 0.5 - 0.5 * std::cos(kTwoPi * static_cast<double>(n) /
-                                                                 static_cast<double>(kSamplesPerSymbol - 1));
+    struct ToneBin { int index; double fraction; };
+    struct BaseFrequency { double hz; std::array<ToneBin, 8> tones; };
+    std::vector<BaseFrequency> frequencies;
+    for (double hz = lowHz; hz <= highHz; hz += kFreqStepHz) {
+        BaseFrequency frequency{};
+        frequency.hz = hz;
+        for (int tone = 0; tone < 8; ++tone) {
+            const double position = (hz + tone * kToneSpacingHz) / kFftBinHz;
+            const int bin = int(position);
+            frequency.tones[tone] = {bin, position - bin};
         }
-        return window;
-    }();
+        frequencies.push_back(frequency);
+    }
 
     auto *incremental=M3Ft::currentAnalysis;
     if(incremental && !incremental->originalInput(samples))incremental=nullptr;
     auto buildCacheForStart = [&samples, maxEnergyBin, incremental](int startSample,
-                                                                          CostasSpectrumCache &cache,
-                                                                          std::vector<std::complex<double>> &fft) {
-        cache.binHz = kFftBinHz;
+                                                                          CostasSpectrumCache &cache) {
+        thread_local Ft8CostasFft fft;
         cache.ensureCapacity(maxEnergyBin + 2);
         int costasIndex = 0;
         for (int block = 0; block < 3; ++block) {
@@ -4531,29 +4561,18 @@ QVector<Ft8RxDecoder::Candidate> Ft8RxDecoder::findCandidates(const QVector<doub
                         ++costasIndex;continue;
                     }
                 }
-                std::fill(fft.begin(), fft.end(), std::complex<double>(0.0, 0.0));
-                if (symStart >= 0 && symStart + kSamplesPerSymbol < samples.size()) {
-                    const double *x = samples.constData() + symStart;
-                    for (int n = 0; n < kSamplesPerSymbol; ++n) {
-                        // Hann coefficients are precomputed once.  This removes
-                        // 21 * startCount * 1920 cos() calls from findCandidates()
-                        // and keeps the candidate matrix numerically identical.
-                        fft[static_cast<size_t>(n)] = std::complex<double>(x[n] * costasHannWindow[static_cast<size_t>(n)], 0.0);
-                    }
-                    fftRadix2(fft);
-                }
-
                 double *row = cache.rowData(costasIndex);
-                for (int bin = 0; bin <= maxEnergyBin + 1; ++bin) {
-                    const std::complex<double> v = fft[static_cast<size_t>(bin)];
-                    row[bin] = std::norm(v);
+                if (symStart >= 0 && symStart + kSamplesPerSymbol < samples.size()) {
+                    fft.powers(samples.constData() + symStart, row, maxEnergyBin + 2);
+                } else {
+                    std::fill_n(row, maxEnergyBin + 2, 0.0);
                 }
                 ++costasIndex;
             }
         }
     };
 
-    auto scoreCandidate = [](const CostasSpectrumCache &cache, double baseHz, double *noiseOut) {
+    auto scoreCandidate = [](const CostasSpectrumCache &cache, const BaseFrequency &frequency, double *noiseOut) {
         double tABC = 0.0;
         double allABC = 0.0;
         double tBC = 0.0;
@@ -4565,8 +4584,10 @@ QVector<Ft8RxDecoder::Candidate> Ft8RxDecoder::findCandidates(const QVector<doub
                 const int expectedTone = kCostas[i];
                 double expected = 0.0;
                 double all = 0.0;
+                const double *row = cache.rowData(costasIndex);
                 for (int tone = 0; tone < 8; ++tone) {
-                    const double e = cache.read(baseHz + tone * kToneSpacingHz, costasIndex);
+                    const auto bin = frequency.tones[tone];
+                    const double e = row[bin.index] * (1.0 - bin.fraction) + row[bin.index + 1] * bin.fraction;
                     all += e;
                     if (tone == expectedTone) {
                         expected = e;
@@ -4606,18 +4627,16 @@ QVector<Ft8RxDecoder::Candidate> Ft8RxDecoder::findCandidates(const QVector<doub
         QVector<Candidate> localQso;
         localQso.reserve(48);
         CostasSpectrumCache cache;
-        std::vector<std::complex<double>> fft(static_cast<size_t>(kFftSize));
         for (int startIndex = begin; startIndex < end; ++startIndex) {
             if(searchStopUtcMs>0 && (decodeCancellationRequested() ||
                QDateTime::currentMSecsSinceEpoch()>=searchStopUtcMs)) break;
             const int startSample = firstStart + startIndex * timeStepSamples;
             const double startSec = static_cast<double>(startSample) / static_cast<double>(kDecodeSampleRate);
-            buildCacheForStart(startSample, cache, fft);
-            for (double baseHz = static_cast<double>(lowHz);
-                 baseHz <= static_cast<double>(highHz);
-                baseHz += kFreqStepHz) {
+            buildCacheForStart(startSample, cache);
+            for (const auto &frequency : frequencies) {
+                const double baseHz = frequency.hz;
                 double noise = 0.0;
-                const double sync = scoreCandidate(cache, baseHz, &noise);
+                const double sync = scoreCandidate(cache, frequency, &noise);
                 const double focusDelta = std::abs(baseHz - static_cast<double>(m_rxMarkerHz));
                 const bool qsoPriority = qsoPriorityActive && focusDelta <= kQsoFocusHalfSpanHz;
                 const double admissionThreshold = qsoPriority ? qMin(kSyncMin, 0.92) : kSyncMin;
@@ -4759,7 +4778,7 @@ Ft8RxDecoder::SlotMemoryJob Ft8RxDecoder::beginSlotMemory(const QVector<double> 
     }
     job.context = {m_decodeGeneration.load(std::memory_order_acquire),
                    m_slotMemoryTuningGeneration.load(std::memory_order_acquire),
-                   MadModemNoise::settingsGeneration(),
+                   M3Noise::settingsGeneration(),
                    periodMs, m_searchLowHz, m_searchHighHz};
     job.observations.resize(M3Ft::FtSlotMemory::maxCandidates);
     return job;
@@ -4797,7 +4816,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::recoverWithSlotMemory(
         return !decodeCancellationRequested() &&
                context.generation == m_decodeGeneration.load(std::memory_order_acquire) &&
                context.tuningGeneration == m_slotMemoryTuningGeneration.load(std::memory_order_acquire) &&
-               context.blankerGeneration == MadModemNoise::settingsGeneration();
+               context.blankerGeneration == M3Noise::settingsGeneration();
     };
     if (!validContext()) return recovered;
 
@@ -4903,7 +4922,7 @@ void Ft8RxDecoder::rememberFt8CqTracks(const SlotMemoryJob &job, const QDateTime
     if (job.context.periodMs != 15000 || decodeCancellationRequested() ||
         job.context.generation != m_decodeGeneration.load(std::memory_order_acquire) ||
         job.context.tuningGeneration != m_slotMemoryTuningGeneration.load(std::memory_order_acquire) ||
-        job.context.blankerGeneration != MadModemNoise::settingsGeneration())
+        job.context.blankerGeneration != M3Noise::settingsGeneration())
         return;
 
     auto strongest = decodes;
@@ -4950,7 +4969,7 @@ QVector<Ft8RxDecoder::Decode> Ft8RxDecoder::recoverFt8CqTracks(
                (stats->offline || QDateTime::currentMSecsSinceEpoch() + 4 < deadline) &&
                context.generation == m_decodeGeneration.load(std::memory_order_acquire) &&
                context.tuningGeneration == m_slotMemoryTuningGeneration.load(std::memory_order_acquire) &&
-               context.blankerGeneration == MadModemNoise::settingsGeneration();
+               context.blankerGeneration == M3Noise::settingsGeneration();
     };
     if (!timeAvailable()) return recovered;
     const double driftLimit =
@@ -5175,6 +5194,7 @@ bool Ft8RxDecoder::decodeCandidate(const QVector<double> &samples,
         for (int dt : sampleOffsets) {
             const int trialStart = startSample + dt;
             for (double df : freqOffsets) {
+                if (dt == 0 && df == 0.0) continue; // this fit is already scored
                 const double trialBaseHz = baseHz + df;
                 if (trialBaseHz < 50.0 || trialBaseHz > 5000.0) {
                     continue;

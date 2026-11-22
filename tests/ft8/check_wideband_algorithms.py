@@ -303,8 +303,8 @@ def test_source_invariants() -> None:
         "(const QVector<double> &samples, double threshold) const",
     )
     require(hashlib.sha256(without_incremental_reuse(ft8_finder).encode()).hexdigest() ==
-            "61845ce7cb1bb78b8d7fa73160802f32645a813795727f0bad829fad61c8b84e",  # MadModemRuntime -> M3Runtime rename only
-            "FT8 live candidate finder differs from the validated QSO-deadline checkpoint")
+            "abd1e303c0c6485bc389795720dc892db57b3831f5905e5f80ed6103e93ba1f7",  # MadModemRuntime -> M3Runtime rename only
+            "FT8 live candidate finder differs from the validated R7 real-FFT search")
     require(hashlib.sha256(without_incremental_reuse(ft4_finder).encode()).hexdigest() ==
             "3b160cfb8f022a74282c6907a2e470e2615f6792a81bb2af95baa6191fff2af3",
             "FT4 live candidate finder differs from the validated adaptive-runtime checkpoint")
