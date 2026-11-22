@@ -899,6 +899,8 @@ private slots:
     void autoStageCqSeriesUnanswered();
     void updateAutoStageStatus();
     void updateStopLatchIndicator();
+    void pauseFt8QsoForLaterReply();
+    bool resumePausedFt8Qso(const FtQsoSequencer::ParsedMessage &parsed, const Ft8RxDecoder::Decode &decode);
     // Country file (cty.csv) download: Help menu and optional weekly check.
     void startCtyUpdate(bool userInitiated);
     void handleCtyUpdateFinished(bool ok, bool updated, const QString &message, bool userInitiated);
@@ -2594,6 +2596,21 @@ private:
         QDateTime receivedUtc;
     };
     QVector<Ft8LateFinal> m_ft8LateFinals;
+    // QSOs that were given up without a reply (no-response limit). A message of the partner that
+    // is decoded later continues the QSO (see resumePausedFt8Qso); kept for 15 minutes.
+    struct Ft8PausedQso
+    {
+        QString call;
+        QString grid;
+        int audioHz = 0;
+        QString reportSent;
+        QString reportReceived;
+        FtQsoSession::State state = FtQsoSession::State::Idle;
+        QDateTime startUtc;
+        QDateTime pausedUtc;
+        bool autoTx = false;   // was Auto mode transmitting for it? (a manual QSO may resume without Auto mode)
+    };
+    QHash<QString, Ft8PausedQso> m_ft8PausedQsos;   // by normalized call
     QPushButton *m_btnFt8CallerList = nullptr;
     QDialog *m_ft8CallerDialog = nullptr;
     QTableWidget *m_ft8CallerTable = nullptr;

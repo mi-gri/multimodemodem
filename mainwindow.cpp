@@ -20611,6 +20611,72 @@ bool MainWindow::ftOperatorEngaged() const
     return last > 0 && QDateTime::currentMSecsSinceEpoch() - last <= 45000;
 }
 
+void MainWindow::pauseFt8QsoForLaterReply()
+{
+    if (!m_ftSession.qsoActive || m_ftSession.dxCall.trimmed().isEmpty()) return;
+    using State = FtQsoSession::State;
+    const State st = m_ftSession.state;
+    if (st != State::SendingLocator && st != State::WaitingReport && st != State::SendingReport && st != State::WaitingRReport)
+        return;   // later states are covered by the late-final handling
+    Ft8PausedQso paused;
+    paused.call = m_ftSession.dxCall.trimmed().toUpper();
+    paused.grid = m_ftSession.dxGrid;
+    paused.audioHz = m_ftSession.audioFreqHz;
+    paused.reportSent = m_ftSession.reportSent;
+    paused.reportReceived = m_ftSession.reportReceived;
+    paused.state = st;
+    paused.startUtc = m_ftSession.qsoStartUtc;
+    paused.pausedUtc = QDateTime::currentDateTimeUtc();
+    paused.autoTx = autoTxPermitted();
+    const QDateTime now = paused.pausedUtc;
+    for (auto it = m_ft8PausedQsos.begin(); it != m_ft8PausedQsos.end();)
+        it = it->pausedUtc.secsTo(now) > 15 * 60 ? m_ft8PausedQsos.erase(it) : it + 1;
+    m_ft8PausedQsos.insert(AdifLogbook::normalizeCallsign(paused.call), paused);
+    traceFtAutomation("qso.paused", "no_reply", {{"candidate_call", paused.call}});
+}
+
+bool MainWindow::resumePausedFt8Qso(const FtQsoSequencer::ParsedMessage &parsed, const Ft8RxDecoder::Decode &decode)
+{
+    if (m_ft8PausedQsos.isEmpty() || m_ft8OperatorStopLatched || m_offlineAnalysisActive || m_shutdownInProgress) return false;
+    const QString key = AdifLogbook::normalizeCallsign(parsed.senderCall.trimmed().toUpper());
+    auto it = m_ft8PausedQsos.find(key);
+    if (it == m_ft8PausedQsos.end()) return false;
+    if (it->pausedUtc.secsTo(QDateTime::currentDateTimeUtc()) > 15 * 60) { m_ft8PausedQsos.erase(it); return false; }
+    // His message must continue the exchange (report, R-report, RR73/73), not start a new one.
+    const bool continues = parsed.rReport || parsed.rr73 || parsed.rrr || parsed.final73 || !parsed.report.trimmed().isEmpty();
+    if (!continues) return false;
+    // Gates: a known frequency on a band with TX permission; an Auto-started QSO resumes only while Auto mode may
+    // transmit (not in stage 0), a manually started one may also resume without Auto mode.
+    if (!txBandPermitted(false) || isFtCallBlacklisted(parsed.senderCall)) return false;
+    if (it->autoTx && !(autoTxPermitted() && m_autoPlanner.stage() != 0 && ftAutoQsoFilterReason(parsed.senderCall).isEmpty())) return false;
+    const Ft8PausedQso paused = it.value();
+    m_ft8PausedQsos.erase(it);
+    m_ftSession.clearQso();
+    m_ftSession.cqRepeatActive = false;
+    m_ftSession.startQso(paused.call, paused.grid, decode.frequencyHz > 0 ? decode.frequencyHz : paused.audioHz, paused.startUtc);
+    m_ftSession.reportSent = paused.reportSent;
+    m_ftSession.reportReceived = paused.reportReceived;
+    m_ftSession.state = paused.state;
+    if (m_editFt8DxCall != nullptr) {
+        const QSignalBlocker blockDxCall(m_editFt8DxCall);
+        m_editFt8DxCall->setText(paused.call);
+        m_settings.ft8DxCallsign = paused.call;
+    }
+    if (m_editFt8DxGrid != nullptr && !paused.grid.isEmpty()) {
+        const QSignalBlocker blockDxGrid(m_editFt8DxGrid);
+        m_editFt8DxGrid->setText(paused.grid);
+        m_settings.ft8DxGrid = paused.grid;
+    }
+    if (m_ft8RxDecoder != nullptr) {
+        QMetaObject::invokeMethod(m_ft8RxDecoder, "setDxCall", Qt::QueuedConnection, Q_ARG(QString, paused.call));
+        QMetaObject::invokeMethod(m_ft8RxDecoder, "setQsoDeadlineActive", Qt::QueuedConnection, Q_ARG(bool, true));
+    }
+    updateCatRotatorQsoTarget(QStringLiteral("QSO resumed: %1").arg(paused.call));
+    appendLog(uiText("ft_resume_log", "QSO with %1 resumed: his message arrived after the QSO had been given up.").arg(paused.call));
+    traceFtAutomation("qso.resume", "late_reply", {{"candidate_call", paused.call}, {"rx_message", decode.message}});
+    return true;
+}
+
 bool MainWindow::activateNextFt8QueuedCaller()
 {
     {
@@ -20778,6 +20844,30 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         seqContext.startToleranceHz = 25;
         seqContext.stopToleranceHz = 50;
         decision = FtQsoSequencer::evaluateDecode(seqDecode, seqContext);
+    }
+
+    // A late message of a station whose QSO was given up without a reply continues that QSO.
+    if (!m_ftSession.qsoActive && parsed.addressedToMe && !parsed.senderCall.isEmpty() &&
+        resumePausedFt8Qso(parsed, decode)) {
+        seqContext = m_ftSession.makeContext(
+            myCall,
+            (m_spinFt8RxFreq != nullptr) ? m_spinFt8RxFreq->value() : m_settings.ft8RxFrequencyHz,
+            (m_spinFt8TxFreq != nullptr) ? m_spinFt8TxFreq->value() : m_settings.ft8TxFrequencyHz);
+        seqContext.txActive = m_txRunning || m_ftTxWorkerRunning ||
+                              (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning());
+        seqContext.startToleranceHz = 25;
+        seqContext.stopToleranceHz = 50;
+        decision = FtQsoSequencer::evaluateDecode(seqDecode, seqContext);
+        if (decision.action == FtQsoSequencer::Action::Ignore || decision.action == FtQsoSequencer::Action::None) {
+            // Nothing to send for this message: do not keep an empty QSO that blocks the automation.
+            appendLog(uiText("ft_resume_nothing_log", "QSO with %1 not resumed: his message needs no reply.").arg(parsed.senderCall));
+            m_ftSession.clearQso();
+            if (m_ft8RxDecoder != nullptr)
+                QMetaObject::invokeMethod(m_ft8RxDecoder, "setQsoDeadlineActive", Qt::QueuedConnection, Q_ARG(bool, false));
+            updateFt8SequencerUi();
+            return;
+        }
+        m_ftTxOriginHint = uiText("ft_origin_resumed", "QSO with %1 resumed (his late message after the QSO was given up)").arg(parsed.senderCall);
     }
 
     // A call that would start a QSO while the operator has done nothing (no CQ,
@@ -22252,6 +22342,7 @@ void MainWindow::finishFt8ResponseWait(quint64 retryGeneration, qint64 replySlot
                       .arg(dx));
     }
     traceFtAutomation("qso.timeout","no_reply",{{"cooldown_seconds",fullAutoEnabled ? 900 : 0},{"reply_slot_utc_ms",replySlotUtcMs}});
+    pauseFt8QsoForLaterReply();   // a late reply from him resumes this QSO
     // Auto mode: a CQ series that was running when this caller answered goes on
     // after the unanswered attempt, as after a completed QSO (decided before the stop).
     const bool resumeCq = m_ftCqResumeAfterQso && autoTxPermitted() && m_chkFt8CqRepeat != nullptr &&
