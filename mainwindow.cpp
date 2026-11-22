@@ -20396,6 +20396,18 @@ bool MainWindow::activateNextFt8QueuedCaller()
                   .arg(m_ft8CallerQueue.size()));
     traceFtAutomation("candidate.select","direct_caller_fifo",{{"candidate_call",queued.call},{"rx_message",queued.latestDecode.message}});
     processFt8SequencerDecode(queued.latestDecode);
+    const bool txFollows = m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan || m_txRunning || m_ftTxWorkerRunning ||
+                           !m_pendingFt8TxPlan.message.trimmed().isEmpty();
+    if (!txFollows && m_ftSession.qsoActive && !m_ft8OperatorStopLatched &&
+        (m_ftSession.state == Ft8SequencerState::Idle || m_ftSession.state == Ft8SequencerState::Completed)) {
+        // The queued caller's last message (e.g. a late R-report) gave the sequencer nothing to send:
+        // a QSO without a pending transmission would block CQ resume and Auto mode for good.
+        appendLog(QString("FT caller queue: nothing to send to %1; the empty QSO is dropped.").arg(queued.call));
+        traceFtAutomation("queue.empty_qso_dropped","no_tx_plan",{{"candidate_call",queued.call}});
+        m_ftSession.clearQso();
+        updateFt8SequencerUi();
+        return false;
+    }
     return m_ftSession.qsoActive || m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan;
 }
 

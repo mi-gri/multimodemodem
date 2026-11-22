@@ -17,6 +17,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- Auto mode: after a QSO the caller queue could activate a station whose last message gave the sequencer nothing to send (e.g. a late
+  R-report). That empty QSO stayed active and blocked the CQ series and Auto mode until restart; it is now dropped and the CQ series resumes.
 - Fake It: the temporary TX frequency and the RX frequency after TX are set again (up to 3 attempts, 200 ms apart) when the radio
   answers "Command rejected by the rig" (seen on IC-7300/IC-7610); no more CAT ERROR in the runtime log for that case.
 - The Tune carrier length setting moved to Settings → Audio / PTT / CAT (own group "Tune"); `--startupmenu` writes the chosen
