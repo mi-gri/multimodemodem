@@ -126,6 +126,13 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'FT verspätetes Ende: kein 73 an %1, sein RR73 ist älter als 2 Minuten (QSO ist geloggt).',
   'FT sen avslutning: ingen 73 til %1, RR73 er mer enn 2 minutter gammel (QSO er logget).',
   'FT opožděné ukončení: žádné 73 pro %1, jeho RR73 je starší než 2 minuty (spojení je zapsáno).'),
+ 'log.ft_caller_queue_nothing_to_send_to_1_the_empty_qso_is_dropped':(
+  'FT caller queue: nothing to send to %1; the empty QSO is dropped.',
+  'Coda chiamanti FT: niente da inviare a %1; il QSO vuoto viene scartato.',
+  "File des appelants FT : rien à envoyer à %1 ; le QSO vide est abandonné.",
+  'FT-Anruferliste: nichts an %1 zu senden; das leere QSO wird verworfen.',
+  'FT-anroperkø: ingenting å sende til %1; den tomme QSO-en forkastes.',
+  'Fronta volajících FT: pro %1 není co vysílat; prázdné QSO se zahazuje.'),
  'log.ft_late_final_sending_73_to_1':(
   'FT late final: sending 73 to %1.','FT conferma tardiva: invio 73 a %1.','FT confirmation tardive : envoi de 73 à %1.',
   'FT verspätetes Ende: sende 73 an %1.','FT sen avslutning: sender 73 til %1.','FT opožděné ukončení: posílám 73 pro %1.'),
