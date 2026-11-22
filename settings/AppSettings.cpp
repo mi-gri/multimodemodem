@@ -565,7 +565,12 @@ void AppSettings::load()
     qrzPassword = settings.value("QRZ/password", qrzPassword).toString();
     ftGpuDecodeEnabled = settings.value("FT/gpuDecodeEnabled", false).toBool();
     ftGpuSyncEnabled = settings.value("FT/gpuSyncEnabled", false).toBool();
-    ftAutoModeEnabled = settings.value("FT/autoModeEnabled", false).toBool();
+    ftAutoModeEnabled = false;   // after a start nothing may transmit by itself: Auto mode is always off
+    ftAutoStage = settings.contains("FT/autoStage")
+        ? qBound(1, settings.value("FT/autoStage", 1).toInt(), 4)
+        : (settings.value("FT8/cqRepeat", false).toBool() ? 2 : 1);   // old CQ retry -> stage 2, Auto QSO -> stage 1
+    ftAutoAlternateCount = qBound(1, settings.value("FT/autoAlternateCount", ftAutoAlternateCount).toInt(), 20);
+    ftAutoNoTargetSlots = qBound(1, settings.value("FT/autoNoTargetSlots", ftAutoNoTargetSlots).toInt(), 20);
     ftLateDecodeEnabled = settings.value("FT/lateDecodeEnabled", true).toBool();
     ftDriftRxEnabled = settings.value("FT/driftRxEnabled", false).toBool();
     ftDriftMaxHzPerSec = qBound(0.25, settings.value("FT/driftMaxHzPerSec", 2.0).toDouble(), 20.0);
@@ -1071,7 +1076,10 @@ bool AppSettings::save() const
     else settings.setValue("QRZ/password", qrzPassword);
     settings.setValue("FT/gpuSyncEnabled", ftGpuSyncEnabled);
     settings.setValue("FT/gpuDecodeEnabled", ftGpuDecodeEnabled);
-    settings.setValue("FT/autoModeEnabled", ftAutoModeEnabled);
+    settings.setValue("FT/autoModeEnabled", false);   // never persisted as on
+    settings.setValue("FT/autoStage", ftAutoStage);
+    settings.setValue("FT/autoAlternateCount", ftAutoAlternateCount);
+    settings.setValue("FT/autoNoTargetSlots", ftAutoNoTargetSlots);
     settings.setValue("FT/lateDecodeEnabled", ftLateDecodeEnabled);
     settings.setValue("FT/driftRxEnabled", ftDriftRxEnabled);
     settings.setValue("FT/driftMaxHzPerSec", qBound(0.25, ftDriftMaxHzPerSec, 20.0));

@@ -1,3 +1,4 @@
+#include <QScopedValueRollback>
 #include "utils/AppIcon.h"
 #include "utils/ApplicationIdentity.h"
 #include "runtime/SessionDiagnostics.h"
@@ -13,6 +14,7 @@
 #include "runtime/WeakSignalTxPreparer.h"
 #include "logbook/CqWwRtty.h"
 #include "mainwindow.h"
+#include <QScopedValueRollback>
 #include "dialogs/AutoModeNoticeDialog.h"
 #include "utils/BandPolicy.h"
 #include "audio/AudioDeviceCache.h"
@@ -9859,7 +9861,7 @@ void MainWindow::setupFt8Page()
     m_spinFt8CqTimeoutMin = new QSpinBox(controlGroup);
     m_spinFt8CqTimeoutMin->setRange(1, 99);
     m_spinFt8CqTimeoutMin->setSuffix(QStringLiteral(" x"));
-    m_spinFt8CqTimeoutMin->setToolTip(uiText("ft8_cq_retry_count_tooltip", "Number of CQ transmissions when CQ retry is enabled. After the last unanswered CQ, MM returns to RX standby."));
+    m_spinFt8CqTimeoutMin->setToolTip(uiText("ft8_cq_series_count_tooltip", "Number of CQ transmissions per series (the first one included). After the last unanswered CQ, stage 2 starts a new series; stages 3 and 4 go back to answering."));
 
     m_spinFt8NoResponseLimit = new QSpinBox(controlGroup);
     m_spinFt8NoResponseLimit->setRange(1, 12);
@@ -9888,9 +9890,11 @@ void MainWindow::setupFt8Page()
     // Tune: the button beside the frequency display (all modes).
     m_chkFt8AutoSeq->setChecked(true);
     m_chkFt8AutoSeq->hide();
-    controlGrid->addWidget(m_chkFt8CqRepeat, 1, 0);
-    m_lblFt8CqTimeout = new QLabel(uiText("ft8_cq_retry_count", "CQ retry count"), controlGroup);
-    m_lblFt8CqTimeout->hide(); // count belongs directly beside CQ retry
+    // The CQ retry box is only the model of the CQ phase now (hidden); the stage selector drives it.
+    m_chkFt8CqRepeat->hide();
+    m_lblFt8CqTimeout = new QLabel(uiText("ft8_cq_series_count", "CQs per series"), controlGroup);
+    m_lblFt8CqTimeout->setToolTip(m_spinFt8CqTimeoutMin->toolTip());
+    controlGrid->addWidget(m_lblFt8CqTimeout, 1, 0);
     controlGrid->addWidget(m_spinFt8CqTimeoutMin, 1, 1);
     m_lblFt8NoResponseLimit = new QLabel(uiText("ft8_no_response_limit", "No-response limit"), controlGroup);
     m_lblFt8NoResponseLimit->setToolTip(m_spinFt8NoResponseLimit->toolTip());
@@ -9903,8 +9907,61 @@ void MainWindow::setupFt8Page()
     // Auto QSO sits directly below Auto log; the caller queue gets its own
     // row laid out like the CQ queue row (checkbox left, list button right).
     // Auto QSO as a button beside STOP (orange when on); same checkbox object underneath.
-    controlGrid->addWidget(m_btnFt8AutoQso, 0, 5);
+    m_btnFt8AutoQso->hide();   // replaced by the stage selector below
     m_chkFt8FullAutoQso->hide();
+    m_cmbAutoStage = new QComboBox(controlGroup);
+    m_cmbAutoStage->setObjectName(QStringLiteral("ftAutoStage"));
+    m_cmbAutoStage->addItem(uiText("ft_auto_stage_1", "1 Respond (CQ/RR73/73)"), 1);
+    m_cmbAutoStage->addItem(uiText("ft_auto_stage_2", "2 Call CQ"), 2);
+    m_cmbAutoStage->addItem(uiText("ft_auto_stage_3", "3 CQ and respond alternately"), 3);
+    m_cmbAutoStage->addItem(uiText("ft_auto_stage_4", "4 CQ if no target"), 4);
+    m_cmbAutoStage->setToolTip(uiText("ft_auto_stage_tooltip", "What Auto mode does: 1 answers only CQ, RR73 and 73 of other stations; 2 only calls CQ and works the stations that answer; 3 switches between answering and calling CQ after the set number of QSOs; 4 answers and calls CQ only when no target was there for the set number of slots. Applies when Auto mode is on. After STOP or a mode/band change select the stage again to continue."));
+    m_cmbAutoStage->setStyleSheet(QStringLiteral(
+        "QComboBox#ftAutoStage { border: 2px solid #F28C00; border-radius: 4px; padding: 3px 6px; }"
+        "QComboBox#ftAutoStage:disabled { border-color: palette(mid); }"));
+    controlGrid->addWidget(m_cmbAutoStage, 0, 5);
+    m_lblAutoStageStatus = new QLabel(controlGroup);
+    m_lblAutoStageStatus->setWordWrap(true);
+    M3Ui::setSemanticRole(m_lblAutoStageStatus, QStringLiteral("muted"));
+    controlGrid->addWidget(m_lblAutoStageStatus, 5, 0, 1, 6);
+    m_spinAutoAlternate = new QSpinBox(controlGroup);
+    m_spinAutoAlternate->setRange(1, 20);
+    m_spinAutoAlternate->setValue(qBound(1, m_settings.ftAutoAlternateCount, 20));
+    m_spinAutoAlternate->setSuffix(QStringLiteral(" QSO"));
+    m_spinAutoAlternate->setToolTip(uiText("ft_auto_alternate_tooltip", "Stage 3: number of completed QSOs after which Auto mode switches between answering and calling CQ."));
+    m_spinAutoNoTarget = new QSpinBox(controlGroup);
+    m_spinAutoNoTarget->setRange(1, 20);
+    m_spinAutoNoTarget->setValue(qBound(1, m_settings.ftAutoNoTargetSlots, 20));
+    m_spinAutoNoTarget->setSuffix(QStringLiteral(" Slots"));
+    m_spinAutoNoTarget->setToolTip(uiText("ft_auto_no_target_tooltip", "Stages 3 and 4: number of slots without a station to answer after which Auto mode calls CQ."));
+    {
+        auto *lblAlt = new QLabel(uiText("ft_auto_alternate", "Switch after"), controlGroup);
+        lblAlt->setToolTip(m_spinAutoAlternate->toolTip());
+        controlGrid->addWidget(lblAlt, 7, 0, 1, 2);
+        controlGrid->addWidget(m_spinAutoAlternate, 7, 2);
+        auto *lblNt = new QLabel(uiText("ft_auto_no_target", "CQ after"), controlGroup);
+        lblNt->setToolTip(m_spinAutoNoTarget->toolTip());
+        controlGrid->addWidget(lblNt, 8, 0, 1, 2);
+        controlGrid->addWidget(m_spinAutoNoTarget, 8, 2);
+    }
+    {
+        const int idx = m_cmbAutoStage->findData(qBound(1, m_settings.ftAutoStage, 4));
+        m_cmbAutoStage->setCurrentIndex(idx >= 0 ? idx : 0);
+    }
+    configureAutoPlanner();
+    connect(m_cmbAutoStage, QOverload<int>::of(&QComboBox::activated), this, [this](int) { rearmAutoStage(); });
+    connect(m_spinAutoAlternate, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int v) {
+        m_settings.ftAutoAlternateCount = v;
+        m_settings.save();
+        configureAutoPlanner();
+        applyAutoPhase();
+    });
+    connect(m_spinAutoNoTarget, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int v) {
+        m_settings.ftAutoNoTargetSlots = v;
+        m_settings.save();
+        configureAutoPlanner();
+        applyAutoPhase();
+    });
     m_btnFt8CallerList=new QPushButton(controlGroup);
     m_btnFt8CallerList->setObjectName(QStringLiteral("ftCallerQueueOpen"));
     m_spinFt8CqResumeWait = new QSpinBox(controlGroup);
@@ -11683,8 +11740,14 @@ void MainWindow::setAutoModeEnabledFromUi(bool on)
     }
     m_settings.ftAutoModeEnabled = on;
     m_ft8AutoModeEnabled = on;
-    if (!on && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked())
-        m_chkFt8FullAutoQso->setChecked(false);
+    if (on) {
+        // Switched on by the operator (notice confirmed): this is the explicit action
+        // that arms the selected stage; the STOP latch and a pause end here.
+        m_autoStagePaused = false;
+        m_ft8OperatorStopLatched = false;
+    }
+    configureAutoPlanner();
+    applyAutoPhase();   // off: both models off; on: the stage's first phase
     updateFt8AutoModeVisibility();
     appendLog(on ? QStringLiteral("Auto mode switched on (notice confirmed).")
                  : QStringLiteral("Auto mode switched off; Auto QSO is off."));
@@ -13273,8 +13336,9 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
     // way (the toggle handler ends the automation), then hide the control.
     if (m_ft8AutoModeEnabled != m_settings.ftAutoModeEnabled) {
         m_ft8AutoModeEnabled = m_settings.ftAutoModeEnabled;
-        if (!m_ft8AutoModeEnabled && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked())
-            m_chkFt8FullAutoQso->setChecked(false);
+        if (m_ft8AutoModeEnabled) { m_autoStagePaused = false; m_ft8OperatorStopLatched = false; }
+        configureAutoPlanner();
+        applyAutoPhase();
         updateFt8AutoModeVisibility();
         syncAutoModeUi();
         appendLog(m_ft8AutoModeEnabled ? QStringLiteral("Auto mode enabled in Settings (notice confirmed).")
@@ -15199,6 +15263,7 @@ void MainWindow::applyWaterfallRangeForMode(const QString &modeName)
 void MainWindow::handleModeChanged(const QString &modeName)
 {
     ++m_ftCqResumeGen;   // a pending automatic CQ resume never survives a mode change
+    pauseAutoStage(QStringLiteral("mode change"));
     if (!WsprMode::isMode(modeName) && m_chkWsprTx != nullptr && m_chkWsprTx->isChecked())
         wsprStopBeacon(QStringLiteral("mode changed"));
     restoreTxLevelForContext();
@@ -19290,11 +19355,11 @@ void MainWindow::updateFt8AutoModeVisibility()
     if (!visible) m_js8TxQueue.clear();
 
     if (m_chkFt8CqRepeat != nullptr) {
-        m_chkFt8CqRepeat->setVisible(true);
-        m_chkFt8CqRepeat->setEnabled(!m_offlineAnalysisActive);
+        m_chkFt8CqRepeat->setVisible(false);   // model only; the stage selector drives it
     }
+    if (m_cmbAutoStage != nullptr) m_cmbAutoStage->setEnabled(!m_offlineAnalysisActive);
     if (m_lblFt8CqTimeout != nullptr) {
-        m_lblFt8CqTimeout->setVisible(false);
+        m_lblFt8CqTimeout->setVisible(true);
     }
     if (m_spinFt8CqTimeoutMin != nullptr) {
         m_spinFt8CqTimeoutMin->setVisible(true);
@@ -19311,7 +19376,7 @@ void MainWindow::updateFt8AutoModeVisibility()
         m_chkFt8FullAutoQso->setVisible(false);   // model only; the button is shown
         m_chkFt8FullAutoQso->setEnabled(visible && !m_offlineAnalysisActive);
         if (m_btnFt8AutoQso != nullptr) {
-            m_btnFt8AutoQso->setVisible(visible);
+            m_btnFt8AutoQso->setVisible(false);
             m_btnFt8AutoQso->setEnabled(visible && !m_offlineAnalysisActive);
         }
         if (!visible && m_chkFt8FullAutoQso->isChecked()) {
@@ -19376,9 +19441,157 @@ bool MainWindow::startFt8CqRepeatIfIdle(const QString &reason)
     if (m_chkFt8CqRepeat == nullptr || !m_chkFt8CqRepeat->isChecked() || m_ft8OperatorStopLatched) return false;
     if (m_ftSession.cqRepeatActive || m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning || m_ft8PendingTxArmed)
         return false;
+    // Stations that called us directly are served before a new CQ series starts.
+    if (m_chkFt8CallerQueue != nullptr && m_chkFt8CallerQueue->isChecked() && !m_ft8CallerQueue.isEmpty())
+        return false;
     traceFtAutomation("cq.start", reason);
     startFt8CqRepeat();
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// Auto mode stages. FtAutoPlanner decides only what is due (answer / call CQ);
+// every transmission still passes the existing gates (autoTxPermitted, STOP latch,
+// block lists, ...). The planner drives the two hidden models: the Auto QSO box
+// (answer other stations' CQs) and the CQ retry box (a CQ series).
+// ---------------------------------------------------------------------------
+void MainWindow::configureAutoPlanner()
+{
+    M3::FtAutoPlanner::Config config;
+    config.stage = m_cmbAutoStage != nullptr ? m_cmbAutoStage->currentData().toInt() : m_settings.ftAutoStage;
+    config.alternateCount = m_spinAutoAlternate != nullptr ? m_spinAutoAlternate->value() : m_settings.ftAutoAlternateCount;
+    config.noTargetSlots = m_spinAutoNoTarget != nullptr ? m_spinAutoNoTarget->value() : m_settings.ftAutoNoTargetSlots;
+    m_autoPlanner.configure(config);
+    m_settings.ftAutoStage = m_autoPlanner.stage();
+}
+
+bool MainWindow::autoStageActive() const
+{
+    return m_ft8AutoModeEnabled && !m_autoStagePaused && !m_ft8OperatorStopLatched &&
+           !m_offlineAnalysisActive && !m_shutdownInProgress && !m_runtimeShutdownComplete &&
+           ui != nullptr && ui->cmbMode != nullptr && Ft8Mode::isFamilyMode(ui->cmbMode->currentText());
+}
+
+void MainWindow::applyAutoPhase()
+{
+    if (m_applyingAutoPhase || m_chkFt8FullAutoQso == nullptr || m_chkFt8CqRepeat == nullptr) return;
+    QScopedValueRollback<bool> guard(m_applyingAutoPhase, true);
+    bool wantAnswer = false;
+    bool wantCq = false;
+    if (autoStageActive() && autoTxPermitted()) {
+        (m_autoPlanner.phase() == M3::FtAutoPlanner::Phase::Cq ? wantCq : wantAnswer) = true;
+    }
+    // Switch the phase that is no longer wanted off first (the handlers keep them exclusive).
+    if (!wantAnswer && m_chkFt8FullAutoQso->isChecked()) m_chkFt8FullAutoQso->setChecked(false);
+    if (!wantCq && m_chkFt8CqRepeat->isChecked()) m_chkFt8CqRepeat->setChecked(false);
+    if (wantAnswer && !m_chkFt8FullAutoQso->isChecked()) m_chkFt8FullAutoQso->setChecked(true);
+    if (wantCq && !m_chkFt8CqRepeat->isChecked()) m_chkFt8CqRepeat->setChecked(true);
+    updateAutoStageStatus();
+}
+
+void MainWindow::rearmAutoStage()
+{
+    if (m_cmbAutoStage == nullptr) return;
+    m_settings.save();
+    // Choosing the stage is the explicit operator action that ends a pause (STOP, mode or band change).
+    if (m_ft8AutoModeEnabled) {
+        m_autoStagePaused = false;
+        m_ft8OperatorStopLatched = false;
+    }
+    configureAutoPlanner();
+    m_settings.save();
+    if (m_ft8AutoModeEnabled)
+        appendLog(uiText("ft_auto_stage_selected_log", "Auto stage %1 selected.").arg(m_autoPlanner.stage()));
+    applyAutoPhase();
+}
+
+void MainWindow::pauseAutoStage(const QString &reason)
+{
+    if (m_ft8AutoModeEnabled && !m_autoStagePaused) {
+        m_autoStagePaused = true;
+        appendLog(uiText("ft_auto_stage_paused_log", "Auto stage paused (%1): select the stage again to continue.").arg(reason));
+    }
+    applyAutoPhase();
+}
+
+void MainWindow::autoStageSlotTick()
+{
+    if (!autoStageActive()) {
+        updateAutoStageStatus();
+        return;
+    }
+    const bool busy = m_ftSession.qsoActive || m_ftSession.cqRepeatActive || m_txRunning || m_ftTxWorkerRunning ||
+                      m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan || m_txPreparationPending;
+    bool target = !m_ft8CallerQueue.isEmpty();
+    for (const auto &candidate : std::as_const(m_ft8FullAutoCqCandidates))
+        if (candidate.cq) target = true;
+    const auto before = m_autoPlanner.phase();
+    m_autoPlanner.slotPassed(target, busy);
+    if (m_autoPlanner.phase() != before)
+        appendLog(uiText("ft_auto_phase_log", "Auto stage %1: now %2.").arg(m_autoPlanner.stage())
+                      .arg(m_autoPlanner.phase() == M3::FtAutoPlanner::Phase::Cq
+                               ? uiText("ft_auto_phase_cq", "calling CQ") : uiText("ft_auto_phase_answer", "answering CQs")));
+    applyAutoPhase();
+    if (m_autoPlanner.phase() == M3::FtAutoPlanner::Phase::Cq && m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked() && !busy)
+        startFt8CqRepeatIfIdle(QStringLiteral("Auto stage"));
+    updateAutoStageStatus();
+}
+
+void MainWindow::autoStageQsoCompleted()
+{
+    if (!autoStageActive()) return;
+    const auto before = m_autoPlanner.phase();
+    m_autoPlanner.qsoCompleted();
+    if (m_autoPlanner.phase() != before)
+        appendLog(uiText("ft_auto_phase_log", "Auto stage %1: now %2.").arg(m_autoPlanner.stage())
+                      .arg(m_autoPlanner.phase() == M3::FtAutoPlanner::Phase::Cq
+                               ? uiText("ft_auto_phase_cq", "calling CQ") : uiText("ft_auto_phase_answer", "answering CQs")));
+    applyAutoPhase();
+}
+
+void MainWindow::autoStageCqSeriesUnanswered()
+{
+    if (!autoStageActive()) return;
+    const auto before = m_autoPlanner.phase();
+    m_autoPlanner.cqSeriesUnanswered();
+    if (m_autoPlanner.phase() != before) {
+        appendLog(uiText("ft_auto_phase_log", "Auto stage %1: now %2.").arg(m_autoPlanner.stage())
+                      .arg(uiText("ft_auto_phase_answer", "answering CQs")));
+        applyAutoPhase();
+        return;
+    }
+    if (m_autoPlanner.phase() != M3::FtAutoPlanner::Phase::Cq) return;
+    // Stage 2: the unanswered series is followed by a new one after the wait slots (at least one).
+    const QString mode = ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QStringLiteral("FT8");
+    const int slotMs = Ft8Mode::profileForMode(mode).slotMs;
+    const int waitSlots = qBound(1, m_settings.ft8CqResumeWaitSlots, 10);
+    const quint64 gen = m_ftCqResumeGen;   // STOP, Tune, mode/band change or SWR stop cancel it
+    QTimer::singleShot(waitSlots * slotMs, this, [this, gen, mode]() {
+        const QString nowMode = ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QString();
+        if (gen != m_ftCqResumeGen || nowMode != mode || !autoStageActive() ||
+            m_autoPlanner.phase() != M3::FtAutoPlanner::Phase::Cq || m_ftSession.qsoActive || m_ftSession.cqRepeatActive ||
+            m_txRunning || m_txPreparationPending || m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan) return;
+        applyAutoPhase();   // checks the CQ model again; its handler starts the series
+        if (m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked()) startFt8CqRepeatIfIdle(QStringLiteral("Auto stage"));
+    });
+}
+
+void MainWindow::updateAutoStageStatus()
+{
+    if (m_lblAutoStageStatus == nullptr) return;
+    QString text;
+    if (!m_ft8AutoModeEnabled) {
+        text = uiText("ft_auto_status_off", "Auto mode is off; switch it on with the Auto button.");
+    } else if (m_autoStagePaused || m_ft8OperatorStopLatched) {
+        text = uiText("ft_auto_status_paused", "Auto paused (STOP, mode or band change): select the stage again to continue.");
+    } else if (m_autoPlanner.phase() == M3::FtAutoPlanner::Phase::Cq) {
+        text = uiText("ft_auto_status_cq", "Auto stage %1: calling CQ (QSOs in this phase: %2)")
+                   .arg(m_autoPlanner.stage()).arg(m_autoPlanner.qsosInPhase());
+    } else {
+        text = uiText("ft_auto_status_answer", "Auto stage %1: answering CQ / RR73 / 73 (QSOs in this phase: %2)")
+                   .arg(m_autoPlanner.stage()).arg(m_autoPlanner.qsosInPhase());
+    }
+    m_lblAutoStageStatus->setText(text);
 }
 
 void MainWindow::handleFt8FullAutoQsoToggled(bool enabled)
@@ -20753,6 +20966,7 @@ void MainWindow::handleFt8TxCompleted()
             savePersistentSettings();
             appendLog("FT8 CQ retry count reached; staying in RX.");
             updateFt8SequencerUi();
+            autoStageCqSeriesUnanswered();
             return;
         }
         m_ftSession.state = Ft8SequencerState::CallingCq;
@@ -20855,6 +21069,8 @@ void MainWindow::completeFt8Qso(const QString &reason)
     m_deferredFt8TxPlan.tag.clear();
     m_deferredFt8TxPlan = FtTxPlan();
     m_ftSession.deferredState = Ft8SequencerState::Idle;
+    // Auto stages: the planner may switch between answering and calling CQ after this QSO.
+    if (countSessionQso) autoStageQsoCompleted();
     const bool autoQsoArmed = autoTxPermitted() && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked();
     // Auto mode: a CQ series that was running when the reply came continues
     // after every QSO with a fresh count.  Without Auto mode, or after STOP,
@@ -22222,8 +22438,6 @@ void MainWindow::queueFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
 
 void MainWindow::handleFt8DecodeBatchFinished(qint64 slotStartUtcMs, const QString &phase)
 {
-    Q_UNUSED(slotStartUtcMs)
-    Q_UNUSED(phase)
 
     // Apply all visual rows in one GUI transaction. Decoder rows were queued
     // while the batch was active, so the table, log, overlays and scroll bar do
@@ -22288,6 +22502,10 @@ void MainWindow::handleFt8DecodeBatchFinished(qint64 slotStartUtcMs, const QStri
     if (!m_ft8FullAutoCqCandidates.isEmpty()) {
         m_ft8FullAutoCqSelectionTimer.stop();
         processFt8FullAutoCqCandidates();
+    }
+    if (phase == QStringLiteral("boundary") && slotStartUtcMs != m_autoTickSlotUtcMs) {
+        m_autoTickSlotUtcMs = slotStartUtcMs;
+        autoStageSlotTick();
     }
 }
 
@@ -23056,6 +23274,7 @@ void MainWindow::stopFt8ShellImpl(bool keepAutomation)
         });
     }
 
+    if (!keepAutomation) pauseAutoStage(QStringLiteral("STOP"));
     if (!keepAutomation && m_chkFt8FullAutoQso != nullptr && m_chkFt8FullAutoQso->isChecked()) {
         m_chkFt8FullAutoQso->setChecked(false);
     }

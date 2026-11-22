@@ -163,6 +163,7 @@ void MainWindow::abortTxForBandChange(const QString &from, const QString &to)
     ++m_ftCqResumeGen;
     m_txBandOverride.clear();
     m_autoTxBlockLoggedKey.clear();
+    pauseAutoStage(QStringLiteral("band change"));   // new situation: the operator selects the Auto stage again
     const bool ftActive = m_ftTxWorkerRunning || m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan ||
                           m_pendingFt8PttKeyed || m_ftSession.qsoActive || m_ftSession.cqRepeatActive;
     const bool wsprOn = m_chkWsprTx != nullptr && m_chkWsprTx->isChecked();

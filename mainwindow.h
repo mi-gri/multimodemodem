@@ -1,4 +1,5 @@
 #include "runtime/AsyncCatCommand.h"
+#include "modems/ft8/FtAutoPlanner.h"
 #include "runtime/RxDecoderWorker.h"
 #include "runtime/LogbookIndexWorker.h"
 #include "runtime/TextAssistWorker.h"
@@ -885,6 +886,17 @@ private slots:
     bool activateNextFt8QueuedCaller();
     // Starts CQ repeat when it is checked and FT is idle; false otherwise.
     bool startFt8CqRepeatIfIdle(const QString &reason);
+    // Auto mode stages (see modems/ft8/FtAutoPlanner.h): one control replaces the old
+    // "Auto QSO" button and the "CQ retry" box, which stay as hidden models.
+    void configureAutoPlanner();
+    bool autoStageActive() const;
+    void applyAutoPhase();
+    void rearmAutoStage();
+    void pauseAutoStage(const QString &reason);
+    void autoStageSlotTick();
+    void autoStageQsoCompleted();
+    void autoStageCqSeriesUnanswered();
+    void updateAutoStageStatus();
     // Country file (cty.csv) download: Help menu and optional weekly check.
     void startCtyUpdate(bool userInitiated);
     void handleCtyUpdateFinished(bool ok, bool updated, const QString &message, bool userInitiated);
@@ -2518,7 +2530,15 @@ private:
     QLabel *m_lblFt8CqTimeout = nullptr;
     QCheckBox *m_chkFt8AutoLog = nullptr;
     QCheckBox *m_chkFt8FullAutoQso = nullptr;     // model of Auto QSO (hidden); shown as m_btnFt8AutoQso
-    QPushButton *m_btnFt8AutoQso = nullptr;
+    QPushButton *m_btnFt8AutoQso = nullptr;   // hidden (replaced by the stage selector)
+    M3::FtAutoPlanner m_autoPlanner;
+    QComboBox *m_cmbAutoStage = nullptr;
+    QSpinBox *m_spinAutoAlternate = nullptr;
+    QSpinBox *m_spinAutoNoTarget = nullptr;
+    QLabel *m_lblAutoStageStatus = nullptr;
+    bool m_autoStagePaused = false;       // STOP / mode or band change: select the stage again to continue
+    bool m_applyingAutoPhase = false;
+    qint64 m_autoTickSlotUtcMs = 0;
     QCheckBox *m_chkFt8CallerQueue = nullptr;
     QLabel *m_lblFt8SessionQueue = nullptr;
     bool m_ft8AutoModeEnabled = false;  // Settings: Auto mode (Auto QSO) after the legal notice
