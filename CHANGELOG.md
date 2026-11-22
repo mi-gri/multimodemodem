@@ -12,6 +12,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   same parity (slot memory, repeated CQs), and the Costasarray search uses reusable real-FFT plans (about 12-17 % faster on
   the simulated band recordings, identical decodes there).
 - MSK144 decode list: new "ms" column with the ping duration in 20 ms steps.
+- MSK144 and Q65 use the Split Operation (Rig / Fake It) of FT4/FT8 too: TX audio kept at 1500-2000 Hz, dial moved by CAT
+  in 500 Hz steps and restored after TX; with Split Operation None nothing changes.
 
 ## m³ 0.26.11
 

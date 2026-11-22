@@ -1710,7 +1710,9 @@ private:
 
     QString ftSplitOperationKey() const;
     int ftEffectiveTxAudioFrequency(int logicalFrequencyHz, int *rfShiftHz = nullptr) const;
-    void prepareFtSplitForTx(std::function<void(bool)> completion);
+    QString weakSignalSplitLabel(int logicalTxHz) const;
+    void prepareFtSplitForTx(std::function<void(bool)> completion, int logicalTxHz = -1);
+    void keyPttForTxWithSplit(bool split, int logicalTxHz, std::function<void(bool)> completion);
     void restoreFtSplitAfterTx();
 
     /**
