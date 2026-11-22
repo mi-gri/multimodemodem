@@ -8,6 +8,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 - RX noise blanker (Decode → Noise Blanker: Off / NB2 Auto / NB2, three thresholds) and MSK144 carrier notch (ZAP), ported from
   the MadModem upstream (IC8TEM). Applied before the FT8/FT4, Q65 and text-mode decoders; off by default, no delay when off;
   the 48 ms delay is subtracted from the decode times.
+- FT8/FT4 decoder (port from the MadModem upstream): weak CQs are recovered from the soft decisions of earlier slots of the
+  same parity (slot memory, repeated CQs), and the Costasarray search uses reusable real-FFT plans (about 12-17 % faster on
+  the simulated band recordings, identical decodes there).
+- MSK144 decode list: new "ms" column with the ping duration in 20 ms steps.
 
 ## m³ 0.26.11
 

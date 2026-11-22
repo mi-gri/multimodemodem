@@ -4965,8 +4965,8 @@ void MainWindow::setupTextTerminalPages()
 
     QLabel *mskCaption = new QLabel(uiText("msk144_activity", "MSK144 activity"), m_msk144DisplayPage);
     mskCaption->setStyleSheet(QStringLiteral("font-weight: 600;"));
-    m_tableMsk144Rx = new QTableWidget(0, 5, m_msk144DisplayPage);
-    m_tableMsk144Rx->setHorizontalHeaderLabels(QStringList() << "UTC" << "dB" << "T" << "DF" << "Message");
+    m_tableMsk144Rx = new QTableWidget(0, 6, m_msk144DisplayPage);
+    m_tableMsk144Rx->setHorizontalHeaderLabels(QStringList() << "UTC" << "dB" << "T" << "DF" << "Message" << "ms");
     m_tableMsk144Rx->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_tableMsk144Rx->setSelectionMode(QAbstractItemView::SingleSelection);
     m_tableMsk144Rx->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -4976,6 +4976,13 @@ void MainWindow::setupTextTerminalPages()
     m_tableMsk144Rx->setColumnWidth(1, 42);
     m_tableMsk144Rx->setColumnWidth(2, 42);
     m_tableMsk144Rx->setColumnWidth(3, 52);
+    // Ping duration (ms, 20 ms steps) after the message, as in MSK144ms.
+    m_tableMsk144Rx->horizontalHeader()->setStretchLastSection(false);
+    m_tableMsk144Rx->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
+    m_tableMsk144Rx->setColumnWidth(5, 54);
+    if (QTableWidgetItem *header = m_tableMsk144Rx->horizontalHeaderItem(5)) {
+        header->setToolTip(uiText("msk_ping_ms_tip", "Ping duration in ms (20 ms steps): how long the MSK144 band stayed 3 dB above the noise of the period around the decoded frame."));
+    }
     applyDecodeTableVisualSettings(m_tableMsk144Rx);
     connect(m_tableMsk144Rx, &QTableWidget::cellClicked, this, [this](int row, int) {
         if (m_tableMsk144Rx == nullptr || row < 0 || row >= m_tableMsk144Rx->rowCount()) return;
@@ -16033,6 +16040,7 @@ void MainWindow::handleMsk144DecodeReady(const Msk144Decode &decode)
         m_tableMsk144Rx->setItem(row, 2, new QTableWidgetItem(QString::number(decode.tSeconds, 'f', 1)));
         m_tableMsk144Rx->setItem(row, 3, new QTableWidgetItem(QString::number(decode.dfHz)));
         m_tableMsk144Rx->setItem(row, 4, new QTableWidgetItem(decode.message));
+        m_tableMsk144Rx->setItem(row, 5, new QTableWidgetItem(decode.pingWidthMs > 0 ? QString::number(decode.pingWidthMs) : QString()));
         while (m_tableMsk144Rx->rowCount() > 600) {
             m_tableMsk144Rx->removeRow(0);
         }

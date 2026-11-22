@@ -101,7 +101,7 @@ KEYS.update({
                    'Hat das DX-Rufzeichen keinen Locator, sucht MadModem in diesen Quellen in dieser Reihenfolge und füllt den DX-Locator aus. Die kleine Marke im Feld zeigt die Herkunft; mit der Maus darauf sieht man, was jede Quelle meldet.',
                    'Når DX-kallesignalet ikke har lokator, leter MadModem i disse kildene i denne rekkefølgen og fyller ut DX-lokatoren. Den lille merkelappen i feltet viser hvor lokatoren kommer fra; hold musen over den for å se hva hver kilde sier.',
                    'Když DX značka nemá lokátor, MadModem ho hledá v těchto zdrojích v tomto pořadí a vyplní DX lokátor. Malý štítek v poli ukazuje, odkud lokátor pochází; po najetí myší je vidět, co říká každý zdroj.'),
-    'loc_src_rx': _t('Decodes of the last %1 periods', 'Decodifiche degli ultimi %1 periodi', 'Décodages des %1 dernières périodes', 'Dekodierungen der letzten %1 Perioden', 'Dekodinger fra de siste %1 periodene', 'Dekódování za posledních %1 period'),
+    'loc_src_rx': _t('Decodes of the last %1 periods', 'Decodifiche degli ultimi %1 periodi', 'Décodages des %1 dernières périodes', 'Dekodierungen der letzten %1 Slots', 'Dekodinger fra de siste %1 periodene', 'Dekódování za posledních %1 period'),
     'loc_src_web': _t('Online (api.g7vrd.co.uk)', 'In rete (api.g7vrd.co.uk)', 'En ligne (api.g7vrd.co.uk)', 'Online (api.g7vrd.co.uk)', 'På nett (api.g7vrd.co.uk)', 'Online (api.g7vrd.co.uk)'),
     'loc_web_info': _t('The online lookup sends the call to api.g7vrd.co.uk only when no other source has the locator; the answers are kept for 30 days.',
                        "La ricerca in rete invia il nominativo ad api.g7vrd.co.uk solo se nessun'altra fonte ha il locatore; le risposte restano per 30 giorni.",
@@ -199,7 +199,7 @@ KEYS.update({
     'msk_ping_ms_tip': _t('Ping duration in ms (20 ms steps): how long the MSK144 band stayed 3 dB above the noise of the period around the decoded frame.',
                           'Durata del ping in ms (passi di 20 ms): per quanto la banda MSK144 è rimasta 3 dB sopra il rumore del periodo attorno al frame decodificato.',
                           'Durée du ping en ms (pas de 20 ms) : combien de temps la bande MSK144 est restée 3 dB au-dessus du bruit de la période autour de la trame décodée.',
-                          'Ping-Dauer in ms (20-ms-Schritte): wie lange das MSK144-Band um den dekodierten Rahmen 3 dB über dem Rauschen der Periode blieb.',
+                          'Ping-Dauer in ms (20-ms-Schritte): wie lange das MSK144-Band um den dekodierten Rahmen 3 dB über dem Rauschen des MSK144-Slots blieb.',
                           'Ping-varighet i ms (trinn på 20 ms): hvor lenge MSK144-båndet lå 3 dB over støyen i perioden rundt den dekodede rammen.',
                           'Délka pingu v ms (kroky 20 ms): jak dlouho bylo pásmo MSK144 kolem dekódovaného rámce 3 dB nad šumem periody.'),
 })
