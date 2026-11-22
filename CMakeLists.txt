@@ -564,6 +564,8 @@ add_executable(MultiModeModem
     widgets/RadioTelescopeHeatmapWidget.cpp
     widgets/CwDiagnosticWidget.h
     widgets/CwDiagnosticWidget.cpp
+    utils/ButtonFeedback.h
+    utils/ButtonFeedback.cpp
     widgets/RxNoiseBlankerMenu.h
     widgets/RxNoiseBlankerMenu.cpp
     utils/RuntimeI18n.h

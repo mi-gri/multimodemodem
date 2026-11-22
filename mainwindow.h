@@ -898,6 +898,7 @@ private slots:
     void autoStageQsoCompleted();
     void autoStageCqSeriesUnanswered();
     void updateAutoStageStatus();
+    void updateStopLatchIndicator();
     // Country file (cty.csv) download: Help menu and optional weekly check.
     void startCtyUpdate(bool userInitiated);
     void handleCtyUpdateFinished(bool ok, bool updated, const QString &message, bool userInitiated);

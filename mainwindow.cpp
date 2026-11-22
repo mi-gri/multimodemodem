@@ -1,4 +1,5 @@
 #include <QScopedValueRollback>
+#include "utils/ButtonFeedback.h"
 #include "utils/AppIcon.h"
 #include "utils/ApplicationIdentity.h"
 #include "runtime/SessionDiagnostics.h"
@@ -10005,6 +10006,7 @@ void MainWindow::setupFt8Page()
         activateNextFt8QueuedCaller();
         processFtCqWorkList();
         processFt8FullAutoCqCandidates();
+        updateStopLatchIndicator();
         if(m_ftCqDialog && m_ftCqDialog->isVisible()) refreshFtCqWorkListUi();
     });
     m_ftCqWorkListTimer.start();
@@ -12722,6 +12724,11 @@ void MainWindow::setupUiConnections()
         connect(m_btnFt8Tx, &QPushButton::clicked,
                 this, &MainWindow::startFt8TxShell);
     }
+    M3ButtonFeedback::install();   // pressed buttons flash; STOP buttons red
+    for (QAbstractButton *stop : {static_cast<QAbstractButton *>(m_btnFt8Stop), static_cast<QAbstractButton *>(m_btnMsk144Stop),
+                                  static_cast<QAbstractButton *>(m_btnQ65Stop), static_cast<QAbstractButton *>(m_btnJs8Stop),
+                                  static_cast<QAbstractButton *>(m_btnStopImageTx), static_cast<QAbstractButton *>(m_btnRadioTelescopeStopScan)})
+        M3ButtonFeedback::markStop(stop);
     if (m_btnFt8Stop != nullptr) {
         connect(m_btnFt8Stop, &QPushButton::clicked,
                 this, &MainWindow::stopFt8Shell);
@@ -19617,8 +19624,16 @@ void MainWindow::autoStageCqSeriesUnanswered()
     });
 }
 
+void MainWindow::updateStopLatchIndicator()
+{
+    // The FT STOP button stays red while STOP is active (automatic transmissions locked).
+    M3ButtonFeedback::setLatched(m_btnFt8Stop, m_ft8OperatorStopLatched,
+        uiText("ft_stop_latched_tooltip", "STOP is active: nothing is sent automatically. Press TX, or select the Auto stage again, to continue."));
+}
+
 void MainWindow::updateAutoStageStatus()
 {
+    updateStopLatchIndicator();
     if (m_lblAutoStageStatus == nullptr) return;
     QString text;
     if (!m_ft8AutoModeEnabled) {
@@ -23338,6 +23353,7 @@ void MainWindow::stopFt8ShellImpl(bool keepAutomation)
     }
 
     stopFt8Sequencer(keepAutomation ? QStringLiteral("Clear DX") : QStringLiteral("STOP requested"));
+    updateStopLatchIndicator();
     setReceiverRunning(m_rxRunning && !m_txRunning);
     updateTxControlState();
     updateFt8TxBannerUi();
