@@ -2559,6 +2559,7 @@ private:
     QString m_ftTxOriginHint;             // why the next FT transmission is scheduled (set by the caller, consumed once)
     QString m_lastFtTxOriginLine;
     qint64 m_lastFtTxOriginMs = 0;
+    qint64 m_ft8StopLatchedSinceMs = 0;   // when STOP was pressed (the second click lifts it)
     bool m_autoStagePaused = false;       // STOP / mode or band change: select the stage again to continue
     bool m_applyingAutoPhase = false;
     qint64 m_autoTickSlotUtcMs = 0;

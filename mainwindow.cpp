@@ -12724,8 +12724,23 @@ void MainWindow::setupUiConnections()
                                   static_cast<QAbstractButton *>(m_btnStopImageTx), static_cast<QAbstractButton *>(m_btnRadioTelescopeStopScan)})
         M3ButtonFeedback::markStop(stop);
     if (m_btnFt8Stop != nullptr) {
-        connect(m_btnFt8Stop, &QPushButton::clicked,
-                this, &MainWindow::stopFt8Shell);
+        connect(m_btnFt8Stop, &QPushButton::clicked, this, [this]() {
+            // A second click on the red STOP lifts the STOP lock (not within the first 800 ms, so a hasty double-click
+            // never undoes a STOP). Nothing is sent by this click; with Auto mode on, the paused stage still has to be
+            // selected again.
+            if (m_ft8OperatorStopLatched && m_ft8StopLatchedSinceMs > 0 &&
+                QDateTime::currentMSecsSinceEpoch() - m_ft8StopLatchedSinceMs > 800) {
+                m_ft8OperatorStopLatched = false;
+                m_ft8StopLatchedSinceMs = 0;
+                appendLog(m_ft8AutoModeEnabled
+                              ? uiText("ft_stop_released_auto_log", "STOP released. Automatic transmissions stay paused until the Auto stage is selected again.")
+                              : uiText("ft_stop_released_log", "STOP released. Manual operation continues."));
+                updateStopLatchIndicator();
+                updateAutoStageStatus();
+                return;
+            }
+            stopFt8Shell();
+        });
     }
     if (m_btnFt8ClearDx != nullptr) {
         connect(m_btnFt8ClearDx, &QPushButton::clicked, this, &MainWindow::clearFt8Dx);
@@ -19624,8 +19639,10 @@ void MainWindow::autoStageCqSeriesUnanswered()
 void MainWindow::updateStopLatchIndicator()
 {
     // The FT STOP button stays red while STOP is active (automatic transmissions locked).
-    M3ButtonFeedback::setLatched(m_btnFt8Stop, m_ft8OperatorStopLatched,
-        uiText("ft_stop_latched_tooltip", "STOP is active: nothing is sent automatically. Press TX, or select the Auto stage again, to continue."));
+    // Red only while it matters: STOP is active and Auto mode runs a stage (otherwise only the flash on the click).
+    const bool red = m_ft8OperatorStopLatched && m_ft8AutoModeEnabled && m_autoPlanner.stage() != 0;
+    M3ButtonFeedback::setLatched(m_btnFt8Stop, red,
+        uiText("ft_stop_latched_tooltip", "STOP is active: nothing is sent automatically. Click again to release STOP; with Auto mode on, select the Auto stage again."));
 }
 
 void MainWindow::updateAutoStageStatus()
@@ -23360,6 +23377,7 @@ void MainWindow::stopFt8ShellImpl(bool keepAutomation)
     if(m_ftTxWorker)m_ftTxWorker->cancelPendingStart();
     // STOP latches the automation off; Clear DX (keepAutomation) does not.
     m_ft8OperatorStopLatched = !keepAutomation;
+    m_ft8StopLatchedSinceMs = keepAutomation ? 0 : QDateTime::currentMSecsSinceEpoch();
     m_ft8TxStartFailureCount = 0;
     const bool txWasActive = (m_txRunning ||
                               m_ftTxWorkerRunning ||

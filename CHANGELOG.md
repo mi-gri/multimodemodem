@@ -16,8 +16,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 - A QSO that was given up without a reply (no-response limit) is kept for 15 minutes; a late message of that station (report, R-report, RR73/73)
   resumes it. A QSO started under Auto mode resumes only while Auto mode may transmit (not in stage 0); a manually started one may also resume with Auto
   off. STOP, blocked stations and bands without TX permission never resume.
-- Pressed buttons give visible feedback: every push/tool button flashes briefly (theme highlight colour), STOP buttons flash red, and the FT STOP
-  button stays red while STOP is active (automatic transmissions locked) until TX is pressed or the Auto stage is selected again.
+- Pressed buttons give visible feedback: every push/tool button flashes briefly (theme highlight colour), STOP buttons flash red. The FT STOP button stays
+  red while STOP is active and Auto mode runs a stage; a second click (after 0.8 s) lifts the STOP lock without sending anything (with Auto mode on the
+  paused stage still has to be selected again), as do TX, a double-click on a line, selecting the stage again and switching Auto mode on.
 - Every FT transmission now logs why it happens ("TX reason: ...": Auto stage and answered CQ, caller queue, CQ series, repeat, QSO sequence, manual) in the
   runtime log and as `tx.origin` in the session diagnostics.
 - RX noise blanker (Decode → Noise Blanker: Off / NB2 Auto / NB2, three thresholds) and MSK144 carrier notch (ZAP), ported from
