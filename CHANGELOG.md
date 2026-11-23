@@ -42,6 +42,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- Runtime log: when a newer transmission plan replaces the one being prepared, the cancelled CAT split preparation is no longer reported as "FT TX
+  aborted: CAT split preparation failed"; the log says it was replaced (no error).
 - QSO activity table: a double-click on a received line that is addressed to my call now answers that station at once (and switches away from the
   station being called), like a double-click in the decode table. Before, only the station was selected ("press TX") and the running QSO went on.
 - Runtime log: when a newer transmission plan replaces the one being prepared (e.g. the partner's reply arrives just before the slot), the cancelled
