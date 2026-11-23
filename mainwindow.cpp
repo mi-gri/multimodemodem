@@ -19468,7 +19468,7 @@ void MainWindow::handleFt8AutoCqToggled(bool enabled)
         m_chkFt8FullAutoQso->setChecked(false);
     }
 
-    appendLog("FT CQ retry enabled: MM will repeat the selected CQ for the configured count, then stay in RX.");
+    appendLog(uiText("ft_cq_series_active_log", "CQ series active: m³ calls the selected CQ up to %1 times, then stays in RX.").arg(m_spinFt8CqTimeoutMin != nullptr ? m_spinFt8CqTimeoutMin->value() : m_settings.ft8CqRepeatCount));
     const bool liveCq=(m_txRunning||m_ftTxWorkerRunning) && isFt8CqMessage(m_ftSession.lastTxPlan.message);
     const bool pendingCq=m_ft8PendingTxArmed && isFt8CqMessage(m_pendingFt8TxPlan.message);
     if(!m_ftSession.qsoActive && (liveCq||pendingCq)) {
