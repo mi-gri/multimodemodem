@@ -566,6 +566,7 @@ void AppSettings::load()
     ftGpuDecodeEnabled = settings.value("FT/gpuDecodeEnabled", false).toBool();
     ftGpuSyncEnabled = settings.value("FT/gpuSyncEnabled", false).toBool();
     ftAutoModeEnabled = false;   // after a start nothing may transmit by itself: Auto mode is always off
+    ftDoubleMessage = settings.value("FT/doubleMessage", false).toBool();
     ftAutoStage = settings.contains("FT/autoStage")
         ? qBound(0, settings.value("FT/autoStage", 1).toInt(), 4)
         : (settings.value("FT8/cqRepeat", false).toBool() ? 2 : 1);   // old CQ retry -> stage 2, Auto QSO -> stage 1
@@ -1077,6 +1078,7 @@ bool AppSettings::save() const
     settings.setValue("FT/gpuSyncEnabled", ftGpuSyncEnabled);
     settings.setValue("FT/gpuDecodeEnabled", ftGpuDecodeEnabled);
     settings.setValue("FT/autoModeEnabled", false);   // never persisted as on
+    settings.setValue("FT/doubleMessage", ftDoubleMessage);
     settings.setValue("FT/autoStage", ftAutoStage);
     settings.setValue("FT/autoAlternateCount", ftAutoAlternateCount);
     settings.setValue("FT/autoNoTargetSlots", ftAutoNoTargetSlots);

@@ -20308,6 +20308,7 @@ void MainWindow::startFt8CqRepeat()
 void MainWindow::stopFt8Sequencer(const QString &reason)
 {
     ++m_ftCqResumeGen;
+    dropDoubleMessage(true);   // a double message that was not sent: the second station goes back to the queue
     traceFtAutomation("sequencer.stop",reason);
     if (m_ft8OperatorStopLatched) { refreshFtCqWorkListUi(); }
     m_ftSession.resetAll();
@@ -20701,6 +20702,111 @@ bool MainWindow::resumePausedFt8Qso(const FtQsoSequencer::ParsedMessage &parsed,
     return true;
 }
 
+static bool ftCallerPlausible(const QString &call);
+
+// ---------------------------------------------------------------------------
+// Double message: when RR73 goes to A and a regular caller B is waiting whose call arrived in the same
+// kind of slot, ONE transmission carries both: "A RR73; B <MYCALL> -nn". A's QSO is complete with it, B has his
+// report and continues like after a plain report. FT8 only; independent of Auto mode (it only adds B to a
+// transmission that happens anyway); B must pass the same checks as any queued caller.
+// ---------------------------------------------------------------------------
+QString MainWindow::maybeDoubleMessage(const QString &rr73Message, const Ft8RxDecoder::Decode &decode)
+{
+    if (!m_settings.ftDoubleMessage || m_ft8OperatorStopLatched || m_doubleTx.valid) return rr73Message;
+    const QString modeName = ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QString();
+    const Ft8Mode::Profile profile = Ft8Mode::profileForMode(modeName);
+    if (profile.shortLabel.compare(QStringLiteral("FT8"), Qt::CaseInsensitive) != 0) return rr73Message;
+    QStringList words = rr73Message.trimmed().toUpper().split(QLatin1Char(' '), Qt::SkipEmptyParts);
+    if (words.size() != 3 || words.at(2) != QStringLiteral("RR73")) return rr73Message;
+    QString plainA = words.at(0);
+    plainA.remove(QLatin1Char('<')).remove(QLatin1Char('>'));
+    const QString callA = FtDecodedText::baseCall(plainA);
+    const QString myCall = stationCallsign();
+    if (!M3::FtDoubleMessage::isStandardCall(callA) || myCall.isEmpty()) return rr73Message;
+
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    for (int idx : m_workQueue.order(now)) {
+        const M3::FtQueueEntry entry = m_workQueue.entries.at(idx);
+        if (entry.source != M3::QueueSource::Caller || entry.noReply(now) || entry.pinned) continue;
+        const QString callB = entry.call.trimmed().toUpper();
+        if (FtDecodedText::callMatches(callB, callA) || isFtCallBlacklisted(callB) || !ftCallerPlausible(callB) ||
+            !ftAutoQsoFilterReason(callB).isEmpty() || !ftCqTargetSkipReason(callB).isEmpty()) continue;
+        // B called me with his locator (a first call), recently, and in a slot of the same parity as A's.
+        const ParsedFt8Message pb = parseFt8MessageText(entry.decode.message, myCall);
+        if (!pb.addressedToMe || pb.grid.trimmed().isEmpty() || FtDecodedText::isAckLikeGridTrap(pb.grid) ||
+            !pb.report.isEmpty() || pb.rr73 || pb.rrr || pb.final73) continue;
+        if (nowMs - entry.decode.slotStartUtcMs > 3 * profile.slotMs) continue;
+        if (!M3::FtDoubleMessage::sameParity(decode.slotStartUtcMs, entry.decode.slotStartUtcMs, profile.slotMs)) continue;
+        const QString combined = M3::FtDoubleMessage::build(callA, callB, myCall, entry.decode.snrDb);
+        if (combined.isEmpty()) continue;
+        m_doubleTx.valid = true;
+        m_doubleTx.partner = entry;
+        m_doubleTx.report = M3::FtDoubleMessage::reportText(M3::FtDoubleMessage::fieldReportDb(entry.decode.snrDb));
+        m_doubleTx.plainReportMessage = QStringLiteral("%1 %2 %3").arg(callB, myCall, m_doubleTx.report);
+        m_workQueue.removeCall(callB);
+        updateFt8SessionQueueUi();
+        refreshFtCqWorkListUi();
+        appendLog(uiText("ft_double_log", "Double message: RR73 to %1 and the report for %2 in one transmission.").arg(callA, callB));
+        traceFtAutomation("tx.double_message", "rr73_plus_report", {{"candidate_call", callB}, {"tx_message", combined}});
+        m_ftTxOriginHint = uiText("ft_origin_double", "QSO sequence with %1 plus the answer to %2 (double message)").arg(callA, callB);
+        return combined;
+    }
+    return rr73Message;
+}
+
+// After the transmission: A is complete (the caller did that); B continues as if his plain report had just been sent.
+void MainWindow::finishDoubleMessage()
+{
+    if (!m_doubleTx.valid) return;
+    const DoubleTx tx = m_doubleTx;
+    m_doubleTx = DoubleTx();
+    if (m_ft8OperatorStopLatched || m_shutdownInProgress) return;
+    const QString call = tx.partner.call.trimmed().toUpper();
+    m_ftSession.clearQso();
+    m_ftSession.cqRepeatActive = false;
+    m_ftSession.startQso(call, tx.partner.grid, tx.partner.decode.frequencyHz);
+    m_ftSession.reportSent = tx.report;
+    m_ftSession.reportReceived.clear();
+    m_ftSession.state = FtQsoSession::State::SendingReport;
+    if (m_editFt8DxCall != nullptr) {
+        const QSignalBlocker blockDxCall(m_editFt8DxCall);
+        m_editFt8DxCall->setText(call);
+        m_settings.ft8DxCallsign = call;
+    }
+    if (m_editFt8DxGrid != nullptr && !tx.partner.grid.isEmpty()) {
+        const QSignalBlocker blockDxGrid(m_editFt8DxGrid);
+        m_editFt8DxGrid->setText(tx.partner.grid.left(4).toUpper());
+        m_settings.ft8DxGrid = tx.partner.grid.left(4).toUpper();
+    }
+    if (m_ft8RxDecoder != nullptr) {
+        QMetaObject::invokeMethod(m_ft8RxDecoder, "setDxCall", Qt::QueuedConnection, Q_ARG(QString, call));
+        QMetaObject::invokeMethod(m_ft8RxDecoder, "setQsoDeadlineActive", Qt::QueuedConnection, Q_ARG(bool, true));
+    }
+    updateCatRotatorQsoTarget(QStringLiteral("double message to %1").arg(call));
+    // The plain report counts as the last transmission: the normal retry/wait logic takes over.
+    m_ftSession.lastTxPlan.message = tx.plainReportMessage;
+    m_ftSession.lastTxPlan.tag = QStringLiteral("SEQ");
+    m_ftSession.beginRetry(tx.plainReportMessage, QStringLiteral("SEQ"), m_settings.ft8NoResponseRetryCount);
+    m_ftSession.retryLastCompletedTxSlotUtcMs = 0;
+    const FtQsoSequencer::TxCompleteDecision next = FtQsoSequencer::onTxCompleted(m_ftSession.state);
+    m_ftSession.state = next.nextState;
+    appendLog(uiText("ft_double_follow_log", "QSO with %1 continues after the double message (report %2 sent).").arg(call, tx.report));
+    traceFtAutomation("qso.double_follow", "report_sent", {{"candidate_call", call}});
+    updateFt8SequencerUi();
+    scheduleFt8RetryIfNeeded();
+}
+
+// The transmission did not happen (STOP, abort): B was only borrowed from the queue.
+void MainWindow::dropDoubleMessage(bool restorePartner)
+{
+    if (!m_doubleTx.valid) return;
+    const DoubleTx tx = m_doubleTx;
+    m_doubleTx = DoubleTx();
+    if (restorePartner && !m_ft8OperatorStopLatched) m_workQueue.upsert(tx.partner, QDateTime::currentDateTimeUtc());
+    refreshFtCqWorkListUi();
+}
+
 // He stays in the queue, grey, at the end, until the 15-minute pause is over.
 void MainWindow::markQueueNoReply(const QString &dx)
 {
@@ -21050,11 +21156,12 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         refreshFt8StandardMessages();
     }
 
-    const auto armRow = [this](int row, const QString &tag, Ft8SequencerState nextState) {
-        const QString msg = selectFt8TxRow(row);
+    const auto armRow = [this, &decode](int row, const QString &tag, Ft8SequencerState nextState) {
+        QString msg = selectFt8TxRow(row);
         if (msg.trimmed().isEmpty()) {
             return;
         }
+        if (row == 4 && nextState == Ft8SequencerState::SendingRr73) msg = maybeDoubleMessage(msg, decode);
         if (m_tableFt8TxMessages != nullptr && m_tableFt8TxMessages->item(row, 0) != nullptr) {
             m_tableFt8TxMessages->scrollToItem(m_tableFt8TxMessages->item(row, 0), QAbstractItemView::PositionAtCenter);
         }
@@ -21167,6 +21274,7 @@ void MainWindow::handleFt8TxCompleted()
         break;
     case FtQsoSequencer::Action::Complete:
         completeFt8Qso(decision.completeReason);
+        finishDoubleMessage();   // the second station of a double message continues from here
         return;
     case FtQsoSequencer::Action::None:
     case FtQsoSequencer::Action::Ignore:

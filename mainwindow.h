@@ -1,6 +1,7 @@
 #include "runtime/AsyncCatCommand.h"
 #include "modems/ft8/FtAutoPlanner.h"
 #include "modems/ft8/FtWorkQueue.h"
+#include "modems/ft8/FtDoubleMessage.h"
 #include "runtime/RxDecoderWorker.h"
 #include "runtime/LogbookIndexWorker.h"
 #include "runtime/TextAssistWorker.h"
@@ -1142,6 +1143,10 @@ private:
      */
     void processFt8FullAutoCqCandidates();
     bool processWorkQueue();
+    // Double message ("A RR73; B <MYCALL> -nn"): see maybeDoubleMessage()
+    QString maybeDoubleMessage(const QString &rr73Message, const Ft8RxDecoder::Decode &decode);
+    void finishDoubleMessage();
+    void dropDoubleMessage(bool restorePartner);
     void markQueueNoReply(const QString &dx);
     bool activateQueuedCaller(const M3::FtQueueEntry &queued);
 
@@ -2553,6 +2558,13 @@ private:
     bool m_ft8UiBatchApplying = false;
     QString m_lastFtResourceAdjustment;
     QHash<QString, QDateTime> m_ft8AutoNoResponseCooldown;
+    struct DoubleTx
+    {
+        bool valid = false;
+        M3::FtQueueEntry partner;     // B, taken out of the queue for this transmission
+        QString report;               // the report B gets, "-12"
+        QString plainReportMessage;   // "B MYCALL -12": what is repeated if B does not answer
+    } m_doubleTx;
     M3::FtWorkQueue m_workQueue;                 // callers, Auto CQs and the operator's picks: one queue
     M3::FtQueueEntry m_activeQueueEntry;          // the entry the running QSO was started from (no-reply handling)
     bool m_haveActiveQueueEntry = false;

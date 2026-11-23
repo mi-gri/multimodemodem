@@ -9,6 +9,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   3 alternate (after N QSOs), 4 CQ only when no target was there for M slots. Auto mode is never restored after a start (it is off
   every time; switching it on shows the notice). STOP, a mode change and a band change pause the stage until it is selected again.
   The stage planner is a small tested class (FtAutoPlanner); all transmit gates are unchanged.
+- Double message (FT8, setting \"Allow double messages\" in Automodes -> FT8/FT4, off by default, independent of Auto mode): when RR73 goes to a station and a
+  regular caller who called with his locator in the same kind of slot is waiting in the queue, ONE transmission \"A RR73; B <my call> -nn\" finishes the first
+  QSO and gives the second station his report; his QSO continues like after a plain report (the plain report is repeated if he does not answer). The caller
+  passes the same checks as any queued caller; both calls must be standard callsigns; an aborted transmission puts him back in the queue.
 - One FT queue (button "Queue (n)", menu Automodes -> FT queue) replaces the separate "Callers" and "CQ list" lists: stations that called me, CQs of Auto
   mode and CQs you add are entries of one list (at most 50). The automation takes the next one by policy: your "Next" mark, then callers (first come
   first served), then the most valuable CQ; stations that gave no reply stay in the list, grey, at the end for 15 minutes. The table can be sorted by any

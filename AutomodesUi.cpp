@@ -144,6 +144,11 @@ void MainWindow::buildAutomodesDialog()
         if (m_menuFilter != nullptr) m_menuFilter->removeAction(m_actFilterAnswerCalls);   // lives here now
     }
     cl->addWidget(unsolicited);
+    auto *doubleMessage = new QCheckBox(uiText("automodes_double", "Allow double messages (RR73 to one station and the report for a waiting caller in one transmission)"), callBox);
+    doubleMessage->setToolTip(uiText("automodes_double_tip", "FT8 only. When RR73 goes to a station and a regular caller who called in the same kind of slot is waiting, one transmission \"A RR73; B <my call> -nn\" finishes the first QSO and answers the second. Works with and without Auto mode, because it only adds the caller to a transmission that happens anyway. The caller must pass the same checks as any queued caller; both stations need software that decodes this message type (WSJT-X does)."));
+    doubleMessage->setChecked(m_settings.ftDoubleMessage);
+    connect(doubleMessage, &QCheckBox::toggled, this, [this](bool on) { m_settings.ftDoubleMessage = on; m_settings.save(); });
+    cl->addWidget(doubleMessage);
     if (m_chkFt8AutoLog != nullptr) { cl->addWidget(m_chkFt8AutoLog); m_chkFt8AutoLog->show(); }
     ftl->addWidget(callBox);
     ftl->addStretch(1);
