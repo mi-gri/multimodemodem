@@ -662,6 +662,7 @@ add_executable(MultiModeModem
     modems/ft8/Ft8Mode.h
     modems/ft8/Ft8Mode.cpp
     modems/ft8/FtAutoPlanner.h
+    modems/ft8/FtWorkQueue.h
     modems/ft8/FtSlotMemory.h
     modems/ft8/Ft8RepeatRecovery.h
     modems/ft8/Ft8RxDecoder.h
@@ -1233,6 +1234,12 @@ if(BUILD_TESTING)
     target_include_directories(m3_ft_coherent_alignment PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME m3_ft_coherent_alignment COMMAND m3_ft_coherent_alignment)
     set_tests_properties(m3_ft_coherent_alignment PROPERTIES TIMEOUT 30)
+    add_executable(m3_ft_work_queue tests/FtWorkQueueRegression.cpp modems/ft8/FtDecodedText.cpp)
+    target_include_directories(m3_ft_work_queue PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/modems/ft8)
+    target_link_libraries(m3_ft_work_queue PRIVATE ${QT}::Core)
+    set_target_properties(m3_ft_work_queue PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME m3_ft_work_queue COMMAND m3_ft_work_queue)
+    set_tests_properties(m3_ft_work_queue PROPERTIES TIMEOUT 10)
     add_executable(m3_ft_auto_planner tests/FtAutoPlannerRegression.cpp)
     add_test(NAME m3_ft_auto_planner COMMAND m3_ft_auto_planner)
     set_tests_properties(m3_ft_auto_planner PROPERTIES TIMEOUT 10)
@@ -1269,11 +1276,6 @@ if(BUILD_TESTING)
     target_link_libraries(m3_ft_cq_directive PRIVATE ${QT}::Core)
     set_target_properties(m3_ft_cq_directive PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
     add_test(NAME m3_ft_cq_directive COMMAND m3_ft_cq_directive)
-    add_executable(m3_ft_cq_worklist tests/FtCqWorkListRegression.cpp)
-    target_include_directories(m3_ft_cq_worklist PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(m3_ft_cq_worklist PRIVATE ${QT}::Core)
-    set_target_properties(m3_ft_cq_worklist PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
-    add_test(NAME m3_ft_cq_worklist COMMAND m3_ft_cq_worklist)
     add_executable(m3_ft_incremental_producer tests/FtIncrementalProducerRegression.cpp)
     target_include_directories(m3_ft_incremental_producer PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(m3_ft_incremental_producer PRIVATE ${QT}::Core Threads::Threads)

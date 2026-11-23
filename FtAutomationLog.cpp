@@ -34,13 +34,12 @@ QString MainWindow::ftAutomationWaitReason() const
     if (m_ft8OperatorStopLatched) return "operator_stop";
     if (m_shutdownInProgress || m_runtimeShutdownComplete) return "shutdown";
     if (m_offlineAnalysisActive) return "offline_analysis";
-    if (m_ftCqWorkList.running && !m_ftCqWorkList.entries.isEmpty()) return "manual_queue_priority";
     if (m_txRunning || m_ftTxWorkerRunning) return "transmitting";
     if (m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan || m_pendingFt8PttKeyed) return "tx_pending";
     if (m_ftSession.qsoActive) return "qso_active";
-    if (m_chkFt8CallerQueue && m_chkFt8CallerQueue->isChecked() && !m_ft8CallerQueue.isEmpty()) return "direct_callers_priority";
+    if (m_chkFt8CallerQueue && m_chkFt8CallerQueue->isChecked() && m_workQueue.count(M3::QueueSource::Caller) > 0) return "direct_callers_priority";
     if (stationCallsign().trimmed().isEmpty() || stationLocator().trimmed().isEmpty()) return "missing_station_identity";
-    return m_ft8FullAutoCqCandidates.isEmpty() ? "no_cq" : "not_ready";
+    return m_workQueue.isEmpty() ? "no_cq" : "not_ready";
 }
 
 void MainWindow::traceFtAutomation(const QString &action, const QString &reason,
@@ -66,9 +65,9 @@ void MainWindow::traceFtAutomation(const QString &action, const QString &reason,
     details.insert("dx_call", m_ftSession.dxCall);
     details.insert("qso_id", m_ftSession.qsoStartUtc.isValid()
         ? m_ftSession.dxCall + QLatin1Char('|') + QString::number(m_ftSession.qsoStartUtc.toMSecsSinceEpoch()) : QString());
-    details.insert("cq_queue_size", m_ft8FullAutoCqCandidates.size());
-    details.insert("caller_queue_size", m_ft8CallerQueue.size());
-    details.insert("manual_queue_size", m_ftCqWorkList.entries.size());
+    details.insert("cq_queue_size", m_workQueue.count(M3::QueueSource::AutoCq));
+    details.insert("caller_queue_size", m_workQueue.count(M3::QueueSource::Caller));
+    details.insert("manual_queue_size", m_workQueue.count(M3::QueueSource::Manual));
     details.insert("tx_armed", m_ft8PendingTxArmed);
     details.insert("tx_running", m_txRunning || m_ftTxWorkerRunning);
     details.insert("tx_deferred", m_hasDeferredFt8TxPlan);

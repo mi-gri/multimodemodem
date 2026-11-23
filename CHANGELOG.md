@@ -9,6 +9,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   3 alternate (after N QSOs), 4 CQ only when no target was there for M slots. Auto mode is never restored after a start (it is off
   every time; switching it on shows the notice). STOP, a mode change and a band change pause the stage until it is selected again.
   The stage planner is a small tested class (FtAutoPlanner); all transmit gates are unchanged.
+- One FT queue (button "Queue (n)", menu Automodes -> FT queue) replaces the separate "Callers" and "CQ list" lists: stations that called me, CQs of Auto
+  mode and CQs you add are entries of one list (at most 50). The automation takes the next one by policy: your "Next" mark, then callers (first come
+  first served), then the most valuable CQ; stations that gave no reply stay in the list, grey, at the end for 15 minutes. The table can be sorted by any
+  column (view only), double-click switches to a station at once, "Add selected CQs" adds from the decode table. Manual entries are worked like all other
+  entries (no separate Start). All transmit gates are unchanged; queue data class `FtWorkQueue` with unit test.
 - New menu "Automodes" and dialog with tabs Overview, FT8/FT4, Targets, JS8 and WSPR/Safety: Auto mode and stage choice, the CQ series length, wait slots,
   no-response limit, caller queue, unsolicited callers and auto log (moved from the FT panel and the Filter menu), the blacklist and the target rules
   (directed CQs, CQ DX, CQ destination; moved from Settings -> Display) and the JS8 automatic group (moved from the JS8 page). The Overview lists the last

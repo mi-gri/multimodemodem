@@ -1,5 +1,6 @@
 #include "runtime/AsyncCatCommand.h"
 #include "modems/ft8/FtAutoPlanner.h"
+#include "modems/ft8/FtWorkQueue.h"
 #include "runtime/RxDecoderWorker.h"
 #include "runtime/LogbookIndexWorker.h"
 #include "runtime/TextAssistWorker.h"
@@ -28,7 +29,6 @@
 #include "modems/hell/HellschreiberDecoder.h"
 #include "modems/ft8/Ft8Mode.h"
 #include "modems/ft8/Ft8RxDecoder.h"
-#include "modems/ft8/FtCqWorkList.h"
 #include "modems/ft8/FtSlotScheduler.h"
 #include "modems/ft8/FtQsoSequencer.h"
 #include "modems/ft8/FtQsoSession.h"
@@ -118,46 +118,6 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-
-/**
- * @brief One decoded CQ waiting for Auto QSO priority selection.
- *
- * Auto QSO must not answer the first CQ that happens to be emitted by the
- * decoder.  A full FT pass can contain many simultaneous CQs; MM buffers them
- * briefly, ranks them by worked-needed value and distance, then starts exactly
- * one QSO.
- */
-struct Ft8FullAutoCqCandidate
-{
-    Ft8RxDecoder::Decode decode;
-    QString call;
-    QString grid;
-    QString distanceGrid;
-    QString country;
-    QString dxcc;
-    QString band;
-    QString mode;
-    bool valid = false;
-    bool cq = true;
-    bool workedCall = false;
-    bool newCountry = false;
-    bool newGrid = false;
-    bool newBand = false;
-    bool newMode = false;
-    double distanceKm = -1.0;
-    QDateTime queuedUtc;
-    QString priorityText;
-    static bool higherPriority(const Ft8FullAutoCqCandidate &a, const Ft8FullAutoCqCandidate &b) {
-        if (a.newCountry != b.newCountry) return a.newCountry;
-        if (a.newGrid != b.newGrid) return a.newGrid;
-        if (a.newBand != b.newBand) return a.newBand;
-        if (a.newMode != b.newMode) return a.newMode;
-        if (a.workedCall != b.workedCall) return !a.workedCall;
-        if (qAbs(a.distanceKm - b.distanceKm) > 1.0) return a.distanceKm > b.distanceKm;
-        if (a.decode.snrDb != b.decode.snrDb) return a.decode.snrDb > b.decode.snrDb;
-        return a.decode.frequencyHz < b.decode.frequencyHz;
-    }
-};
 
 /**
  * @brief Main application window for MultiModeModem.
@@ -1181,6 +1141,9 @@ private:
      * @brief Selects and starts the best buffered Auto QSO CQ candidate.
      */
     void processFt8FullAutoCqCandidates();
+    bool processWorkQueue();
+    void markQueueNoReply(const QString &dx);
+    bool activateQueuedCaller(const M3::FtQueueEntry &queued);
 
     /**
      * @brief Computes the earliest safe retry-arm time after an FT TX slot.
@@ -2579,7 +2542,6 @@ private:
     void scheduleFt8DecodeScroll();   // one scroll to the newest line per event-loop pass
     bool m_ftCqResumeAfterQso = false;   // a CQ series was running when its reply became a QSO
     bool m_ft8SelectionOnly = false;
-    QVector<Ft8FullAutoCqCandidate> m_ft8FullAutoCqCandidates;
     QHash<QString, qint64> m_ft8AutoCqBusySlots;
     QTimer m_ft8FullAutoCqSelectionTimer;
     bool m_ft8DecodeBatchActive = false;
@@ -2591,15 +2553,9 @@ private:
     bool m_ft8UiBatchApplying = false;
     QString m_lastFtResourceAdjustment;
     QHash<QString, QDateTime> m_ft8AutoNoResponseCooldown;
-    struct Ft8QueuedCaller
-    {
-        Ft8RxDecoder::Decode latestDecode;
-        QString call;
-        QString grid;
-        QDateTime firstSeenUtc;
-        QDateTime lastSeenUtc;
-    };
-    QVector<Ft8QueuedCaller> m_ft8CallerQueue;
+    M3::FtWorkQueue m_workQueue;                 // callers, Auto CQs and the operator's picks: one queue
+    M3::FtQueueEntry m_activeQueueEntry;          // the entry the running QSO was started from (no-reply handling)
+    bool m_haveActiveQueueEntry = false;
     struct Ft8RReportQso
     {
         FtQsoSession session;      // state when our R-report went out
@@ -2629,11 +2585,7 @@ private:
     };
     QHash<QString, Ft8PausedQso> m_ft8PausedQsos;   // by normalized call
     QPushButton *m_btnFt8CallerList = nullptr;
-    QDialog *m_ft8CallerDialog = nullptr;
-    QTableWidget *m_ft8CallerTable = nullptr;
-    QLabel *m_ft8CallerEmpty = nullptr;
     QCheckBox *m_chkFtCqQueue = nullptr;
-    FtCqWorkList m_ftCqWorkList;
     QTimer m_ftCqWorkListTimer;
     QDialog *m_ftCqDialog = nullptr;
     QTableWidget *m_ftCqTable = nullptr;

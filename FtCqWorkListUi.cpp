@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// The one FT queue: stations that called me, CQs of Auto mode and CQs the operator added.
+// (File name kept from the former manual CQ list.)
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "modems/ft8/FtDecodedText.h"
@@ -10,14 +12,36 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QTableWidget>
-#include <QCheckBox>
 #include <QItemSelectionModel>
 #include <QSignalBlocker>
+#include <QBrush>
+#include <QPalette>
 #include <algorithm>
 namespace {
 constexpr int kFtDecodeRole=Qt::UserRole+430;
 constexpr int kFtPresentationOnlyRole=Qt::UserRole+429;
+constexpr int kSortRole=Qt::UserRole+431;
 QString uiText(const char *key,const char *fallback){return M3I18n::translate(QString::fromUtf8(key),QString::fromUtf8(fallback));}
+// Sorts by a number where the cell has one (position, SNR, km, age), otherwise by text.
+class QueueCell : public QTableWidgetItem
+{
+public:
+    using QTableWidgetItem::QTableWidgetItem;
+    bool operator<(const QTableWidgetItem &other) const override
+    {
+        const QVariant a=data(kSortRole), b=other.data(kSortRole);
+        if(a.isValid()&&b.isValid())return a.toDouble()<b.toDouble();
+        return QTableWidgetItem::operator<(other);
+    }
+};
+QString sourceText(M3::QueueSource source)
+{
+    switch(source){
+    case M3::QueueSource::Caller:return uiText("ft_queue_source_caller","Caller");
+    case M3::QueueSource::Manual:return uiText("ft_queue_source_manual","Operator");
+    default:return uiText("ft_queue_source_auto","Auto CQ");
+    }
+}
 }
 bool MainWindow::addFtDecodeToCqWorkList(QTableWidgetItem *selected, bool cqOnly)
 {
@@ -29,13 +53,17 @@ bool MainWindow::addFtDecodeToCqWorkList(QTableWidgetItem *selected, bool cqOnly
     const auto call=(parsed.cq?FtDecodedText::cqersCall(decode.message):parsed.senderCall).trimmed().toUpper();
     if((cqOnly&&!parsed.cq)||call.isEmpty()||isFtCallBlacklisted(call)||FtDecodedText::callMatches(call,stationCallsign()))return false;
     if(m_ftSession.qsoActive&&FtDecodedText::callMatches(call,m_ftSession.dxCall))return false;
-    FtCqWorkList::Entry entry;entry.call=call;entry.grid=parsed.grid;entry.decode=decode;entry.cq=parsed.cq;
-    entry.mode=ui->cmbMode->currentText().trimmed().toUpper();
+    M3::FtQueueEntry entry;
+    entry.source=M3::QueueSource::Manual;
+    entry.valid=true;entry.call=call;entry.grid=parsed.grid;entry.decode=decode;entry.cq=parsed.cq;
+    entry.mode=currentAdifMode().trimmed().toUpper();
     entry.band=m_cmbFt8Band?m_cmbFt8Band->currentText().trimmed().toLower():m_settings.ft8Band;
-    entry.confirmed=!item->data(kFtPresentationOnlyRole).toBool();
-    if (!m_ftCqWorkList.add(entry)) return false;
-    for (int i=m_ft8FullAutoCqCandidates.size()-1;i>=0;--i)
-        if (FtDecodedText::callMatches(call,m_ft8FullAutoCqCandidates.at(i).call)) m_ft8FullAutoCqCandidates.removeAt(i);
+    entry.queuedUtc=QDateTime::currentDateTimeUtc();
+    entry.priorityText=uiText("ft_queue_manual_text","added by the operator");
+    if(item->data(kFtPresentationOnlyRole).toBool())entry.cq=false;   // not a live decode: wait for a fresh CQ
+    if(m_workQueue.contains(call)&&m_workQueue.entries.at(m_workQueue.indexOf(call)).source==M3::QueueSource::Caller)return false;   // he is a caller already
+    if(!m_workQueue.upsert(entry,QDateTime::currentDateTimeUtc()))return false;
+    queueFtLogbookQueriesForDecode(decode,true);   // ranking follows as soon as the logbook answers
     return true;
 }
 void MainWindow::addSelectedFtCqsToWorkList()
@@ -45,91 +73,117 @@ void MainWindow::addSelectedFtCqsToWorkList()
     std::sort(selected.begin(),selected.end(),[](const auto&a,const auto&b){return a.row()<b.row();});
     int added=0;
     for(const auto &index:selected)if(addFtDecodeToCqWorkList(m_tableFt8Rx->item(index.row(),4),true))++added;
-    appendLog(QStringLiteral("FT CQ list: %1 selected CQ target(s) added; %2 total. Adding targets does not start TX.").arg(added).arg(m_ftCqWorkList.entries.size()));
+    appendLog(uiText("ft_queue_added_log","FT queue: %1 selected CQ(s) added; %2 entries. Adding does not start TX.").arg(added).arg(m_workQueue.size()));
     refreshFtCqWorkListUi();showFtCqWorkList();
 }
 void MainWindow::showFtCqWorkList()
 {
     if(!m_ftCqDialog){
-        m_ftCqDialog=new QDialog(this);m_ftCqDialog->setObjectName(QStringLiteral("ftCqWorkListDialog"));
-        m_ftCqDialog->setWindowTitle(uiText("ft_cq_list_title","CQ stations to work"));m_ftCqDialog->resize(670,420);
+        m_ftCqDialog=new QDialog(this);m_ftCqDialog->setObjectName(QStringLiteral("ftCqWorkListDialog"));m_ftCqDialog->setModal(false);
+        m_ftCqDialog->setWindowTitle(uiText("ft_queue_title","FT queue"));m_ftCqDialog->resize(980,460);
         auto *layout=new QVBoxLayout(m_ftCqDialog);
-        auto *help=new QLabel(uiText("ft_cq_list_help", "Select CQ rows with Ctrl/Shift and add them. Start works the manual list in order after a fresh CQ. Auto QSO also keeps a priority queue, with blacklist and duplicate checks. Direct callers have priority. Double-click selects a station immediately, interrupting the current TX if necessary. STOP stops TX and pauses automation."),m_ftCqDialog);
+        auto *help=new QLabel(uiText("ft_queue_help","Stations that called me, CQs of Auto mode and CQs you added share this queue. The automation takes the next one by its policy: your \"Next\" mark first, then callers (first come first served), then the most valuable CQ; stations that gave no reply wait at the end (grey). Click a column header to sort the view; the order the automation uses does not change. Double-click switches to a station at once. Entries are worked only while Auto mode may answer (stage, TX permission)."),m_ftCqDialog);
         help->setObjectName(QStringLiteral("ftCqHelp"));help->setWordWrap(true);layout->addWidget(help);
-        m_ftCqTable=new QTableWidget(0,5,m_ftCqDialog);m_ftCqTable->setObjectName(QStringLiteral("ftCqWorkListTable"));
-        m_ftCqTable->setHorizontalHeaderLabels({QStringLiteral("#"),uiText("callsign","Callsign"),uiText("locator","Locator"),uiText("frequency","Frequency"),uiText("status","Status")});
+        m_ftCqTable=new QTableWidget(0,10,m_ftCqDialog);m_ftCqTable->setObjectName(QStringLiteral("ftCqWorkListTable"));
         m_ftCqTable->setEditTriggers(QAbstractItemView::NoEditTriggers);m_ftCqTable->setSelectionBehavior(QAbstractItemView::SelectRows);m_ftCqTable->setSelectionMode(QAbstractItemView::ExtendedSelection);
-        m_ftCqTable->verticalHeader()->hide();m_ftCqTable->horizontalHeader()->setStretchLastSection(true);layout->addWidget(m_ftCqTable);
+        m_ftCqTable->verticalHeader()->hide();m_ftCqTable->horizontalHeader()->setStretchLastSection(true);
+        m_ftCqTable->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+        m_ftCqTable->horizontalHeader()->setSortIndicatorShown(true);
+        layout->addWidget(m_ftCqTable);
         auto *buttons=new QHBoxLayout;
-        m_btnFtCqRun=new QPushButton(m_ftCqDialog);m_btnFtCqRun->setObjectName(QStringLiteral("ftCqWorkListRun"));buttons->addWidget(m_btnFtCqRun);
-        auto *remove=new QPushButton(uiText("ft_cq_list_remove","Remove selected"),m_ftCqDialog);remove->setObjectName(QStringLiteral("ftCqRemove"));buttons->addWidget(remove);
-        auto *clear=new QPushButton(uiText("ft_cq_list_clear","Clear list"),m_ftCqDialog);clear->setObjectName(QStringLiteral("ftCqClear"));buttons->addWidget(clear);layout->addLayout(buttons);
-        connect(m_btnFtCqRun,&QPushButton::clicked,this,[this]{
-            if(!m_ftCqWorkList.running&&m_ftCqWorkList.entries.isEmpty())return;
-            m_ftCqWorkList.running=!m_ftCqWorkList.running;
-            if(m_ftCqWorkList.running&&m_chkFtCqQueue){const QSignalBlocker blocker(m_chkFtCqQueue);m_chkFtCqQueue->setChecked(true);}
-            if(m_ftCqWorkList.running){m_ft8OperatorStopLatched=false;m_ftCqWorkList.requireFreshCheck();
-                if(!m_rxRunning&&!m_txRunning)startFt8RxShell();
-                appendLog(QStringLiteral("FT CQ list started: waiting for fresh CQ before calling each selected target."));
-            }else appendLog(QStringLiteral("FT CQ list paused; current QSO remains under the normal sequencer."));
-            refreshFtCqWorkListUi();processFtCqWorkList();
+        auto *next=new QPushButton(uiText("ft_queue_next","Next"),m_ftCqDialog);next->setObjectName(QStringLiteral("ftQueueNext"));
+        next->setToolTip(uiText("ft_queue_next_tip","Marks the selected station as the next one to work (again: removes the mark)."));
+        auto *remove=new QPushButton(uiText("ft_cq_list_remove","Remove selected"),m_ftCqDialog);remove->setObjectName(QStringLiteral("ftCqRemove"));
+        auto *clear=new QPushButton(uiText("ft_cq_list_clear","Clear list"),m_ftCqDialog);clear->setObjectName(QStringLiteral("ftCqClear"));
+        auto *add=new QPushButton(uiText("ft_cq_list_add","Add selected CQs"),m_ftCqDialog);add->setObjectName(QStringLiteral("ftQueueAdd"));
+        add->setToolTip(uiText("ft_queue_add_tip","Adds the CQ lines selected in the decode table to this queue."));
+        auto *close=new QPushButton(uiText("automodes_close","Close"),m_ftCqDialog);
+        buttons->addWidget(next);buttons->addWidget(remove);buttons->addWidget(clear);buttons->addWidget(add);buttons->addStretch();buttons->addWidget(close);layout->addLayout(buttons);
+        connect(close,&QPushButton::clicked,m_ftCqDialog,&QDialog::hide);
+        connect(add,&QPushButton::clicked,this,&MainWindow::addSelectedFtCqsToWorkList);
+        connect(next,&QPushButton::clicked,this,[this]{
+            const auto rows=m_ftCqTable->selectionModel()->selectedRows();
+            if(rows.isEmpty())return;
+            auto *cell=m_ftCqTable->item(rows.first().row(),2);if(!cell)return;
+            const QString call=cell->text();
+            m_workQueue.togglePinned(call);
+            const int idx=m_workQueue.indexOf(call);
+            const bool pinned=idx>=0&&m_workQueue.entries.at(idx).pinned;
+            appendLog(pinned?uiText("ft_queue_next_log","FT queue: %1 is the next station to work.").arg(call):uiText("ft_queue_next_off_log","FT queue: %1 is no longer marked as next.").arg(call));
+            refreshFtCqWorkListUi();processWorkQueue();
         });
-        connect(remove,&QPushButton::clicked,this,[this]{auto rows=m_ftCqTable->selectionModel()->selectedRows();std::sort(rows.begin(),rows.end(),[](const auto&a,const auto&b){return a.row()>b.row();});for(const auto&i:rows){const int autoRow=i.row()-m_ftCqWorkList.entries.size();if(autoRow>=0&&autoRow<m_ft8FullAutoCqCandidates.size())m_ft8FullAutoCqCandidates.removeAt(autoRow);else if(i.row()<m_ftCqWorkList.entries.size())m_ftCqWorkList.entries.removeAt(i.row());}refreshFtCqWorkListUi();});
-        connect(clear,&QPushButton::clicked,this,[this]{m_ftCqWorkList.clear();m_ft8FullAutoCqCandidates.clear();refreshFtCqWorkListUi();});
+        connect(remove,&QPushButton::clicked,this,[this]{
+            QSet<QString> calls;
+            for(const auto &i:m_ftCqTable->selectionModel()->selectedRows())if(auto *cell=m_ftCqTable->item(i.row(),2))calls.insert(cell->text());
+            for(const auto &call:calls)m_workQueue.removeCall(call);
+            updateFt8SessionQueueUi();refreshFtCqWorkListUi();
+        });
+        connect(clear,&QPushButton::clicked,this,[this]{m_workQueue.clear();m_ft8AutoCqBusySlots.clear();updateFt8SessionQueueUi();refreshFtCqWorkListUi();});
+        // Double-click: switch to this station at once, like a double-click on his line in the decode table.
+        connect(m_ftCqTable,&QTableWidget::cellDoubleClicked,this,[this](int row,int){
+            auto *cell=m_ftCqTable->item(row,2);if(!cell||!m_tableFt8Rx)return;
+            const int idx=m_workQueue.indexOf(cell->text());if(idx<0)return;
+            const auto entry=m_workQueue.entries.at(idx);
+            for(int r=m_tableFt8Rx->rowCount()-1;r>=0;--r){
+                auto *msg=m_tableFt8Rx->item(r,4);if(!msg)continue;
+                const auto decode=msg->data(kFtDecodeRole).value<Ft8RxDecoder::Decode>();
+                if(decode.message==entry.decode.message&&decode.slotStartUtcMs==entry.decode.slotStartUtcMs){
+                    m_tableFt8Rx->selectRow(r);
+                    handleFt8DecodeDoubleClicked(msg);
+                    refreshFtCqWorkListUi();
+                    return;
+                }
+            }
+            appendLog(uiText("ft_queue_switch_gone_log","FT queue: the line of %1 is no longer in the decode table; select his next line there.").arg(entry.call));
+        });
     }
     refreshFtCqWorkListUi();m_ftCqDialog->show();m_ftCqDialog->raise();m_ftCqDialog->activateWindow();
 }
 void MainWindow::refreshFtCqWorkListUi()
 {
-    if(m_btnFtCqList)m_btnFtCqList->setText(uiText("ft_cq_list_button","CQ list (%1)").arg(m_ftCqWorkList.entries.size()+m_ft8FullAutoCqCandidates.size()));
-    if(m_btnFtCqRun)m_btnFtCqRun->setText(m_ftCqWorkList.running?uiText("ft_cq_list_pause","Pause after QSO"):uiText("ft_cq_list_start","Start list"));
-    if(m_btnFtCqRun)m_btnFtCqRun->setEnabled(m_ftCqWorkList.running || !m_ftCqWorkList.entries.isEmpty());
-    if(m_chkFtCqQueue){m_chkFtCqQueue->setText(uiText("ft_cq_queue_enable","Manage CQ queue"));m_chkFtCqQueue->setToolTip(uiText("ft_cq_queue_tooltip", "Opens the CQ work queue. Use Add selected CQs to queue stations. A double-click always selects a station for immediate TX."));}
+    if(m_btnFt8CallerList)m_btnFt8CallerList->setText(uiText("ft_queue_button","Queue (%1)").arg(m_workQueue.size()));
     if(m_btnFtCqAdd)m_btnFtCqAdd->setText(uiText("ft_cq_list_add","Add selected CQs"));
     if(!m_ftCqTable)return;
-    m_ftCqTable->setHorizontalHeaderLabels({QStringLiteral("#"),uiText("callsign","Callsign"),uiText("locator","Locator"),uiText("frequency","Frequency"),uiText("status","Status")});
-    m_ftCqTable->setColumnWidth(0,30);
-    // Preserve selected calls when preceding rows leave the queue.
-    const auto selected=m_ftCqTable->selectionModel()->selectedRows();QSet<QString> selectedCalls;
-    for(auto i:selected)if(auto *cell=m_ftCqTable->item(i.row(),1))selectedCalls.insert(cell->text());
-    const QSignalBlocker blocker(m_ftCqTable);m_ftCqTable->setRowCount(m_ftCqWorkList.entries.size()+m_ft8FullAutoCqCandidates.size());
-    for(int i=0;i<m_ftCqWorkList.entries.size();++i){const auto&e=m_ftCqWorkList.entries[i];
-        QString state=e.confirmed?(e.cq?uiText("ft_cq_list_heard","CQ heard"):uiText("ft_cq_list_busy","Working another station")):uiText("ft_cq_list_wait","Waiting for new CQ");
-        const QStringList cells{QString::number(i+1),e.call,e.grid,QString::number(e.decode.frequencyHz),state};
-        for(int col=0;col<cells.size();++col){auto *item=m_ftCqTable->item(i,col);if(!item){item=new QTableWidgetItem;m_ftCqTable->setItem(i,col,item);}item->setText(cells[col]);item->setSelected(selectedCalls.contains(e.call));}
+    const QStringList headers{QStringLiteral("#"),uiText("ft_queue_col_source","Source"),uiText("callsign","Callsign"),uiText("locator","Locator"),QStringLiteral("Hz"),QStringLiteral("dB"),QStringLiteral("km"),uiText("ft_queue_col_why","Why"),uiText("ft_queue_col_age","Age"),uiText("status","Status")};
+    m_ftCqTable->setHorizontalHeaderLabels(headers);
+    const auto header=m_ftCqTable->horizontalHeader();
+    const int sortColumn=header->sortIndicatorSection();const Qt::SortOrder sortOrder=header->sortIndicatorOrder();
+    const bool sorted=m_ftCqTable->isSortingEnabled();
+    m_ftCqTable->setSortingEnabled(false);
+    // Preserve the selected calls across the refresh.
+    QSet<QString> selectedCalls;
+    for(const auto &i:m_ftCqTable->selectionModel()->selectedRows())if(auto *cell=m_ftCqTable->item(i.row(),2))selectedCalls.insert(cell->text());
+    const QSignalBlocker blocker(m_ftCqTable);
+    const QDateTime now=QDateTime::currentDateTimeUtc();const qint64 nowMs=QDateTime::currentMSecsSinceEpoch();
+    const int slotMs=Ft8Mode::profileForMode(ui->cmbMode->currentText()).slotMs;
+    const QVector<int> order=m_workQueue.order(now);
+    m_ftCqTable->setRowCount(order.size());
+    for(int pos=0;pos<order.size();++pos){
+        const auto &e=m_workQueue.entries.at(order.at(pos));
+        const bool grey=e.noReply(now);
+        const bool fresh=e.decode.slotStartUtcMs>0&&nowMs-e.decode.slotStartUtcMs<=2*slotMs+1000;
+        QString state;
+        if(grey)state=uiText("ft_queue_state_noreply","No reply until %1").arg(e.noReplyUntilUtc.toLocalTime().toString(QStringLiteral("HH:mm")));
+        else if(e.source==M3::QueueSource::Caller)state=uiText("ft_queue_state_caller","Called me, waiting");
+        else if(!e.cq)state=uiText("ft_cq_list_busy","Working another station");
+        else if(!fresh)state=uiText("ft_cq_list_wait","Waiting for new CQ");
+        else state=uiText("ft_cq_list_heard","CQ heard");
+        if(e.pinned)state=uiText("ft_queue_state_next","Next")+QStringLiteral(" - ")+state;
+        const qint64 age=e.lastSeenUtc.isValid()?e.lastSeenUtc.secsTo(now):0;
+        struct Cell{QString text;QVariant sort;};
+        const QVector<Cell> cells{{QString::number(pos+1),pos+1},{sourceText(e.source),{}},{e.call,{}},{e.grid,{}},{QString::number(e.decode.frequencyHz),e.decode.frequencyHz},
+            {QString::number(e.decode.snrDb),e.decode.snrDb},{e.distanceKm>=0?QString::number(qRound(e.distanceKm)):QString(),e.distanceKm},{e.priorityText,{}},
+            {QStringLiteral("%1:%2").arg(age/60).arg(age%60,2,10,QLatin1Char('0')),age},{state,{}}};
+        for(int col=0;col<cells.size();++col){
+            auto *item=new QueueCell(cells[col].text);
+            if(cells[col].sort.isValid())item->setData(kSortRole,cells[col].sort);
+            if(grey)item->setForeground(m_ftCqTable->palette().brush(QPalette::Disabled,QPalette::Text));
+            if(e.pinned){QFont f=item->font();f.setBold(true);item->setFont(f);}
+            m_ftCqTable->setItem(pos,col,item);
+            if(selectedCalls.contains(e.call))item->setSelected(true);
+        }
     }
-    for(int i=0;i<m_ft8FullAutoCqCandidates.size();++i){
-        const auto &e=m_ft8FullAutoCqCandidates.at(i);const int row=m_ftCqWorkList.entries.size()+i;
-        const bool fresh=e.decode.slotStartUtcMs>0 && QDateTime::currentMSecsSinceEpoch()-e.decode.slotStartUtcMs<=2*Ft8Mode::profileForMode(ui->cmbMode->currentText()).slotMs+1000;
-        const QString state=!e.cq?uiText("ft_cq_list_busy","Working another station"):
-            !fresh?uiText("ft_cq_list_wait","Waiting for new CQ"):uiText("ft_auto_queue_priority","Auto QSO: %1").arg(e.priorityText);
-        const QStringList cells{QString::number(row+1),e.call,e.grid,QString::number(e.decode.frequencyHz),state};
-        for(int col=0;col<cells.size();++col){auto *item=m_ftCqTable->item(row,col);if(!item){item=new QTableWidgetItem;m_ftCqTable->setItem(row,col,item);}item->setText(cells[col]);item->setSelected(selectedCalls.contains(e.call));}
-    }
-}
-void MainWindow::processFtCqWorkList()
-{
-    if(!m_ftCqWorkList.running)return;
-    if(m_shutdownInProgress || m_runtimeShutdownComplete){m_ftCqWorkList.running=false;return;}
-    if(m_ft8OperatorStopLatched||m_offlineAnalysisActive||!Ft8Mode::isFamilyMode(ui->cmbMode->currentText())){m_ftCqWorkList.running=false;refreshFtCqWorkListUi();return;}
-    const bool busy=m_ftSession.qsoActive||m_txRunning||m_ftTxWorkerRunning||m_ft8PendingTxArmed||m_hasDeferredFt8TxPlan||!m_pendingFt8TxPlan.message.trimmed().isEmpty()||(m_txAudioEngine&&m_txAudioEngine->isRunning());
-    if(busy){m_ftCqWorkList.requireFreshCheck();return;}
-    if(m_chkFt8CallerQueue&&m_chkFt8CallerQueue->isChecked()&&!m_ft8CallerQueue.isEmpty()){
-        if(activateNextFt8QueuedCaller())return;
-    }
-    const auto now=QDateTime::currentMSecsSinceEpoch();const int period=Ft8Mode::profileForMode(ui->cmbMode->currentText()).slotMs;
-    m_ftCqWorkList.beginCheck(now,period);
-    for(int i=0;i<m_ftCqWorkList.entries.size();){
-        const auto entry=m_ftCqWorkList.entries[i];
-        const auto state=m_ftCqWorkList.availability(entry,now,period);
-        if(state==FtCqWorkList::Availability::Wait)break; // Preserve the operator's order.
-        m_ftCqWorkList.entries.removeAt(i);
-        if(state!=FtCqWorkList::Availability::Ready){appendLog(QStringLiteral("FT CQ list: skipped %1 (%2).").arg(entry.call,state==FtCqWorkList::Availability::Busy?QStringLiteral("directed traffic after CQ"):QStringLiteral("no fresh CQ in one cycle")));continue;}
-        if(entry.mode!=ui->cmbMode->currentText().trimmed().toUpper()||entry.band!=(m_cmbFt8Band?m_cmbFt8Band->currentText().trimmed().toLower():m_settings.ft8Band))continue;
-        Ft8FullAutoCqCandidate candidate;candidate.valid=true;candidate.call=entry.call;candidate.grid=entry.grid;candidate.decode=entry.decode;candidate.priorityText=uiText("ft_cq_list_priority","Operator CQ list");
-        if(startFt8FullAutoQsoFromCandidate(candidate,true)){m_ftCqWorkList.requireFreshCheck();break;}
-    }
-    // Keep the explicit Start enabled while idle, so further double-clicks
-    // can extend the list during the last active QSO. Pause/STOP/clear disable it.
-    refreshFtCqWorkListUi();
+    m_ftCqTable->setSortingEnabled(true);
+    if(sorted&&sortColumn>0)m_ftCqTable->sortByColumn(sortColumn,sortOrder);
+    else m_ftCqTable->sortByColumn(0,Qt::AscendingOrder);
 }

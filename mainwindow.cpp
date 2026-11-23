@@ -9971,7 +9971,7 @@ void MainWindow::setupFt8Page()
         m_settings.save();
     });
     m_chkFt8CallerQueue->hide();   // lives in the Automodes dialog; the list button stays here
-    controlGrid->addWidget(m_btnFt8CallerList, 4, 0, 1, 6);
+    controlGrid->addWidget(m_btnFt8CallerList, 3, 3, 1, 3);
     connect(m_btnFt8CallerList,&QPushButton::clicked,this,&MainWindow::showFt8CallerQueue);
 
     m_btnFtCqAdd = new QPushButton(uiText("ft_cq_list_add", "Add selected CQs"), controlGroup);
@@ -9982,20 +9982,14 @@ void MainWindow::setupFt8Page()
     m_chkFtCqQueue = new QCheckBox(uiText("ft_cq_queue_enable", "Manage CQ queue"), controlGroup);
     m_chkFtCqQueue->setObjectName(QStringLiteral("ftCqQueueEnable"));
     m_chkFtCqQueue->setToolTip(uiText("ft_cq_queue_tooltip", "Opens the CQ work queue. Use Add selected CQs to queue stations. A double-click always selects a station for immediate TX."));
-    controlGrid->addWidget(m_chkFtCqQueue, 3, 0, 1, 2);
-    controlGrid->addWidget(m_btnFtCqAdd, 3, 2, 1, 2);
-    controlGrid->addWidget(m_btnFtCqList, 3, 4, 1, 2);
-    connect(m_chkFtCqQueue, &QCheckBox::toggled, this, [this](bool enabled){
-        if (enabled) showFtCqWorkList();
-        else { m_ftCqWorkList.running=false; refreshFtCqWorkListUi(); }
-    });
+    // One queue for callers, Auto CQs and the operator's picks: "Add selected CQs" and "Queue (n)" are all that is left here.
+    m_chkFtCqQueue->hide();
+    m_btnFtCqList->hide();
+    controlGrid->addWidget(m_btnFtCqAdd, 3, 0, 1, 3);
     connect(m_btnFtCqAdd, &QPushButton::clicked, this, &MainWindow::addSelectedFtCqsToWorkList);
-    connect(m_btnFtCqList, &QPushButton::clicked, this, &MainWindow::showFtCqWorkList);
     m_ftCqWorkListTimer.setInterval(1000);
     connect(&m_ftCqWorkListTimer, &QTimer::timeout, this, [this]{
         activateNextFt8QueuedCaller();
-        processFtCqWorkList();
-        processFt8FullAutoCqCandidates();
         updateStopLatchIndicator();
         if(m_ftCqDialog && m_ftCqDialog->isVisible()) refreshFtCqWorkListUi();
     });
@@ -12653,7 +12647,7 @@ void MainWindow::setupUiConnections()
     if (m_cmbFt8Band != nullptr) {
         connect(m_cmbFt8Band, QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, [this](int) {
-                    m_ftCqWorkList.clear(); m_ft8FullAutoCqCandidates.clear(); m_ft8AutoCqBusySlots.clear(); refreshFtCqWorkListUi();
+                    m_workQueue.removeSource(M3::QueueSource::AutoCq); m_workQueue.removeSource(M3::QueueSource::Manual); m_ft8AutoCqBusySlots.clear(); refreshFtCqWorkListUi();
                     clearFt8DecodeList();
                     applyFt8Settings();
                     qsyRigToSelectedFtBand();
@@ -15319,7 +15313,7 @@ void MainWindow::handleModeChanged(const QString &modeName)
     if (Ft8Mode::isFamilyMode(modeName)) {
         if (!m_ftCallerQueueMode.isEmpty() && m_ftCallerQueueMode != ftPerfModeName) {
             clearFt8CallerQueue(QStringLiteral("FT mode changed"));
-            m_ftCqWorkList.clear(); m_ft8FullAutoCqCandidates.clear(); m_ft8AutoCqBusySlots.clear(); refreshFtCqWorkListUi();
+            m_workQueue.removeSource(M3::QueueSource::AutoCq); m_workQueue.removeSource(M3::QueueSource::Manual); m_ft8AutoCqBusySlots.clear(); refreshFtCqWorkListUi();
         }
         m_ftCallerQueueMode = ftPerfModeName;
     } else {
@@ -15329,11 +15323,11 @@ void MainWindow::handleModeChanged(const QString &modeName)
         if (m_ftSession.qsoActive || m_ftSession.cqRepeatActive || m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan) {
             stopFt8Sequencer(QStringLiteral("left FT mode"));
         }
-        if (!m_ft8CallerQueue.isEmpty()) {
+        if (m_workQueue.count(M3::QueueSource::Caller) > 0) {
             clearFt8CallerQueue(QStringLiteral("left FT mode"));
         }
         m_ftCallerQueueMode.clear();
-        m_ftCqWorkList.clear(); m_ft8FullAutoCqCandidates.clear(); m_ft8AutoCqBusySlots.clear(); refreshFtCqWorkListUi();
+        m_workQueue.removeSource(M3::QueueSource::AutoCq); m_workQueue.removeSource(M3::QueueSource::Manual); m_ft8AutoCqBusySlots.clear(); refreshFtCqWorkListUi();
     }
     if (Ft8Mode::isFamilyMode(modeName) && m_ft8RecentLiveDecodeModeName != ftPerfModeName) {
         m_ft8RecentLiveDecodeMs.clear();
@@ -19497,7 +19491,7 @@ bool MainWindow::startFt8CqRepeatIfIdle(const QString &reason)
     if (m_ftSession.cqRepeatActive || m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning || m_ft8PendingTxArmed)
         return false;
     // Stations that called us directly are served before a new CQ series starts.
-    if (m_chkFt8CallerQueue != nullptr && m_chkFt8CallerQueue->isChecked() && !m_ft8CallerQueue.isEmpty())
+    if (m_chkFt8CallerQueue != nullptr && m_chkFt8CallerQueue->isChecked() && m_workQueue.count(M3::QueueSource::Caller) > 0)
         return false;
     traceFtAutomation("cq.start", reason);
     m_ftTxOriginHint = reason == QStringLiteral("Auto stage")
@@ -19582,9 +19576,10 @@ void MainWindow::autoStageSlotTick()
     }
     const bool busy = m_ftSession.qsoActive || m_ftSession.cqRepeatActive || m_txRunning || m_ftTxWorkerRunning ||
                       m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan || m_txPreparationPending;
-    bool target = !m_ft8CallerQueue.isEmpty();
-    for (const auto &candidate : std::as_const(m_ft8FullAutoCqCandidates))
-        if (candidate.cq) target = true;
+    bool target = false;
+    const QDateTime tickNow = QDateTime::currentDateTimeUtc();
+    for (const auto &entry : std::as_const(m_workQueue.entries))
+        if (!entry.noReply(tickNow) && (entry.source == M3::QueueSource::Caller || entry.cq)) target = true;
     const auto before = m_autoPlanner.phase();
     m_autoPlanner.slotPassed(target, busy);
     if (m_autoPlanner.phase() != before)
@@ -19685,7 +19680,7 @@ void MainWindow::handleFt8FullAutoQsoToggled(bool enabled)
 
     m_ft8AutoCqBusySlots.clear();
     if (enabled) {
-        m_ft8FullAutoCqCandidates.clear();
+        m_workQueue.removeSource(M3::QueueSource::AutoCq);
         m_ft8FullAutoCqSelectionTimer.stop();
         if (m_chkFt8CqRepeat != nullptr && m_chkFt8CqRepeat->isChecked()) {
             const QSignalBlocker blockAutoCq(m_chkFt8CqRepeat);
@@ -19711,7 +19706,7 @@ void MainWindow::handleFt8FullAutoQsoToggled(bool enabled)
                                    ? uiText("ft_auto_qso_paused_plan", "the QSY plan is on (no automatic TX while it runs).")
                                    : txBandRefusalReason()));
     } else {
-        m_ft8FullAutoCqCandidates.clear();
+        m_workQueue.removeSource(M3::QueueSource::AutoCq);
         m_ft8FullAutoCqSelectionTimer.stop();
         appendLog("FT Auto QSO disabled: no new CQ will be answered automatically.");
     }
@@ -19795,7 +19790,8 @@ void MainWindow::observeFt8AutoCqActivity(const Ft8RxDecoder::Decode &decode)
         m_ft8AutoCqBusySlots.erase(std::min_element(m_ft8AutoCqBusySlots.begin(), m_ft8AutoCqBusySlots.end()));
     auto &slot = m_ft8AutoCqBusySlots[parsed.senderCall];
     slot = qMax(slot, decode.slotStartUtcMs);
-    for (auto &candidate : m_ft8FullAutoCqCandidates) {
+    for (auto &candidate : m_workQueue.entries) {
+        if (candidate.source == M3::QueueSource::Caller) continue;
         if (FtDecodedText::callMatches(candidate.call, parsed.senderCall) &&
             decode.slotStartUtcMs >= candidate.decode.slotStartUtcMs) {
             if (candidate.cq) traceFtAutomation("candidate.wait", "directed_traffic",
@@ -19807,7 +19803,6 @@ void MainWindow::observeFt8AutoCqActivity(const Ft8RxDecoder::Decode &decode)
 
 bool MainWindow::canStartFt8FullAutoQsoNow() const
 {
-    if (m_ftCqWorkList.running && !m_ftCqWorkList.entries.isEmpty()) return false;
     if (!canCollectFt8FullAutoCqs()) {
         return false;
     }
@@ -19821,12 +19816,7 @@ bool MainWindow::canStartFt8FullAutoQsoNow() const
         m_pendingFt8TxPlan.tune || m_pendingFt8PttKeyed) {
         return false;
     }
-    if (m_chkFt8CallerQueue != nullptr && m_chkFt8CallerQueue->isChecked() && !m_ft8CallerQueue.isEmpty()) {
-        // Direct callers already waiting in the explicit FIFO always have
-        // priority over answering a new generic CQ in Auto QSO mode.
-        return false;
-    }
-
+    // Callers have priority over CQs through the order of the queue (processWorkQueue).
     const QString myCall = stationCallsign();
     const QString myGrid = stationLocator();
     return !myCall.trimmed().isEmpty() && !myGrid.trimmed().isEmpty();
@@ -20004,40 +19994,33 @@ bool MainWindow::queueFt8FullAutoCqCandidate(const Ft8RxDecoder::Decode &decode,
     if (m_ftSession.qsoActive && FtDecodedText::callMatches(candidate.call, m_ftSession.dxCall)) {
         traceFtAutomation("candidate.reject", "active_correspondent",evidence,true); return false;
     }
-    for (const auto &entry : m_ftCqWorkList.entries)
-        if (FtDecodedText::callMatches(candidate.call,entry.call)) {traceFtAutomation("candidate.reject","manual_queue_owns_target",evidence,true);return false;}
     for (auto it=m_ft8AutoCqBusySlots.cbegin(); it!=m_ft8AutoCqBusySlots.cend(); ++it)
         if (FtDecodedText::callMatches(it.key(),candidate.call) && candidate.decode.slotStartUtcMs<=it.value()) {traceFtAutomation("candidate.reject","directed_traffic",evidence,true);return false;}
     const auto now = QDateTime::currentDateTimeUtc();
-    for (int i=m_ft8FullAutoCqCandidates.size()-1;i>=0;--i) {
-        const auto &old=m_ft8FullAutoCqCandidates.at(i);
+    for (int i=m_workQueue.entries.size()-1;i>=0;--i) {
+        const auto &old=m_workQueue.entries.at(i);
+        if (old.source==M3::QueueSource::Caller) continue;
         if (old.mode!=candidate.mode || old.band!=candidate.band || !old.queuedUtc.isValid() || old.queuedUtc.secsTo(now)>300)
-            {traceFtAutomation("candidate.remove","expired_or_band_mode_changed",{{"candidate_call",old.call}},true);m_ft8FullAutoCqCandidates.removeAt(i);}
+            {traceFtAutomation("candidate.remove","expired_or_band_mode_changed",{{"candidate_call",old.call}},true);m_workQueue.entries.removeAt(i);}
     }
-    bool replaced=false;
-    for (auto &old:m_ft8FullAutoCqCandidates) {
-        if (!FtDecodedText::callMatches(old.call,candidate.call)) continue;
-        if (candidate.decode.slotStartUtcMs<old.decode.slotStartUtcMs) {traceFtAutomation("candidate.reject","older_cq",evidence,true);return false;}
-        // Refresh even a weaker CQ: freshness takes precedence over an old SNR.
-        old=candidate;replaced=true;break;
+    const int existing = m_workQueue.indexOf(candidate.call);
+    const bool replaced = existing >= 0;
+    if (replaced && candidate.decode.slotStartUtcMs < m_workQueue.entries.at(existing).decode.slotStartUtcMs) {
+        traceFtAutomation("candidate.reject","older_cq",evidence,true);return false;
     }
-    if (!replaced) m_ft8FullAutoCqCandidates.append(candidate);
-    std::sort(m_ft8FullAutoCqCandidates.begin(),m_ft8FullAutoCqCandidates.end(),Ft8FullAutoCqCandidate::higherPriority);
-    const auto profile=Ft8Mode::profileForMode(ui->cmbMode->currentText());
-    if (m_ft8FullAutoCqCandidates.size()>64) {
-        int discard=m_ft8FullAutoCqCandidates.size()-1;
-        for(int i=discard;i>=0;--i) {
-            const auto &e=m_ft8FullAutoCqCandidates.at(i);
-            if(!e.cq || now.toMSecsSinceEpoch()-e.decode.slotStartUtcMs>2*profile.slotMs+1000){discard=i;break;}
-        }
-        traceFtAutomation("candidate.remove","queue_capacity",{{"candidate_call",m_ft8FullAutoCqCandidates.at(discard).call}},true);
-        m_ft8FullAutoCqCandidates.removeAt(discard);
+    M3::FtQueueEntry entry;
+    static_cast<Ft8FullAutoCqCandidate &>(entry) = candidate;
+    entry.source = M3::QueueSource::AutoCq;
+    if (!m_workQueue.upsert(entry, now)) {
+        traceFtAutomation("candidate.reject","queue_full",evidence,true);
+        return false;
     }
     QJsonObject ranked=evidence;
     ranked.insert("priority",candidate.priorityText);ranked.insert("new_country",candidate.newCountry);
     ranked.insert("new_grid",candidate.newGrid);ranked.insert("new_band",candidate.newBand);ranked.insert("new_mode",candidate.newMode);
     ranked.insert("distance_km",candidate.distanceKm);
     traceFtAutomation(replaced ? "candidate.refresh" : "candidate.enqueue","ranked_cq",ranked,true);
+    const auto profile=Ft8Mode::profileForMode(ui->cmbMode->currentText());
     if (!m_ft8FullAutoCqSelectionTimer.isActive()) m_ft8FullAutoCqSelectionTimer.start(profile.slotMs<=8000?280:420);
     if (!m_ft8UiBatchApplying) refreshFtCqWorkListUi();
     return true;
@@ -20045,52 +20028,114 @@ bool MainWindow::queueFt8FullAutoCqCandidate(const Ft8RxDecoder::Decode &decode,
 
 void MainWindow::processFt8FullAutoCqCandidates()
 {
-    if (m_ft8FullAutoCqCandidates.isEmpty() || !canStartFt8FullAutoQsoNow()) {
-        if (m_ft8AutoModeEnabled && m_chkFt8FullAutoQso && m_chkFt8FullAutoQso->isChecked())
-            traceFtAutomation("wait",ftAutomationWaitReason(),{},true);
-        return;
+    processWorkQueue();
+}
+
+void MainWindow::processFtCqWorkList()
+{
+    processWorkQueue();
+}
+
+// The one dispatcher of the queue: takes the next entry in policy order that may be worked now (callers first, FIFO;
+// CQs by value; the operator's "Next" before all) and starts the QSO through the normal sequencer. All gates are the
+// ones that always applied (STOP latch, autoTxPermitted, stage, block lists ...).
+bool MainWindow::processWorkQueue()
+{
+    {
+        const bool busyForLate73 = m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning ||
+                                   (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning()) ||
+                                   m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan ||
+                                   !m_pendingFt8TxPlan.message.trimmed().isEmpty();
+        if (!busyForLate73 && !m_ft8LateFinals.isEmpty() && activateNextFt8LateFinal()) return true;
     }
-    const auto now=QDateTime::currentDateTimeUtc();
-    const auto mode=currentAdifMode().trimmed().toUpper();
-    const auto band=m_cmbFt8Band?m_cmbFt8Band->currentText().trimmed().toLower():m_settings.ft8Band.trimmed().toLower();
-    const int slotMs=Ft8Mode::profileForMode(ui->cmbMode->currentText()).slotMs;
-    std::sort(m_ft8FullAutoCqCandidates.begin(),m_ft8FullAutoCqCandidates.end(),Ft8FullAutoCqCandidate::higherPriority);
-    QVector<Ft8FullAutoCqCandidate> ready;
-    for (int i=0;i<m_ft8FullAutoCqCandidates.size();) {
-        auto candidate=m_ft8FullAutoCqCandidates.at(i);
-        if (candidate.mode!=mode || candidate.band!=band || !candidate.queuedUtc.isValid() || candidate.queuedUtc.secsTo(now)>300) {
-            traceFtAutomation("candidate.remove","expired_or_band_mode_changed",{{"candidate_call",candidate.call}},true);
-            m_ft8FullAutoCqCandidates.removeAt(i);continue;
-        }
-        const auto slot=candidate.decode.slotStartUtcMs;
-        // Keep stale targets visible, but require a recently heard CQ before calling.
-        if (!candidate.cq || slot<=0 || slot>now.toMSecsSinceEpoch() || now.toMSecsSinceEpoch()-slot>2*slotMs+1000) {
-            traceFtAutomation("candidate.wait",candidate.cq ? "fresh_cq_required" : "directed_traffic",{{"candidate_call",candidate.call},{"rx_slot_utc_ms",slot}},true);
-            ++i;continue;
-        }
-        const auto query=makeFtLogbookQuery(candidate.call,candidate.band,candidate.mode,candidate.dxcc,candidate.grid,
-            kFtLogbookRecentHours,0);
-        const auto status=cachedFtLogbookStatus(query);
-        if (status.isEmpty()) {queueFtLogbookQueriesForDecode(candidate.decode,true);++i;continue;}
-        candidate=buildFt8FullAutoCqCandidate(candidate.decode,status);
-        if (!candidate.valid) {traceFtAutomation("candidate.remove",candidate.priorityText,{{"candidate_call",m_ft8FullAutoCqCandidates.at(i).call}},true);m_ft8FullAutoCqCandidates.removeAt(i);continue;}
-        // Recheck priority/duplicate policy against the current logbook cache.
-        m_ft8FullAutoCqCandidates[i]=candidate;
-        ready.append(candidate);
-        ++i;
+    if (m_ft8OperatorStopLatched || m_shutdownInProgress || m_runtimeShutdownComplete || m_offlineAnalysisActive ||
+        ui == nullptr || ui->cmbMode == nullptr || !Ft8Mode::isFamilyMode(ui->cmbMode->currentText())) {
+        return false;
     }
-    if (!ready.isEmpty()) {
-        std::sort(ready.begin(),ready.end(),Ft8FullAutoCqCandidate::higherPriority);
-        const auto best=ready.first();
-        traceFtAutomation("candidate.select","highest_priority",{{"candidate_call",best.call},{"priority",best.priorityText},{"rx_slot_utc_ms",best.decode.slotStartUtcMs},{"rx_audio_hz",best.decode.frequencyHz},{"snr_db",best.decode.snrDb}},true);
-        appendLog(QStringLiteral("FT Auto QSO queue: selected %1 [%2]; %3 target(s) waiting.")
-            .arg(best.call,best.priorityText).arg(m_ft8FullAutoCqCandidates.size()-1));
-        if (startFt8FullAutoQsoFromCandidate(best)) {
-            for(int i=m_ft8FullAutoCqCandidates.size()-1;i>=0;--i)
-                if(FtDecodedText::callMatches(best.call,m_ft8FullAutoCqCandidates.at(i).call)) m_ft8FullAutoCqCandidates.removeAt(i);
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const int sizeBefore = m_workQueue.size();
+    m_workQueue.expire(now, 5 * 60);
+    if (m_workQueue.size() != sizeBefore) updateFt8SessionQueueUi();
+    if (m_workQueue.isEmpty()) return false;
+    // Serving the queue starts a QSO by itself: automatic TX.
+    if (!autoTxPermitted() || m_autoPlanner.stage() == 0) return false;
+    const bool busy = m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning ||
+                      (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning()) ||
+                      m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan ||
+                      !m_pendingFt8TxPlan.message.trimmed().isEmpty() ||
+                      m_pendingFt8TxPlan.tune || m_pendingFt8PttKeyed;
+    if (busy) return false;
+
+    const bool callersAllowed = m_chkFt8CallerQueue != nullptr && m_chkFt8CallerQueue->isChecked();
+    const bool answersAllowed = canStartFt8FullAutoQsoNow();
+    const QString mode = currentAdifMode().trimmed().toUpper();
+    const QString band = m_cmbFt8Band ? m_cmbFt8Band->currentText().trimmed().toLower() : m_settings.ft8Band.trimmed().toLower();
+    const int slotMs = Ft8Mode::profileForMode(ui->cmbMode->currentText()).slotMs;
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+
+    const QVector<int> order = m_workQueue.order(now);
+    for (int idx : order) {
+        if (idx < 0 || idx >= m_workQueue.entries.size()) continue;
+        M3::FtQueueEntry entry = m_workQueue.entries.at(idx);
+        if (entry.noReply(now)) continue;
+        if (entry.source == M3::QueueSource::Caller) {
+            if (!callersAllowed) continue;
+            m_workQueue.removeCall(entry.call);
+            updateFt8SessionQueueUi();
+            if (activateQueuedCaller(entry)) { m_activeQueueEntry = entry; m_haveActiveQueueEntry = true; return true; }
+            return false;   // the queue changed under us; the next tick continues
+        }
+        if (!answersAllowed) continue;
+        // CQs of Auto mode and picks of the operator: a recently heard CQ is required before calling.
+        if (entry.mode != mode || entry.band != band || !entry.queuedUtc.isValid() || entry.queuedUtc.secsTo(now) > 300) {
+            if (!entry.pinned && entry.source != M3::QueueSource::Manual) {
+                traceFtAutomation("candidate.remove","expired_or_band_mode_changed",{{"candidate_call",entry.call}},true);
+                m_workQueue.removeCall(entry.call);
+            }
+            continue;
+        }
+        const qint64 slot = entry.decode.slotStartUtcMs;
+        if (!entry.cq || slot <= 0 || slot > nowMs || nowMs - slot > 2 * slotMs + 1000) {
+            traceFtAutomation("candidate.wait", entry.cq ? "fresh_cq_required" : "directed_traffic",
+                              {{"candidate_call",entry.call},{"rx_slot_utc_ms",slot}},true);
+            continue;
+        }
+        const auto query = makeFtLogbookQuery(entry.call, entry.band, entry.mode, entry.dxcc, entry.grid, kFtLogbookRecentHours, 0);
+        const auto status = cachedFtLogbookStatus(query);
+        if (status.isEmpty()) { queueFtLogbookQueriesForDecode(entry.decode, true); continue; }
+        Ft8FullAutoCqCandidate candidate = buildFt8FullAutoCqCandidate(entry.decode, status);
+        if (!candidate.valid) {
+            if (entry.source == M3::QueueSource::Manual || entry.pinned) {
+                candidate = entry;            // the operator's pick is worked as it is
+                candidate.valid = true;
+            } else {
+                traceFtAutomation("candidate.remove",candidate.priorityText,{{"candidate_call",entry.call}},true);
+                m_workQueue.removeCall(entry.call);
+                continue;
+            }
+        }
+        // The ranking follows the current logbook cache.
+        const int cur = m_workQueue.indexOf(entry.call);
+        if (cur >= 0) {
+            static_cast<Ft8FullAutoCqCandidate &>(m_workQueue.entries[cur]) = candidate;
+            m_workQueue.entries[cur].decode = entry.decode;
+            m_workQueue.entries[cur].cq = entry.cq;
+        }
+        traceFtAutomation("candidate.select", entry.pinned ? "operator_next" : "queue_policy",
+                          {{"candidate_call",candidate.call},{"priority",candidate.priorityText},{"rx_slot_utc_ms",candidate.decode.slotStartUtcMs},
+                           {"rx_audio_hz",candidate.decode.frequencyHz},{"snr_db",candidate.decode.snrDb}},true);
+        appendLog(QStringLiteral("FT queue: selected %1 [%2]; %3 other entr%4 waiting.")
+                      .arg(candidate.call, candidate.priorityText).arg(m_workQueue.size() - 1).arg(m_workQueue.size() == 2 ? QStringLiteral("y") : QStringLiteral("ies")));
+        if (startFt8FullAutoQsoFromCandidate(candidate)) {
+            m_activeQueueEntry = entry;
+            m_haveActiveQueueEntry = true;
+            m_workQueue.removeCall(entry.call);
+            refreshFtCqWorkListUi();
+            return true;
         }
     }
     refreshFtCqWorkListUi();
+    return false;
 }
 
 bool MainWindow::tryStartFt8FullAutoQso(const Ft8RxDecoder::Decode &decode, const QVariantMap &logbookStatus)
@@ -20107,12 +20152,7 @@ bool MainWindow::tryStartFt8FullAutoQso(const Ft8RxDecoder::Decode &decode, cons
 
 bool MainWindow::startFt8FullAutoQsoFromCandidate(const Ft8FullAutoCqCandidate &candidate, bool fromCqWorkList)
 {
-    const bool plannedAllowed = fromCqWorkList && m_ftCqWorkList.running &&
-        !m_ft8OperatorStopLatched && !m_offlineAnalysisActive && !m_shutdownInProgress && !m_runtimeShutdownComplete &&
-        Ft8Mode::isFamilyMode(ui->cmbMode->currentText()) &&
-        !m_ftSession.qsoActive && !m_ft8PendingTxArmed && !m_hasDeferredFt8TxPlan &&
-        !m_txRunning && !m_ftTxWorkerRunning &&
-        !(m_txAudioEngine && m_txAudioEngine->isRunning());
+    const bool plannedAllowed = false;   // the operator's CQ list is part of the one queue now (processWorkQueue)
     if (!candidate.valid || !(fromCqWorkList ? plannedAllowed : canStartFt8FullAutoQsoNow())) {
         traceFtAutomation("qso.start_rejected",candidate.valid ? ftAutomationWaitReason() : "invalid_candidate",{{"candidate_call",candidate.call}},true);
         return false;
@@ -20269,7 +20309,7 @@ void MainWindow::stopFt8Sequencer(const QString &reason)
 {
     ++m_ftCqResumeGen;
     traceFtAutomation("sequencer.stop",reason);
-    if (m_ft8OperatorStopLatched) { m_ftCqWorkList.running = false; refreshFtCqWorkListUi(); }
+    if (m_ft8OperatorStopLatched) { refreshFtCqWorkListUi(); }
     m_ftSession.resetAll();
     if (m_ft8RxDecoder != nullptr) {
         QMetaObject::invokeMethod(m_ft8RxDecoder, "setQsoDeadlineActive", Qt::QueuedConnection, Q_ARG(bool, false));
@@ -20298,7 +20338,7 @@ void MainWindow::stopFt8Sequencer(const QString &reason)
     m_deferredFt8TxPlan = FtTxPlan();
     m_ftSession.deferredState = Ft8SequencerState::Idle;
     if (m_ft8OperatorStopLatched || !canCollectFt8FullAutoCqs()) {
-        m_ft8FullAutoCqCandidates.clear();
+        m_workQueue.removeSource(M3::QueueSource::AutoCq);
         m_ft8AutoCqBusySlots.clear();
     }
     m_ft8FullAutoCqSelectionTimer.stop();
@@ -20330,6 +20370,7 @@ void MainWindow::clearFt8Dx()
     if (!dx.isEmpty()) {
         // Like a given-up QSO: no automatic answer to this station for 15 minutes.
         m_ft8AutoNoResponseCooldown.insert(dx, QDateTime::currentDateTimeUtc().addSecs(15 * 60));
+        markQueueNoReply(dx);
         removeFt8QueuedCaller(dx);
     }
     if (m_editFt8DxCall != nullptr) m_editFt8DxCall->clear();
@@ -20362,68 +20403,23 @@ void MainWindow::updateFt8SessionQueueUi()
     m_lblFt8SessionQueue->setText(
         uiText("ft8_session_stats", "Session QSOs: %1 · Queued callers: %2")
             .arg(m_ftSessionQsoCount)
-            .arg(m_ft8CallerQueue.size()));
+            .arg(m_workQueue.count(M3::QueueSource::Caller)));
 }
 
 void MainWindow::showFt8CallerQueue()
 {
-    if(!m_ft8CallerDialog){
-        m_ft8CallerDialog=new QDialog(this);m_ft8CallerDialog->setModal(false);
-        m_ft8CallerDialog->setObjectName(QStringLiteral("ftCallerQueueDialog"));
-        m_ft8CallerDialog->setWindowTitle(uiText("ft_callers_title","Waiting callers"));
-        m_ft8CallerDialog->resize(700,340);
-        auto *layout=new QVBoxLayout(m_ft8CallerDialog);
-        auto *help=new QLabel(uiText("ft_callers_help","Direct callers waiting for the current QSO to finish. Served in FIFO order."),m_ft8CallerDialog);
-        help->setWordWrap(true);layout->addWidget(help);
-        m_ft8CallerEmpty=new QLabel(uiText("ft_callers_empty","No callers waiting"),m_ft8CallerDialog);
-        layout->addWidget(m_ft8CallerEmpty);
-        m_ft8CallerTable=new QTableWidget(m_ft8CallerDialog);
-        m_ft8CallerTable->setObjectName(QStringLiteral("ftCallerQueueTable"));
-        m_ft8CallerTable->setColumnCount(6);
-        m_ft8CallerTable->setSortingEnabled(false);
-        m_ft8CallerTable->setHorizontalHeaderLabels({QStringLiteral("#"),uiText("callsign","Callsign"),uiText("locator","Locator"),QStringLiteral("dB"),QStringLiteral("Hz"),uiText("ft_callers_seen","Last heard UTC")});
-        m_ft8CallerTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-        m_ft8CallerTable->setSelectionMode(QAbstractItemView::ExtendedSelection);
-        m_ft8CallerTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-        m_ft8CallerTable->verticalHeader()->hide();
-        m_ft8CallerTable->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-        m_ft8CallerTable->horizontalHeader()->setStretchLastSection(true);layout->addWidget(m_ft8CallerTable);
-        auto *buttons=new QHBoxLayout;
-        auto *remove=new QPushButton(uiText("ft_cq_list_remove","Remove selected"),m_ft8CallerDialog);
-        remove->setObjectName(QStringLiteral("ftCallerQueueRemove"));
-        auto *clear=new QPushButton(uiText("ft_cq_list_clear","Clear list"),m_ft8CallerDialog);
-        clear->setObjectName(QStringLiteral("ftCallerQueueClear"));
-        auto *close=new QPushButton(uiText("close","Close"),m_ft8CallerDialog);
-        buttons->addWidget(remove);buttons->addWidget(clear);buttons->addStretch();buttons->addWidget(close);layout->addLayout(buttons);
-        connect(close,&QPushButton::clicked,m_ft8CallerDialog,&QDialog::hide);
-        connect(clear,&QPushButton::clicked,this,[this]{clearFt8CallerQueue(QStringLiteral("operator cleared waiting list"));});
-        connect(remove,&QPushButton::clicked,this,[this]{
-            QSet<QString> calls;
-            for(auto *item:m_ft8CallerTable->selectedItems())calls.insert(item->data(Qt::UserRole).toString());
-            for(const auto &call:calls)removeFt8QueuedCaller(call);
-        });
-    }
-    refreshFt8CallerQueueUi();m_ft8CallerDialog->show();m_ft8CallerDialog->raise();
+    showFtCqWorkList();   // callers, Auto CQs and the operator's picks share one queue
 }
 
 void MainWindow::refreshFt8CallerQueueUi()
 {
-    if(m_btnFt8CallerList)m_btnFt8CallerList->setText(uiText("ft_callers_open","Callers (%1)").arg(m_ft8CallerQueue.size()));
-    if(!m_ft8CallerTable)return;
-    QSet<QString> selected;
-    for(auto *item:m_ft8CallerTable->selectedItems())selected.insert(item->data(Qt::UserRole).toString());
-    const QSignalBlocker block(m_ft8CallerTable);m_ft8CallerTable->setRowCount(m_ft8CallerQueue.size());
-    for(int row=0;row<m_ft8CallerQueue.size();++row){const auto &caller=m_ft8CallerQueue[row];
-        const QStringList values{QString::number(row+1),caller.call,caller.grid,QString::number(caller.latestDecode.snrDb),QString::number(caller.latestDecode.frequencyHz),caller.lastSeenUtc.toUTC().toString(QStringLiteral("HH:mm:ss"))};
-        for(int col=0;col<values.size();++col){auto *item=new QTableWidgetItem(values[col]);item->setData(Qt::UserRole,caller.call);m_ft8CallerTable->setItem(row,col,item);if(selected.contains(caller.call))item->setSelected(true);}
-    }
-    if(m_ft8CallerEmpty)m_ft8CallerEmpty->setVisible(m_ft8CallerQueue.isEmpty());
+    refreshFtCqWorkListUi();
 }
 
 void MainWindow::clearFt8CallerQueue(const QString &reason)
 {
-    const int removed = m_ft8CallerQueue.size();
-    m_ft8CallerQueue.clear();
+    const int removed = m_workQueue.count(M3::QueueSource::Caller);
+    m_workQueue.removeSource(M3::QueueSource::Caller);
     updateFt8SessionQueueUi();
     if (removed > 0 && !reason.trimmed().isEmpty()) {
         appendLog(QString("FT caller queue: cleared %1 waiting caller(s): %2")
@@ -20439,9 +20435,10 @@ void MainWindow::removeFt8QueuedCaller(const QString &call)
         return;
     }
     bool changed = false;
-    for (int i = m_ft8CallerQueue.size() - 1; i >= 0; --i) {
-        if (FtDecodedText::callMatches(m_ft8CallerQueue.at(i).call, wanted)) {
-            m_ft8CallerQueue.removeAt(i);
+    for (int i = m_workQueue.entries.size() - 1; i >= 0; --i) {
+        if (m_workQueue.entries.at(i).source == M3::QueueSource::Caller &&
+            FtDecodedText::callMatches(m_workQueue.entries.at(i).call, wanted)) {
+            m_workQueue.entries.removeAt(i);
             changed = true;
         }
     }
@@ -20496,11 +20493,11 @@ void MainWindow::considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, b
         return;
     }
 
-    for (Ft8QueuedCaller &queued : m_ft8CallerQueue) {
-        if (!FtDecodedText::callMatches(queued.call, call)) {
-            continue;
-        }
-        queued.latestDecode = decode;
+    const int known = m_workQueue.indexOf(call);
+    if (known >= 0 && m_workQueue.entries.at(known).source == M3::QueueSource::Caller) {
+        // Already waiting as a caller: refresh what we know of him.
+        auto &queued = m_workQueue.entries[known];
+        queued.decode = decode;
         if (!parsed.grid.trimmed().isEmpty() && !FtDecodedText::isAckLikeGridTrap(parsed.grid)) {
             queued.grid = parsed.grid.left(4).toUpper();
         }
@@ -20510,27 +20507,39 @@ void MainWindow::considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, b
     }
 
     constexpr int kMaxQueuedCallers = 12;
-    if (m_ft8CallerQueue.size() >= kMaxQueuedCallers) {
+    if (m_workQueue.count(M3::QueueSource::Caller) >= kMaxQueuedCallers) {
         appendLog(QString("FT caller queue: full (%1); ignoring additional caller %2.")
                       .arg(kMaxQueuedCallers)
                       .arg(call));
         return;
     }
 
-    Ft8QueuedCaller queued;
-    queued.latestDecode = decode;
+    M3::FtQueueEntry queued;
+    queued.source = M3::QueueSource::Caller;
+    queued.valid = true;
+    queued.cq = false;
+    queued.decode = decode;
     queued.call = call;
+    queued.mode = ui->cmbMode->currentText().trimmed().toUpper();
+    queued.band = m_cmbFt8Band ? m_cmbFt8Band->currentText().trimmed().toLower() : m_settings.ft8Band;
+    queued.queuedUtc = now;
+    queued.priorityText = uiText("ft_queue_caller_text", "called me");
     if (!parsed.grid.trimmed().isEmpty() && !FtDecodedText::isAckLikeGridTrap(parsed.grid)) {
         queued.grid = parsed.grid.left(4).toUpper();
     }
-    queued.firstSeenUtc = now;
-    queued.lastSeenUtc = now;
-    m_ft8CallerQueue.append(queued);
+    if (known >= 0) queued.firstSeenUtc = m_workQueue.entries.at(known).firstSeenUtc;   // a CQ station that now calls me keeps his place
+    if (!m_workQueue.upsert(queued, now)) {
+        appendLog(QString("FT caller queue: full; ignoring additional caller %1.").arg(call));
+        return;
+    }
     traceFtAutomation("candidate.enqueue","direct_caller_fifo",{{"candidate_call",call},{"rx_message",decode.message},{"rx_slot_utc_ms",decode.slotStartUtcMs}},true);
     updateFt8SessionQueueUi();
+    int position = 0;
+    for (const auto &e : std::as_const(m_workQueue.entries))
+        if (e.source == M3::QueueSource::Caller && e.firstSeenUtc <= m_workQueue.entries.at(m_workQueue.indexOf(call)).firstSeenUtc) ++position;
     appendLog(QString("FT caller queue: %1 queued in FIFO position %2 (%3 dB, %4 Hz).")
                   .arg(call)
-                  .arg(m_ft8CallerQueue.size())
+                  .arg(position)
                   .arg(decode.snrDb)
                   .arg(decode.frequencyHz));
 }
@@ -20692,54 +20701,39 @@ bool MainWindow::resumePausedFt8Qso(const FtQsoSequencer::ParsedMessage &parsed,
     return true;
 }
 
+// He stays in the queue, grey, at the end, until the 15-minute pause is over.
+void MainWindow::markQueueNoReply(const QString &dx)
+{
+    const QDateTime nowUtc = QDateTime::currentDateTimeUtc();
+    M3::FtQueueEntry gone;
+    if (m_haveActiveQueueEntry && FtDecodedText::callMatches(m_activeQueueEntry.call, dx)) {
+        gone = m_activeQueueEntry;
+    } else {
+        gone.call = dx.trimmed().toUpper();
+        gone.valid = true;
+        gone.cq = true;
+        gone.source = M3::QueueSource::AutoCq;
+        gone.queuedUtc = nowUtc;
+        gone.mode = currentAdifMode().trimmed().toUpper();
+        gone.band = m_cmbFt8Band ? m_cmbFt8Band->currentText().trimmed().toLower() : m_settings.ft8Band;
+        gone.priorityText = uiText("ft_queue_noreply_text", "gave no reply");
+    }
+    m_workQueue.markNoReply(gone, nowUtc.addSecs(15 * 60), nowUtc);
+    refreshFtCqWorkListUi();
+}
+
 bool MainWindow::activateNextFt8QueuedCaller()
 {
-    {
-        const bool busyForLate73 = m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning ||
-                                   (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning()) ||
-                                   m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan ||
-                                   !m_pendingFt8TxPlan.message.trimmed().isEmpty();
-        if (!busyForLate73 && !m_ft8LateFinals.isEmpty() && activateNextFt8LateFinal()) return true;
-    }
-    if (m_chkFt8CallerQueue == nullptr || !m_chkFt8CallerQueue->isChecked() ||
-        m_ft8OperatorStopLatched || !Ft8Mode::isFamilyMode(ui->cmbMode->currentText())) {
-        return false;
-    }
-    // Serving the next caller of the queue starts a QSO by itself: automatic TX.
-    if (!autoTxPermitted()) return false;
-    if (m_autoPlanner.stage() == 0) return false;   // stage 0: no automatic answers
+    return processWorkQueue();
+}
 
-    const bool busy = m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning ||
-                      (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning()) ||
-                      m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan ||
-                      !m_pendingFt8TxPlan.message.trimmed().isEmpty();
-    if (busy) {
-        return false;
-    }
-
-    const QDateTime now = QDateTime::currentDateTimeUtc();
-    constexpr qint64 kCallerQueueMaxAgeSeconds = 5 * 60;
-    for (int i = m_ft8CallerQueue.size() - 1; i >= 0; --i) {
-        const Ft8QueuedCaller &queued = m_ft8CallerQueue.at(i);
-        if (!queued.lastSeenUtc.isValid() || queued.lastSeenUtc.secsTo(now) > kCallerQueueMaxAgeSeconds) {
-            appendLog(QString("FT caller queue: expired %1 after more than 5 minutes without a fresh call.")
-                          .arg(queued.call));
-            m_ft8CallerQueue.removeAt(i);
-        }
-    }
-    updateFt8SessionQueueUi();
-    if (m_ft8CallerQueue.isEmpty()) {
-        return false;
-    }
-
-    const Ft8QueuedCaller queued = m_ft8CallerQueue.first();
-    m_ft8CallerQueue.removeAt(0);
-    updateFt8SessionQueueUi();
-
+// A caller of the queue is activated through the same single sequencer used by a normal live decode.
+bool MainWindow::activateQueuedCaller(const M3::FtQueueEntry &queued)
+{
     // A queued caller is activated through the same single sequencer used by a
     // normal live decode. Select only the opposite UTC period here; no second
     // QSO state machine and no parallel TX path are introduced.
-    selectFt8OppositePeriodFromDecode(queued.latestDecode);
+    selectFt8OppositePeriodFromDecode(queued.decode);
 
     // Drop the completed correspondent's retained UI/session context before the
     // next FIFO item is fed to the normal sequencer. Known grids are maintained
@@ -20750,10 +20744,10 @@ bool MainWindow::activateNextFt8QueuedCaller()
     m_ft8AutoNoResponseCooldown.remove(queued.call);
     appendLog(QString("FT caller queue: activating %1 (FIFO; %2 caller(s) remain).")
                   .arg(queued.call)
-                  .arg(m_ft8CallerQueue.size()));
-    traceFtAutomation("candidate.select","direct_caller_fifo",{{"candidate_call",queued.call},{"rx_message",queued.latestDecode.message}});
+                  .arg(m_workQueue.count(M3::QueueSource::Caller)));
+    traceFtAutomation("candidate.select","direct_caller_fifo",{{"candidate_call",queued.call},{"rx_message",queued.decode.message}});
     m_ftTxOriginHint = uiText("ft_origin_queue", "caller queue: %1 called us and was waiting").arg(queued.call);
-    processFt8SequencerDecode(queued.latestDecode);
+    processFt8SequencerDecode(queued.decode);
     m_ftTxOriginHint.clear();
     const bool txFollows = m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan || m_txRunning || m_ftTxWorkerRunning ||
                            !m_pendingFt8TxPlan.message.trimmed().isEmpty();
@@ -21690,10 +21684,7 @@ void MainWindow::handleFt8DecodeDoubleClicked(QTableWidgetItem *item)
     if (!m_ft8SelectionOnly && !call.isEmpty()) {
         // Explicit selection takes this target out of both work queues.
         m_ft8FullAutoCqSelectionTimer.stop();
-        for (int i=m_ft8FullAutoCqCandidates.size()-1;i>=0;--i)
-            if (FtDecodedText::callMatches(call,m_ft8FullAutoCqCandidates.at(i).call)) m_ft8FullAutoCqCandidates.removeAt(i);
-        for (int i=m_ftCqWorkList.entries.size()-1;i>=0;--i)
-            if (FtDecodedText::callMatches(call,m_ftCqWorkList.entries.at(i).call)) m_ftCqWorkList.entries.removeAt(i);
+        m_workQueue.removeCall(call);
         refreshFtCqWorkListUi();
     }
     if (!call.isEmpty()) {
@@ -22358,6 +22349,7 @@ void MainWindow::finishFt8ResponseWait(quint64 retryGeneration, qint64 replySlot
                                  m_chkFt8FullAutoQso->isChecked();
     if (fullAutoEnabled && !dx.isEmpty()) {
         m_ft8AutoNoResponseCooldown.insert(dx, QDateTime::currentDateTimeUtc().addSecs(15 * 60));
+        markQueueNoReply(dx);
         appendLog(QString("FT Auto QSO: %1 gave no reply; skipping this call for 15 minutes and waiting for another CQ.")
                       .arg(dx));
     }
@@ -22679,10 +22671,9 @@ void MainWindow::handleFt8DecodeBatchFinished(qint64 slotStartUtcMs, const QStri
         slotStartUtcMs == m_ftSession.retryReplySlotUtcMs) {
         finishFt8ResponseWait(m_ftSession.retryGeneration, slotStartUtcMs);
     }
-    processFtCqWorkList();
-    if (!m_ft8FullAutoCqCandidates.isEmpty()) {
+    if (!m_workQueue.isEmpty()) {
         m_ft8FullAutoCqSelectionTimer.stop();
-        processFt8FullAutoCqCandidates();
+        processWorkQueue();
     }
     if (phase == QStringLiteral("boundary") && slotStartUtcMs != m_autoTickSlotUtcMs) {
         m_autoTickSlotUtcMs = slotStartUtcMs;
@@ -22725,11 +22716,20 @@ void MainWindow::handleFt8DecodeReady(const Ft8RxDecoder::Decode &decode)
     const QString myCall = stationCallsign();
     const ParsedFt8Message parsed = parseFt8MessageText(decode.message, myCall);
     if (!presentationOnly) observeFt8AutoCqActivity(decode);
-    if (!presentationOnly && !m_ftCqWorkList.entries.isEmpty()) {
-        const QString heard = parsed.cq ? ft8CqCallsignFromMessage(parsed) : parsed.senderCall;
-        m_ftCqWorkList.observe(heard.trimmed().toUpper(), parsed.cq, decode,
-            ui->cmbMode->currentText().trimmed().toUpper(),
-            m_cmbFt8Band ? m_cmbFt8Band->currentText().trimmed().toLower() : m_settings.ft8Band);
+    if (!presentationOnly && !m_workQueue.isEmpty() && decode.slotStartUtcMs > 0) {
+        // What the queue knows about a station follows what is heard: his CQ keeps him ready, directed traffic
+        // of his means he is busy. Older publications never undo a later one.
+        const QString heard = (parsed.cq ? ft8CqCallsignFromMessage(parsed) : parsed.senderCall).trimmed().toUpper();
+        const int qi = heard.isEmpty() ? -1 : m_workQueue.indexOf(heard);
+        if (qi >= 0 && m_workQueue.entries.at(qi).source != M3::QueueSource::Caller &&
+            decode.slotStartUtcMs >= m_workQueue.entries.at(qi).decode.slotStartUtcMs) {
+            auto &e = m_workQueue.entries[qi];
+            if (!(decode.slotStartUtcMs == e.decode.slotStartUtcMs && !e.cq)) {
+                e.decode = decode;
+                e.cq = parsed.cq;
+                e.lastSeenUtc = QDateTime::currentDateTimeUtc();
+            }
+        }
     }
     if (!presentationOnly && m_settings.pskReporterEnabled && !m_offlineAnalysisActive) {
         // The station the locator belongs to: the CQ caller or the sender.

@@ -44,6 +44,9 @@ void MainWindow::buildAutomodesMenu()
         });
     }
     m_menuAutomodes->addSeparator();
+    QAction *queue = m_menuAutomodes->addAction(QString());
+    queue->setObjectName(QStringLiteral("automodesQueue"));
+    connect(queue, &QAction::triggered, this, &MainWindow::showFtCqWorkList);
     QAction *open = m_menuAutomodes->addAction(QString());
     open->setObjectName(QStringLiteral("automodesOpen"));
     connect(open, &QAction::triggered, this, &MainWindow::showAutomodesDialog);
@@ -82,6 +85,9 @@ void MainWindow::buildAutomodesDialog()
     auto *gates = new QLabel(uiText("automodes_gates", "These rules always apply, whatever the stage: nothing is sent after a program start until you switch Auto mode on; STOP, a mode change and a band change pause the automation until you select the stage again; no automatic transmission without a known frequency on a band with TX permission; blocked stations, excluded countries/continents, a-priori (AP) decodes and implausible callsigns are never answered; the SWR protection stops a transmission."), overview);
     gates->setWordWrap(true);
     ov->addWidget(gates);
+    auto *queueButton = new QPushButton(uiText("automodes_queue", "FT queue ..."), overview);
+    connect(queueButton, &QPushButton::clicked, this, &MainWindow::showFtCqWorkList);
+    ov->addWidget(queueButton, 0, Qt::AlignLeft);
     auto *recentBox = new QGroupBox(uiText("automodes_recent", "Last transmissions and why they happened"), overview);
     auto *rb = new QVBoxLayout(recentBox);
     m_automodesRecent = new QListWidget(recentBox);
@@ -236,6 +242,10 @@ void MainWindow::refreshAutomodesDialog()
     if (m_menuAutomodes != nullptr) {
         m_menuAutomodes->setTitle(uiText("menu_automodes", "Automodes"));
         for (QAction *action : m_menuAutomodes->actions()) {
+            if (action->objectName() == QLatin1String("automodesQueue")) {
+                action->setText(uiText("automodes_queue", "FT queue ..."));
+                continue;
+            }
             if (action->objectName() == QLatin1String("automodesOpen")) {
                 action->setText(uiText("automodes_open", "Automodes settings ..."));
                 continue;

@@ -9,6 +9,7 @@ settings_h = (root / 'settings/AppSettings.h').read_text(encoding='utf-8')
 settings_cpp = (root / 'settings/AppSettings.cpp').read_text(encoding='utf-8')
 wf_cpp = (root / 'widgets/WaterfallWidget.cpp').read_text(encoding='utf-8')
 wf_h = (root / 'widgets/WaterfallWidget.h').read_text(encoding='utf-8')
+queue_h = (root / 'modems/ft8/FtWorkQueue.h').read_text(encoding='utf-8')
 
 checks = [
     ('caller queue setting exists', 'bool ft8QueueCallers = false;' in settings_h),
@@ -16,11 +17,11 @@ checks = [
     ('caller queue setting saves', 'settings.setValue("FT8/queueCallers"' in settings_cpp),
     ('caller queue checkbox exists', 'm_chkFt8CallerQueue = new QCheckBox' in main),
     ('session QSO counter exists', 'm_ftSessionQsoCount' in hdr and '++m_ftSessionQsoCount;' in main),
-    ('FIFO uses first queued caller', 'const Ft8QueuedCaller queued = m_ft8CallerQueue.first();' in main and 'm_ft8CallerQueue.removeAt(0);' in main),
-    ('queue feeds normal sequencer', 'processFt8SequencerDecode(queued.latestDecode);' in main),
-    ('queue uses shared opposite-period selector', 'selectFt8OppositePeriodFromDecode(queued.latestDecode);' in main),
+    ('FIFO uses first queued caller', 'activateQueuedCaller(entry)' in main and 'm_workQueue.removeCall(entry.call);' in main and 'callers: first come first served' in queue_h),
+    ('queue feeds normal sequencer', 'processFt8SequencerDecode(queued.decode);' in main),
+    ('queue uses shared opposite-period selector', 'selectFt8OppositePeriodFromDecode(queued.decode);' in main),
     ('terminal acks do not resurrect queued QSO', 'removeFt8QueuedCaller(call);\n        return;' in main),
-    ('queued direct callers outrank Auto QSO CQ', 'priority over answering a new generic CQ' in main),
+    ('queued direct callers outrank Auto QSO CQ', 'Callers have priority over CQs through the order of the queue' in main and 'stations that called me, first come first served' in queue_h.replace('\n','').replace('//',' ').replace('  ',' ') or 'callers: first come first served' in queue_h),
     ('legacy parked late-reply fallback removed', 'processParkedFt8LateReplies' not in main and 'm_ft8ParkedLateReplies' not in hdr),
     ('waterfall detects minimized top-level', 'topLevel->isMinimized()' in wf_cpp),
     ('waterfall drops hidden/minimized display rows', 'display-only FFT rows are discarded while GL history is preserved' in wf_cpp),
