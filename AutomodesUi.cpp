@@ -76,7 +76,7 @@ void MainWindow::buildAutomodesDialog()
     // ---- Overview
     auto *overview = new QWidget(tabs);
     auto *ov = new QVBoxLayout(overview);
-    m_automodesAutoCheck = new QCheckBox(uiText("automodes_auto_on", "Auto mode on (switching it on shows the legal and safety notice)"), overview);
+    m_automodesAutoCheck = new QCheckBox(uiText("automodes_auto_on", "Auto mode on"), overview);
     connect(m_automodesAutoCheck, &QCheckBox::clicked, this, [this](bool on) { setAutoModeEnabledFromUi(on); refreshAutomodesDialog(); });
     ov->addWidget(m_automodesAutoCheck);
     m_automodesStatus = new QLabel(overview);
