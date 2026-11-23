@@ -13,6 +13,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   regular caller who called with his locator in the same kind of slot is waiting in the queue, ONE transmission \"A RR73; B <my call> -nn\" finishes the first
   QSO and gives the second station his report; his QSO continues like after a plain report (the plain report is repeated if he does not answer). The caller
   passes the same checks as any queued caller; both calls must be standard callsigns; an aborted transmission puts him back in the queue.
+- Safety fixes from the pre-build audit: a band change in the FT panel now pauses the Auto stage and drops the waiting callers of the old band; the queue and
+  the resume of paused QSOs serve nobody while the stage is paused; an orphaned double message can no longer start a QSO later (it must belong to the QSO that
+  just completed, be recent and match mode and band; otherwise the second station goes back to the queue); portable calls get no double message; operator
+  picks in the queue keep the block and CQ-target checks.
 - One FT queue (button "Queue (n)", menu Automodes -> FT queue) replaces the separate "Callers" and "CQ list" lists: stations that called me, CQs of Auto
   mode and CQs you add are entries of one list (at most 50). The automation takes the next one by policy: your "Next" mark, then callers (first come
   first served), then the most valuable CQ; stations that gave no reply stay in the list, grey, at the end for 15 minutes. The table can be sorted by any

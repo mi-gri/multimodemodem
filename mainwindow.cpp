@@ -12647,6 +12647,10 @@ void MainWindow::setupUiConnections()
     if (m_cmbFt8Band != nullptr) {
         connect(m_cmbFt8Band, QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, [this](int) {
+                    ++m_ftCqResumeGen;   // a pending automatic CQ resume never survives a band change
+                    pauseAutoStage(QStringLiteral("band change"));   // new situation: the operator selects the Auto stage again
+                    dropDoubleMessage(true);
+                    clearFt8CallerQueue(QStringLiteral("FT band changed"));
                     m_workQueue.removeSource(M3::QueueSource::AutoCq); m_workQueue.removeSource(M3::QueueSource::Manual); m_ft8AutoCqBusySlots.clear(); refreshFtCqWorkListUi();
                     clearFt8DecodeList();
                     applyFt8Settings();
@@ -20065,8 +20069,8 @@ bool MainWindow::processWorkQueue()
     m_workQueue.expire(now, 5 * 60);
     if (m_workQueue.size() != sizeBefore) updateFt8SessionQueueUi();
     if (m_workQueue.isEmpty()) return false;
-    // Serving the queue starts a QSO by itself: automatic TX.
-    if (!autoTxPermitted() || m_autoPlanner.stage() == 0) return false;
+    // Serving the queue starts a QSO by itself: automatic TX. Not while the stage is paused (STOP, mode or band change).
+    if (!autoStageActive() || !autoTxPermitted() || m_autoPlanner.stage() == 0) return false;
     const bool busy = m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning ||
                       (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning()) ||
                       m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan ||
@@ -20081,10 +20085,12 @@ bool MainWindow::processWorkQueue()
     const int slotMs = Ft8Mode::profileForMode(ui->cmbMode->currentText()).slotMs;
     const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
 
-    const QVector<int> order = m_workQueue.order(now);
-    for (int idx : order) {
-        if (idx < 0 || idx >= m_workQueue.entries.size()) continue;
-        M3::FtQueueEntry entry = m_workQueue.entries.at(idx);
+    // Work on a snapshot in policy order: the queue itself changes while entries are removed in the loop.
+    QVector<M3::FtQueueEntry> snapshot;
+    for (int idx : m_workQueue.order(now)) snapshot.append(m_workQueue.entries.at(idx));
+    for (const M3::FtQueueEntry &listed : std::as_const(snapshot)) {
+        M3::FtQueueEntry entry = listed;
+        if (m_workQueue.indexOf(entry.call) < 0) continue;   // removed meanwhile
         if (entry.noReply(now)) continue;
         if (entry.source == M3::QueueSource::Caller) {
             if (!callersAllowed) continue;
@@ -20114,13 +20120,14 @@ bool MainWindow::processWorkQueue()
         Ft8FullAutoCqCandidate candidate = buildFt8FullAutoCqCandidate(entry.decode, status);
         if (!candidate.valid) {
             if (entry.source == M3::QueueSource::Manual || entry.pinned) {
-                candidate = entry;            // the operator's pick is worked as it is
-                candidate.valid = true;
+                // The operator's pick stays in the queue, but the checks (blocked, CQ target, pause after no reply, duplicates)
+                // still apply: it is worked as soon as they allow.
+                traceFtAutomation("candidate.skip",candidate.priorityText,{{"candidate_call",entry.call}},true);
             } else {
                 traceFtAutomation("candidate.remove",candidate.priorityText,{{"candidate_call",entry.call}},true);
                 m_workQueue.removeCall(entry.call);
-                continue;
             }
+            continue;
         }
         // The ranking follows the current logbook cache.
         const int cur = m_workQueue.indexOf(entry.call);
@@ -20660,7 +20667,7 @@ void MainWindow::pauseFt8QsoForLaterReply()
     paused.state = st;
     paused.startUtc = m_ftSession.qsoStartUtc;
     paused.pausedUtc = QDateTime::currentDateTimeUtc();
-    paused.autoTx = autoTxPermitted();
+    paused.autoTx = autoTxPermitted() || (m_haveActiveQueueEntry && FtDecodedText::callMatches(m_activeQueueEntry.call, paused.call));
     const QDateTime now = paused.pausedUtc;
     for (auto it = m_ft8PausedQsos.begin(); it != m_ft8PausedQsos.end();)
         it = it->pausedUtc.secsTo(now) > 15 * 60 ? m_ft8PausedQsos.erase(it) : it + 1;
@@ -20681,7 +20688,7 @@ bool MainWindow::resumePausedFt8Qso(const FtQsoSequencer::ParsedMessage &parsed,
     // Gates: a known frequency on a band with TX permission; an Auto-started QSO resumes only while Auto mode may
     // transmit (not in stage 0), a manually started one may also resume without Auto mode.
     if (!txBandPermitted(false) || isFtCallBlacklisted(parsed.senderCall)) return false;
-    if (it->autoTx && !(autoTxPermitted() && m_autoPlanner.stage() != 0 && ftAutoQsoFilterReason(parsed.senderCall).isEmpty())) return false;
+    if (it->autoTx && !(autoStageActive() && autoTxPermitted() && m_autoPlanner.stage() != 0 && ftAutoQsoFilterReason(parsed.senderCall).isEmpty())) return false;
     const Ft8PausedQso paused = it.value();
     m_ft8PausedQsos.erase(it);
     m_ftSession.clearQso();
@@ -20720,7 +20727,13 @@ static bool ftCallerPlausible(const QString &call);
 // ---------------------------------------------------------------------------
 QString MainWindow::maybeDoubleMessage(const QString &rr73Message, const Ft8RxDecoder::Decode &decode)
 {
-    if (!m_settings.ftDoubleMessage || m_ft8OperatorStopLatched || m_doubleTx.valid) return rr73Message;
+    if (!m_settings.ftDoubleMessage || m_ft8OperatorStopLatched) return rr73Message;
+    if (m_doubleTx.valid) {
+        // The same RR73 planned again (the plan was replaced by an equal one): keep the combined text.
+        const QString same = rr73Message.trimmed().toUpper();
+        if (QDateTime::currentMSecsSinceEpoch() - m_doubleTx.createdMs < 45000 && same.contains(m_doubleTx.callA)) return m_doubleTx.combined;
+        dropDoubleMessage(true);   // a plan that never ran: B goes back to the queue
+    }
     const QString modeName = ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QString();
     const Ft8Mode::Profile profile = Ft8Mode::profileForMode(modeName);
     if (profile.shortLabel.compare(QStringLiteral("FT8"), Qt::CaseInsensitive) != 0) return rr73Message;
@@ -20728,7 +20741,7 @@ QString MainWindow::maybeDoubleMessage(const QString &rr73Message, const Ft8RxDe
     if (words.size() != 3 || words.at(2) != QStringLiteral("RR73")) return rr73Message;
     QString plainA = words.at(0);
     plainA.remove(QLatin1Char('<')).remove(QLatin1Char('>'));
-    const QString callA = FtDecodedText::baseCall(plainA);
+    const QString callA = plainA.trimmed().toUpper();   // a portable call (DL1ABC/P) is not a standard call: no double message
     const QString myCall = stationCallsign();
     if (!M3::FtDoubleMessage::isStandardCall(callA) || myCall.isEmpty()) return rr73Message;
 
@@ -20749,6 +20762,11 @@ QString MainWindow::maybeDoubleMessage(const QString &rr73Message, const Ft8RxDe
         const QString combined = M3::FtDoubleMessage::build(callA, callB, myCall, entry.decode.snrDb);
         if (combined.isEmpty()) continue;
         m_doubleTx.valid = true;
+        m_doubleTx.createdMs = QDateTime::currentMSecsSinceEpoch();
+        m_doubleTx.callA = callA;
+        m_doubleTx.combined = combined;
+        m_doubleTx.modeName = modeName;
+        m_doubleTx.band = m_cmbFt8Band ? m_cmbFt8Band->currentText().trimmed().toLower() : m_settings.ft8Band;
         m_doubleTx.partner = entry;
         m_doubleTx.report = M3::FtDoubleMessage::reportText(M3::FtDoubleMessage::fieldReportDb(entry.decode.snrDb));
         m_doubleTx.plainReportMessage = QStringLiteral("%1 %2 %3").arg(callB, myCall, m_doubleTx.report);
@@ -20770,6 +20788,19 @@ void MainWindow::finishDoubleMessage()
     const DoubleTx tx = m_doubleTx;
     m_doubleTx = DoubleTx();
     if (m_ft8OperatorStopLatched || m_shutdownInProgress) return;
+    // Only the QSO the double message belonged to may start B's QSO: the completed QSO is A's, the transmission was
+    // the combined text, it is recent and nothing (mode, band) has changed since.
+    const QString nowMode = ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QString();
+    const QString nowBand = m_cmbFt8Band ? m_cmbFt8Band->currentText().trimmed().toLower() : m_settings.ft8Band;
+    const bool genuine = FtDecodedText::callMatches(m_lastCompletedFt8Call, tx.callA) &&
+                         m_ftSession.lastTxPlan.message.trimmed().toUpper() == tx.combined.trimmed().toUpper() &&
+                         QDateTime::currentMSecsSinceEpoch() - tx.createdMs < 120000 &&
+                         nowMode == tx.modeName && nowBand == tx.band;
+    if (!genuine) {
+        m_workQueue.upsert(tx.partner, QDateTime::currentDateTimeUtc());   // B was only borrowed
+        refreshFtCqWorkListUi();
+        return;
+    }
     const QString call = tx.partner.call.trimmed().toUpper();
     m_ftSession.clearQso();
     m_ftSession.cqRepeatActive = false;
@@ -21754,6 +21785,7 @@ void MainWindow::handleFt8DecodeDoubleClicked(QTableWidgetItem *item)
             appendLog(QString("FT sequencer: correspondent changed %1 -> %2; clearing old QSO/retry/TX plan.")
                           .arg(previousDx, call));
             pauseFt8QsoForLaterReply();   // the station that is left may still answer: his late message resumes that QSO
+            dropDoubleMessage(true);      // a planned double message is gone with the old plan
             m_ftSession.clearQso();
             m_ftSession.cqRepeatActive = false;
             m_ftSession.resumeCqAfterQso = false;

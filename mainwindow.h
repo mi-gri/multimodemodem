@@ -2561,6 +2561,11 @@ private:
     struct DoubleTx
     {
         bool valid = false;
+        qint64 createdMs = 0;
+        QString callA;                // the station that gets RR73
+        QString combined;             // "A RR73; B <MYCALL> -nn"
+        QString modeName;
+        QString band;
         M3::FtQueueEntry partner;     // B, taken out of the queue for this transmission
         QString report;               // the report B gets, "-12"
         QString plainReportMessage;   // "B MYCALL -12": what is repeated if B does not answer
