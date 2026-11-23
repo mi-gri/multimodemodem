@@ -12980,11 +12980,19 @@ void MainWindow::prepareFtSplitForTx(std::function<void(bool)> completion)
     int shift=0;
     ftEffectiveTxAudioFrequency(m_spinFt8TxFreq?m_spinFt8TxFreq->value():m_settings.ft8TxFrequencyHz,&shift);
     auto *controller=m_rigController;
+    const auto requestGeneration=m_txRequestGeneration;
     m_catCommand->request(controller,[controller,operation,shift](){return controller->beginFtSplitTx(operation,shift);},
         [controller](){const bool off=controller->setPtt(false); return off && controller->endFtSplitTx();},
-        [this,completion](bool ok){
+        [this,completion,requestGeneration](bool ok){
             m_ftSplitPreparedForTx=ok;
-            if(!ok)appendLog(QStringLiteral("FT TX aborted: asynchronous CAT split preparation failed or timed out."));
+            if(!ok){
+                // A newer transmission plan (e.g. the reply that just arrived) cancels the preparation made for the old
+                // one: nothing failed, the new plan prepares the split itself.
+                if(requestGeneration!=m_txRequestGeneration)
+                    appendLog(uiText("tx_split_request_replaced_log","CAT split preparation of the earlier transmission plan was cancelled because a newer plan replaced it (no error)."));
+                else
+                    appendLog(QStringLiteral("FT TX aborted: asynchronous CAT split preparation failed or timed out."));
+            }
             completion(ok);
         });
 }
