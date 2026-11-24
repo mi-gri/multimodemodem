@@ -1144,6 +1144,7 @@ private:
     void processFt8FullAutoCqCandidates();
     bool processWorkQueue();
     // Double message ("A RR73; B <MYCALL> -nn"): see maybeDoubleMessage()
+    QString apDecodeSuspectReason(const Ft8RxDecoder::Decode &decode, const QString &sender, bool isCq) const;
     QString maybeDoubleMessage(const QString &rr73Message, const Ft8RxDecoder::Decode &decode);
     void finishDoubleMessage();
     void dropDoubleMessage(bool restorePartner);

@@ -9136,6 +9136,13 @@ void MainWindow::setupMsk144Page()
         });
 
         M3Noise::installMenu(decodeMenu, [this](const QString &message) { appendLog(message); });
+        {
+            QAction *hideAp = decodeMenu->addAction(uiText("decode_hide_ap", "Hide suspicious a-priori (AP) decodes"));
+            hideAp->setCheckable(true);
+            hideAp->setChecked(m_settings.ftHideSuspectApDecodes);
+            hideAp->setToolTip(uiText("decode_hide_ap_tip", "A-priori decodes assume your call or CQ and can come out of noise as phantom stations. With this on, AP decodes with an implausible callsign or a rover/portable call with a contest exchange are not shown at all. Other AP decodes are marked with \"?\"; none is ever answered automatically or reported to PSK Reporter."));
+            connect(hideAp, &QAction::toggled, this, [this](bool on) { m_settings.ftHideSuspectApDecodes = on; m_settings.save(); });
+        }
 
         QAction *insertBefore = m_actionAppSettings != nullptr ? m_actionAppSettings : nullptr;
         if (insertBefore == nullptr && ui->menuHelp != nullptr) {
@@ -19996,6 +20003,7 @@ bool MainWindow::queueFt8FullAutoCqCandidate(const Ft8RxDecoder::Decode &decode,
 {
     // Collection survives an active QSO; only dispatch needs an idle transmitter.
     if (!canCollectFt8FullAutoCqs()) return false;
+    if (decode.apDecode) { traceFtAutomation("candidate.reject", "ap_decode", {{"rx_message",decode.message}}, true); return false; }   // phantom CQs
     auto candidate = buildFt8FullAutoCqCandidate(decode, logbookStatus);
     const QJsonObject evidence{{"candidate_call",candidate.call},{"rx_message",decode.message},
         {"rx_slot_utc_ms",decode.slotStartUtcMs},{"rx_audio_hz",decode.frequencyHz},{"snr_db",decode.snrDb}};
@@ -20474,6 +20482,7 @@ void MainWindow::considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, b
         return;
     }
     const ParsedFt8Message parsed = parseFt8MessageText(decode.message, myCall);
+    if (decode.apDecode) return;   // an AP decode never puts a caller into the queue
     if (!isFt8DirectReplyToMyCall(parsed, myCall) || parsed.senderCall.isEmpty()) {
         return;
     }
@@ -20680,6 +20689,7 @@ void MainWindow::pauseFt8QsoForLaterReply()
 bool MainWindow::resumePausedFt8Qso(const FtQsoSequencer::ParsedMessage &parsed, const Ft8RxDecoder::Decode &decode)
 {
     if (m_ft8PausedQsos.isEmpty() || m_ft8OperatorStopLatched || m_offlineAnalysisActive || m_shutdownInProgress) return false;
+    if (decode.apDecode) return false;   // a phantom must not revive a QSO
     const QString key = AdifLogbook::normalizeCallsign(parsed.senderCall.trimmed().toUpper());
     auto it = m_ft8PausedQsos.find(key);
     if (it == m_ft8PausedQsos.end()) return false;
@@ -22831,6 +22841,19 @@ void MainWindow::handleFt8DecodeBatchFinished(qint64 slotStartUtcMs, const QStri
     }
 }
 
+// A-priori (AP) decodes assume my own call (or "CQ") and can come out of noise as phantom stations. Reasons why one
+// looks like a phantom; empty = no objection (or not an AP decode).
+QString MainWindow::apDecodeSuspectReason(const Ft8RxDecoder::Decode &decode, const QString &senderCall, bool isCq) const
+{
+    if (!decode.apDecode) return QString();
+    const QString sender = senderCall.trimmed().toUpper();
+    if (sender.isEmpty()) return QString();
+    if (!ftCallerPlausible(sender)) return QStringLiteral("implausible callsign");
+    if ((sender.endsWith(QStringLiteral("/R")) || sender.endsWith(QStringLiteral("/P"))) && !isCq)
+        return QStringLiteral("rover/portable call with a contest exchange");
+    return QString();
+}
+
 void MainWindow::handleFt8DecodeReady(const Ft8RxDecoder::Decode &decode)
 {
     SessionDiagnostics::instance().record("rx.message.delivery",{{"mode","FT"},{"message",decode.message},{"snr",decode.snrDb},{"frequency",decode.frequencyHz}});
@@ -22865,6 +22888,20 @@ void MainWindow::handleFt8DecodeReady(const Ft8RxDecoder::Decode &decode)
 
     const QString myCall = stationCallsign();
     const ParsedFt8Message parsed = parseFt8MessageText(decode.message, myCall);
+    if (decode.apDecode && m_settings.ftHideSuspectApDecodes) {
+        const QString suspect = apDecodeSuspectReason(decode, parsed.cq ? ft8CqCallsignFromMessage(parsed) : parsed.senderCall, parsed.cq);
+        if (!suspect.isEmpty()) {
+            if (!presentationOnly) {
+                SessionDiagnostics::instance().record("rx.ap_hidden", {{"message", decode.message}, {"reason", suspect}, {"frequency", decode.frequencyHz}});
+                static QString lastHidden;
+                if (lastHidden != decode.message) {
+                    lastHidden = decode.message;
+                    appendLog(uiText("ft_ap_hidden_log", "Hidden: a-priori (AP) decode that looks like a phantom (%1): %2").arg(suspect, decode.message));
+                }
+            }
+            return;
+        }
+    }
     if (!presentationOnly) observeFt8AutoCqActivity(decode);
     if (!presentationOnly && !m_workQueue.isEmpty() && decode.slotStartUtcMs > 0) {
         // What the queue knows about a station follows what is heard: his CQ keeps him ready, directed traffic
@@ -22881,7 +22918,7 @@ void MainWindow::handleFt8DecodeReady(const Ft8RxDecoder::Decode &decode)
             }
         }
     }
-    if (!presentationOnly && m_settings.pskReporterEnabled && !m_offlineAnalysisActive) {
+    if (!presentationOnly && m_settings.pskReporterEnabled && !m_offlineAnalysisActive && !decode.apDecode) {   // an AP decode may be a phantom: never reported
         // The station the locator belongs to: the CQ caller or the sender.
         const QString spotCall = parsed.cq ? ft8CqCallsignFromMessage(parsed) : parsed.senderCall;
         if (!FtDecodedText::isAckLikeGridTrap(parsed.grid.left(4)))
@@ -23003,6 +23040,7 @@ void MainWindow::handleFt8DecodeReady(const Ft8RxDecoder::Decode &decode)
     if (m_settings.ftWatchListIconEnabled && watchedDecode) {
         displayMessage = QString::fromUtf8("🚨 ") + displayMessage;
     }
+    if (decode.apDecode) displayMessage += QStringLiteral(" ?");   // a-priori decode: assumes my call, may be false
     const QString upperMessage = decode.message.trimmed().toUpper();
     if (upperMessage.contains(QStringLiteral("IC8TEM")) || upperMessage.contains(QStringLiteral("IC8FAX"))) {
         displayMessage += QString::fromUtf8("  🐣📡✨");
@@ -23124,6 +23162,7 @@ void MainWindow::handleFt8DecodeReady(const Ft8RxDecoder::Decode &decode)
             messageItem->setData(kFtOriginalMessageRole, decode.message.trimmed().toUpper());
             messageItem->setData(kFtDecodeRole, QVariant::fromValue(decode));
             messageItem->setData(kFtPresentationOnlyRole, presentationOnly);
+            if (decode.apDecode) messageItem->setToolTip(uiText("ft_ap_row_tip", "A-priori (AP) decode: the decoder assumed your call (or CQ). It can be a false decode; it is never answered automatically, never reported to PSK Reporter."));
         }
         if (QTableWidgetItem *bearingItem = items.value(7, nullptr)) {
             bearingItem->setTextAlignment(Qt::AlignCenter);

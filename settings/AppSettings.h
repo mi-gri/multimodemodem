@@ -270,6 +270,7 @@ public:
     bool ftGpuSyncEnabled = false;
     bool ftGpuDecodeEnabled = false;
     bool ftAutoModeEnabled = false;    // Auto mode on; NEVER restored from the file: it is switched on by the operator (with the notice) after every start
+    bool ftHideSuspectApDecodes = true;   // FT: hide a-priori (AP) decodes that look like phantoms (implausible call, rover/portable call with a contest exchange)
     bool ftDoubleMessage = false;      // FT8: RR73 to one station and the report for a waiting caller in ONE transmission ("A RR73; B <MYCALL> -nn")
     int ftAutoStage = 1;               // Auto mode stage: 0 none, 1 respond, 2 call CQ, 3 alternate, 4 CQ if no target (see FtAutoPlanner)
     int ftAutoAlternateCount = 3;      // stage 3: completed QSOs per phase (1-20)
