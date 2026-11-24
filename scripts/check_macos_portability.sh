@@ -37,6 +37,13 @@ if [[ ! -f third_party/mshv_gpl/port/boost/config/compiler/clang.hpp ]]; then
 fi
 
 
+# QHash/QMap iterators have no operator+ with the Qt of the macOS runners (use ++it).
+if grep -n -E '\bit\s*\+\s*1\b' ./*.cpp modems/ft8/*.h modems/ft8/*.cpp 2>/dev/null >/tmp/m3_iterplus_hits.$$; then
+  cat /tmp/m3_iterplus_hits.$$ >&2
+  say_fail "iterator arithmetic 'it + 1' does not compile with Qt on macOS; advance with ++it"
+fi
+rm -f /tmp/m3_iterplus_hits.$$ 2>/dev/null || true
+
 python3 - <<'PYCHK'
 from pathlib import Path
 import re, sys

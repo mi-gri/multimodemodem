@@ -20669,8 +20669,10 @@ void MainWindow::pauseFt8QsoForLaterReply()
     paused.pausedUtc = QDateTime::currentDateTimeUtc();
     paused.autoTx = autoTxPermitted() || (m_haveActiveQueueEntry && FtDecodedText::callMatches(m_activeQueueEntry.call, paused.call));
     const QDateTime now = paused.pausedUtc;
-    for (auto it = m_ft8PausedQsos.begin(); it != m_ft8PausedQsos.end();)
-        it = it->pausedUtc.secsTo(now) > 15 * 60 ? m_ft8PausedQsos.erase(it) : it + 1;
+    for (auto it = m_ft8PausedQsos.begin(); it != m_ft8PausedQsos.end();) {
+        if (it->pausedUtc.secsTo(now) > 15 * 60) it = m_ft8PausedQsos.erase(it);
+        else ++it;   // QHash iterators have no operator+ (macOS Qt)
+    }
     m_ft8PausedQsos.insert(AdifLogbook::normalizeCallsign(paused.call), paused);
     traceFtAutomation("qso.paused", "no_reply", {{"candidate_call", paused.call}});
 }
