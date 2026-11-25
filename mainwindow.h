@@ -2,6 +2,7 @@
 #include "modems/ft8/FtAutoPlanner.h"
 #include "modems/ft8/FtWorkQueue.h"
 #include "modems/ft8/FtDoubleMessage.h"
+#include "modems/ft8/FtAutoIdle.h"
 #include "runtime/RxDecoderWorker.h"
 #include "runtime/LogbookIndexWorker.h"
 #include "runtime/TextAssistWorker.h"
@@ -862,6 +863,10 @@ private slots:
     void autoStageCqSeriesUnanswered();
     void updateAutoStageStatus();
     void updateStopLatchIndicator();
+    bool isWaitedStation(const QString &call) const;
+    bool waitingForStation() const;
+    bool waitOnlyBlocks(const QString &call) const;
+    void restartAutoIdle();
     // Automodes menu and dialog (AutomodesUi.cpp)
     void buildAutomodesMenu();
     void buildAutomodesDialog();
@@ -2513,6 +2518,10 @@ private:
     QCheckBox *m_chkFt8FullAutoQso = nullptr;     // model of Auto QSO (hidden); shown as m_btnFt8AutoQso
     QPushButton *m_btnFt8AutoQso = nullptr;   // hidden (replaced by the stage selector)
     M3::FtAutoPlanner m_autoPlanner;
+    M3::FtAutoIdle m_autoIdle;
+    QSpinBox *m_automodesIdleSpin = nullptr;
+    QLineEdit *m_automodesWaitEdit = nullptr;
+    QCheckBox *m_automodesWaitOnly = nullptr;
     QDialog *m_automodesDialog = nullptr;
     QMenu *m_menuAutomodes = nullptr;
     QActionGroup *m_automodesStageGroup = nullptr;

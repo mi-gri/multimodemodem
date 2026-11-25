@@ -13,6 +13,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   regular caller who called with his locator in the same kind of slot is waiting in the queue, ONE transmission \"A RR73; B <my call> -nn\" finishes the first
   QSO and gives the second station his report; his QSO continues like after a plain report (the plain report is repeated if he does not answer). The caller
   passes the same checks as any queued caller; both calls must be standard callsigns; an aborted transmission puts him back in the queue.
+- Idle pause: Auto mode pauses the stage after N minutes without a completed QSO (Automodes -> FT8/FT4, default 30, 0 = never; a running QSO or an operator
+  transmission counts as activity), so a quiet band can no longer keep the transmitter calling CQ for hours (seen: ~395 CQs in six hours). Stage 1 has a list
+  \"Waiting for\" (callsigns): while a listed station is not worked, the pause is suspended and his CQs and calls come first in the queue; optionally only
+  these stations are answered; a station leaves the list when the QSO with him is complete.
 - A-priori (AP) decodes (the decoder assumes my call or CQ and can produce phantom stations such as "DO3BOX G63OPA/R R RQ40"): they are marked with "?" in
   the decode table, are never reported to PSK Reporter, never put a caller or an Auto CQ target into the queue, never resume a QSO, and (Decode menu, on by
   default) AP decodes with an implausible callsign or a rover/portable call with a contest exchange are not shown at all.

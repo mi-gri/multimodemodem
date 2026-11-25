@@ -11745,6 +11745,7 @@ void MainWindow::setAutoModeEnabledFromUi(bool on)
         m_ft8OperatorStopLatched = false;
     }
     configureAutoPlanner();
+    restartAutoIdle();
     applyAutoPhase();   // off: both models off; on: the stage's first phase
     updateFt8AutoModeVisibility();
     appendLog(on ? QStringLiteral("Auto mode switched on (notice confirmed).")
@@ -13367,6 +13368,7 @@ void MainWindow::applyPersistentSettingsToRuntime(const AppSettings *previousSet
     if (m_ft8AutoModeEnabled != m_settings.ftAutoModeEnabled) {
         m_ft8AutoModeEnabled = m_settings.ftAutoModeEnabled;
         if (m_ft8AutoModeEnabled) { m_autoStagePaused = false; m_ft8OperatorStopLatched = false; }
+        restartAutoIdle();
         configureAutoPlanner();
         applyAutoPhase();
         updateFt8AutoModeVisibility();
@@ -19572,6 +19574,7 @@ void MainWindow::rearmAutoStage()
         m_ft8OperatorStopLatched = false;
     }
     configureAutoPlanner();
+    restartAutoIdle();
     m_settings.save();
     if (m_ft8AutoModeEnabled)
         appendLog(uiText("ft_auto_stage_selected_log", "Auto stage %1 selected.").arg(m_autoPlanner.stage()));
@@ -19587,10 +19590,43 @@ void MainWindow::pauseAutoStage(const QString &reason)
     applyAutoPhase();
 }
 
+bool MainWindow::isWaitedStation(const QString &call) const
+{
+    for (const QString &waited : m_settings.ftWaitStations)
+        if (FtDecodedText::callMatches(call, waited)) return true;
+    return false;
+}
+
+bool MainWindow::waitingForStation() const
+{
+    return m_autoPlanner.stage() == 1 && !m_settings.ftWaitStations.isEmpty();
+}
+
+bool MainWindow::waitOnlyBlocks(const QString &call) const
+{
+    return waitingForStation() && m_settings.ftWaitOnlyThese && !isWaitedStation(call);
+}
+
+void MainWindow::restartAutoIdle()
+{
+    m_autoIdle.restart(QDateTime::currentMSecsSinceEpoch());
+}
+
 void MainWindow::autoStageSlotTick()
 {
     if (!autoStageActive()) {
         updateAutoStageStatus();
+        return;
+    }
+    // Idle pause: no QSO for the set time pauses the stage, so a quiet band can not keep the transmitter calling for hours.
+    // A running QSO is activity; waiting for a station (stage 1) suspends the pause.
+    const qint64 idleNowMs = QDateTime::currentMSecsSinceEpoch();
+    if (m_ftSession.qsoActive || waitingForStation() || !m_autoIdle.running()) {
+        restartAutoIdle();
+    } else if (m_autoIdle.expired(idleNowMs, m_settings.ftAutoIdleMinutes)) {
+        appendLog(uiText("ft_auto_idle_log", "Auto paused: no QSO for %1 minutes. Select the stage again to continue.").arg(m_settings.ftAutoIdleMinutes));
+        traceFtAutomation("auto.idle_pause", "no_qso", {{"minutes", m_settings.ftAutoIdleMinutes}});
+        pauseAutoStage(uiText("ft_auto_idle_reason", "no QSO for %1 min").arg(m_settings.ftAutoIdleMinutes));
         return;
     }
     const bool busy = m_ftSession.qsoActive || m_ftSession.cqRepeatActive || m_txRunning || m_ftTxWorkerRunning ||
@@ -19677,6 +19713,14 @@ void MainWindow::updateAutoStageStatus()
     } else {
         text = uiText("ft_auto_status_answer", "Auto stage %1: answering CQ / RR73 / 73 (QSOs in this phase: %2)")
                    .arg(m_autoPlanner.stage()).arg(m_autoPlanner.qsosInPhase());
+    }
+    if (m_ft8AutoModeEnabled && !m_autoStagePaused && !m_ft8OperatorStopLatched && m_autoPlanner.stage() != 0) {
+        if (waitingForStation()) {
+            text += QStringLiteral(" - ") + uiText("ft_wait_status", "waiting for %1").arg(m_settings.ftWaitStations.join(QStringLiteral(", ")));
+        } else if (m_settings.ftAutoIdleMinutes > 0 && m_autoIdle.running()) {
+            text += QStringLiteral(" - ") + uiText("ft_idle_status", "pause in %1 min without a QSO")
+                        .arg(m_autoIdle.remainingMinutes(QDateTime::currentMSecsSinceEpoch(), m_settings.ftAutoIdleMinutes));
+        }
     }
     m_lblAutoStageStatus->setText(text);
 }
@@ -20096,10 +20140,16 @@ bool MainWindow::processWorkQueue()
     // Work on a snapshot in policy order: the queue itself changes while entries are removed in the loop.
     QVector<M3::FtQueueEntry> snapshot;
     for (int idx : m_workQueue.order(now)) snapshot.append(m_workQueue.entries.at(idx));
+    if (waitingForStation()) {
+        // Stage 1 with a station the operator waits for: his calls come first (right after "Next").
+        std::stable_partition(snapshot.begin(), snapshot.end(), [this](const M3::FtQueueEntry &e) { return isWaitedStation(e.call); });
+        std::stable_partition(snapshot.begin(), snapshot.end(), [](const M3::FtQueueEntry &e) { return e.pinned; });
+    }
     for (const M3::FtQueueEntry &listed : std::as_const(snapshot)) {
         M3::FtQueueEntry entry = listed;
         if (m_workQueue.indexOf(entry.call) < 0) continue;   // removed meanwhile
         if (entry.noReply(now)) continue;
+        if (waitOnlyBlocks(entry.call)) continue;            // stage 1: only the stations waited for
         if (entry.source == M3::QueueSource::Caller) {
             if (!callersAllowed) continue;
             m_workQueue.removeCall(entry.call);
@@ -21058,7 +21108,8 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
     if (decision.startsQso && !m_ftSession.qsoActive && !ftOperatorEngaged()) {
         // Unsolicited caller: needs automatic TX, the switch "Answer calls without own
         // CQ" (Filter menu) and a country/continent that is not blocked.
-        const QString blockReason = ftAutoQsoFilterReason(parsed.senderCall);
+        const QString blockReason = waitOnlyBlocks(parsed.senderCall) ? QStringLiteral("only the stations you are waiting for are answered")
+                                                                     : ftAutoQsoFilterReason(parsed.senderCall);
         if (!(autoTxPermitted() && m_autoPlanner.stage() != 0 && m_settings.ftAnswerUnsolicited) || !blockReason.isEmpty()) {
             static QString lastCaller;
             if (lastCaller != parsed.senderCall) {
@@ -21379,6 +21430,18 @@ void MainWindow::completeFt8Qso(const QString &reason)
     m_lastCompletedFt8Call = completedCall;
     m_lastCompletedFt8Utc = QDateTime::currentDateTimeUtc();
     m_lastCompletedFt8Reason = reason;
+    restartAutoIdle();   // a completed QSO is activity
+    if (!completedCall.isEmpty() && isWaitedStation(completedCall)) {
+        // The station the operator was waiting for is worked: off the list.
+        for (int i = m_settings.ftWaitStations.size() - 1; i >= 0; --i)
+            if (FtDecodedText::callMatches(completedCall, m_settings.ftWaitStations.at(i))) m_settings.ftWaitStations.removeAt(i);
+        m_settings.save();
+        if (m_automodesWaitEdit != nullptr) {
+            const QSignalBlocker block(m_automodesWaitEdit);
+            m_automodesWaitEdit->setText(m_settings.ftWaitStations.join(QStringLiteral(", ")));
+        }
+        appendLog(uiText("ft_wait_done_log", "%1 is worked: removed from the stations you are waiting for.").arg(completedCall));
+    }
 
     m_ftSession.qsoActive = false;
     if (m_ft8RxDecoder != nullptr) {
@@ -21645,6 +21708,7 @@ void MainWindow::handleFt8QsoHistoryDoubleClicked(QTableWidgetItem *item)
 void MainWindow::handleFt8DecodeDoubleClicked(QTableWidgetItem *item)
 {
     m_ft8OperatorStopLatched = false;
+    restartAutoIdle();   // the operator picks a station: activity
     if (item == nullptr || m_tableFt8Rx == nullptr) {
         return;
     }
@@ -23365,6 +23429,7 @@ void MainWindow::updateFt8WaterfallOverlays()
 
 void MainWindow::startFt8TxShell()
 {
+    restartAutoIdle();   // the operator transmits: activity
     if (!confirmTxBand(ui->cmbMode->currentText())) return;
     m_ft8OperatorStopLatched = false;
     applyFt8Settings();

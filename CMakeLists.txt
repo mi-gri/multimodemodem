@@ -664,6 +664,7 @@ add_executable(MultiModeModem
     modems/ft8/FtAutoPlanner.h
     modems/ft8/FtWorkQueue.h
     modems/ft8/FtDoubleMessage.h
+    modems/ft8/FtAutoIdle.h
     modems/ft8/FtSlotMemory.h
     modems/ft8/Ft8RepeatRecovery.h
     modems/ft8/Ft8RxDecoder.h
@@ -1235,6 +1236,11 @@ if(BUILD_TESTING)
     target_include_directories(m3_ft_coherent_alignment PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME m3_ft_coherent_alignment COMMAND m3_ft_coherent_alignment)
     set_tests_properties(m3_ft_coherent_alignment PROPERTIES TIMEOUT 30)
+    add_executable(m3_ft_auto_idle tests/FtAutoIdleRegression.cpp)
+    target_include_directories(m3_ft_auto_idle PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(m3_ft_auto_idle PRIVATE ${QT}::Core)
+    set_target_properties(m3_ft_auto_idle PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    add_test(NAME m3_ft_auto_idle COMMAND m3_ft_auto_idle)
     add_executable(m3_ft_double_message tests/FtDoubleMessageRegression.cpp)
     target_include_directories(m3_ft_double_message PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(m3_ft_double_message PRIVATE ${QT}::Core)
