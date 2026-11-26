@@ -63,6 +63,7 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   while the closing window still used it (possible crash before PTT was off); the audio and CAT objects are now detached before their threads stop.
 - Safety: the TX band permission checks the signal, not only the dial: dial plus the audio range of the mode (sideband from CAT) must stay inside the
   band, otherwise PTT is refused with a message.
+- Safety: closing stops the TX audio before PTT is released; the band edge check also covers serial CW keying.
 - SSTV editor: images in a project file are limited before they are decoded (8192 pixels per side, 80 million pixels in total).
 - Runtime log: when a newer transmission plan replaces the one being prepared, the cancelled CAT split preparation is no longer reported as "FT TX
   aborted: CAT split preparation failed"; the log says it was replaced (no error).
