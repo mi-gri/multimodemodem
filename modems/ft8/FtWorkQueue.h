@@ -18,6 +18,7 @@
 #include <QVector>
 
 #include <algorithm>
+#include <utility>
 /**
  * @brief One decoded CQ waiting for Auto QSO priority selection.
  *
@@ -79,6 +80,11 @@ class FtWorkQueue
 public:
     static constexpr int MaxEntries = 50;
 
+    // A call to me may end the no-reply pause of a station only this often within the window: a station that does
+    // not hear me must not be worked again and again.
+    static constexpr int MaxNoReplyLifts = 2;
+    static constexpr qint64 NoReplyLiftWindowSecs = 15 * 60;
+
     QVector<FtQueueEntry> entries;
 
     int indexOf(const QString &call) const
@@ -103,6 +109,30 @@ public:
     {
         return heard.source == QueueSource::Caller && old.noReplyUntilUtc.isValid() &&
                heard.decode.slotStartUtcMs > old.decode.slotStartUtcMs;
+    }
+
+    // True when a decode of @p call heard in the slot @p slotUtcMs may end its no-reply pause (the same decode
+    // asks more than once on its way through the program and counts once).
+    bool canLiftNoReply(const QString &call, qint64 slotUtcMs, const QDateTime &now) const
+    {
+        int used = 0;
+        for (const Lift &lift : m_lifts) {
+            if (lift.utc.secsTo(now) > NoReplyLiftWindowSecs || !FtDecodedText::callMatches(lift.call, call)) continue;
+            if (lift.slotUtcMs == slotUtcMs) return true;
+            ++used;
+        }
+        return used < MaxNoReplyLifts;
+    }
+    // Like canLiftNoReply, and counts the lift.
+    bool allowNoReplyLift(const QString &call, qint64 slotUtcMs, const QDateTime &now)
+    {
+        for (int i = m_lifts.size() - 1; i >= 0; --i)
+            if (m_lifts.at(i).utc.secsTo(now) > NoReplyLiftWindowSecs) m_lifts.removeAt(i);
+        if (!canLiftNoReply(call, slotUtcMs, now)) return false;
+        for (const Lift &lift : std::as_const(m_lifts))
+            if (lift.slotUtcMs == slotUtcMs && FtDecodedText::callMatches(lift.call, call)) return true;
+        m_lifts.append({call.trimmed().toUpper(), slotUtcMs, now});
+        return true;
     }
 
     // Calls of the stations that may be served now: callers without a no-reply pause and not too old. Only these
@@ -132,7 +162,7 @@ public:
             if (entry.decode.slotStartUtcMs > 0 && old.decode.slotStartUtcMs > entry.decode.slotStartUtcMs && old.source == entry.source)
                 return true;                                  // never replace by an older decode
             entry.pinned = old.pinned || entry.pinned;
-            if (endsNoReplyPause(old, entry)) {
+            if (endsNoReplyPause(old, entry) && allowNoReplyLift(entry.call, entry.decode.slotStartUtcMs, now)) {
                 entry.noReplyUntilUtc = QDateTime();
                 entry.firstSeenUtc = now;                     // first come first served counts from this call
             } else {
@@ -228,6 +258,13 @@ public:
     }
 
 private:
+    struct Lift {
+        QString call;
+        qint64 slotUtcMs = 0;
+        QDateTime utc;
+    };
+    QVector<Lift> m_lifts;
+
     // Makes room: the least valuable entry that is neither pinned nor a caller (no-reply entries first).
     bool dropOne(const QDateTime &now)
     {

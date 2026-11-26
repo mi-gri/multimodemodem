@@ -869,6 +869,12 @@ private slots:
     bool waitOnlyBlocks(const QString &call) const;
     bool servableCallerWaiting() const;
     void restartAutoIdle();
+    bool enforceAutoIdle();   // pauses the stage when the idle time is over and no QSO runs; true = paused now
+    // Why no QSO with @p call may start by itself (Clear DX, no-reply pause); empty = no objection. With @p consume a
+    // call that ends a no-reply pause is counted.
+    QString ftAutoStartRefusal(const QString &call, qint64 slotUtcMs, bool consume);
+    bool ftOperatorBlocked(const QString &call) const;
+    void releaseFtOperatorBlock(const QString &call);   // the operator picked the station again
     // Automodes menu and dialog (AutomodesUi.cpp)
     void buildAutomodesMenu();
     void buildAutomodesDialog();
@@ -2526,6 +2532,7 @@ private:
     QPushButton *m_btnFt8AutoQso = nullptr;   // hidden (replaced by the stage selector)
     M3::FtAutoPlanner m_autoPlanner;
     M3::FtAutoIdle m_autoIdle;
+    QHash<QString, QDateTime> m_ftOperatorBlocks;   // Clear DX: no automatic QSO with this call until then
     QSpinBox *m_automodesIdleSpin = nullptr;
     QLineEdit *m_automodesWaitEdit = nullptr;
     QCheckBox *m_automodesWaitOnly = nullptr;

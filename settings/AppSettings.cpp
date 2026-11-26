@@ -1,4 +1,5 @@
 #include "AppSettings.h"
+#include "../modems/ft8/FtWaitList.h"
 #include "../utils/InstallationPaths.h"
 #include "../rotator/RotatorPeakSearch.h"
 #include "../audio/TxLevel.h"
@@ -572,7 +573,7 @@ void AppSettings::load()
     ftWaitStations.clear();
     for (const QString &call : settings.value("FT/waitStations").toStringList()) {
         const QString c = call.trimmed().toUpper();
-        if (!c.isEmpty() && !ftWaitStations.contains(c)) ftWaitStations << c;
+        if (M3::isWaitListCall(c) && !ftWaitStations.contains(c)) ftWaitStations << c;
     }
     ftWaitOnlyThese = settings.value("FT/waitOnlyThese", false).toBool();
     ftAutoStage = settings.contains("FT/autoStage")

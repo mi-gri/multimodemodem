@@ -22,6 +22,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   step no longer delays or advances the pause); the idle minutes are saved once the value rests instead of on every spin step.
 - Fixed: a station that did not answer and then called me stayed in its 15 min no-reply pause and, as a waiting caller, also blocked the next CQ series
   (Auto stood still until the idle pause). A call to me now ends the pause, and only callers that may be served now hold back a CQ.
+- Audit fixes: a call ends the no-reply pause at most twice per station within 15 minutes; a station you ended with Clear DX is not worked automatically
+  for 15 minutes whatever it sends (a double-click or adding it to the queue lifts this). The idle pause now counts completed QSOs only (attempts no longer
+  restart it; a running QSO is finished first), and while Auto is paused no caller is answered automatically. The waiting list accepts callsigns only.
 - A-priori (AP) decodes (the decoder assumes my call or CQ and can produce phantom stations such as "DO3BOX G63OPA/R R RQ40"): they are marked with "?" in
   the decode table, are never reported to PSK Reporter, never put a caller or an Auto CQ target into the queue, never resume a QSO, and (Decode menu, on by
   default) AP decodes with an implausible callsign or a rover/portable call with a contest exchange are not shown at all.

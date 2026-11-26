@@ -62,6 +62,7 @@ bool MainWindow::addFtDecodeToCqWorkList(QTableWidgetItem *selected, bool cqOnly
     entry.priorityText=uiText("ft_queue_manual_text","added by the operator");
     if(item->data(kFtPresentationOnlyRole).toBool())entry.cq=false;   // not a live decode: wait for a fresh CQ
     if(m_workQueue.contains(call)&&m_workQueue.entries.at(m_workQueue.indexOf(call)).source==M3::QueueSource::Caller)return false;   // he is a caller already
+    releaseFtOperatorBlock(call);   // added by the operator
     if(!m_workQueue.upsert(entry,QDateTime::currentDateTimeUtc()))return false;
     queueFtLogbookQueriesForDecode(decode,true);   // ranking follows as soon as the logbook answers
     return true;
@@ -109,6 +110,7 @@ void MainWindow::showFtCqWorkList()
             m_workQueue.togglePinned(call);
             const int idx=m_workQueue.indexOf(call);
             const bool pinned=idx>=0&&m_workQueue.entries.at(idx).pinned;
+            if(pinned)releaseFtOperatorBlock(call);
             appendLog(pinned?uiText("ft_queue_next_log","FT queue: %1 is the next station to work.").arg(call):uiText("ft_queue_next_off_log","FT queue: %1 is no longer marked as next.").arg(call));
             refreshFtCqWorkListUi();processWorkQueue();
         });

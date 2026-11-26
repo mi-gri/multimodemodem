@@ -1,5 +1,6 @@
 // Automodes: menu and dialog that gather every setting of the automatic transmissions.
 #include "mainwindow.h"
+#include "modems/ft8/FtWaitList.h"
 #include "ui_mainwindow.h"
 #include "settings/AppSettings.h"
 #include "modems/ft8/Ft8Mode.h"
@@ -11,6 +12,7 @@
 #include <QDialog>
 #include <QFormLayout>
 #include <QTimer>
+#include <QSignalBlocker>
 #include <QGroupBox>
 #include <QLabel>
 #include <QListWidget>
@@ -160,7 +162,7 @@ void MainWindow::buildAutomodesDialog()
     m_automodesIdleSpin->setSpecialValueText(uiText("automodes_idle_never", "never"));
     m_automodesIdleSpin->setValue(m_settings.ftAutoIdleMinutes);
     m_automodesIdleSpin->setKeyboardTracking(false);
-    m_automodesIdleSpin->setToolTip(uiText("automodes_idle_tip", "Auto mode pauses itself when no QSO was completed for this long, so a quiet band can not keep the transmitter calling for hours. A running QSO counts as activity. Select the stage again to continue. 0 = never."));
+    m_automodesIdleSpin->setToolTip(uiText("automodes_idle_tip", "Auto mode pauses itself when no QSO was completed for this long, so a quiet band or a station that does not hear you can not keep the transmitter calling for hours. A running QSO is finished first; only a completed QSO or an action of yours restarts the time. While Auto is paused no caller is answered automatically. Select the stage again to continue. 0 = never."));
     // Wheel/arrow steps apply at once; the settings file is written once the value rests for a second.
     auto *idleSaveTimer = new QTimer(m_automodesIdleSpin);
     idleSaveTimer->setSingleShot(true);
@@ -176,9 +178,16 @@ void MainWindow::buildAutomodesDialog()
     m_automodesWaitEdit->setToolTip(uiText("automodes_wait_tip", "Stage 1: stations you are waiting for. Their CQs and calls come first in the queue. With \"Answer only these stations\" the idle pause is suspended while one of them is not worked yet. A station leaves the list when the QSO with it is complete."));
     connect(m_automodesWaitEdit, &QLineEdit::editingFinished, this, [this]() {
         QStringList calls;
+        QStringList rejected;
         for (const QString &part : m_automodesWaitEdit->text().split(QRegularExpression(QStringLiteral("[\\s,;]+")), Qt::SkipEmptyParts)) {
             const QString c = part.trimmed().toUpper();
-            if (!c.isEmpty() && !calls.contains(c)) calls << c;
+            if (!M3::isWaitListCall(c)) rejected << c;
+            else if (!calls.contains(c)) calls << c;
+        }
+        if (!rejected.isEmpty()) {
+            appendLog(uiText("ft_wait_rejected_log", "Not a callsign, ignored in the waiting list: %1").arg(rejected.join(QStringLiteral(", "))));
+            const QSignalBlocker block(m_automodesWaitEdit);
+            m_automodesWaitEdit->setText(calls.join(QStringLiteral(", ")));
         }
         m_settings.ftWaitStations = calls;
         m_settings.save();

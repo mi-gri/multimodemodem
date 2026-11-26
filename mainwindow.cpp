@@ -19546,6 +19546,7 @@ bool MainWindow::startFt8CqRepeatIfIdle(const QString &reason)
     if (m_chkFt8CqRepeat == nullptr || !m_chkFt8CqRepeat->isChecked() || m_ft8OperatorStopLatched) return false;
     if (m_ftSession.cqRepeatActive || m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning || m_ft8PendingTxArmed)
         return false;
+    if (enforceAutoIdle()) return false;
     // Stations that called us directly are served before a new CQ series starts.
     if (servableCallerWaiting())
         return false;
@@ -19663,22 +19664,60 @@ void MainWindow::restartAutoIdle()
     m_autoIdle.restart(autoIdleClockMs());
 }
 
+// Idle pause: no COMPLETED QSO for the set time pauses the stage, so neither a quiet band nor a signal nobody hears can
+// keep the transmitter calling for hours. Attempts do not count; a running QSO is finished first. Only waiting ONLY for
+// listed stations (stage 1) suspends the pause: without "only these" Auto answers everybody.
+bool MainWindow::enforceAutoIdle()
+{
+    if (!autoStageActive()) return false;
+    if ((waitingForStation() && m_settings.ftWaitOnlyThese) || !m_autoIdle.running()) {
+        restartAutoIdle();
+        return false;
+    }
+    if (m_ftSession.qsoActive || !m_autoIdle.expired(autoIdleClockMs(), m_settings.ftAutoIdleMinutes)) return false;
+    appendLog(uiText("ft_auto_idle_log", "Auto paused: no QSO for %1 minutes. Select the stage again to continue.").arg(m_settings.ftAutoIdleMinutes));
+    traceFtAutomation("auto.idle_pause", "no_qso", {{"minutes", m_settings.ftAutoIdleMinutes}});
+    pauseAutoStage(uiText("ft_auto_idle_reason", "no QSO for %1 min").arg(m_settings.ftAutoIdleMinutes));
+    return true;
+}
+
+bool MainWindow::ftOperatorBlocked(const QString &call) const
+{
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    for (auto it = m_ftOperatorBlocks.constBegin(); it != m_ftOperatorBlocks.constEnd(); ++it)
+        if (it.value() > now && FtDecodedText::callMatches(it.key(), call)) return true;
+    return false;
+}
+
+void MainWindow::releaseFtOperatorBlock(const QString &call)
+{
+    const QString wanted = call.trimmed().toUpper();
+    if (wanted.isEmpty()) return;
+    for (auto it = m_ftOperatorBlocks.begin(); it != m_ftOperatorBlocks.end();) {
+        if (FtDecodedText::callMatches(it.key(), wanted)) it = m_ftOperatorBlocks.erase(it);
+        else ++it;
+    }
+    m_ft8AutoNoResponseCooldown.remove(wanted);
+}
+
+QString MainWindow::ftAutoStartRefusal(const QString &call, qint64 slotUtcMs, bool consume)
+{
+    const QString key = call.trimmed().toUpper();
+    if (key.isEmpty()) return QString();
+    if (ftOperatorBlocked(key)) return QStringLiteral("cleared by you (Clear DX), 15 minutes");
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const auto cooldown = m_ft8AutoNoResponseCooldown.constFind(key);
+    if (cooldown == m_ft8AutoNoResponseCooldown.constEnd() || cooldown.value() <= now) return QString();
+    const bool allowed = consume ? m_workQueue.allowNoReplyLift(key, slotUtcMs, now) : m_workQueue.canLiftNoReply(key, slotUtcMs, now);
+    // A lift ends the pause as a whole: further calls while the station waits for its turn do not count again.
+    if (allowed && consume) m_ft8AutoNoResponseCooldown.remove(key);
+    return allowed ? QString() : QStringLiteral("gave no reply repeatedly, waiting");
+}
+
 void MainWindow::autoStageSlotTick()
 {
-    if (!autoStageActive()) {
+    if (!autoStageActive() || enforceAutoIdle()) {
         updateAutoStageStatus();
-        return;
-    }
-    // Idle pause: no QSO for the set time pauses the stage, so a quiet band can not keep the transmitter calling for hours.
-    // A running QSO is activity; waiting ONLY for listed stations (stage 1) suspends the pause. Without "only these"
-    // Auto answers everybody, so the pause stays in force: otherwise a station that never shows up keeps Auto on.
-    const qint64 idleNowMs = autoIdleClockMs();
-    if (m_ftSession.qsoActive || (waitingForStation() && m_settings.ftWaitOnlyThese) || !m_autoIdle.running()) {
-        restartAutoIdle();
-    } else if (m_autoIdle.expired(idleNowMs, m_settings.ftAutoIdleMinutes)) {
-        appendLog(uiText("ft_auto_idle_log", "Auto paused: no QSO for %1 minutes. Select the stage again to continue.").arg(m_settings.ftAutoIdleMinutes));
-        traceFtAutomation("auto.idle_pause", "no_qso", {{"minutes", m_settings.ftAutoIdleMinutes}});
-        pauseAutoStage(uiText("ft_auto_idle_reason", "no QSO for %1 min").arg(m_settings.ftAutoIdleMinutes));
         return;
     }
     const bool busy = m_ftSession.qsoActive || m_ftSession.cqRepeatActive || m_txRunning || m_ftTxWorkerRunning ||
@@ -19998,7 +20037,8 @@ Ft8FullAutoCqCandidate MainWindow::buildFt8FullAutoCqCandidate(const Ft8RxDecode
     candidate.call = ft8CqCallsignFromMessage(parsed).trimmed().toUpper();
     if (candidate.call.isEmpty() || FtDecodedText::callMatches(candidate.call, myCall)) return candidate;
 
-    const QString autoFilterReason = ftAutoQsoFilterReason(candidate.call);
+    const QString autoFilterReason = ftOperatorBlocked(candidate.call) ? QStringLiteral("cleared by the operator (Clear DX)")
+                                                                      : ftAutoQsoFilterReason(candidate.call);
     if (!autoFilterReason.isEmpty()) {
         candidate.priorityText = autoFilterReason;
         return candidate;
@@ -20174,7 +20214,9 @@ bool MainWindow::processWorkQueue()
     m_workQueue.expire(now, 5 * 60);
     if (m_workQueue.size() != sizeBefore) updateFt8SessionQueueUi();
     if (m_workQueue.isEmpty()) return false;
-    // Serving the queue starts a QSO by itself: automatic TX. Not while the stage is paused (STOP, mode or band change).
+    // Serving the queue starts a QSO by itself: automatic TX. Not while the stage is paused (STOP, mode or band change,
+    // idle time over: checked here, before the next QSO would start).
+    if (enforceAutoIdle()) return false;
     if (!autoStageActive() || !autoTxPermitted() || m_autoPlanner.stage() == 0) return false;
     const bool busy = m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning ||
                       (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning()) ||
@@ -20497,6 +20539,7 @@ void MainWindow::clearFt8Dx()
     if (!dx.isEmpty()) {
         // Like a given-up QSO: no automatic answer to this station for 15 minutes.
         m_ft8AutoNoResponseCooldown.insert(dx, QDateTime::currentDateTimeUtc().addSecs(15 * 60));
+        m_ftOperatorBlocks.insert(dx.trimmed().toUpper(), QDateTime::currentDateTimeUtc().addSecs(15 * 60));   // only you end this
         markQueueNoReply(dx);
         removeFt8QueuedCaller(dx);
     }
@@ -20621,13 +20664,17 @@ void MainWindow::considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, b
         return;
     }
 
+    // Cleared by the operator, or no reply too often: neither queued nor released from its pause.
+    if (!ftAutoStartRefusal(call, decode.slotStartUtcMs, true).isEmpty()) return;
+
     const int known = m_workQueue.indexOf(call);
     if (known >= 0 && m_workQueue.entries.at(known).source == M3::QueueSource::Caller) {
         // Already waiting as a caller: refresh what we know of him.
         auto &queued = m_workQueue.entries[known];
         M3::FtQueueEntry heard = queued;
         heard.decode = decode;
-        if (M3::FtWorkQueue::endsNoReplyPause(queued, heard)) {
+        if (M3::FtWorkQueue::endsNoReplyPause(queued, heard) &&
+            m_workQueue.allowNoReplyLift(call, decode.slotStartUtcMs, now)) {
             queued.noReplyUntilUtc = QDateTime();
             queued.firstSeenUtc = now;
             traceFtAutomation("candidate.enqueue","called_after_no_reply",{{"candidate_call",call},{"rx_message",decode.message},{"rx_slot_utc_ms",decode.slotStartUtcMs}},true);
@@ -20812,6 +20859,7 @@ bool MainWindow::resumePausedFt8Qso(const FtQsoSequencer::ParsedMessage &parsed,
     if (!txBandPermitted(false) || isFtCallBlacklisted(parsed.senderCall)) return false;
     if (it->autoTx && !(autoStageActive() && autoTxPermitted() && m_autoPlanner.stage() != 0 && ftAutoQsoFilterReason(parsed.senderCall).isEmpty() &&
                         !waitOnlyBlocks(parsed.senderCall))) return false;
+    if (!ftAutoStartRefusal(parsed.senderCall, decode.slotStartUtcMs, true).isEmpty()) return false;
     const Ft8PausedQso paused = it.value();
     m_ft8PausedQsos.erase(it);
     m_ftSession.clearQso();
@@ -20875,7 +20923,7 @@ QString MainWindow::maybeDoubleMessage(const QString &rr73Message, const Ft8RxDe
         if (entry.source != M3::QueueSource::Caller || entry.noReply(now) || entry.pinned) continue;
         const QString callB = entry.call.trimmed().toUpper();
         if (FtDecodedText::callMatches(callB, callA) || isFtCallBlacklisted(callB) || !ftCallerPlausible(callB) ||
-            !ftAutoQsoFilterReason(callB).isEmpty() || !ftCqTargetSkipReason(callB).isEmpty() || waitOnlyBlocks(callB)) continue;
+            !ftAutoQsoFilterReason(callB).isEmpty() || !ftCqTargetSkipReason(callB).isEmpty() || waitOnlyBlocks(callB) || ftOperatorBlocked(callB)) continue;
         // B called me with his locator (a first call), recently, and in a slot of the same parity as A's.
         const ParsedFt8Message pb = parseFt8MessageText(entry.decode.message, myCall);
         if (!pb.addressedToMe || pb.grid.trimmed().isEmpty() || FtDecodedText::isAckLikeGridTrap(pb.grid) ||
@@ -21123,6 +21171,9 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         decision = FtQsoSequencer::evaluateDecode(seqDecode, seqContext);
     }
 
+    // The idle time is checked before a decode may start anything.
+    if (!m_ftSession.qsoActive) enforceAutoIdle();
+
     // A late message of a station whose QSO was given up without a reply continues that QSO.
     if (!m_ftSession.qsoActive && parsed.addressedToMe && !parsed.senderCall.isEmpty() &&
         resumePausedFt8Qso(parsed, decode)) {
@@ -21171,7 +21222,7 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         // CQ" (Filter menu) and a country/continent that is not blocked.
         const QString blockReason = waitOnlyBlocks(parsed.senderCall) ? QStringLiteral("only the stations you are waiting for are answered")
                                                                      : ftAutoQsoFilterReason(parsed.senderCall);
-        if (!(autoTxPermitted() && m_autoPlanner.stage() != 0 && m_settings.ftAnswerUnsolicited) || !blockReason.isEmpty()) {
+        if (!(autoStageActive() && autoTxPermitted() && m_autoPlanner.stage() != 0 && m_settings.ftAnswerUnsolicited) || !blockReason.isEmpty()) {
             static QString lastCaller;
             if (lastCaller != parsed.senderCall) {
                 lastCaller = parsed.senderCall;
@@ -21179,7 +21230,22 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
                               .arg(parsed.senderCall,
                                    !blockReason.isEmpty() ? blockReason
                                    : !autoTxPermitted() ? QStringLiteral("automatic TX is off, paused by the QSY plan or not allowed on this band")
+                                   : !autoStageActive() ? QStringLiteral("Auto is paused")
                                                         : QStringLiteral("\"Answer calls without own CQ\" is off")));
+            }
+            return;
+        }
+    }
+
+    // Every QSO that would start from a decode (unsolicited caller, reply to a CQ): not with a station the operator
+    // cleared, and a station that gave no reply only ends that pause a limited number of times.
+    if (decision.startsQso && !m_ftSession.qsoActive) {
+        const QString refusal = ftAutoStartRefusal(parsed.senderCall, decode.slotStartUtcMs, true);
+        if (!refusal.isEmpty()) {
+            static QString lastRefused;
+            if (lastRefused != parsed.senderCall) {
+                lastRefused = parsed.senderCall;
+                appendLog(QStringLiteral("FT: the call from %1 is not answered automatically (%2).").arg(parsed.senderCall, refusal));
             }
             return;
         }
@@ -21913,6 +21979,7 @@ void MainWindow::handleFt8DecodeDoubleClicked(QTableWidgetItem *item)
     }
 
     if (!m_ft8SelectionOnly && !call.isEmpty()) {
+        releaseFtOperatorBlock(call);
         const QString previousDx = m_ftSession.dxCall.trimmed().toUpper();
         const bool changingCorrespondent = !previousDx.isEmpty() &&
                                           !FtDecodedText::callMatches(call, previousDx);
@@ -22859,6 +22926,13 @@ int MainWindow::selectBestFt8SequencerDecode(const QVector<Ft8RxDecoder::Decode>
             }
         }
 
+        // A station that must not be started now does not take the slot away from another caller.
+        if (!m_ftSession.qsoActive && !decision.parsed.senderCall.isEmpty() &&
+            (ftOperatorBlocked(decision.parsed.senderCall) ||
+             const_cast<MainWindow *>(this)->ftAutoStartRefusal(decision.parsed.senderCall, decodes.at(i).slotStartUtcMs, false).size() > 0)) {
+            continue;
+        }
+
         int score = actionRank(decision.action);
         score += static_cast<int>(decision.nextState) * 20;
         if (decision.parsed.addressedToMe) score += 300;
@@ -23493,6 +23567,7 @@ void MainWindow::startFt8TxShell()
     restartAutoIdle();   // the operator transmits: activity
     if (!confirmTxBand(ui->cmbMode->currentText())) return;
     m_ft8OperatorStopLatched = false;
+    if (m_editFt8DxCall != nullptr) releaseFtOperatorBlock(m_editFt8DxCall->text());
     applyFt8Settings();
     const QString modeName = (ui != nullptr && ui->cmbMode != nullptr) ? ui->cmbMode->currentText() : QStringLiteral("FT8");
     const Ft8Mode::Profile profile = Ft8Mode::profileForMode(modeName);

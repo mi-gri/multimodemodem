@@ -84,6 +84,26 @@ int main()
         q.markNoReply(q.entries[0], at(900), at(50));
         CHECK(q.readyCallers(at(50), 300).isEmpty());                   // paused caller blocks nothing
     }
+    {   // at most two lifts per station within 15 minutes; one decode counts once
+        FtWorkQueue q;
+        auto call = [&](qint64 slot, int s) {
+            FtQueueEntry c = entry("DL7XYZ", QueueSource::Caller);
+            c.decode.slotStartUtcMs = slot;
+            q.upsert(c, at(s));
+            return !q.entries[q.indexOf("DL7XYZ")].noReply(at(s));
+        };
+        q.upsert(entry("DL7XYZ", QueueSource::Caller), at(0));
+        q.markNoReply(q.entries[0], at(900), at(10));
+        CHECK(call(2000, 20));
+        CHECK(q.allowNoReplyLift("DL7XYZ", 2000, at(21)));          // same decode again: not counted
+        q.markNoReply(q.entries[0], at(930), at(30));
+        CHECK(call(3000, 40));
+        q.markNoReply(q.entries[0], at(950), at(50));
+        CHECK(!call(4000, 60));                                     // third lift within the window: stays paused
+        CHECK(!q.canLiftNoReply("DL7XYZ", 5000, at(70)));
+        CHECK(q.canLiftNoReply("DL8OTHER", 5000, at(70)));          // another station is not affected
+        CHECK(q.allowNoReplyLift("DL7XYZ", 6000, at(1000)));        // the window has passed
+    }
     {   // limit 50: CQs are dropped for new entries, callers and pins never
         FtWorkQueue q;
         for (int i = 0; i < 50; ++i) q.upsert(entry(("DL" + std::to_string(100 + i) + "X").c_str(), QueueSource::AutoCq, -30 + i % 5, false, 100 + i), at(i));
