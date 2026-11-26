@@ -84,6 +84,16 @@ int main()
         q.markNoReply(q.entries[0], at(900), at(50));
         CHECK(q.readyCallers(at(50), 300).isEmpty());                   // paused caller blocks nothing
     }
+    {   // "called during my activity" stays with the caller across updates
+        FtWorkQueue q;
+        FtQueueEntry a = entry("DK6MR", QueueSource::Caller);
+        a.calledDuringActivity = true;
+        q.upsert(a, at(0));
+        FtQueueEntry b = entry("DK6MR", QueueSource::Caller);
+        b.decode.slotStartUtcMs = 2000;
+        q.upsert(b, at(15));
+        CHECK(q.entries[0].calledDuringActivity);
+    }
     {   // at most two lifts per station within 15 minutes; one decode counts once
         FtWorkQueue q;
         auto call = [&](qint64 slot, int s) {

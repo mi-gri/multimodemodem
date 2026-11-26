@@ -1739,6 +1739,9 @@ private:
     bool txBandPermitted(bool automatic) const;
     static QString txBandKey(double hz);
     bool ftOperatorEngaged() const;
+    bool ftOwnActivityRecent() const;   // a QSO or CQ of mine runs, or I transmitted within the last minute
+    // Why the caller queue must not answer this station now; empty = it may.
+    QString ftQueuedCallerRefusal(const Ft8RxDecoder::Decode &decode, const QString &call, bool calledDuringActivity) const;
     QString txBandRefusalReason() const;
     bool confirmTxBand(const QString &what);
     void logAutoTxBandRefusal(const QString &key) const;
@@ -2597,6 +2600,9 @@ private:
     M3::FtWorkQueue m_workQueue;                 // callers, Auto CQs and the operator's picks: one queue
     M3::FtQueueEntry m_activeQueueEntry;          // the entry the running QSO was started from (no-reply handling)
     bool m_haveActiveQueueEntry = false;
+    qint64 m_ftLastOwnTxMs = 0;                       // last keyed FT message (not Tune)
+    bool m_ftServingSolicitedCaller = false;          // the queue is activating a caller of my activity
+    QHash<QString, qint64> m_ftCallerRefusalLogged;   // call|reason -> when it was written to the log
     struct Ft8RReportQso
     {
         FtQsoSession session;      // state when our R-report went out

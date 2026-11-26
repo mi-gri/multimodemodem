@@ -70,6 +70,7 @@ struct FtQueueEntry : Ft8FullAutoCqCandidate
     QDateTime firstSeenUtc;
     QDateTime lastSeenUtc;
     bool pinned = false;            // "Next"
+    bool calledDuringActivity = false;   // a caller who called while my QSO or CQ ran: not a call out of the blue
     QDateTime noReplyUntilUtc;      // valid and in the future: gave no reply, at the end of the list
 
     bool noReply(const QDateTime &now) const { return noReplyUntilUtc.isValid() && noReplyUntilUtc > now; }
@@ -162,6 +163,7 @@ public:
             if (entry.decode.slotStartUtcMs > 0 && old.decode.slotStartUtcMs > entry.decode.slotStartUtcMs && old.source == entry.source)
                 return true;                                  // never replace by an older decode
             entry.pinned = old.pinned || entry.pinned;
+            entry.calledDuringActivity = old.calledDuringActivity || entry.calledDuringActivity;
             if (endsNoReplyPause(old, entry) && allowNoReplyLift(entry.call, entry.decode.slotStartUtcMs, now)) {
                 entry.noReplyUntilUtc = QDateTime();
                 entry.firstSeenUtc = now;                     // first come first served counts from this call
