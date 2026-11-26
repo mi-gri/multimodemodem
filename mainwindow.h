@@ -866,6 +866,7 @@ private slots:
     bool isWaitedStation(const QString &call) const;
     bool waitingForStation() const;
     bool waitOnlyBlocks(const QString &call) const;
+    bool servableCallerWaiting() const;
     void restartAutoIdle();
     // Automodes menu and dialog (AutomodesUi.cpp)
     void buildAutomodesMenu();

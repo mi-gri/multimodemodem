@@ -37,7 +37,7 @@ QString MainWindow::ftAutomationWaitReason() const
     if (m_txRunning || m_ftTxWorkerRunning) return "transmitting";
     if (m_ft8PendingTxArmed || m_hasDeferredFt8TxPlan || m_pendingFt8PttKeyed) return "tx_pending";
     if (m_ftSession.qsoActive) return "qso_active";
-    if (m_chkFt8CallerQueue && m_chkFt8CallerQueue->isChecked() && m_workQueue.count(M3::QueueSource::Caller) > 0) return "direct_callers_priority";
+    if (servableCallerWaiting()) return "direct_callers_priority";
     if (stationCallsign().trimmed().isEmpty() || stationLocator().trimmed().isEmpty()) return "missing_station_identity";
     return m_workQueue.isEmpty() ? "no_cq" : "not_ready";
 }

@@ -14,6 +14,7 @@
 
 #include <QDateTime>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 #include <algorithm>
@@ -97,8 +98,28 @@ public:
         return n;
     }
 
-    // Adds or refreshes an entry. A newer entry keeps what the operator did (pinned, no-reply pause) and the
-    // first-seen time; a caller stays a caller; a manual entry stays manual. Returns false when the queue is
+    // A call to me heard after the stored decode is a reply: it ends the no-reply pause of that station.
+    static bool endsNoReplyPause(const FtQueueEntry &old, const FtQueueEntry &heard)
+    {
+        return heard.source == QueueSource::Caller && old.noReplyUntilUtc.isValid() &&
+               heard.decode.slotStartUtcMs > old.decode.slotStartUtcMs;
+    }
+
+    // Calls of the stations that may be served now: callers without a no-reply pause and not too old. Only these
+    // have priority over a new CQ series; any other caller entry must not hold the automation back.
+    QStringList readyCallers(const QDateTime &now, qint64 maxAgeSecs) const
+    {
+        QStringList calls;
+        for (const auto &e : entries) {
+            if (e.source != QueueSource::Caller || e.noReply(now)) continue;
+            if (!e.pinned && e.lastSeenUtc.isValid() && e.lastSeenUtc.secsTo(now) > maxAgeSecs) continue;
+            calls << e.call;
+        }
+        return calls;
+    }
+
+    // Adds or refreshes an entry. A newer entry keeps what the operator did (pinned, no-reply pause - unless the
+    // station now calls me, see endsNoReplyPause) and the first-seen time; a caller stays a caller; a manual entry stays manual. Returns false when the queue is
     // full and nothing could be dropped for it.
     bool upsert(FtQueueEntry entry, const QDateTime &now)
     {
@@ -111,8 +132,13 @@ public:
             if (entry.decode.slotStartUtcMs > 0 && old.decode.slotStartUtcMs > entry.decode.slotStartUtcMs && old.source == entry.source)
                 return true;                                  // never replace by an older decode
             entry.pinned = old.pinned || entry.pinned;
-            entry.noReplyUntilUtc = old.noReplyUntilUtc;
-            entry.firstSeenUtc = old.firstSeenUtc.isValid() ? old.firstSeenUtc : entry.firstSeenUtc;
+            if (endsNoReplyPause(old, entry)) {
+                entry.noReplyUntilUtc = QDateTime();
+                entry.firstSeenUtc = now;                     // first come first served counts from this call
+            } else {
+                entry.noReplyUntilUtc = old.noReplyUntilUtc;
+                entry.firstSeenUtc = old.firstSeenUtc.isValid() ? old.firstSeenUtc : entry.firstSeenUtc;
+            }
             if (old.source == QueueSource::Caller) entry.source = QueueSource::Caller;
             else if (old.source == QueueSource::Manual && entry.source == QueueSource::AutoCq) entry.source = QueueSource::Manual;
             entries[idx] = entry;

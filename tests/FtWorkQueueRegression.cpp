@@ -65,6 +65,25 @@ int main()
         q.upsert(old, at(30));
         CHECK(q.entries[0].decode.snrDb == -3);
     }
+    {   // a call to me ends the no-reply pause; only ready callers hold back a new CQ series
+        FtWorkQueue q;
+        q.upsert(entry("ZS4AW", QueueSource::AutoCq), at(0));
+        q.markNoReply(q.entries[0], at(900), at(10));
+        q.upsert(entry("ZS4AW", QueueSource::Caller), at(20));          // same slot as stored: nothing new
+        CHECK(q.entries[0].noReply(at(20)) && q.readyCallers(at(20), 300).isEmpty());
+        FtQueueEntry cq = entry("ZS4AW", QueueSource::AutoCq);
+        cq.decode.slotStartUtcMs = 2000;
+        q.upsert(cq, at(25));                                           // a new CQ is no reply to me
+        CHECK(q.entries[0].noReply(at(25)));
+        FtQueueEntry call = entry("ZS4AW", QueueSource::Caller);
+        call.decode.slotStartUtcMs = 3000;
+        q.upsert(call, at(40));
+        CHECK(!q.entries[0].noReply(at(40)) && q.entries[0].firstSeenUtc == at(40));
+        CHECK(q.readyCallers(at(40), 300) == QStringList{QStringLiteral("ZS4AW")});
+        CHECK(q.readyCallers(at(400), 300).isEmpty());                  // too old
+        q.markNoReply(q.entries[0], at(900), at(50));
+        CHECK(q.readyCallers(at(50), 300).isEmpty());                   // paused caller blocks nothing
+    }
     {   // limit 50: CQs are dropped for new entries, callers and pins never
         FtWorkQueue q;
         for (int i = 0; i < 50; ++i) q.upsert(entry(("DL" + std::to_string(100 + i) + "X").c_str(), QueueSource::AutoCq, -30 + i % 5, false, 100 + i), at(i));

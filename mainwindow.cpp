@@ -19513,7 +19513,7 @@ bool MainWindow::startFt8CqRepeatIfIdle(const QString &reason)
     if (m_ftSession.cqRepeatActive || m_ftSession.qsoActive || m_txRunning || m_ftTxWorkerRunning || m_ft8PendingTxArmed)
         return false;
     // Stations that called us directly are served before a new CQ series starts.
-    if (m_chkFt8CallerQueue != nullptr && m_chkFt8CallerQueue->isChecked() && m_workQueue.count(M3::QueueSource::Caller) > 0)
+    if (servableCallerWaiting())
         return false;
     traceFtAutomation("cq.start", reason);
     m_ftTxOriginHint = reason == QStringLiteral("Auto stage")
@@ -19612,6 +19612,16 @@ bool MainWindow::waitOnlyBlocks(const QString &call) const
 static qint64 autoIdleClockMs()
 {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() + 1;
+}
+
+// A caller the dispatcher would take now. Callers it skips (no-reply pause, not on the waiting list with "only these",
+// too old) must not block a new CQ series.
+bool MainWindow::servableCallerWaiting() const
+{
+    if (m_chkFt8CallerQueue == nullptr || !m_chkFt8CallerQueue->isChecked()) return false;
+    for (const QString &call : m_workQueue.readyCallers(QDateTime::currentDateTimeUtc(), 5 * 60))
+        if (!waitOnlyBlocks(call)) return true;
+    return false;
 }
 
 void MainWindow::restartAutoIdle()
@@ -20581,6 +20591,13 @@ void MainWindow::considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, b
     if (known >= 0 && m_workQueue.entries.at(known).source == M3::QueueSource::Caller) {
         // Already waiting as a caller: refresh what we know of him.
         auto &queued = m_workQueue.entries[known];
+        M3::FtQueueEntry heard = queued;
+        heard.decode = decode;
+        if (M3::FtWorkQueue::endsNoReplyPause(queued, heard)) {
+            queued.noReplyUntilUtc = QDateTime();
+            queued.firstSeenUtc = now;
+            traceFtAutomation("candidate.enqueue","called_after_no_reply",{{"candidate_call",call},{"rx_message",decode.message},{"rx_slot_utc_ms",decode.slotStartUtcMs}},true);
+        }
         queued.decode = decode;
         if (!parsed.grid.trimmed().isEmpty() && !FtDecodedText::isAckLikeGridTrap(parsed.grid)) {
             queued.grid = parsed.grid.left(4).toUpper();
