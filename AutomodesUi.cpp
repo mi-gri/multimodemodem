@@ -10,6 +10,7 @@
 #include <QDateTime>
 #include <QDialog>
 #include <QFormLayout>
+#include <QTimer>
 #include <QGroupBox>
 #include <QLabel>
 #include <QListWidget>
@@ -158,15 +159,21 @@ void MainWindow::buildAutomodesDialog()
     m_automodesIdleSpin->setSuffix(QStringLiteral(" min"));
     m_automodesIdleSpin->setSpecialValueText(uiText("automodes_idle_never", "never"));
     m_automodesIdleSpin->setValue(m_settings.ftAutoIdleMinutes);
+    m_automodesIdleSpin->setKeyboardTracking(false);
     m_automodesIdleSpin->setToolTip(uiText("automodes_idle_tip", "Auto mode pauses itself when no QSO was completed for this long, so a quiet band can not keep the transmitter calling for hours. A running QSO counts as activity. Select the stage again to continue. 0 = never."));
-    connect(m_automodesIdleSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int v) {
-        m_settings.ftAutoIdleMinutes = v; m_settings.save(); restartAutoIdle(); updateAutoStageStatus();
+    // Wheel/arrow steps apply at once; the settings file is written once the value rests for a second.
+    auto *idleSaveTimer = new QTimer(m_automodesIdleSpin);
+    idleSaveTimer->setSingleShot(true);
+    idleSaveTimer->setInterval(1000);
+    connect(idleSaveTimer, &QTimer::timeout, this, [this]() { m_settings.save(); });
+    connect(m_automodesIdleSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this, idleSaveTimer](int v) {
+        m_settings.ftAutoIdleMinutes = v; restartAutoIdle(); updateAutoStageStatus(); idleSaveTimer->start();
     });
     iform->addRow(uiText("automodes_idle", "Pause Auto after"), m_automodesIdleSpin);
     m_automodesWaitEdit = new QLineEdit(idleBox);
     m_automodesWaitEdit->setText(m_settings.ftWaitStations.join(QStringLiteral(", ")));
     m_automodesWaitEdit->setPlaceholderText(uiText("automodes_wait_hint", "callsigns, separated by commas"));
-    m_automodesWaitEdit->setToolTip(uiText("automodes_wait_tip", "Stage 1: stations you are waiting for. While one of them is not worked yet, the idle pause is suspended and their CQs and calls come first in the queue. A station leaves the list when the QSO with it is complete."));
+    m_automodesWaitEdit->setToolTip(uiText("automodes_wait_tip", "Stage 1: stations you are waiting for. Their CQs and calls come first in the queue. With \"Answer only these stations\" the idle pause is suspended while one of them is not worked yet. A station leaves the list when the QSO with it is complete."));
     connect(m_automodesWaitEdit, &QLineEdit::editingFinished, this, [this]() {
         QStringList calls;
         for (const QString &part : m_automodesWaitEdit->text().split(QRegularExpression(QStringLiteral("[\\s,;]+")), Qt::SkipEmptyParts)) {

@@ -17,6 +17,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   transmission counts as activity), so a quiet band can no longer keep the transmitter calling CQ for hours (seen: ~395 CQs in six hours). Stage 1 has a list
   \"Waiting for\" (callsigns): while a listed station is not worked, the pause is suspended and his CQs and calls come first in the queue; optionally only
   these stations are answered; a station leaves the list when the QSO with him is complete.
+- Audit follow-up: the waiting list suspends the idle pause only with "Answer only these stations" (otherwise Auto answers everybody and the pause stays in
+  force); "only these" also applies to the second call of a double message and to resuming a paused Auto QSO. The idle clock is monotonic (a wall-clock
+  step no longer delays or advances the pause); the idle minutes are saved once the value rests instead of on every spin step.
 - A-priori (AP) decodes (the decoder assumes my call or CQ and can produce phantom stations such as "DO3BOX G63OPA/R R RQ40"): they are marked with "?" in
   the decode table, are never reported to PSK Reporter, never put a caller or an Auto CQ target into the queue, never resume a QSO, and (Decode menu, on by
   default) AP decodes with an implausible callsign or a rover/portable call with a contest exchange are not shown at all.
