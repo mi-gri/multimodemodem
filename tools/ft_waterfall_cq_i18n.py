@@ -1216,6 +1216,7 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
   'Die Antwort gilt bis zum Bandwechsel. Automatische Sendungen bleiben auf diesem Band aus.',
   'Svaret gjelder til båndet byttes. Automatiske sendinger forblir av på dette båndet.',
   'Odpověď platí do změny pásma. Automatická vysílání na tomto pásmu zůstávají vypnutá.'),
+ 'tx_band_edge_refused':('The signal would reach beyond the %1 band edge (%2 to %3). Move the dial or the TX audio frequency.', 'Il segnale supererebbe il limite della banda %1 (da %2 a %3). Sposta la sintonia o la frequenza audio TX.', "Le signal dépasserait la limite de la bande %1 (de %2 à %3). Déplacez le VFO ou la fréquence audio TX.", 'Das Signal würde die Bandgrenze von %1 überschreiten (%2 bis %3). Dial oder TX-Audiofrequenz verschieben.', 'Signalet ville gå utenfor båndgrensen for %1 (%2 til %3). Flytt VFO-en eller TX-lydfrekvensen.', 'Signál by přesáhl hranici pásma %1 (%2 až %3). Posuňte ladění nebo audio frekvenci TX.'),
  'tx_band_confirmed_log':(
   'TX on %1 confirmed by the operator (band is receive only); valid until the band changes.',
   "TX su %1 confermata dall'operatore (banda solo ricezione); valida fino al cambio di banda.",

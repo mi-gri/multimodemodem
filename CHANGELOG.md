@@ -4,6 +4,11 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- Safety: closing the program releases PTT first (serial lines, then CAT with a bounded wait for the confirmation). Before, an audio buffer could be freed
+  while the closing window still used it (possible crash before PTT was off); the audio and CAT objects are now detached before their threads stop.
+- Safety: the TX band permission checks the signal, not only the dial: dial plus the audio range of the mode (sideband from CAT) must stay inside the
+  band, otherwise PTT is refused with a message.
+- SSTV editor: images in a project file are limited before they are decoded (8192 pixels per side, 80 million pixels in total).
 - Runtime log: when a newer transmission plan replaces the one being prepared, the cancelled CAT split preparation is no longer reported as "FT TX
   aborted: CAT split preparation failed"; the log says it was replaced (no error).
 - QSO activity table: a double-click on a received line that is addressed to my call now answers that station at once (and switches away from the

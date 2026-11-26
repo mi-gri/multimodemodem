@@ -6,6 +6,15 @@
 #include "ui_mainwindow.h"
 
 #include "modems/ft8/Ft8Mode.h"
+#include "modems/bpsk31/Bpsk31Decoder.h"
+#include "modems/cw/CwDecoder.h"
+#include "modems/hell/HellschreiberDecoder.h"
+#include "modems/mfsk/MfskDecoder.h"
+#include "modems/msk144/Msk144Mode.h"
+#include "modems/q65/Q65Mode.h"
+#include "modems/rtty/RttyDecoder.h"
+#include "modems/sstv/SstvDecoder.h"
+#include "modems/weatherfax/WeatherFaxDecoder.h"
 #include "modems/js8/Js8Mode.h"
 #include "modems/wspr/WsprMode.h"
 #include "rig/HamlibController.h"
@@ -23,6 +32,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QRegularExpression>
+#include <QSpinBox>
 #include <QSettings>
 #include <QToolButton>
 
@@ -77,6 +88,87 @@ QString MainWindow::txBandRefusalReason() const
     if (band.isEmpty())
         return uiText("tx_band_outside", "%1 is outside the amateur bands.").arg(formatRigFrequency(hz));
     return uiText("tx_band_rx_only", "TX is not allowed on %1 (receive only, Settings → Bands).").arg(band);
+}
+
+M3TxBand::Span MainWindow::txAudioSpan() const
+{
+    const QString mode = ui != nullptr && ui->cmbMode != nullptr ? ui->cmbMode->currentText() : QString();
+    const auto value = [](const QSpinBox *spin, double fallback) { return spin != nullptr ? double(spin->value()) : fallback; };
+    if (Ft8Mode::isFamilyMode(mode)) {
+        // The logical frequency: with split the CAT shift and the audio frequency add up to it again.
+        const double hz = m_pendingFt8TxPlan.audioFrequencyHz > 0 ? m_pendingFt8TxPlan.audioFrequencyHz : value(m_spinFt8TxFreq, 1500.0);
+        const bool ft4 = Ft8Mode::profileForMode(mode).shortLabel.compare(QStringLiteral("FT4"), Qt::CaseInsensitive) == 0;
+        return {hz, hz + (ft4 ? 84.0 : 50.0)};
+    }
+    if (Js8Mode::isMode(mode)) {
+        const double hz = value(m_spinJs8TxFreq, 1500.0);
+        return {hz, hz + Js8Mode::parameters(currentJs8Submode()).bandwidthHz()};
+    }
+    if (Q65Mode::isFamilyMode(mode)) {
+        const double hz = value(m_spinQ65TxFreq, 1500.0);
+        const int period = m_cmbQ65Period != nullptr ? m_cmbQ65Period->currentData().toInt() : Q65Mode::defaultPeriodSeconds();
+        return {hz, hz + 65.0 * Q65Mode::baud(period) * Q65Mode::mshvToneSpacingMultiplier(currentQ65Submode())};
+    }
+    if (Msk144Mode::isMode(mode)) {
+        const double hz = value(m_spinMsk144TxFreq, 1500.0);
+        return {qMax(0.0, hz - 1250.0), hz + 1250.0};
+    }
+    if (WsprMode::isMode(mode)) {
+        const double hz = value(m_spinWsprTxHz, 1500.0);
+        return {hz - 5.0, hz + 10.0};
+    }
+    if (mode == RttyDecoder::modeName()) {
+        const double mark = value(m_spinRttyMarkHz, 2125.0);
+        const double space = mark + value(m_spinRttyShiftHz, 170.0);
+        return {qMax(0.0, qMin(mark, space) - 50.0), qMax(mark, space) + 50.0};
+    }
+    if (mode == Bpsk31Decoder::modeName()) {
+        const double hz = value(m_spinBpsk31ToneHz, 1000.0);
+        // Variant names end in the symbol rate ("BPSK31" = 31.25 Bd, "QPSK125"); unknown: the widest one.
+        const QString variant = m_cmbBpsk31Variant != nullptr ? m_cmbBpsk31Variant->currentData().toString() : QStringLiteral("BPSK31");
+        const int digits = QString(variant).remove(QRegularExpression(QStringLiteral("[^0-9]"))).toInt();
+        const double rate = digits > 0 ? qMax(63.0, double(digits)) : 1000.0;
+        return {qMax(0.0, hz - rate), hz + rate};
+    }
+    if (mode == MfskDecoder::modeName()) {
+        const double hz = value(m_spinMfskCenterHz, 1000.0);
+        const bool wide = m_cmbMfskVariant != nullptr &&
+                          MfskDecoder::variantFromKey(m_cmbMfskVariant->currentData().toString()) == MfskDecoder::Variant::Mfsk32;
+        const double half = wide ? 520.0 : 135.0;
+        return {qMax(0.0, hz - half), hz + half};
+    }
+    if (mode == CwDecoder::modeName()) {
+        const double hz = value(m_spinCwTxToneHz, m_settings.cwTxToneHz);
+        return {qMax(0.0, hz - 100.0), hz + 100.0};
+    }
+    if (mode == HellschreiberDecoder::modeName()) {
+        const double hz = value(m_spinHellToneHz, 1000.0);
+        const double half = qMax(130.0, value(m_spinHellBandwidthHz, 245.0));
+        return {qMax(0.0, hz - half), hz + half};
+    }
+    if (mode == SstvDecoder::modeName()) return {1100.0, 2300.0};
+    if (mode == WeatherFaxDecoder::modeName() && ui != nullptr) {
+        const double black = ui->spinFaxBlackHz->value();
+        const double white = ui->spinFaxWhiteHz->value();
+        return {qMax(0.0, qMin(black, white) - 100.0), qMax(black, white) + 100.0};
+    }
+    return {300.0, 2700.0};   // any other signal fits a normal SSB transmit filter
+}
+
+bool MainWindow::txSignalInsideBand(QString *refusal) const
+{
+    const double dial = txReferenceDialHz();
+    const QString rigMode = m_settings.hamlibCatEnabled ? m_lastRigModeName : QString();
+    const M3TxBand::Span span = txAudioSpan();
+    double low = 0.0;
+    double high = 0.0;
+    if (M3TxBand::signalInsideBand(dial, rigMode, wantsLowerSideband(), span, &low, &high)) return true;
+    if (refusal != nullptr) {
+        *refusal = uiText("tx_band_edge_refused", "The signal would reach beyond the %1 band edge (%2 to %3). Move the dial or the TX audio frequency.")
+                       .arg(M3StandardFrequencies::bandOf(dial), formatRigFrequency(low), formatRigFrequency(high));
+    }
+    SessionDiagnostics::instance().record("tx.band.edge_refused", {{"dial_hz", dial}, {"rf_low_hz", low}, {"rf_high_hz", high}, {"rig_mode", rigMode}});
+    return false;
 }
 
 // Manual transmissions: asks once per band when the band is receive only;
