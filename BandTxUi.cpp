@@ -155,10 +155,11 @@ M3TxBand::Span MainWindow::txAudioSpan() const
     return {300.0, 2700.0};   // any other signal fits a normal SSB transmit filter
 }
 
-bool MainWindow::txSignalInsideBand(QString *refusal) const
+bool MainWindow::txSignalInsideBand(QString *refusal, const QString &rigModeOverride) const
 {
     const double dial = txReferenceDialHz();
-    const QString rigMode = m_settings.hamlibCatEnabled ? m_lastRigModeName : QString();
+    const QString rigMode = !rigModeOverride.isEmpty() ? rigModeOverride
+                            : m_settings.hamlibCatEnabled ? m_lastRigModeName : QString();
     const M3TxBand::Span span = txAudioSpan();
     double low = 0.0;
     double high = 0.0;

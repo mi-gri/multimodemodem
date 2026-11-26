@@ -1671,7 +1671,8 @@ private:
     // carriesSignal = false: a bare PTT test without audio (only the dial permission applies).
     void keyPttForTx(std::function<void(bool)> completion, bool carriesSignal = true);
     M3TxBand::Span txAudioSpan() const;       // audio frequencies of the next transmission in the active mode
-    bool txSignalInsideBand(QString *refusal) const;
+    // @p rigModeOverride: the path keys in a mode of its own (serial CW), whatever CAT reports.
+    bool txSignalInsideBand(QString *refusal, const QString &rigModeOverride = QString()) const;
     void releasePttForShutdown();
 
     /**

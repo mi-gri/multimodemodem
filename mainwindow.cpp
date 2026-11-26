@@ -2125,9 +2125,20 @@ void MainWindow::shutdownLog(const QString &message) const
     }
 }
 
-// First step of the shutdown: release the transmitter and wait (bounded) until the CAT thread reports it.
+// First step of the shutdown: stop the TX audio (a VOX transmitter drops at once), release PTT and wait (bounded)
+// until the CAT thread reports it.
 void MainWindow::releasePttForShutdown()
 {
+    if (m_txAudioEngine != nullptr) {
+        disconnect(m_txAudioEngine, nullptr, this, nullptr);
+        m_txAudioEngine->stopOutput();
+    }
+    if (m_ftTxWorker != nullptr) {
+        disconnect(m_ftTxWorker, nullptr, this, nullptr);
+        m_ftTxWorker->cancelPendingStart();
+        if (m_ftTxWorker->thread() != nullptr && m_ftTxWorker->thread()->isRunning())
+            QMetaObject::invokeMethod(m_ftTxWorker, "stopOutput", Qt::QueuedConnection);
+    }
     if (m_pttSerial.isOpen()) {
         m_pttSerial.setRequestToSend(false);
         m_pttSerial.setDataTerminalReady(false);
@@ -2260,17 +2271,6 @@ void MainWindow::shutdownRuntime(const char *reason)
             QThread::currentThread()->quit();
         }, Qt::QueuedConnection);
     }
-    if (m_txAudioEngine != nullptr) {
-        shutdownLog(QStringLiteral("stopping TX audio"));
-        disconnect(m_txAudioEngine, nullptr, this, nullptr);
-        m_txAudioEngine->stopOutput();
-    }
-    if (m_ftTxWorker != nullptr) {
-        disconnect(m_ftTxWorker, nullptr, this, nullptr);
-        m_ftTxWorker->cancelPendingStart();
-        invokeStopQueued(m_ftTxWorker, "stopOutput");
-    }
-
     if (m_ntpClient != nullptr) {
         m_ntpClient->setEnabled(false);
         disconnect(m_ntpClient, nullptr, this, nullptr);
