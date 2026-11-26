@@ -149,6 +149,7 @@
 #include <QScrollBar>
 #include <QScreen>
 #include <QSerialPortInfo>
+#include <QScopedValueRollback>
 #include <QSemaphore>
 #include <QSettings>
 #include <QStandardPaths>
@@ -19530,7 +19531,7 @@ bool MainWindow::canStartFt8FullAutoQsoNow() const
         m_pendingFt8TxPlan.tune || m_pendingFt8PttKeyed) {
         return false;
     }
-    if (m_chkFt8CallerQueue != nullptr && m_chkFt8CallerQueue->isChecked() && !m_ft8CallerQueue.isEmpty()) {
+    if (servableCallerWaiting()) {
         // Direct callers already waiting in the explicit FIFO always have
         // priority over answering a new generic CQ in Auto QSO mode.
         return false;
@@ -20210,6 +20211,7 @@ void MainWindow::considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, b
             queued.grid = parsed.grid.left(4).toUpper();
         }
         queued.lastSeenUtc = now;
+        queued.calledDuringActivity = queued.calledDuringActivity || ftOwnActivityRecent();
         updateFt8SessionQueueUi();
         return;
     }
@@ -20230,6 +20232,7 @@ void MainWindow::considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, b
     }
     queued.firstSeenUtc = now;
     queued.lastSeenUtc = now;
+    queued.calledDuringActivity = ftOwnActivityRecent();
     m_ft8CallerQueue.append(queued);
     traceFtAutomation("candidate.enqueue","direct_caller_fifo",{{"candidate_call",call},{"rx_message",decode.message},{"rx_slot_utc_ms",decode.slotStartUtcMs}},true);
     updateFt8SessionQueueUi();
@@ -20331,6 +20334,37 @@ bool MainWindow::ftOperatorEngaged() const
     return last > 0 && QDateTime::currentMSecsSinceEpoch() - last <= 45000;
 }
 
+static bool ftCallerPlausible(const QString &call);
+
+// "Answer calls without own CQ" is about calls out of the blue. A station that calls while a QSO or CQ of mine runs
+// answers my activity.
+bool MainWindow::ftOwnActivityRecent() const
+{
+    if (m_ftSession.qsoActive || m_ftSession.cqRepeatActive) return true;
+    return m_ftLastOwnTxMs > 0 && QDateTime::currentMSecsSinceEpoch() - m_ftLastOwnTxMs <= 60000;
+}
+
+QString MainWindow::ftQueuedCallerRefusal(const Ft8RxDecoder::Decode &decode, const QString &call, bool calledDuringActivity) const
+{
+    if (decode.apDecode) return QStringLiteral("a-priori (AP) decode");
+    if (!ftCallerPlausible(call)) return QStringLiteral("implausible callsign");
+    const QString filter = ftAutoQsoFilterReason(call);
+    if (!filter.isEmpty()) return filter;
+    if (!calledDuringActivity && !m_settings.ftAnswerUnsolicited) return QStringLiteral("\"Answer calls without own CQ\" is off");
+    return QString();
+}
+
+// Only callers the queue would answer hold back a CQ or the answer to another CQ.
+bool MainWindow::servableCallerWaiting() const
+{
+    if (m_chkFt8CallerQueue == nullptr || !m_chkFt8CallerQueue->isChecked()) return false;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    for (const Ft8QueuedCaller &queued : m_ft8CallerQueue)
+        if (queued.lastSeenUtc.isValid() && queued.lastSeenUtc.secsTo(now) <= 5 * 60 &&
+            ftQueuedCallerRefusal(queued.latestDecode, queued.call, queued.calledDuringActivity).isEmpty()) return true;
+    return false;
+}
+
 bool MainWindow::activateNextFt8QueuedCaller()
 {
     {
@@ -20370,9 +20404,25 @@ bool MainWindow::activateNextFt8QueuedCaller()
         return false;
     }
 
-    const Ft8QueuedCaller queued = m_ft8CallerQueue.first();
-    m_ft8CallerQueue.removeAt(0);
+    // The first caller that may be answered. The others stay in the queue until they may or expire; each refusal is
+    // written to the log.
+    int next = -1;
+    const qint64 nowMs = now.toMSecsSinceEpoch();
+    for (int i = 0; i < m_ft8CallerQueue.size() && next < 0; ++i) {
+        const Ft8QueuedCaller &caller = m_ft8CallerQueue.at(i);
+        const QString refusal = ftQueuedCallerRefusal(caller.latestDecode, caller.call, caller.calledDuringActivity);
+        if (refusal.isEmpty()) { next = i; break; }
+        const QString key = caller.call + QLatin1Char('|') + refusal;
+        if (nowMs - m_ftCallerRefusalLogged.value(key, 0) > 5 * 60000) {
+            m_ftCallerRefusalLogged.insert(key, nowMs);
+            appendLog(QStringLiteral("FT caller queue: %1 stays in the queue and is not answered (%2).").arg(caller.call, refusal));
+        }
+    }
+    if (next < 0) return false;
+    const Ft8QueuedCaller queued = m_ft8CallerQueue.at(next);
+    m_ft8CallerQueue.removeAt(next);
     updateFt8SessionQueueUi();
+    const QScopedValueRollback<bool> solicited(m_ftServingSolicitedCaller, queued.calledDuringActivity);
 
     // A queued caller is activated through the same single sequencer used by a
     // normal live decode. Select only the opposite UTC period here; no second
@@ -20520,7 +20570,8 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         // Unsolicited caller: needs automatic TX, the switch "Answer calls without own
         // CQ" (Filter menu) and a country/continent that is not blocked.
         const QString blockReason = ftAutoQsoFilterReason(parsed.senderCall);
-        if (!(autoTxPermitted() && m_settings.ftAnswerUnsolicited) || !blockReason.isEmpty()) {
+        const bool answersCalls = m_settings.ftAnswerUnsolicited || m_ftServingSolicitedCaller || ftOwnActivityRecent();
+        if (!(autoTxPermitted() && answersCalls) || !blockReason.isEmpty()) {
             static QString lastCaller;
             if (lastCaller != parsed.senderCall) {
                 lastCaller = parsed.senderCall;
@@ -28504,6 +28555,7 @@ void MainWindow::prearmFtPreparedSlotTransmit()
             }
         } else {
             m_pendingFt8PttKeyed=true;
+            if (!m_pendingFt8TxPlan.tune) m_ftLastOwnTxMs = QDateTime::currentMSecsSinceEpoch();
             traceFtAutomation("tx.ptt","keyed");
             m_pendingFt8PttPrearmed=true;
             if (m_pendingFt8TxPlan.tune || m_ft8AudioStartRequested) {

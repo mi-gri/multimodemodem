@@ -16,7 +16,7 @@ checks = [
     ('caller queue setting saves', 'settings.setValue("FT8/queueCallers"' in settings_cpp),
     ('caller queue checkbox exists', 'm_chkFt8CallerQueue = new QCheckBox' in main),
     ('session QSO counter exists', 'm_ftSessionQsoCount' in hdr and '++m_ftSessionQsoCount;' in main),
-    ('FIFO uses first queued caller', 'const Ft8QueuedCaller queued = m_ft8CallerQueue.first();' in main and 'm_ft8CallerQueue.removeAt(0);' in main),
+    ('FIFO uses the first caller that may be answered', 'for (int i = 0; i < m_ft8CallerQueue.size() && next < 0; ++i)' in main and 'm_ft8CallerQueue.removeAt(next);' in main),
     ('queue feeds normal sequencer', 'processFt8SequencerDecode(queued.latestDecode);' in main),
     ('queue uses shared opposite-period selector', 'selectFt8OppositePeriodFromDecode(queued.latestDecode);' in main),
     ('terminal acks do not resurrect queued QSO', 'removeFt8QueuedCaller(call);\n        return;' in main),
