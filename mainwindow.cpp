@@ -154,6 +154,7 @@
 #include <QScrollBar>
 #include <QScreen>
 #include <QSerialPortInfo>
+#include <QSemaphore>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QStyle>
@@ -2129,6 +2130,41 @@ void MainWindow::shutdownLog(const QString &message) const
     }
 }
 
+// First step of the shutdown: release the transmitter and wait (bounded) until the CAT thread reports it.
+void MainWindow::releasePttForShutdown()
+{
+    if (m_pttSerial.isOpen()) {
+        m_pttSerial.setRequestToSend(false);
+        m_pttSerial.setDataTerminalReady(false);
+        m_pttSerial.close();
+    }
+    if (m_catCommand != nullptr) m_catCommand->cancel();   // revokes a pending key-up; its rollback keys down
+    if (m_rigController == nullptr) return;
+    constexpr int kPttReleaseTimeoutMs = 2000;
+    const auto done = std::make_shared<QSemaphore>(0);
+    const auto released = std::make_shared<std::atomic_bool>(false);
+    HamlibController *controller = m_rigController;
+    // Not connected: there is nothing to release, and asking for PTT must not open a connection now.
+    const auto release = [controller, done, released] {
+        released->store(!controller->isConnected() || controller->setPtt(false));
+        done->release();
+    };
+    if (controller->thread() == QThread::currentThread()) {
+        release();
+    } else if (controller->thread() == nullptr || !controller->thread()->isRunning()) {
+        return;
+    } else {
+        QMetaObject::invokeMethod(controller, release, Qt::QueuedConnection);
+    }
+    if (!done->tryAcquire(1, kPttReleaseTimeoutMs)) {
+        shutdownLog(QStringLiteral("CAT PTT OFF not confirmed within %1 ms; check the transmitter").arg(kPttReleaseTimeoutMs));
+    } else if (!released->load()) {
+        shutdownLog(QStringLiteral("CAT PTT OFF failed; check the transmitter"));
+    } else {
+        shutdownLog(QStringLiteral("PTT released"));
+    }
+}
+
 void MainWindow::shutdownRuntime(const char *reason)
 {
     if (m_runtimeShutdownComplete) {
@@ -2143,6 +2179,8 @@ void MainWindow::shutdownRuntime(const char *reason)
         m_cwSerialTx->requestStop();
         m_cwSerialTx->wait(); // Worker releases lines without needing GUI/CAT events.
     }
+    // The transmitter first: nothing that follows (logbook, audio, threads) may leave it keyed.
+    releasePttForShutdown();
     if (m_logbookStore) m_logbookStore->drain();
     m_shutdownInProgress = true;
     if (m_txWaveformPreparer) m_txWaveformPreparer->cancel();
@@ -2210,6 +2248,14 @@ void MainWindow::shutdownRuntime(const char *reason)
 
     endTextTxHighlight();
 
+    // The dispatchers are deleted when their threads finish: detach and empty them BEFORE any thread is told to stop.
+    if (m_rxUiAudioDispatcher != nullptr) {
+        disconnect(m_rxUiAudioDispatcher, nullptr, this, nullptr);
+        m_rxUiAudioDispatcher->clear();
+    }
+    if (m_dspAudioDispatcher != nullptr) {
+        m_dspAudioDispatcher->clear();
+    }
     if (m_audioEngine != nullptr) {
         shutdownLog(QStringLiteral("stopping RX audio"));
         disconnect(m_audioEngine, nullptr, this, nullptr);
@@ -2218,13 +2264,6 @@ void MainWindow::shutdownRuntime(const char *reason)
             engine->stopInput();
             QThread::currentThread()->quit();
         }, Qt::QueuedConnection);
-    }
-    if (m_rxUiAudioDispatcher != nullptr) {
-        disconnect(m_rxUiAudioDispatcher, nullptr, this, nullptr);
-        m_rxUiAudioDispatcher->clear();
-    }
-    if (m_dspAudioDispatcher != nullptr) {
-        m_dspAudioDispatcher->clear();
     }
     if (m_txAudioEngine != nullptr) {
         shutdownLog(QStringLiteral("stopping TX audio"));
@@ -2237,12 +2276,6 @@ void MainWindow::shutdownRuntime(const char *reason)
         invokeStopQueued(m_ftTxWorker, "stopOutput");
     }
 
-    if (m_pttSerial.isOpen()) {
-        m_pttSerial.setRequestToSend(false);
-        m_pttSerial.setDataTerminalReady(false);
-        m_pttSerial.close();
-    }
-
     if (m_ntpClient != nullptr) {
         m_ntpClient->setEnabled(false);
         disconnect(m_ntpClient, nullptr, this, nullptr);
@@ -2250,8 +2283,9 @@ void MainWindow::shutdownRuntime(const char *reason)
 
     m_catCommand->cancel();
     if(m_rigController) {
-        QMetaObject::invokeMethod(m_rigController,[controller=m_rigController](){controller->disconnectRig();QThread::currentThread()->quit();},Qt::QueuedConnection);
+        // Disconnect before the rig thread is told to quit: the controller is deleted when that thread finishes.
         disconnect(m_rigController,nullptr,this,nullptr);
+        QMetaObject::invokeMethod(m_rigController,[controller=m_rigController](){controller->disconnectRig();QThread::currentThread()->quit();},Qt::QueuedConnection);
     }
 
     savePersistentSettings();
@@ -28492,7 +28526,7 @@ void MainWindow::updateTxControlState()
     updateFt8TxBannerUi();
 }
 
-void MainWindow::keyPttForTx(std::function<void(bool)> completion)
+void MainWindow::keyPttForTx(std::function<void(bool)> completion, bool carriesSignal)
 {
     if (m_cwKeyReleaseFailed) { completion(false); return; }
     if(m_catCommand->faulted() || m_ftSplitRestoreFailed){completion(false);return;}
@@ -28505,6 +28539,11 @@ void MainWindow::keyPttForTx(std::function<void(bool)> completion)
     if (!txBandPermitted(false)) {
         appendLog(QStringLiteral("TX/PTT refused: ") + txBandRefusalReason());
         SessionDiagnostics::instance().record("tx.band.ptt_refused", {{"band", currentTxBand()}, {"frequency_hz", txReferenceDialHz()}});
+        completion(false); return;
+    }
+    QString edgeRefusal;
+    if (carriesSignal && !txSignalInsideBand(&edgeRefusal)) {
+        appendLog(QStringLiteral("TX/PTT refused: ") + edgeRefusal);
         completion(false); return;
     }
 
@@ -29811,7 +29850,7 @@ void MainWindow::testPtt()
         m_offlineAnalysisActive=false;m_txRunning=true;setReceiverRunning(false);
         appendLog(uiText("ptt_test_on_one_second", "PTT test ON for 1 second."));
         m_pttTestTimer.start(1000);
-    });
+    }, false);
 }
 
 

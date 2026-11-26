@@ -43,6 +43,14 @@ int main(int argc,char **argv){QApplication app(argc,argv);try {
  const QImage finalImage=editor.composedImage();
  const QByteArray valid=editor.projectData();check(!editor.restoreProject(QByteArray("bad")),"invalid project accepted");check(editor.projectData()==valid,"invalid project changed document");
  QByteArray truncated=valid.left(valid.size()/2);check(!editor.restoreProject(truncated),"truncated project accepted");check(editor.projectData()==valid,"truncated project changed document");
+ { // memory budget: sizes are checked from the image headers, before anything is decoded
+   auto huge=parse(valid);QImage wide(8200,4,QImage::Format_Mono);wide.fill(0);huge.bg=wide;
+   check(!editor.restoreProject(pack(huge)),"oversized background accepted");
+   auto many=parse(valid);QImage big(8000,8000,QImage::Format_Mono);big.fill(0);
+   auto overlay=many.objects.first();overlay.type=1;overlay.image=big;overlay.qso=false;overlay.key.clear();
+   many.objects.append(overlay);check(editor.restoreProject(pack(many)),"one large overlay refused");
+   many.objects.append(overlay);check(!editor.restoreProject(pack(many)),"images over the total budget accepted");
+   check(editor.restoreProject(valid),"restore after budget tests"); }
  QImage handed;QObject::connect(&editor,&SstvImageEditorDialog::imageReadyForTx,[&](const QImage &im,const QString &){handed=im;});button(editor,"Use for SSTV TX")->click();check(handed==finalImage,"TX handoff differs from editor");
  second.setBackgroundImage(bg); // clean closing state
  editor.grab().save("sstv-editor-800.png");

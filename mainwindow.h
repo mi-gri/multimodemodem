@@ -7,6 +7,7 @@
 #include "runtime/LogbookIndexWorker.h"
 #include "runtime/TextAssistWorker.h"
 #include "modems/rtty/RttyAfc.h"
+#include "utils/TxOccupiedBand.h"
 #include "audio/AudioContinuity.h"
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
@@ -1666,7 +1667,11 @@ private:
     /**
      * @brief Opens the configured RTS PTT line for image TX.
      */
-    void keyPttForTx(std::function<void(bool)> completion);
+    // carriesSignal = false: a bare PTT test without audio (only the dial permission applies).
+    void keyPttForTx(std::function<void(bool)> completion, bool carriesSignal = true);
+    M3TxBand::Span txAudioSpan() const;       // audio frequencies of the next transmission in the active mode
+    bool txSignalInsideBand(QString *refusal) const;
+    void releasePttForShutdown();
 
     /**
      * @brief Releases the RTS PTT line after image TX.

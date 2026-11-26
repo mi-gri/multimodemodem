@@ -46,6 +46,33 @@ QString P18n(const QString &source)
 {
     return M3I18n::placeholder(source);
 }
+
+// Images of a project file are limited BEFORE they are decoded: each side and the total of all images together, so a
+// foreign project can not exhaust the memory. 80 million pixels = the largest background plus ample overlays.
+constexpr int kMaxProjectImageSide = 8192;
+constexpr qint64 kMaxProjectPixels = 80 * 1000 * 1000;
+
+// Reads a QImage as QDataStream writes it (null marker, then PNG data); the size comes from the image header.
+bool readBudgetedImage(QDataStream &in, QImage &image, qint64 &pixelsLeft)
+{
+    QIODevice *device = in.device();
+    const qint64 start = device->pos();
+    qint32 marker = 0;
+    in >> marker;
+    if (in.status() != QDataStream::Ok) return false;
+    if (marker == 0) { image = QImage(); return true; }
+    QSize size;
+    {
+        QImageReader header(device, "png");
+        size = header.size();
+    }
+    if (!size.isValid() || size.width() > kMaxProjectImageSide || size.height() > kMaxProjectImageSide) return false;
+    const qint64 pixels = qint64(size.width()) * size.height();
+    if (pixels > pixelsLeft || !device->seek(start)) return false;
+    pixelsLeft -= pixels;
+    in >> image;
+    return in.status() == QDataStream::Ok && !image.isNull();
+}
 }
 
 
@@ -96,14 +123,18 @@ public:
         in >> magic >> version;
         if (magic!=0x53535456 || (version!=1 && version!=2)) return false;
         QStringList suppressed;
-        in >> background >> frame;
+        qint64 pixelsLeft = kMaxProjectPixels;
+        if (!readBudgetedImage(in, background, pixelsLeft)) return false;
+        in >> frame;
         if(version==2)in >> suppressed;
         in >> count;
-        if (background.isNull() || background.width()>8192 || background.height()>8192 || count>200) return false;
+        if (background.isNull() || count>200) return false;
         QVector<Overlay> overlays;
         for (quint32 i=0;i<count;++i) {
             Overlay o; int type=0;
-            in >> type >> o.text >> o.image >> o.pos >> o.font >> o.color >> o.qsoField >> o.qsoKey;
+            in >> type >> o.text;
+            if (!readBudgetedImage(in, o.image, pixelsLeft)) return false;
+            in >> o.pos >> o.font >> o.color >> o.qsoField >> o.qsoKey;
             if (type<0 || type>1) return false;
             o.type=OverlayType(type); overlays.append(o);
         }
