@@ -64,6 +64,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 - Logging: automatic FT8/FT4 log entries carry the frequency (ADIF FREQ: dial plus TX audio frequency, as in WSJT-X). It was missing in the
   logbook, the UDP message to logging programs (e.g. UcxLog) and Wavelog; the "FT auto-log saved" line shows it.
+  A late final (up to 15 min after the QSO was given up) is logged with the frequency and band of the QSO's own transmission, not the
+  current ones after a QSY.
 - Safety: ending the program blocks keying from the first step on (also while the last logbook entry is being
   written), and a CW KEY serial port that hangs no longer delays the PTT release for more than a second.
 - The logbook status cache of the FT decode list is limited (5000 entries); it grew for days during reception
