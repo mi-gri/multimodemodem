@@ -842,6 +842,7 @@ QWidget *AppSettingsDialog::buildSettingsPage(InitialPage page)
     case InitialPage::SoundCardCalibration:
         m_calibrationPage = new SoundCardCalibrationDialog(m_initialSettings, this);
         m_calibrationPage->setTextTranslator([this](const QString &source) { return L(source); });
+        m_calibrationPage->setTransmitGuard(m_transmitting, m_txToneActive);
         return embedDialogPage(m_calibrationPage);
     }
     return makeDeferredSettingsPage(L(QStringLiteral("Settings")));
@@ -2724,6 +2725,13 @@ void AppSettingsDialog::chooseColour(ColourButton *entry)
     }
     entry->value = colourName(chosen, entry->value);
     setColourButton(entry->button, chosen);
+}
+
+void AppSettingsDialog::setTransmitGuard(std::function<bool()> transmitting, std::function<void(bool)> toneActive)
+{
+    m_transmitting = std::move(transmitting);
+    m_txToneActive = std::move(toneActive);
+    if (m_calibrationPage != nullptr) m_calibrationPage->setTransmitGuard(m_transmitting, m_txToneActive);
 }
 
 void AppSettingsDialog::setExternalCatTestStatus(const QString &message, bool ok)

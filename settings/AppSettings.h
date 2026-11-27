@@ -38,12 +38,12 @@ public:
     /**
      * @brief Loads settings from disk.
      */
-    void load();
+    void load(const QString &path = QString());   // empty: settingsFilePath()
 
     /**
      * @brief Saves settings to disk.
      */
-    bool save() const;
+    bool save(const QString &path = QString()) const;
 
 public:
     QString audioInputName = "default";

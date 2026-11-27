@@ -183,6 +183,7 @@
 #include <QSpacerItem>
 #include <QStyledItemDelegate>
 #include <QThread>
+#include <QTemporaryDir>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QTreeWidget>
@@ -2242,8 +2243,12 @@ void MainWindow::shutdownRuntime(const char *reason)
     releasePttForShutdown();
     if (m_deferredSettings) {
         // OK was pressed during the last transmission: keep the values for the next start (not applied to the runtime now).
-        m_settings = m_deferredSettings->settings;
-        m_settings.schedulerQsyPlanJson = BandSchedulerDialog::serializeEntries(m_deferredSettings->schedulerEntries);
+        const QString logbookPath = m_settings.logbookFilePath;   // a new path is taken only after it loaded
+        const QString plan = BandSchedulerDialog::serializeEntries(m_deferredSettings->schedulerEntries);
+        const bool planEdited = plan != m_deferredSettings->opened.schedulerQsyPlanJson;
+        m_settings = mergeChangedSettings(m_deferredSettings->opened, m_deferredSettings->settings);
+        m_settings.logbookFilePath = logbookPath;
+        if (planEdited) m_settings.schedulerQsyPlanJson = plan;
         m_deferredSettings.reset();
         savePersistentSettings();
         shutdownLog(QStringLiteral("settings from OK during the transmission saved for the next start"));
@@ -26499,20 +26504,76 @@ void MainWindow::showAppSettingsDialog()
 // running transmission (a changed PTT line would never be released): OK during TX applies after it.
 bool MainWindow::settingsApplyMustWait() const
 {
-    return m_txRunning || m_txPreparationPending || m_ftTxWorkerRunning || m_cwSerialActive || m_lastRigPttOn;
+    // As for a scheduled QSY, plus everything that keys or is about to key (armed FT slot, weak-signal TX pending,
+    // Tune, VOX audio, serial PTT line, CAT command or split in flight).
+    return m_txRunning || m_txPreparationPending || m_ftTxWorkerRunning || m_lastRigPttOn ||
+           m_cwSerialActive || m_cwSerialFinishing || m_cwKeyReleaseFailed ||
+           m_ft8PendingTxArmed || m_pendingFt8PttKeyed || m_nativeWeakSignalTxPending || m_tuneTxRunning ||
+           m_ftSplitPreparedForTx || m_ftSplitRestoreFailed || m_pttSerial.isOpen() ||
+           (m_catCommand != nullptr && m_catCommand->busy()) ||
+           (m_txAudioEngine != nullptr && m_txAudioEngine->isRunning());
+}
+
+// Only what the operator changed in the dialog (accepted against the state it opened with), over the settings as they
+// are now: values changed meanwhile (main window, QSY plan, rotor calibration) are kept.
+AppSettings MainWindow::mergeChangedSettings(const AppSettings &opened, const AppSettings &accepted) const
+{
+    QTemporaryDir dir;   // owner-only: the files hold the QRZ password and the Wavelog key
+    if (!dir.isValid()) return accepted;
+    const QString openedFile = dir.filePath(QStringLiteral("opened.ini"));
+    const QString acceptedFile = dir.filePath(QStringLiteral("accepted.ini"));
+    const QString currentFile = dir.filePath(QStringLiteral("current.ini"));
+    if (!opened.save(openedFile) || !accepted.save(acceptedFile) || !m_settings.save(currentFile)) return accepted;
+    {
+        QSettings before(openedFile, QSettings::IniFormat), after(acceptedFile, QSettings::IniFormat);
+        QSettings current(currentFile, QSettings::IniFormat);
+        QStringList keys = before.allKeys() + after.allKeys();
+        keys.removeDuplicates();
+        for (const QString &key : std::as_const(keys)) {
+            if (after.value(key) == before.value(key)) continue;
+            if (after.contains(key)) current.setValue(key, after.value(key));
+            else current.remove(key);
+        }
+        current.sync();
+    }
+    AppSettings merged;
+    merged.load(currentFile);
+    return merged;
+}
+
+void MainWindow::restoreRigAfterSettingsTest()
+{
+    m_settingsRigTestActive = false;
+    if (m_rigController == nullptr) return;
+    const AppSettings saved = m_settings;
+    QMetaObject::invokeMethod(m_rigController, [controller = m_rigController, saved]() {
+        controller->setPtt(false);
+        controller->configureFromSettings(saved);
+    }, Qt::QueuedConnection);
+    appendLog(QStringLiteral("Settings: CAT/PTT test state restore queued."));
 }
 
 void MainWindow::applyDeferredSettingsWhenIdle()
 {
-    if (!m_deferredSettings || m_shutdownInProgress || m_runtimeShutdownComplete) return;
+    if ((!m_deferredSettings && !m_deferredRigRestore) || m_shutdownInProgress || m_runtimeShutdownComplete) return;
     if (settingsApplyMustWait()) {
         QTimer::singleShot(500, this, &MainWindow::applyDeferredSettingsWhenIdle);
         return;
     }
-    const DeferredSettings deferred = *m_deferredSettings;
-    m_deferredSettings.reset();
-    appendLog(uiText("settings_applied_after_tx", "Settings from OK during the transmission are applied now."));
-    applyAcceptedSettings(deferred.settings, deferred.schedulerEntries, deferred.logbookPath, deferred.oldLogbookPath);
+    if (m_deferredSettings) {
+        const DeferredSettings deferred = *m_deferredSettings;
+        m_deferredSettings.reset();
+        appendLog(uiText("settings_applied_after_tx", "Settings from OK during the transmission are applied now."));
+        // A plan the dialog did not change stays as it is now.
+        const bool planEdited = BandSchedulerDialog::serializeEntries(deferred.schedulerEntries) != deferred.opened.schedulerQsyPlanJson;
+        applyAcceptedSettings(mergeChangedSettings(deferred.opened, deferred.settings),
+                              planEdited ? deferred.schedulerEntries : schedulerEntries(),
+                              deferred.logbookPath, deferred.oldLogbookPath);
+    }
+    if (m_deferredRigRestore) {
+        m_deferredRigRestore = false;
+        restoreRigAfterSettingsTest();
+    }
 }
 
 void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
@@ -26565,6 +26626,7 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
             return;
         }
         settingsCatRuntimeTouched = true;
+        m_settingsRigTestActive = true;
         appendLog(QStringLiteral("CAT TEST: queued on isolated worker."));
         if (m_rigController == nullptr) {
             if (dialogPtr) dialogPtr->setExternalCatTestStatus(QStringLiteral("TEST FAILED — no CAT controller"), false);
@@ -26586,11 +26648,12 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
         }, Qt::QueuedConnection);
     });
     connect(&dialog, &AppSettingsDialog::pttTestRequested, this, [this, dialogPtr, &settingsCatRuntimeTouched](const HamlibController::Config &cfg, bool enabled) {
-        if (enabled && settingsApplyMustWait()) {
+        if (settingsApplyMustWait()) {   // also OFF: it would reconfigure the controller under the transmission
             if (dialogPtr) dialogPtr->setExternalCatTestStatus(uiText("settings_test_during_tx", "Not during a transmission"), false);
             return;
         }
         settingsCatRuntimeTouched = true;
+        m_settingsRigTestActive = true;   // the controller runs the dialog's configuration: nothing else keys
         appendLog(enabled ? QStringLiteral("PTT TEST: ON queued on isolated worker.")
                           : QStringLiteral("PTT TEST: OFF queued on isolated worker."));
         if (enabled && !ensureStationIdentityForTx(QStringLiteral("PTT TEST"))) {
@@ -26788,8 +26851,12 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
                   .arg(settingsOpenTimer.elapsed())
                   .arg(settingsConstructMs));
 
+    dialog.setTransmitGuard([this] { return settingsApplyMustWait(); },
+                            [this](bool on) { m_settingsTxToneActive = on; });
+    const AppSettings openedSettings = m_settings;
     m_appSettingsDialogActive = true;
     const int settingsResult = dialog.exec();
+    m_settingsTxToneActive = false;
     m_appSettingsDialogActive = false;
     if (settingsResult != QDialog::Accepted) {
         appendLog(QStringLiteral("Settings cancelled; no saved application setting was changed."));
@@ -26798,13 +26865,13 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
         // were explicitly exercised by Test/Connect buttons, and never run the
         // old fullApply path (which could reopen CAT/rotator backends and block
         // the Settings close for their 3-15 second I/O timeout).
-        if (settingsCatRuntimeTouched && m_rigController != nullptr) {
-            const AppSettings savedSettings = m_settings;
-            QMetaObject::invokeMethod(m_rigController, [controller = m_rigController, savedSettings]() {
-                controller->setPtt(false);
-                controller->configureFromSettings(savedSettings);
-            }, Qt::QueuedConnection);
-            appendLog(QStringLiteral("Settings cancel: CAT/PTT test state restore queued."));
+        if (settingsCatRuntimeTouched) {
+            if (settingsApplyMustWait()) {   // never PTT OFF/reconfigure under a running transmission
+                m_deferredRigRestore = true;
+                QTimer::singleShot(500, this, &MainWindow::applyDeferredSettingsWhenIdle);
+            } else {
+                restoreRigAfterSettingsTest();
+            }
         }
         if (settingsRotatorRuntimeTouched) {
             appendLog(QStringLiteral("Settings cancel: temporary rotator test state retained until the next explicit Apply/Connect; saved configuration was not modified."));
@@ -26813,12 +26880,14 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
     }
 
     if (settingsApplyMustWait()) {
-        m_deferredSettings = DeferredSettings{dialog.settings(), dialog.schedulerEntries(), dialog.selectedLogbookPath(), currentPath};
+        m_deferredSettings = DeferredSettings{openedSettings, dialog.settings(), dialog.schedulerEntries(), dialog.selectedLogbookPath(), currentPath};
+        m_deferredRigRestore = m_deferredRigRestore || settingsCatRuntimeTouched;
         appendLog(uiText("settings_deferred_tx", "Settings: OK during a transmission; they are applied when it has ended."));
         QTimer::singleShot(500, this, &MainWindow::applyDeferredSettingsWhenIdle);
         return;
     }
     applyAcceptedSettings(dialog.settings(), dialog.schedulerEntries(), dialog.selectedLogbookPath(), currentPath);
+    if (settingsCatRuntimeTouched) restoreRigAfterSettingsTest();
 }
 
 void MainWindow::applyAcceptedSettings(const AppSettings &accepted, const QList<ScheduledQsyEntry> &schedulerEntriesAccepted,
@@ -28768,6 +28837,11 @@ void MainWindow::keyPttForTx(std::function<void(bool)> completion, bool carriesS
     if (m_txBlockedForShutdown || m_shutdownInProgress || m_runtimeShutdownComplete) return;
     if (m_cwKeyReleaseFailed) { completion(false); return; }
     if(m_catCommand->faulted() || m_ftSplitRestoreFailed){completion(false);return;}
+    if (m_settingsRigTestActive || m_settingsTxToneActive) {
+        // Settings run a CAT/PTT test configuration or the sound card TX tone: no transmission until that is over.
+        appendLog(uiText("tx_refused_settings_test", "TX/PTT refused: a CAT/PTT test or the TX calibration in Settings is active; close Settings first."));
+        completion(false); return;
+    }
     if (!ensureStationIdentityForTx(QStringLiteral("TX/PTT"))) {
         completion(false); return;
     }

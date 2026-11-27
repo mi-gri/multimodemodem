@@ -183,9 +183,9 @@ QString AppSettings::settingsFilePath()
 // Persistence
 // -----------------------------------------------------------------------------
 
-void AppSettings::load()
+void AppSettings::load(const QString &path)
 {
-    QSettings settings(settingsFilePath(), QSettings::IniFormat);
+    QSettings settings(path.isEmpty() ? settingsFilePath() : path, QSettings::IniFormat);
     sessionDiagnosticsEnabled = settings.value("Diagnostics/sessionEnabled", false).toBool();
     ctyWeeklyUpdate = settings.value("Cty/weeklyUpdate", false).toBool();
     logTechnicalComment = settings.value("Logbook/technicalComment", false).toBool();
@@ -883,14 +883,15 @@ void AppSettings::load()
     ft8MyGrid = textMyLocator.trimmed().toUpper();
 }
 
-bool AppSettings::save() const
+bool AppSettings::save(const QString &targetPath) const
 {
+    const QString file = targetPath.isEmpty() ? settingsFilePath() : targetPath;
 #ifndef Q_OS_WIN
     // Restrict the file before secrets are written. QSettings rewrites through
     // a save file that keeps the existing permissions, so the QRZ password and
     // Wavelog API key are never readable by others, not even briefly.
     {
-        const QString path = settingsFilePath();
+        const QString path = file;
         QDir().mkpath(QFileInfo(path).absolutePath());
         QFile file(path);
         if (file.exists() || file.open(QIODevice::WriteOnly | QIODevice::NewOnly)) {
@@ -898,7 +899,7 @@ bool AppSettings::save() const
         }
     }
 #endif
-    QSettings settings(settingsFilePath(), QSettings::IniFormat);
+    QSettings settings(file, QSettings::IniFormat);
     settings.setValue("Diagnostics/sessionEnabled", sessionDiagnosticsEnabled);
     settings.setValue("Cty/weeklyUpdate", ctyWeeklyUpdate);
     settings.setValue("Logbook/technicalComment", logTechnicalComment);
@@ -1116,6 +1117,7 @@ bool AppSettings::save() const
     settings.setValue("FT8/autoLog", ft8AutoLog);
     settings.setValue("FT8/queueCallers", ft8QueueCallers);
     settings.setValue("FT8/holdTxFrequency", ft8HoldTxFrequency);
+    settings.setValue("FT8/holdTxFrequencyDefaultMigrated194", true);   // what is saved is migrated (a copy loads unchanged)
     settings.setValue("FT8/txFrequencyStrategy", ft8TxFrequencyStrategy);
     settings.setValue("FT8/txGuardHz", ft8TxGuardHz);
     settings.setValue("FT8/liveDecodeDepth", ft8LiveDecodeDepth);

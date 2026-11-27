@@ -1865,3 +1865,9 @@ KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
  'settings_test_during_tx':('Not during a transmission','Non durante una trasmissione','Pas pendant une émission','Nicht während einer Aussendung','Ikke under sending','Ne během vysílání'),
  'settings_deferred_tx':('Settings: OK during a transmission; they are applied when it has ended.','Impostazioni: OK durante una trasmissione; vengono applicate al suo termine.','Réglages : OK pendant une émission ; ils sont appliqués à sa fin.','Einstellungen: OK während einer Aussendung; sie werden nach deren Ende übernommen.','Innstillinger: OK under en sending; de tas i bruk når den er ferdig.','Nastavení: OK během vysílání; použijí se po jeho skončení.'),
 }.items()})
+KEYS.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'tx_refused_settings_test':('TX/PTT refused: a CAT/PTT test or the TX calibration in Settings is active; close Settings first.','TX/PTT rifiutato: nelle impostazioni è attivo un test CAT/PTT o la calibrazione TX; chiudi prima le impostazioni.','TX/PTT refusé : un test CAT/PTT ou la calibration TX est actif dans les réglages ; fermez d\'abord les réglages.','TX/PTT abgelehnt: In den Einstellungen läuft ein CAT-/PTT-Test oder die TX-Kalibrierung; zuerst die Einstellungen schließen.','TX/PTT avvist: en CAT/PTT-test eller TX-kalibreringen er aktiv i innstillingene; lukk innstillingene først.','TX/PTT odmítnuto: v nastavení běží test CAT/PTT nebo kalibrace TX; nejprve zavřete nastavení.'),
+}.items()})
+SOURCES.update({k:dict(zip(LANGS,v)) for k,v in {
+ 'TX calibration is not possible during a transmission.':('TX calibration is not possible during a transmission.','La calibrazione TX non è possibile durante una trasmissione.','La calibration TX n\'est pas possible pendant une émission.','Die TX-Kalibrierung ist während einer Aussendung nicht möglich.','TX-kalibrering er ikke mulig under sending.','Kalibrace TX není během vysílání možná.'),
+}.items()})

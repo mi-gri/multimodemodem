@@ -584,6 +584,8 @@ private slots:
     void showAppSettingsDialogPage(AppSettingsDialog::InitialPage page);
     bool settingsApplyMustWait() const;
     void applyDeferredSettingsWhenIdle();
+    AppSettings mergeChangedSettings(const AppSettings &opened, const AppSettings &accepted) const;
+    void restoreRigAfterSettingsTest();
     void applyAcceptedSettings(const AppSettings &accepted, const QList<ScheduledQsyEntry> &schedulerEntriesAccepted,
                                const QString &selectedLogbookPath, const QString &oldLogbookPath);
 
@@ -1948,12 +1950,16 @@ private:
     bool m_txBlockedForShutdown = false;
     bool m_appSettingsDialogActive = false;
     struct DeferredSettings {   // OK during a transmission: applied when it has ended
+        AppSettings opened;     // the settings the dialog started with (only the changes against them are applied)
         AppSettings settings;
         QList<ScheduledQsyEntry> schedulerEntries;
         QString logbookPath;
         QString oldLogbookPath;
     };
     std::optional<DeferredSettings> m_deferredSettings;
+    bool m_deferredRigRestore = false;     // Cancel after a CAT/PTT test during TX: restore the rig after it
+    bool m_settingsRigTestActive = false;  // the rig controller runs a test configuration from Settings
+    bool m_settingsTxToneActive = false;   // the sound card TX calibration tone is playing
     QString m_uiLanguageCode = QStringLiteral("en");
     QHash<QString, QString> m_uiTranslations;
     QActionGroup *m_languageActionGroup = nullptr;

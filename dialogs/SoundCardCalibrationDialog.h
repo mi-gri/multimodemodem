@@ -33,6 +33,8 @@ public:
 
     AppSettings settings() const;
     void setTextTranslator(std::function<QString(const QString &)> translator);
+    // transmitting: the station transmits now (no TX tone); toneActive: the TX tone starts (true) / ends (false).
+    void setTransmitGuard(std::function<bool()> transmitting, std::function<void(bool)> toneActive);
 
 private slots:
     void calibrateRx();
@@ -56,6 +58,9 @@ private:
 
     MeasurementResult measureRxClock();
     MeasurementResult measureTxClock();
+    MeasurementResult guardedTxMeasurement();
+    std::function<bool()> m_transmitting;
+    std::function<void(bool)> m_toneActive;
 
     void buildUi();
     void refreshLabels();

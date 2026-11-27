@@ -658,7 +658,7 @@ void SoundCardCalibrationDialog::calibrateTx()
     setBusy(true);
     setStatusText(L(QStringLiteral("Measuring TX clock...")));
     if (m_txProgress != nullptr) m_txProgress->setValue(0);
-    const MeasurementResult result = measureTxClock();
+    const MeasurementResult result = guardedTxMeasurement();
     storeTxResult(result);
     setBusy(false);
 }
@@ -675,7 +675,7 @@ void SoundCardCalibrationDialog::calibrateBoth()
     if (!m_cancelRequested) {
         setStatusText(L(QStringLiteral("Measuring TX clock...")));
         if (m_txProgress != nullptr) m_txProgress->setValue(0);
-        MeasurementResult tx = measureTxClock();
+        MeasurementResult tx = guardedTxMeasurement();
         storeTxResult(tx);
     }
 
@@ -859,6 +859,26 @@ SoundCardCalibrationDialog::MeasurementResult SoundCardCalibrationDialog::measur
                          .arg(warning)
                          .arg(stability);
     updateProgress(m_rxProgress, 100);
+    return result;
+}
+
+void SoundCardCalibrationDialog::setTransmitGuard(std::function<bool()> transmitting, std::function<void(bool)> toneActive)
+{
+    m_transmitting = std::move(transmitting);
+    m_toneActive = std::move(toneActive);
+}
+
+// The TX tone goes to the transmitter's audio input (VOX keys it): never into a running transmission.
+SoundCardCalibrationDialog::MeasurementResult SoundCardCalibrationDialog::guardedTxMeasurement()
+{
+    if (m_transmitting && m_transmitting()) {
+        MeasurementResult refused;
+        refused.message = L(QStringLiteral("TX calibration is not possible during a transmission."));
+        return refused;
+    }
+    if (m_toneActive) m_toneActive(true);
+    MeasurementResult result = measureTxClock();
+    if (m_toneActive) m_toneActive(false);
     return result;
 }
 

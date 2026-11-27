@@ -84,6 +84,7 @@ public:
 
 public slots:
     void setExternalCatTestStatus(const QString &message, bool ok);
+    void setTransmitGuard(std::function<bool()> transmitting, std::function<void(bool)> toneActive);
     void setRotatorCalibrationResult(int profileIndex, double azimuthMsPerDeg, double elevationMsPerDeg, const QString &stampUtc, const QString &message);
     void setRotatorConnectionStatus(int profileIndex, bool connected, const QString &message);
 
@@ -182,6 +183,8 @@ private:
     class QDoubleSpinBox *m_spinTxSwrAbortLimit = nullptr;
     QWidget *makeBandsPage();
     SoundCardCalibrationDialog *m_calibrationPage = nullptr;
+    std::function<bool()> m_transmitting;
+    std::function<void(bool)> m_txToneActive;
     QWidget *m_rotatorPage = nullptr;
     QHash<int, InitialPage> m_deferredSettingsTabs;
     bool m_rotatorConnectionKnown[3] = {false, false, false};
