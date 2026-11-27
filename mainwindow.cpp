@@ -2202,6 +2202,8 @@ void MainWindow::releaseTransmitterAtExit()
 void MainWindow::releaseTransmitterForSessionEnd()
 {
     if (m_runtimeShutdownComplete) return;
+    // First Auto mode off: the WSPR beacon and the JS8 automation must not key again while the session is ending.
+    setAutoModeEnabledFromUi(false);
     // End the transmission like the operator's STOP, so the TX state stays consistent if the session end is cancelled.
     const bool ftMode = ui != nullptr && ui->cmbMode != nullptr && Ft8Mode::isFamilyMode(ui->cmbMode->currentText());
     if (ftMode) stopFt8Shell();
@@ -2209,7 +2211,7 @@ void MainWindow::releaseTransmitterForSessionEnd()
     m_ft8OperatorStopLatched = true;   // nothing keys again by itself while the session ends
     if (m_txAudioEngine != nullptr) m_txAudioEngine->stopOutput();   // at once: a VOX transmitter drops
     releaseTransmitterNow();           // and wait for PTT off: the session may end right now
-    appendLog(QStringLiteral("The desktop session is ending: transmission stopped and PTT released."));
+    appendLog(QStringLiteral("The desktop session is ending: transmission stopped, PTT released and Auto mode off."));
 }
 
 void MainWindow::shutdownRuntime(const char *reason)
