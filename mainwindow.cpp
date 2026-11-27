@@ -462,6 +462,7 @@ constexpr int kFtLastQsoUtcRole = Qt::UserRole + 432;  // its latest QSO (UTC)
 constexpr int kFtSlotSeparatorRole = Qt::UserRole + 433;  // "──── 2m ────" row (band)
 constexpr int kFtLogPendingSinceRole = Qt::UserRole + 434; // logbook status asked at (ms since epoch), 0 = known
 constexpr int kFtLogbookRecentHours = 24;            // logbook lookup "recent" window (diagnostics only)
+constexpr int kFtLogbookStatusCacheLimit = 5000;     // entries of about 1 KB; far above what the decode table shows
 constexpr int kFtCountryPrefixRole = Qt::UserRole + 435;   // DXCC primary prefix of the station (cty.dat)
 constexpr int kFtWatchedRole = Qt::UserRole + 436;         // station is on the watch list
 constexpr int kFtContinentRole = Qt::UserRole + 437;       // cty.dat continent of the station
@@ -2187,11 +2188,23 @@ void MainWindow::endForSystem(const char *reason)
 void MainWindow::releaseTransmitterAtExit()
 {
     if (m_runtimeShutdownComplete || thread() != QThread::currentThread()) return;
-    if (m_cwSerialTx) {
-        m_cwSerialTx->requestStop();
-        m_cwSerialTx->wait(1000);
-    }
+    m_txBlockedForShutdown = true;
+    stopCwSerialForShutdown();
     releasePttForShutdown();
+}
+
+// The CW KEY worker releases its lines itself, without GUI or CAT events. Bounded: a serial port that hangs must
+// not keep PTT keyed.
+void MainWindow::stopCwSerialForShutdown()
+{
+    if (m_cwSerialTx == nullptr) return;
+    disconnect(m_cwSerialTx, nullptr, this, nullptr);
+    m_cwSerialTx->requestStop();
+    constexpr int kCwStopTimeoutMs = 1000;
+    if (m_cwSerialTx->wait(kCwStopTimeoutMs)) return;
+    shutdownLog(QStringLiteral("CW KEY worker did not stop within %1 ms; check the transmitter").arg(kCwStopTimeoutMs));
+    m_cwSerialTx->setParent(nullptr);   // never destroy a running thread; the end of the process closes its port
+    m_cwSerialTx = nullptr;
 }
 
 void MainWindow::releaseTransmitterForSessionEnd()
@@ -2218,11 +2231,8 @@ void MainWindow::shutdownRuntime(const char *reason)
         shutdownLog(QStringLiteral("recursive shutdown ignored"));
         return;
     }
-    if (m_cwSerialTx) {
-        disconnect(m_cwSerialTx, nullptr, this, nullptr);
-        m_cwSerialTx->requestStop();
-        m_cwSerialTx->wait(); // Worker releases lines without needing GUI/CAT events.
-    }
+    m_txBlockedForShutdown = true;
+    stopCwSerialForShutdown();
     // The transmitter first: nothing that follows (logbook, audio, threads) may leave it keyed.
     releasePttForShutdown();
     if (m_logbookStore) m_logbookStore->drain();
@@ -4699,6 +4709,10 @@ void MainWindow::handleFtLogbookLookupReady(quint64 requestId,
         if (key.isEmpty()) continue;
         if (status.value(QStringLiteral("generation")).toULongLong() != m_ftLogbookCacheGeneration) continue;
         m_ftLogbookPendingKeys.remove(key);
+        // Days of receiving without a logged QSO add one entry per station heard: start over at the limit. A missing
+        // entry is asked for again, as after a logged QSO.
+        if (m_ftLogbookStatusCache.size() >= kFtLogbookStatusCacheLimit && !m_ftLogbookStatusCache.contains(key))
+            m_ftLogbookStatusCache.clear();
         m_ftLogbookStatusCache.insert(key, status);
 
         const QVector<Ft8RxDecoder::Decode> waiting = m_ftPendingAutoQsoByKey.take(key);
@@ -13007,7 +13021,7 @@ void MainWindow::invokeRigConfigureFromSettings()
 
 void MainWindow::requestRigPtt(bool enabled, std::function<void(bool)> completion)
 {
-    if(m_shutdownInProgress || m_runtimeShutdownComplete){completion(false);return;}
+    if(m_shutdownInProgress || m_runtimeShutdownComplete || (enabled && m_txBlockedForShutdown)){completion(false);return;}
     auto *controller=m_rigController;
     m_catCommand->request(controller,[controller,enabled](){return controller->setPtt(enabled);},
         [controller](){const bool off=controller->setPtt(false); return off && controller->endFtSplitTx();},std::move(completion),3000,!enabled);
@@ -25764,6 +25778,7 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
             if (dialogPtr) dialogPtr->setExternalCatTestStatus(QStringLiteral("PTT TEST FAILED — no CAT controller"), false);
             return;
         }
+        if (enabled && m_txBlockedForShutdown) return;
         QMetaObject::invokeMethod(m_rigController, [controller = m_rigController, cfg, enabled, dialogPtr]() {
             controller->configure(cfg);
             const bool ok = controller->setPtt(enabled);
@@ -27912,7 +27927,7 @@ void MainWindow::updateTxControlState()
 void MainWindow::keyPttForTx(std::function<void(bool)> completion, bool carriesSignal)
 {
     // After the program was told to end nothing keys again (a dialog loop may still be unwinding); no completion.
-    if (m_shutdownInProgress || m_runtimeShutdownComplete) return;
+    if (m_txBlockedForShutdown || m_shutdownInProgress || m_runtimeShutdownComplete) return;
     if (m_cwKeyReleaseFailed) { completion(false); return; }
     if(m_catCommand->faulted() || m_ftSplitRestoreFailed){completion(false);return;}
     if (!ensureStationIdentityForTx(QStringLiteral("TX/PTT"))) {

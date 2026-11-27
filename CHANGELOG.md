@@ -4,6 +4,10 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- Safety: ending the program blocks keying from the first step on (also while the last logbook entry is being
+  written), and a CW KEY serial port that hangs no longer delays the PTT release for more than a second.
+- The logbook status cache of the FT decode list is limited (5000 entries); it grew for days during reception
+  without a logged QSO.
 - Safety: closing the program releases PTT first (serial lines, then CAT with a bounded wait for the confirmation). Before, an audio buffer could be freed
   while the closing window still used it (possible crash before PTT was off); the audio and CAT objects are now detached before their threads stop.
 - Safety: the TX band permission checks the signal, not only the dial: dial plus the audio range of the mode (sideband from CAT) must stay inside the

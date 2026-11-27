@@ -40,7 +40,7 @@ void MainWindow::updateCwTxMethodNotice()
 }
 void MainWindow::startCwSerialTransmission(const QString& text)
 {
-    if (m_shutdownInProgress || m_runtimeShutdownComplete) return;
+    if (m_txBlockedForShutdown || m_shutdownInProgress || m_runtimeShutdownComplete) return;
     const QString port=m_settings.cwKeyPort.trimmed();
     QString error;
     if (port.isEmpty() || port.contains("://") || (port.contains(':') && !QRegularExpression("^COM[0-9]+:?$",QRegularExpression::CaseInsensitiveOption).match(port).hasMatch()))
@@ -68,7 +68,8 @@ void MainWindow::startCwSerialTransmission(const QString& text)
     const double wpm=m_spinCwTxWpm ? m_spinCwTxWpm->value() : m_settings.cwTxWpm;
     const auto generation=m_txRequestGeneration;
     auto begin=[this,config,text,wpm,generation](bool ok) {
-        if(m_shutdownInProgress || m_runtimeShutdownComplete) return;
+        // The CAT handoff may answer while the program is ending: no new keying (the worker may be gone).
+        if(m_txBlockedForShutdown || m_shutdownInProgress || m_runtimeShutdownComplete) return;
         if(!ok || generation!=m_txRequestGeneration) {
             finishCwSerialTransmission(false,generation==m_txRequestGeneration ? uiText("cw_key_handoff_failed", "CAT could not release the CW KEY port; transmission cancelled.") : QString());return;
         }

@@ -1680,6 +1680,7 @@ private:
     M3TxBand::Span txAudioSpan() const;       // audio frequencies of the next transmission in the active mode
     // @p rigModeOverride: the path keys in a mode of its own (serial CW), whatever CAT reports.
     bool txSignalInsideBand(QString *refusal, const QString &rigModeOverride = QString()) const;
+    void stopCwSerialForShutdown();
     void releasePttForShutdown();
     void releaseTransmitterNow();   // serial lines and CAT PTT, waiting (bounded) for the CAT thread
 
@@ -1932,6 +1933,9 @@ private:
     QTimer m_qsoUtcTimer;
     bool m_shutdownInProgress = false;
     bool m_runtimeShutdownComplete = false;
+    // Set first of all when the program ends, never cleared: nothing keys any more, also not from an event loop
+    // that runs inside the shutdown before m_shutdownInProgress is set (logbook completion with a message box).
+    bool m_txBlockedForShutdown = false;
     bool m_appSettingsDialogActive = false;
     QString m_uiLanguageCode = QStringLiteral("en");
     QHash<QString, QString> m_uiTranslations;
