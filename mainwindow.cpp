@@ -26504,9 +26504,16 @@ void MainWindow::showAppSettingsDialog()
 // running transmission (a changed PTT line would never be released): OK during TX applies after it.
 bool MainWindow::settingsApplyMustWait() const
 {
+    // The rig reports PTT on: a transmission of m³ - unless it is the PTT test of Settings itself, which only its
+    // own PTT OFF or the restore ends (both must not wait for it).
+    return runtimeTxActive() || (m_lastRigPttOn && !m_settingsRigTestActive);
+}
+
+bool MainWindow::runtimeTxActive() const
+{
     // As for a scheduled QSY, plus everything that keys or is about to key (armed FT slot, weak-signal TX pending,
     // Tune, VOX audio, serial PTT line, CAT command or split in flight).
-    return m_txRunning || m_txPreparationPending || m_ftTxWorkerRunning || m_lastRigPttOn ||
+    return m_txRunning || m_txPreparationPending || m_ftTxWorkerRunning ||
            m_cwSerialActive || m_cwSerialFinishing || m_cwKeyReleaseFailed ||
            m_ft8PendingTxArmed || m_pendingFt8PttKeyed || m_nativeWeakSignalTxPending || m_tuneTxRunning ||
            m_ftSplitPreparedForTx || m_ftSplitRestoreFailed || m_pttSerial.isOpen() ||
@@ -26536,7 +26543,7 @@ AppSettings MainWindow::mergeChangedSettings(const AppSettings &opened, const Ap
         }
         current.sync();
     }
-    AppSettings merged;
+    AppSettings merged = m_settings;   // fields save() does not write keep their current value
     merged.load(currentFile);
     return merged;
 }
@@ -26648,7 +26655,9 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
         }, Qt::QueuedConnection);
     });
     connect(&dialog, &AppSettingsDialog::pttTestRequested, this, [this, dialogPtr, &settingsCatRuntimeTouched](const HamlibController::Config &cfg, bool enabled) {
-        if (settingsApplyMustWait()) {   // also OFF: it would reconfigure the controller under the transmission
+        // ON never during a transmission; OFF not under one of m³ (it would reconfigure the controller), but always
+        // after an own PTT ON test.
+        if (enabled ? settingsApplyMustWait() : runtimeTxActive()) {
             if (dialogPtr) dialogPtr->setExternalCatTestStatus(uiText("settings_test_during_tx", "Not during a transmission"), false);
             return;
         }

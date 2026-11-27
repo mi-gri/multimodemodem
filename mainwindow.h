@@ -583,6 +583,7 @@ private slots:
      */
     void showAppSettingsDialogPage(AppSettingsDialog::InitialPage page);
     bool settingsApplyMustWait() const;
+    bool runtimeTxActive() const;
     void applyDeferredSettingsWhenIdle();
     AppSettings mergeChangedSettings(const AppSettings &opened, const AppSettings &accepted) const;
     void restoreRigAfterSettingsTest();
