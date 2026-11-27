@@ -20072,6 +20072,7 @@ void MainWindow::clearFt8Dx()
     if (!dx.isEmpty()) {
         // Like a given-up QSO: no automatic answer to this station for 15 minutes.
         m_ft8AutoNoResponseCooldown.insert(dx, QDateTime::currentDateTimeUtc().addSecs(15 * 60));
+        holdQueuedAnswersTo(dx);
         removeFt8QueuedCaller(dx);
     }
     if (m_editFt8DxCall != nullptr) m_editFt8DxCall->clear();
@@ -20247,7 +20248,7 @@ void MainWindow::considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, b
             queued.grid = parsed.grid.left(4).toUpper();
         }
         queued.lastSeenUtc = now;
-        queued.calledDuringActivity = queued.calledDuringActivity || ftOwnActivityRecent();
+        queued.calledDuringActivity = queued.calledDuringActivity || ftOwnActivityRunning();
         updateFt8SessionQueueUi();
         return;
     }
@@ -20268,7 +20269,7 @@ void MainWindow::considerFt8CallerForQueue(const Ft8RxDecoder::Decode &decode, b
     }
     queued.firstSeenUtc = now;
     queued.lastSeenUtc = now;
-    queued.calledDuringActivity = ftOwnActivityRecent();
+    queued.calledDuringActivity = ftOwnActivityRunning();
     m_ft8CallerQueue.append(queued);
     traceFtAutomation("candidate.enqueue","direct_caller_fifo",{{"candidate_call",call},{"rx_message",decode.message},{"rx_slot_utc_ms",decode.slotStartUtcMs}},true);
     updateFt8SessionQueueUi();
@@ -20374,10 +20375,15 @@ static bool ftCallerPlausible(const QString &call);
 
 // "Answer calls without own CQ" is about calls out of the blue. A station that calls while a QSO or CQ of mine runs
 // answers my activity.
-bool MainWindow::ftOwnActivityRecent() const
+bool MainWindow::ftOwnActivityRunning() const
 {
-    if (m_ftSession.qsoActive || m_ftSession.cqRepeatActive) return true;
-    return m_ftLastOwnTxMs > 0 && QDateTime::currentMSecsSinceEpoch() - m_ftLastOwnTxMs <= 60000;
+    return m_ftSession.qsoActive || m_ftSession.cqRepeatActive;
+}
+
+void MainWindow::holdQueuedAnswersTo(const QString &call)
+{
+    const QString key = call.trimmed().toUpper();
+    if (!key.isEmpty()) m_ftQueueHold.insert(key, QDateTime::currentDateTimeUtc().addSecs(15 * 60));
 }
 
 QString MainWindow::ftQueuedCallerRefusal(const Ft8RxDecoder::Decode &decode, const QString &call, bool calledDuringActivity) const
@@ -20386,7 +20392,13 @@ QString MainWindow::ftQueuedCallerRefusal(const Ft8RxDecoder::Decode &decode, co
     if (!ftCallerPlausible(call)) return QStringLiteral("implausible callsign");
     const QString filter = ftAutoQsoFilterReason(call);
     if (!filter.isEmpty()) return filter;
-    if (!calledDuringActivity && !m_settings.ftAnswerUnsolicited) return QStringLiteral("\"Answer calls without own CQ\" is off");
+    if (m_settings.ftAnswerUnsolicited) return QString();
+    // Switch off: a station that was given up or cleared is not taken up again, however often it calls.
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    for (auto it = m_ftQueueHold.constBegin(); it != m_ftQueueHold.constEnd(); ++it)
+        if (it.value() > now && FtDecodedText::callMatches(it.key(), call))
+            return QStringLiteral("gave no reply or cleared by you, 15 minutes");
+    if (!calledDuringActivity) return QStringLiteral("\"Answer calls without own CQ\" is off");
     return QString();
 }
 
@@ -20606,7 +20618,7 @@ void MainWindow::processFt8SequencerDecode(const Ft8RxDecoder::Decode &decode)
         // Unsolicited caller: needs automatic TX, the switch "Answer calls without own
         // CQ" (Filter menu) and a country/continent that is not blocked.
         const QString blockReason = ftAutoQsoFilterReason(parsed.senderCall);
-        const bool answersCalls = m_settings.ftAnswerUnsolicited || m_ftServingSolicitedCaller || ftOwnActivityRecent();
+        const bool answersCalls = m_settings.ftAnswerUnsolicited || m_ftServingSolicitedCaller;
         if (!(autoTxPermitted() && answersCalls) || !blockReason.isEmpty()) {
             static QString lastCaller;
             if (lastCaller != parsed.senderCall) {
@@ -22053,6 +22065,7 @@ void MainWindow::finishFt8ResponseWait(quint64 retryGeneration, qint64 replySlot
         appendLog(QString("FT Auto QSO: %1 gave no reply; skipping this call for 15 minutes and waiting for another CQ.")
                       .arg(dx));
     }
+    holdQueuedAnswersTo(dx);
     traceFtAutomation("qso.timeout","no_reply",{{"cooldown_seconds",fullAutoEnabled ? 900 : 0},{"reply_slot_utc_ms",replySlotUtcMs}});
     // Auto mode: a CQ series that was running when this caller answered goes on
     // after the unanswered attempt, as after a completed QSO (decided before the stop).
@@ -28591,7 +28604,6 @@ void MainWindow::prearmFtPreparedSlotTransmit()
             }
         } else {
             m_pendingFt8PttKeyed=true;
-            if (!m_pendingFt8TxPlan.tune) m_ftLastOwnTxMs = QDateTime::currentMSecsSinceEpoch();
             traceFtAutomation("tx.ptt","keyed");
             m_pendingFt8PttPrearmed=true;
             if (m_pendingFt8TxPlan.tune || m_ft8AudioStartRequested) {

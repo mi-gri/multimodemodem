@@ -8,8 +8,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   while the closing window still used it (possible crash before PTT was off); the audio and CAT objects are now detached before their threads stop.
 - Safety: the TX band permission checks the signal, not only the dial: dial plus the audio range of the mode (sideband from CAT) must stay inside the
   band, otherwise PTT is refused with a message.
-- Auto mode caller queue: a station that calls while a QSO or CQ of mine runs is answered from the queue although "Answer calls without own CQ" is off
-  (the switch concerns calls out of the blue). A caller leaves the queue only when an answer goes out; before, a refused caller was dropped silently.
+- Auto mode caller queue: a station that calls while a QSO or CQ series of mine is running is answered from the queue although "Answer calls without own
+  CQ" is off (the switch concerns calls out of the blue). A caller leaves the queue only when an answer goes out; before, a refused caller was dropped
+  silently. With the switch off, a station that gave no reply or was cleared (Clear DX) is not taken up from the queue for 15 minutes.
 - Safety: PTT is released also when the system ends the program (termination signal at shutdown, log-off or UPS shutdown; end of the desktop session;
   exit without a close). Before, only closing the window ran the shutdown, so a running transmission could stay keyed.
 - Safety: closing stops the TX audio before PTT is released; the band edge check also covers serial CW keying.
