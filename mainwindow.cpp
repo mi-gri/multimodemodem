@@ -21036,7 +21036,10 @@ void MainWindow::autoLogFt8QsoFor(const FtQsoSession &session, const QString &re
     // That dial also gives the band. Without it the current dial, only when it lies on the logged band.
     const int txAudioHz = session.lastTxPlan.audioFrequencyHz > 0 ? session.lastTxPlan.audioFrequencyHz
         : (m_spinFt8TxFreq != nullptr ? m_spinFt8TxFreq->value() : m_settings.ft8TxFrequencyHz);
-    const QString qsoBand = session.lastTxDialHz > 0.0 ? bandFromFrequencyHz(session.lastTxDialHz + txAudioHz) : QString();
+    // Only a transmission to this station counts (not a CQ, Tune or an earlier QSO).
+    const bool ownTxToThisStation = session.lastTxDialHz > 0.0 && !session.lastTxPlan.tune &&
+        FtDecodedText::callMatches(session.lastTxPlan.dxCall, session.dxCall);
+    const QString qsoBand = ownTxToThisStation ? bandFromFrequencyHz(session.lastTxDialHz + txAudioHz) : QString();
     if (!qsoBand.isEmpty()) {
         entry.band = qsoBand.toLower();
         entry.freq = QString::number((session.lastTxDialHz + txAudioHz) / 1.0e6, 'f', 6);
