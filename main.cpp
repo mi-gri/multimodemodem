@@ -3,6 +3,7 @@
 #include "utils/InstallationPaths.h"
 #include "utils/InstanceLock.h"
 #include "utils/StartupTrace.h"
+#include "utils/SystemEndGuard.h"
 #include "utils/ProductName.h"
 #include "runtime/SessionDiagnosticsUiTap.h"
 #include "runtime/SessionDiagnostics.h"
@@ -48,6 +49,10 @@
 #include <QThreadPool>
 #include <QTimer>
 #include <cstdio>
+#include <cstdlib>
+#ifndef QT_NO_SESSIONMANAGER
+#include <QSessionManager>
+#endif
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QTextCodec>
 #endif
@@ -432,5 +437,19 @@ int main(int argc, char *argv[])
         QTimer::singleShot(3000, &app, [] { M3StartupTrace::mark("3 s after event loop start"); });
     }
     if (commandLine.isSet(i18nReportOption)) return M3I18nReport::run(app, window);
-    return app.exec();
+
+    // The transmitter must not stay keyed when the program is ended from outside: termination signal (shutdown,
+    // log-off, UPS), end of the desktop session, or exit() without a close (for example a lost display).
+    M3SystemEnd::watchTerminationSignals(&window, [&window] { window.endForSystem("termination signal"); });
+#ifndef QT_NO_SESSIONMANAGER
+    QObject::connect(&app, &QGuiApplication::commitDataRequest, &window,
+                     [&window](QSessionManager &) { window.releaseTransmitterForSessionEnd(); }, Qt::DirectConnection);
+#endif
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &window, [&window] { window.releaseTransmitterAtExit(); });
+    static MainWindow *exitWindow = nullptr;
+    exitWindow = &window;
+    std::atexit([] { if (exitWindow != nullptr) exitWindow->releaseTransmitterAtExit(); });
+    const int exitCode = app.exec();
+    exitWindow = nullptr;   // the window closes itself down in its destructor
+    return exitCode;
 }

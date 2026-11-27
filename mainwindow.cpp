@@ -2140,6 +2140,11 @@ void MainWindow::releasePttForShutdown()
         if (m_ftTxWorker->thread() != nullptr && m_ftTxWorker->thread()->isRunning())
             QMetaObject::invokeMethod(m_ftTxWorker, "stopOutput", Qt::QueuedConnection);
     }
+    releaseTransmitterNow();
+}
+
+void MainWindow::releaseTransmitterNow()
+{
     if (m_pttSerial.isOpen()) {
         m_pttSerial.setRequestToSend(false);
         m_pttSerial.setDataTerminalReady(false);
@@ -2170,6 +2175,37 @@ void MainWindow::releasePttForShutdown()
     } else {
         shutdownLog(QStringLiteral("PTT released"));
     }
+}
+
+void MainWindow::endForSystem(const char *reason)
+{
+    if (!m_runtimeShutdownComplete) saveLastSession();
+    shutdownRuntime(reason);
+    QCoreApplication::quit();
+}
+
+void MainWindow::releaseTransmitterAtExit()
+{
+    if (m_runtimeShutdownComplete || thread() != QThread::currentThread()) return;
+    if (m_cwSerialTx) {
+        m_cwSerialTx->requestStop();
+        m_cwSerialTx->wait(1000);
+    }
+    releasePttForShutdown();
+}
+
+void MainWindow::releaseTransmitterForSessionEnd()
+{
+    if (m_runtimeShutdownComplete) return;
+    m_ft8OperatorStopLatched = true;   // nothing keys again by itself while the session ends
+    if (m_cwSerialTx) m_cwSerialTx->requestStop();
+    if (m_txAudioEngine != nullptr) m_txAudioEngine->stopOutput();
+    if (m_ftTxWorker != nullptr) {
+        m_ftTxWorker->cancelPendingStart();
+        if (m_ftTxWorker->thread() != nullptr && m_ftTxWorker->thread()->isRunning())
+            QMetaObject::invokeMethod(m_ftTxWorker, "stopOutput", Qt::QueuedConnection);
+    }
+    releaseTransmitterNow();
 }
 
 void MainWindow::shutdownRuntime(const char *reason)

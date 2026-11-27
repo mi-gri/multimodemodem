@@ -189,6 +189,13 @@ public:
      */
     ~MainWindow() override;
 
+    // The system ends the program (termination signal): shut down like a close, then leave the event loop.
+    void endForSystem(const char *reason);
+    // Last resort when the process exits without a close (lost display, session end): release the transmitter.
+    void releaseTransmitterAtExit();
+    // The desktop session is about to end (it may still be cancelled): stop transmitting, release PTT, latch STOP.
+    void releaseTransmitterForSessionEnd();
+
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
@@ -1674,6 +1681,7 @@ private:
     // @p rigModeOverride: the path keys in a mode of its own (serial CW), whatever CAT reports.
     bool txSignalInsideBand(QString *refusal, const QString &rigModeOverride = QString()) const;
     void releasePttForShutdown();
+    void releaseTransmitterNow();   // serial lines and CAT PTT, waiting (bounded) for the CAT thread
 
     /**
      * @brief Releases the RTS PTT line after image TX.
