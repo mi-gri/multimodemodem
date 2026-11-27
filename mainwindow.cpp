@@ -2197,15 +2197,14 @@ void MainWindow::releaseTransmitterAtExit()
 void MainWindow::releaseTransmitterForSessionEnd()
 {
     if (m_runtimeShutdownComplete) return;
+    // End the transmission like the operator's STOP, so the TX state stays consistent if the session end is cancelled.
+    const bool ftMode = ui != nullptr && ui->cmbMode != nullptr && Ft8Mode::isFamilyMode(ui->cmbMode->currentText());
+    if (ftMode) stopFt8Shell();
+    else stopImageTx();
     m_ft8OperatorStopLatched = true;   // nothing keys again by itself while the session ends
-    if (m_cwSerialTx) m_cwSerialTx->requestStop();
-    if (m_txAudioEngine != nullptr) m_txAudioEngine->stopOutput();
-    if (m_ftTxWorker != nullptr) {
-        m_ftTxWorker->cancelPendingStart();
-        if (m_ftTxWorker->thread() != nullptr && m_ftTxWorker->thread()->isRunning())
-            QMetaObject::invokeMethod(m_ftTxWorker, "stopOutput", Qt::QueuedConnection);
-    }
-    releaseTransmitterNow();
+    if (m_txAudioEngine != nullptr) m_txAudioEngine->stopOutput();   // at once: a VOX transmitter drops
+    releaseTransmitterNow();           // and wait for PTT off: the session may end right now
+    appendLog(QStringLiteral("The desktop session is ending: transmission stopped and PTT released."));
 }
 
 void MainWindow::shutdownRuntime(const char *reason)
@@ -27910,6 +27909,8 @@ void MainWindow::updateTxControlState()
 
 void MainWindow::keyPttForTx(std::function<void(bool)> completion, bool carriesSignal)
 {
+    // After the program was told to end nothing keys again (a dialog loop may still be unwinding); no completion.
+    if (m_shutdownInProgress || m_runtimeShutdownComplete) return;
     if (m_cwKeyReleaseFailed) { completion(false); return; }
     if(m_catCommand->faulted() || m_ftSplitRestoreFailed){completion(false);return;}
     if (!ensureStationIdentityForTx(QStringLiteral("TX/PTT"))) {
