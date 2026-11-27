@@ -2240,6 +2240,14 @@ void MainWindow::shutdownRuntime(const char *reason)
     stopCwSerialForShutdown();
     // The transmitter first: nothing that follows (logbook, audio, threads) may leave it keyed.
     releasePttForShutdown();
+    if (m_deferredSettings) {
+        // OK was pressed during the last transmission: keep the values for the next start (not applied to the runtime now).
+        m_settings = m_deferredSettings->settings;
+        m_settings.schedulerQsyPlanJson = BandSchedulerDialog::serializeEntries(m_deferredSettings->schedulerEntries);
+        m_deferredSettings.reset();
+        savePersistentSettings();
+        shutdownLog(QStringLiteral("settings from OK during the transmission saved for the next start"));
+    }
     if (m_logbookStore) m_logbookStore->drain();
     m_shutdownInProgress = true;
     if (m_txWaveformPreparer) m_txWaveformPreparer->cancel();
@@ -26487,14 +26495,39 @@ void MainWindow::showAppSettingsDialog()
     showAppSettingsDialogPage(AppSettingsDialog::InitialPage::AudioPtt);
 }
 
+// Applying settings reconfigures CAT/PTT, audio devices, TX level and band permissions. That must not happen under a
+// running transmission (a changed PTT line would never be released): OK during TX applies after it.
+bool MainWindow::settingsApplyMustWait() const
+{
+    return m_txRunning || m_txPreparationPending || m_ftTxWorkerRunning || m_cwSerialActive || m_lastRigPttOn;
+}
+
+void MainWindow::applyDeferredSettingsWhenIdle()
+{
+    if (!m_deferredSettings || m_shutdownInProgress || m_runtimeShutdownComplete) return;
+    if (settingsApplyMustWait()) {
+        QTimer::singleShot(500, this, &MainWindow::applyDeferredSettingsWhenIdle);
+        return;
+    }
+    const DeferredSettings deferred = *m_deferredSettings;
+    m_deferredSettings.reset();
+    appendLog(uiText("settings_applied_after_tx", "Settings from OK during the transmission are applied now."));
+    applyAcceptedSettings(deferred.settings, deferred.schedulerEntries, deferred.logbookPath, deferred.oldLogbookPath);
+}
+
 void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
 {
-    if (m_txRunning || m_cwKeyReleaseFailed) {
+    if (m_cwKeyReleaseFailed) {
         QMessageBox::information(
             this,
             uiTextFromSource("text", "Settings"),
             uiTextFromSource("text", "Stop TX before changing settings.")
             );
+        return;
+    }
+    if (m_deferredSettings) {
+        QMessageBox::information(this, uiTextFromSource("text", "Settings"),
+            uiText("settings_wait_deferred", "The settings from the last OK are applied when the transmission has ended. Open Settings again after that."));
         return;
     }
 
@@ -26527,6 +26560,10 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
     bool settingsCatRuntimeTouched = false;
     bool settingsRotatorRuntimeTouched = false;
     connect(&dialog, &AppSettingsDialog::catTestRequested, this, [this, dialogPtr, &settingsCatRuntimeTouched](const HamlibController::Config &cfg) {
+        if (settingsApplyMustWait()) {
+            if (dialogPtr) dialogPtr->setExternalCatTestStatus(uiText("settings_test_during_tx", "Not during a transmission"), false);
+            return;
+        }
         settingsCatRuntimeTouched = true;
         appendLog(QStringLiteral("CAT TEST: queued on isolated worker."));
         if (m_rigController == nullptr) {
@@ -26549,6 +26586,10 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
         }, Qt::QueuedConnection);
     });
     connect(&dialog, &AppSettingsDialog::pttTestRequested, this, [this, dialogPtr, &settingsCatRuntimeTouched](const HamlibController::Config &cfg, bool enabled) {
+        if (enabled && settingsApplyMustWait()) {
+            if (dialogPtr) dialogPtr->setExternalCatTestStatus(uiText("settings_test_during_tx", "Not during a transmission"), false);
+            return;
+        }
         settingsCatRuntimeTouched = true;
         appendLog(enabled ? QStringLiteral("PTT TEST: ON queued on isolated worker.")
                           : QStringLiteral("PTT TEST: OFF queued on isolated worker."));
@@ -26771,12 +26812,23 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
         return;
     }
 
+    if (settingsApplyMustWait()) {
+        m_deferredSettings = DeferredSettings{dialog.settings(), dialog.schedulerEntries(), dialog.selectedLogbookPath(), currentPath};
+        appendLog(uiText("settings_deferred_tx", "Settings: OK during a transmission; they are applied when it has ended."));
+        QTimer::singleShot(500, this, &MainWindow::applyDeferredSettingsWhenIdle);
+        return;
+    }
+    applyAcceptedSettings(dialog.settings(), dialog.schedulerEntries(), dialog.selectedLogbookPath(), currentPath);
+}
+
+void MainWindow::applyAcceptedSettings(const AppSettings &accepted, const QList<ScheduledQsyEntry> &schedulerEntriesAccepted,
+                                       const QString &selectedLogbookPath, const QString &oldLogbookPath)
+{
     QElapsedTimer settingsApplyTimer;
     settingsApplyTimer.start();
 
     const AppSettings oldSettings = m_settings;
-    const QString oldLogbookPath = currentPath;
-    m_settings = dialog.settings();
+    m_settings = accepted;
     if(m_settings.sessionDiagnosticsEnabled && (!SessionDiagnostics::instance().enabled() || QDir(oldSettings.sessionDiagnosticsFolder.isEmpty()?SessionDiagnostics::defaultFolder():oldSettings.sessionDiagnosticsFolder).absolutePath()!=QDir(m_settings.sessionDiagnosticsFolder.isEmpty()?SessionDiagnostics::defaultFolder():m_settings.sessionDiagnosticsFolder).absolutePath())) {
         if(!SessionDiagnostics::instance().start(m_settings.sessionDiagnosticsFolder))appendLog(SessionDiagnostics::instance().error());
     } else if(!m_settings.sessionDiagnosticsEnabled)SessionDiagnostics::instance().stop();
@@ -26784,7 +26836,7 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
     SessionDiagnostics::instance().record("resources",{{"cpu",M3Cpu::summary()},{"policy",M3Runtime::SystemResourceManager::instance().startupSummary()}});
     if (m_qrzLookupPanel) m_qrzLookupPanel->setAccountCredentials(m_settings.qrzUsername, m_settings.qrzPassword);
     {
-        const QString newPlan = BandSchedulerDialog::serializeEntries(dialog.schedulerEntries());
+        const QString newPlan = BandSchedulerDialog::serializeEntries(schedulerEntriesAccepted);
         if (newPlan != m_settings.schedulerQsyPlanJson) {
             // A changed plan revokes the WSPR-beacon permission of the old one; the
             // active entry of the new plan gives it back only if it is marked.
@@ -26815,7 +26867,7 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
     }
     if (ui->cmbMode != nullptr) applyWaterfallRangeForMode(ui->cmbMode->currentText());   // per-mode speed
 
-    const QString newLogbookPath = dialog.selectedLogbookPath().trimmed();
+    const QString newLogbookPath = selectedLogbookPath.trimmed();
     const bool logbookPathChanged = !newLogbookPath.isEmpty() &&
         QFileInfo(newLogbookPath).absoluteFilePath() != QFileInfo(oldLogbookPath).absoluteFilePath();
     if (logbookPathChanged) {

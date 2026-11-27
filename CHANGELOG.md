@@ -5,6 +5,9 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 ## m³ 0.26.12 (beta, branch main)
 
 - New features go here; the release candidate 0.26.11 lives on branch release/0.26.11 (bug fixes only).
+- Settings can be opened during a transmission (in Auto mode m³ transmits almost every other slot). OK during a transmission applies the
+  settings when it has ended (CAT/PTT, audio devices and TX level are never reconfigured under a keyed transmitter); CAT and PTT test buttons are
+  refused while transmitting. Closing m³ before that keeps the values for the next start.
 - Auto mode stages (one control instead of the "Auto QSO" button and the "CQ retry" box): 0 no automatic answers and no automatic CQ (manual QSOs only), 1 respond to CQ/RR73/73 only, 2 call CQ only,
   3 alternate (after N QSOs), 4 CQ only when no target was there for M slots. Auto mode is never restored after a start (it is off
   every time; switching it on shows the notice). STOP, a mode change and a band change pause the stage until it is selected again.

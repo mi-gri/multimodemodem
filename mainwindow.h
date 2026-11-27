@@ -62,6 +62,7 @@
 #include "rotator/RotatorPeakSearch.h"
 #include "third_party/decodium_gpl/port/NtpClient.hpp"
 
+#include <optional>
 #include <QComboBox>
 #include <functional>
 #include <QColor>
@@ -581,6 +582,10 @@ private slots:
      * @brief Opens the unified settings dialog on a specific page.
      */
     void showAppSettingsDialogPage(AppSettingsDialog::InitialPage page);
+    bool settingsApplyMustWait() const;
+    void applyDeferredSettingsWhenIdle();
+    void applyAcceptedSettings(const AppSettings &accepted, const QList<ScheduledQsyEntry> &schedulerEntriesAccepted,
+                               const QString &selectedLogbookPath, const QString &oldLogbookPath);
 
     void pointCatRotatorToDirectTarget(const QString &query);
 
@@ -1942,6 +1947,13 @@ private:
     // that runs inside the shutdown before m_shutdownInProgress is set (logbook completion with a message box).
     bool m_txBlockedForShutdown = false;
     bool m_appSettingsDialogActive = false;
+    struct DeferredSettings {   // OK during a transmission: applied when it has ended
+        AppSettings settings;
+        QList<ScheduledQsyEntry> schedulerEntries;
+        QString logbookPath;
+        QString oldLogbookPath;
+    };
+    std::optional<DeferredSettings> m_deferredSettings;
     QString m_uiLanguageCode = QStringLiteral("en");
     QHash<QString, QString> m_uiTranslations;
     QActionGroup *m_languageActionGroup = nullptr;
