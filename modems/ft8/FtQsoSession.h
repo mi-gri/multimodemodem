@@ -52,6 +52,7 @@ public:
 
     int activeTxRow = -1;
     FtTxPlan lastTxPlan; // Updated only after the audio backend acknowledges progress.
+    double lastTxDialHz = 0.0; // receive dial of that transmission (for the log; 0 = unknown)
 
     bool haveLastSnr = false;
     int lastSnrDb = 0;

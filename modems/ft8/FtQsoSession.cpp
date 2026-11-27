@@ -77,6 +77,7 @@ bool FtQsoSession::noteRetryTxCompleted(int slotMs)
 void FtQsoSession::clearLastTx()
 {
     lastTxPlan = FtTxPlan();
+    lastTxDialHz = 0.0;
 }
 
 void FtQsoSession::resetForCqRepeat(const QString &, const QString &, int timeoutMinutes)

@@ -21032,13 +21032,17 @@ void MainWindow::autoLogFt8QsoFor(const FtQsoSession &session, const QString &re
     entry.utc = session.qsoStartUtc.isValid() ? session.qsoStartUtc : QDateTime::currentDateTimeUtc();
     entry.utcEnd = QDateTime::currentDateTimeUtc();
     // FREQ as WSJT-X logs it: dial (receive dial, also with split) plus the TX audio frequency of this QSO.
-    // Only when it lies on the logged band; unknown frequency: no field.
-    const double dialHz = txReferenceDialHz();
-    if (dialHz > 0.0) {
-        const int txAudioHz = session.lastTxPlan.audioFrequencyHz > 0 ? session.lastTxPlan.audioFrequencyHz
-            : (m_spinFt8TxFreq != nullptr ? m_spinFt8TxFreq->value() : m_settings.ft8TxFrequencyHz);
-        if (bandFromFrequencyHz(dialHz + txAudioHz).compare(entry.band, Qt::CaseInsensitive) == 0)
-            entry.freq = QString::number((dialHz + txAudioHz) / 1.0e6, 'f', 6);
+    // The dial of the QSO's own transmission counts: a late final may arrive up to 15 min later, after a QSY.
+    // That dial also gives the band. Without it the current dial, only when it lies on the logged band.
+    const int txAudioHz = session.lastTxPlan.audioFrequencyHz > 0 ? session.lastTxPlan.audioFrequencyHz
+        : (m_spinFt8TxFreq != nullptr ? m_spinFt8TxFreq->value() : m_settings.ft8TxFrequencyHz);
+    const QString qsoBand = session.lastTxDialHz > 0.0 ? bandFromFrequencyHz(session.lastTxDialHz + txAudioHz) : QString();
+    if (!qsoBand.isEmpty()) {
+        entry.band = qsoBand.toLower();
+        entry.freq = QString::number((session.lastTxDialHz + txAudioHz) / 1.0e6, 'f', 6);
+    } else if (const double dialHz = txReferenceDialHz(); dialHz > 0.0 &&
+               bandFromFrequencyHz(dialHz + txAudioHz).compare(entry.band, Qt::CaseInsensitive) == 0) {
+        entry.freq = QString::number((dialHz + txAudioHz) / 1.0e6, 'f', 6);
     }
     // Technical details only when switched on (Settings -> Logbook): some logging programs choke on them.
     if (m_settings.logTechnicalComment)
@@ -28943,6 +28947,7 @@ void MainWindow::handleTxStarted()
                   .arg(ftTx ? QStringLiteral(" (FT dedicated worker, slot-aligned low-latency path)") : QString()));
     if (ftTx && !m_ft8OperatorStopLatched) {
         m_ftSession.lastTxPlan = m_pendingFt8TxPlan;
+        if (!m_pendingFt8TxPlan.tune) m_ftSession.lastTxDialHz = txReferenceDialHz();   // the log of a late final needs it
         traceFtAutomation("tx.audio","started",{{"audio_started_utc_ms",QDateTime::currentMSecsSinceEpoch()}});
         updateFt8TxBannerUi();
         if (!m_ftSession.lastTxPlan.tune)
