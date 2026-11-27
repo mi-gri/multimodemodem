@@ -13,8 +13,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
   silently. With the switch off, a station that gave no reply or was cleared (Clear DX) is not taken up from the queue for 15 minutes.
 - Safety: PTT is released also when the system ends the program (termination signal at shutdown, log-off or UPS shutdown; end of the desktop session;
   exit without a close). Before, only closing the window ran the shutdown, so a running transmission could stay keyed.
-- Safety: after the program was told to end, nothing keys the transmitter again; a session end that is cancelled leaves the transmit state stopped
-  cleanly (as after STOP).
+- Safety: after the program was told to end, nothing keys the transmitter again; when the desktop session ends, Auto mode is switched off (no further
+  WSPR beacon or JS8 automatic transmission) and the transmit state is stopped cleanly (as after STOP). After a cancelled log-off switch Auto on again.
 - Safety: closing stops the TX audio before PTT is released; the band edge check also covers serial CW keying.
 - SSTV editor: images in a project file are limited before they are decoded (8192 pixels per side, 80 million pixels in total).
 - Runtime log: when a newer transmission plan replaces the one being prepared, the cancelled CAT split preparation is no longer reported as "FT TX
