@@ -21031,6 +21031,15 @@ void MainWindow::autoLogFt8QsoFor(const FtQsoSession &session, const QString &re
     }
     entry.utc = session.qsoStartUtc.isValid() ? session.qsoStartUtc : QDateTime::currentDateTimeUtc();
     entry.utcEnd = QDateTime::currentDateTimeUtc();
+    // FREQ as WSJT-X logs it: dial (receive dial, also with split) plus the TX audio frequency of this QSO.
+    // Only when it lies on the logged band; unknown frequency: no field.
+    const double dialHz = txReferenceDialHz();
+    if (dialHz > 0.0) {
+        const int txAudioHz = session.lastTxPlan.audioFrequencyHz > 0 ? session.lastTxPlan.audioFrequencyHz
+            : (m_spinFt8TxFreq != nullptr ? m_spinFt8TxFreq->value() : m_settings.ft8TxFrequencyHz);
+        if (bandFromFrequencyHz(dialHz + txAudioHz).compare(entry.band, Qt::CaseInsensitive) == 0)
+            entry.freq = QString::number((dialHz + txAudioHz) / 1.0e6, 'f', 6);
+    }
     // Technical details only when switched on (Settings -> Logbook): some logging programs choke on them.
     if (m_settings.logTechnicalComment)
     entry.comment = QString("%1; RX audio %2 Hz; TX audio %3 Hz; final: %4")
@@ -21081,7 +21090,8 @@ void MainWindow::finishAutoLogFt8Qso(const LogbookEntry &entry, const QString &r
         }
         appendLog(QStringLiteral("FT auto-log %1: %2 %3 %4")
             .arg(count > 0 ? QStringLiteral("saved") : QStringLiteral("duplicate skipped"),
-                 entry.callsign, entry.band, entry.mode));
+                 entry.callsign, entry.band,
+                 entry.freq.isEmpty() ? entry.mode : entry.mode + QStringLiteral(" %1 MHz").arg(entry.freq)));
     }, true);
 }
 
