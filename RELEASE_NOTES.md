@@ -7,19 +7,73 @@ License: GPL-3.0-or-later (see LICENSE.md).
 
 ## New in MultiModeModem 0.26.11
 
+### Before you update
+
+- Version numbers now follow 0.YY.MM (year, month): 0.26.11 follows 0.6.7.
+- Configuration files are now `settings.m3cfg` and `configs/NAME.m3cfg`; old files are
+  renamed at the first start. Older program versions do not find the renamed files.
+- MadModem's settings are no longer imported (its ADIF logbook still is).
+- Until Settings → Bands is saved once, every amateur band counts as TX allowed.
+- Help → "Include beta versions in update checks" is off by default: only releases are
+  offered.
+
+### Transmit safety
+
+- PTT is released first when the program is closed, and also when the system ends it
+  (shutdown, log-off, UPS shutdown, end of the desktop session). Nothing keys the
+  transmitter afterwards; the end of the desktop session switches Auto mode off.
+- The TX band permission checks the whole signal (dial plus audio range, sideband from
+  CAT) and also covers serial CW keying. No transmission without a known frequency.
+- Bands can be set to receive only. A band change during a transmission or a running
+  sequence stops it.
+- A transmission (not Tune) is stopped when the radio reports a high SWR twice in a row
+  (on by default, limit 2.5).
+- No automatic transmission starts while the QSY plan is running, except a WSPR beacon
+  entry marked for it. Unsolicited calls are answered only when automatic TX is allowed.
+- A new QSO is never started automatically from an a-priori (AP) decode or from an
+  implausible callsign.
+
+### Operation
+
 - WSPR-2 receive and beacon: a C++ port of the WSJT-X wsprd decoder with spot table and
-  PSK Reporter upload; the beacon transmits in even minutes with an adjustable TX share
-  (only with the Auto mode switch on) and logs every period decision.
-- Waterfall: FFTW-based, upper edge selectable 3000-5000 Hz, zoom with real resolution,
-  speed per mode; the receiver passband of the radio follows the upper edge via CAT.
-- Yaesu FTX-1: receive width and DATA SHIFT are set directly, so the DATA passband
-  matches the waterfall (Hamlib releases send a malformed width command).
-- Auto QSO honours the hidden countries/continents of the decode filter; a double-click
-  on an own TX line can no longer make the own call the correspondent.
-- Faster first answer to a CQ with TX audio route Data/Pkt (no needless mode write
-  before PTT).
-- Settings: the mouse wheel no longer changes unfocused fields such as the CAT port.
-- Bundled Hamlib updated (FTX-1 fixes); macOS arm64 builds find FFTW again.
+  PSK Reporter upload; the beacon transmits in even minutes with an adjustable TX share,
+  only in Auto mode.
+- JS8: messages always have a target, TX progress display, CMD menu for common queries,
+  heartbeat and CQ intervals of 5-60 minutes.
+- FT8/FT4: new "Clear DX" button, CQ series continues after an unanswered QSO, RR73 is
+  repeated when the partner missed it, more deep decodes shown after the reply deadline.
+- New "Auto" switch in the menu bar with a notice; new "Filter" menu with one list of
+  excluded countries and continents for all automatic modes and the views.
+- Frequency area for every mode, quick band buttons, preferred bands, Tune in every mode
+  with adjustable length, entry of the dial frequency without CAT.
+- QSY plan for every mode, with one-time entries and JSON import/export.
+- RTTY signal browser, CW noise text suppression, WEFAX line start correction, Feld Hell
+  paper wrapping to the window width, SSTV on the lower sideband.
+- Wavelog/Cloudlog: failed uploads are kept and sent again. Country file update from the
+  Tools menu. Optional operator callsign for club and special-event stations.
+- New start parameter `--startupmenu` to choose a configuration.
+- Menu bar and side panel reorganised; default theme Classic Dark for new installations.
+
+### Performance
+
+- Waterfall based on FFTW with far lower CPU load, upper edge selectable 3000-5000 Hz,
+  zoom with real resolution, speed per mode; the receiver passband follows via CAT.
+- QSO map no longer freezes with large logbooks; faster program start; faster first answer
+  to a CQ with TX audio route Data/Pkt.
+
+### Fixes
+
+- macOS/Windows: crash at start ("Thread stack size exceeded") fixed.
+- No FT decodes after a mode change, or no JS8/Q65 decodes after a mode switch with RX
+  running; WEFAX crash after 3000 free-running lines.
+- Timing recovery after lost audio samples; a short audio underrun no longer aborts a
+  transmission.
+- Fake It split is retried when the radio rejects the command; Auto mode no longer stays
+  blocked by an empty QSO from the caller queue.
+- Yaesu FTX-1: receive width and DATA SHIFT are set directly (Hamlib releases send a
+  malformed width command). Bundled Hamlib updated.
+- Security: crafted JS8 frames could read past a table; received JS8 text in tooltips is
+  shown as plain text; project images in the SSTV editor are limited before decoding.
 
 Details: CHANGELOG.md.
 
