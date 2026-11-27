@@ -7,6 +7,22 @@ License: GPL-3.0-or-later (see LICENSE.md).
 
 ## New in MultiModeModem 0.26.12
 
+- Auto mode stages in one control (answer only, call CQ only, alternate, CQ when nothing
+  is heard); Auto mode is off after every start. Menu "Automodes" collects all automatic
+  transmit settings and shows why each transmission was made.
+- One FT queue for callers, CQs of Auto mode and CQs you add, sortable, with "Next" mark.
+- Idle pause after a set time without a completed QSO (default 30 minutes), with a list of
+  stations to wait for.
+- A QSO given up without a reply is resumed when the station answers within 15 minutes.
+- Optional FT8 double message (RR73 to one station and report to the next).
+- A-priori decodes are marked and never reported or queued.
+- RX noise blanker and MSK144 carrier notch, better recovery of weak repeated CQs, faster
+  FT8/FT4 decoding, MSK144 ping duration column, split operation for MSK144 and Q65.
+
+Details: CHANGELOG.md.
+
+## New in MultiModeModem 0.26.11
+
 ### Before you update
 
 - Version numbers now follow 0.YY.MM (year, month): 0.26.11 follows 0.6.7.
