@@ -26887,7 +26887,9 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
         // old fullApply path (which could reopen CAT/rotator backends and block
         // the Settings close for their 3-15 second I/O timeout).
         if (settingsCatRuntimeTouched) {
-            if (settingsApplyMustWait()) {   // never PTT OFF/reconfigure under a running transmission
+            if (settingsApplyMustWait()) {   // never reconfigure under a running transmission
+                // An own PTT test is never left keyed meanwhile (m³ itself cannot key while the test is active).
+                if (m_settingsTestPttOn) releaseSettingsTestPtt();
                 m_deferredRigRestore = true;
                 QTimer::singleShot(500, this, &MainWindow::applyDeferredSettingsWhenIdle);
             } else {
@@ -26903,6 +26905,7 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
     if (settingsApplyMustWait()) {
         m_deferredSettings = DeferredSettings{openedSettings, dialog.settings(), dialog.schedulerEntries(), dialog.selectedLogbookPath(), currentPath};
         m_deferredRigRestore = m_deferredRigRestore || settingsCatRuntimeTouched;
+        if (settingsCatRuntimeTouched && m_settingsTestPttOn) releaseSettingsTestPtt();   // not keyed while waiting
         appendLog(uiText("settings_deferred_tx", "Settings: OK during a transmission; they are applied when it has ended."));
         QTimer::singleShot(500, this, &MainWindow::applyDeferredSettingsWhenIdle);
         return;
