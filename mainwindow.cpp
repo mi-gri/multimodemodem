@@ -461,6 +461,7 @@ constexpr int kFtWorkedRole = Qt::UserRole + 431;      // station already in the
 constexpr int kFtLastQsoUtcRole = Qt::UserRole + 432;  // its latest QSO (UTC)
 constexpr int kFtSlotSeparatorRole = Qt::UserRole + 433;  // "──── 2m ────" row (band)
 constexpr int kFtLogPendingSinceRole = Qt::UserRole + 434; // logbook status asked at (ms since epoch), 0 = known
+constexpr int kFtLastLogStatusRole = Qt::UserRole + 439;   // last logbook answer of the row, kept while it is asked again
 constexpr int kFtLogbookRecentHours = 24;            // logbook lookup "recent" window (diagnostics only)
 constexpr int kFtLogbookStatusCacheLimit = 5000;     // entries of about 1 KB; far above what the decode table shows
 constexpr int kFtCountryPrefixRole = Qt::UserRole + 435;   // DXCC primary prefix of the station (cty.dat)
@@ -21757,7 +21758,7 @@ void MainWindow::styleFt8DecodeRow(int row, QVariantList *missingQueries, QSet<Q
         const QVariantMap query = makeFtLogbookQuery(station, band, currentAdifMode().trimmed().toUpper(),
                                                      cty.valid ? cty.entity.dxcc : QString(), grid,
                                                      kFtLogbookRecentHours, 0);
-        const QVariantMap status = cachedFtLogbookStatus(query);
+        QVariantMap status = cachedFtLogbookStatus(query);
         if (status.isEmpty()) {
             const QString key = query.value(QStringLiteral("cacheKey")).toString();
             if (missingQueries != nullptr && !key.isEmpty() &&
@@ -21765,7 +21766,14 @@ void MainWindow::styleFt8DecodeRow(int row, QVariantList *missingQueries, QSet<Q
                 if (queuedKeys != nullptr) queuedKeys->insert(key);
                 missingQueries->push_back(query);
             }
+            // After a logged QSO every row is asked again: until the answer comes the row keeps its last one, so the
+            // "hide worked" filter does not hide all rows at once (the table jumped to the top and back).
+            const QVariantMap previous = messageItem->data(kFtLastLogStatusRole).toMap();
+            if (previous.value(QStringLiteral("cacheKey")).toString() == key) status = previous;
         } else {
+            messageItem->setData(kFtLastLogStatusRole, status);
+        }
+        if (!status.isEmpty()) {
             log.known = true;
             log.callWorked = status.value(QStringLiteral("worked")).toBool();
             log.callWorkedBandMode = status.value(QStringLiteral("latestBandModeUtc")).toDateTime().isValid();

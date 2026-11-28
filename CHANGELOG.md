@@ -4,6 +4,8 @@ MultiModeModem (m³) is based on MadModem by IZ6NNH; the MadModem entries follow
 
 ## m³ 0.26.11
 
+- FT decode table: after a logged QSO with "Hide worked stations" on, all rows vanished for a moment while the logbook was asked again,
+  so the table jumped to the top and back. A row now keeps its last logbook answer until the new one is there.
 - Logging: automatic FT8/FT4 log entries carry the frequency (ADIF FREQ: dial plus TX audio frequency, as in WSJT-X). It was missing in the
   logbook, the UDP message to logging programs (e.g. UcxLog) and Wavelog; the "FT auto-log saved" line shows it.
   A late final (up to 15 min after the QSO was given up) is logged with the frequency and band of the QSO's own transmission, not the
