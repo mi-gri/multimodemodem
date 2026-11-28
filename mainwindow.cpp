@@ -26506,7 +26506,7 @@ bool MainWindow::settingsApplyMustWait() const
 {
     // The rig reports PTT on: a transmission of m³ - unless it is the PTT test of Settings itself, which only its
     // own PTT OFF or the restore ends (both must not wait for it).
-    return runtimeTxActive() || (m_lastRigPttOn && !m_settingsRigTestActive);
+    return runtimeTxActive() || (m_lastRigPttOn && !(m_settingsRigTestActive && m_settingsTestPttOn));
 }
 
 bool MainWindow::runtimeTxActive() const
@@ -26548,9 +26548,18 @@ AppSettings MainWindow::mergeChangedSettings(const AppSettings &opened, const Ap
     return merged;
 }
 
+// PTT OFF on the controller as the test left it (old port/model), queued before any new configuration.
+void MainWindow::releaseSettingsTestPtt()
+{
+    if (m_rigController == nullptr) return;
+    QMetaObject::invokeMethod(m_rigController, [controller = m_rigController]() { controller->setPtt(false); },
+                              Qt::QueuedConnection);
+}
+
 void MainWindow::restoreRigAfterSettingsTest()
 {
     m_settingsRigTestActive = false;
+    m_settingsTestPttOn = false;
     if (m_rigController == nullptr) return;
     const AppSettings saved = m_settings;
     QMetaObject::invokeMethod(m_rigController, [controller = m_rigController, saved]() {
@@ -26568,6 +26577,7 @@ void MainWindow::applyDeferredSettingsWhenIdle()
         return;
     }
     if (m_deferredSettings) {
+        if (m_deferredRigRestore) releaseSettingsTestPtt();   // before the new rig configuration is queued
         const DeferredSettings deferred = *m_deferredSettings;
         m_deferredSettings.reset();
         appendLog(uiText("settings_applied_after_tx", "Settings from OK during the transmission are applied now."));
@@ -26663,6 +26673,8 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
         }
         settingsCatRuntimeTouched = true;
         m_settingsRigTestActive = true;   // the controller runs the dialog's configuration: nothing else keys
+        // Once a test keyed, the reported PTT is the test's own until the restore (its OFF may fail): never wait for it.
+        m_settingsTestPttOn = m_settingsTestPttOn || enabled;
         appendLog(enabled ? QStringLiteral("PTT TEST: ON queued on isolated worker.")
                           : QStringLiteral("PTT TEST: OFF queued on isolated worker."));
         if (enabled && !ensureStationIdentityForTx(QStringLiteral("PTT TEST"))) {
@@ -26895,6 +26907,7 @@ void MainWindow::showAppSettingsDialogPage(AppSettingsDialog::InitialPage page)
         QTimer::singleShot(500, this, &MainWindow::applyDeferredSettingsWhenIdle);
         return;
     }
+    if (settingsCatRuntimeTouched) releaseSettingsTestPtt();   // before the new rig configuration is queued
     applyAcceptedSettings(dialog.settings(), dialog.schedulerEntries(), dialog.selectedLogbookPath(), currentPath);
     if (settingsCatRuntimeTouched) restoreRigAfterSettingsTest();
 }

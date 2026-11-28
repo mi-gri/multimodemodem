@@ -587,6 +587,7 @@ private slots:
     void applyDeferredSettingsWhenIdle();
     AppSettings mergeChangedSettings(const AppSettings &opened, const AppSettings &accepted) const;
     void restoreRigAfterSettingsTest();
+    void releaseSettingsTestPtt();
     void applyAcceptedSettings(const AppSettings &accepted, const QList<ScheduledQsyEntry> &schedulerEntriesAccepted,
                                const QString &selectedLogbookPath, const QString &oldLogbookPath);
 
@@ -1960,6 +1961,7 @@ private:
     std::optional<DeferredSettings> m_deferredSettings;
     bool m_deferredRigRestore = false;     // Cancel after a CAT/PTT test during TX: restore the rig after it
     bool m_settingsRigTestActive = false;  // the rig controller runs a test configuration from Settings
+    bool m_settingsTestPttOn = false;      // a PTT ON test ran (until the restore)
     bool m_settingsTxToneActive = false;   // the sound card TX calibration tone is playing
     QString m_uiLanguageCode = QStringLiteral("en");
     QHash<QString, QString> m_uiTranslations;
